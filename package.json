@@ -1,0 +1,31 @@
+{
+  "name": "mining-Simulator",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000M\u0000i\u0000n\u0000i\u0000n\u0000g\u0000-\u0000G\u0000a\u0000m\u0000e\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "hytopia build",
+    "package": "hytopia package",
+    "upgrade-assets-library": "hytopia upgrade-assets-library",
+    "upgrade-project": "hytopia upgrade-project"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "hytopia": "^0.14.26"
+  },
+  "optionalDependencies": {
+    "@hytopia.com/assets": "^0.4.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kienton1/Mining-Simulator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kienton1/Mining-Simulator/issues"
+  },
+  "homepage": "https://github.com/kienton1/Mining-Simulator#readme"
+}

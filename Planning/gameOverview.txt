@@ -1,0 +1,414 @@
+Technical Design Document (TDD)
+Project: Instanced Mining + Surface Training Simulator
+
+(Updated with Surface Training, Ore Generation, Luck, Mines Reset Mechanic, Rebirth Requirements, Power System)
+
+0. Overview
+
+This game combines two distinct progression loops:
+
+Surface Training Loop (AFK/Idle/Clicker Style)
+
+Players stand next to “training rocks” on the surface.
+
+Clicking a UI button begins auto-attacking the training rock.
+
+Each hit grants Power, which increases the player’s global mining effectiveness.
+
+Rebirths multiply Power gain per hit.
+
+Higher-level training rocks require more rebirths to access.
+
+Instanced Mine Loop (Procedural Vertical Mining)
+
+Mines are private instanced worlds.
+
+Players mine downward one block at a time.
+
+Ores spawn based on rarity tables modified by Luck.
+
+Mined ore is stored in inventory and sold at the surface.
+
+Mines reset every 2 minutes (teleporting player back to surface).
+
+The two loops synergize:
+
+Training increases Power → Power increases mining damage.
+
+Better pickaxes increase speed + luck → Mine faster & get more rare ores → earn more money → buy better pickaxes.
+
+Rebirths permanently increase Power gain per hit → unlock stronger training rocks → exponential progression.
+
+1. Game Architecture
+1.1 Lobby / Surface World
+
+Shared space with up to 8–12 players.
+
+Contains:
+
+Training Rocks (Cobbled-Deepslate Clusters)
+- Cobbled-deepslate block clusters represent training rocks
+- Each cluster is a training rock with different tiers
+- Players auto-hit these to gain Power
+
+Shops (pickaxes, boosts)
+
+Rebirth altar
+
+Ore selling station
+
+Portal to mines (Gold Block Area)
+- Gold blocks represent mine entrance/portal
+- Multiple gold blocks can represent different mine levels
+- Players interact with gold blocks to enter instanced mines
+
+Inventory UI
+
+Map Structure Notes:
+- Cobbled-deepslate clusters = Training rocks (practice area)
+- Gold block area = Mine entrance (mining area)
+- See Planning/mapStructure.md for detailed map notes
+
+1.2 Instanced Mines
+
+Each mine is a solo (or small-party) instance.
+
+Contains:
+
+Procedural vertical mining system
+
+Ore generation system
+
+Reset every 2 minutes:
+
+Teleports player to surface
+
+Mine resets to level 1
+
+Player can re-enter immediately
+
+2. Progression Stats
+2.1 Power (New Core Stat)
+
+Power increases mining damage.
+
+Stored as a persistent number (e.g., Power = 0 → 100 → 10,000 → etc.)
+
+Formula:
+
+PowerPerHit = BasePowerGain × RockMultiplier × RebirthMultiplier
+(REBALANCED: Pickaxes no longer affect power gain)
+
+
+Total mining damage:
+
+MiningDamage = BaseDamage × (1 + Power / PowerScalingConstant)
+BaseDamage = 1 (constant - pickaxes no longer affect damage)
+(REBALANCED: Damage comes from Power only)
+
+2.2 Mining Speed
+
+Controlled solely by pickaxe tier:
+
+MiningSpeed = PickaxeMiningSpeed
+
+2.3 Luck
+
+Pickaxes add bonus Luck %.
+
+Luck rerolls ore rarity probabilities in player’s favor.
+
+Formula example:
+
+FinalOreChance = BaseChance × (1 + Luck%)
+
+3. Surface Training System (NEW)
+3.1 Training Flow
+
+Player approaches a Training Rock.
+
+UI appears: TRAIN button.
+
+When pressed:
+
+Player auto-hits the rock until:
+
+They walk away OR
+
+They manually stop OR
+
+They die/disconnect.
+
+Every hit gives Power.
+
+Hit rate = MiningSpeed.
+
+3.2 Training Rocks
+
+Each has:
+
+TrainingRockID
+
+RequiredRebirths
+
+PowerGainMultiplier
+
+HP (optional; can be infinite or per “cycle”)
+
+Example set:
+
+Rock	Required Rebirths	Power Multiplier
+Stone Rock	0	1×
+Iron Rock	5	2×
+Gold Rock	15	4×
+Diamond Rock	50	10×
+Crystal Rock	150	25×
+3.3 Power Gain Formula
+Gain = BasePowerGain × RockMultiplier × (1 + Rebirths × 0.10)
+(REBALANCED: Pickaxes no longer affect power gain)
+
+
+If rebirth multiplier = +10% per rebirth.
+
+4. Rebirth System (UPDATED)
+4.1 Rebirth Benefits
+
++10% Power gain per hit.
+
+Unlocks stronger training rocks.
+
+Optional: +1 inventory capacity or other minor bonuses.
+
+4.2 Rebirth Formula
+RebirthMultiplier = 1 + (Rebirths × 0.10)
+
+4.3 Requirements
+
+Must reach a certain Power threshold to rebirth (configurable).
+
+5. Pickaxe System (REBALANCED)
+
+Pickaxes affect:
+
+Mining Speed
+
+Luck
+
+Sell Value Multiplier (better pickaxes = more money per ore)
+
+Pickaxes NO LONGER affect:
+
+Damage (damage comes from Power only)
+
+Power Gain (power gain comes from training rocks and rebirths only)
+
+Pickaxe stats per tier:
+
+MiningSpeed (swings/second)
+
+LuckBonus (0% → 400%)
+
+SellValueMultiplier (1.0× → 10.0×)
+
+Example Pickaxe Table
+Tier	Name	Speed	Luck	Sell Multiplier
+0	Rusty	2.0	0%	1.0×
+1	Stone	2.3	1%	1.125×
+2	Iron	2.6	2%	1.25×
+3	Steel	2.9	4%	1.375×
+4	Crystal	3.2	6%	1.5×
+5	Silver	3.8	10%	1.7×
+6. Ore Mining System (NEW)
+6.1 Downward Mining System
+
+Inside the mine:
+
+Player stands on a block.
+
+When they mine it:
+
+They destroy the block.
+
+They fall down 1 unit.
+
+The block below is revealed.
+
+A new layer is generated two blocks ahead so the mine always stays prepared.
+
+Block Lifecycle
+
+Block at depth D is current block to mine.
+
+When broken → player falls to D+1.
+
+Block at D+2 is generated immediately.
+
+Repeat.
+
+6.2 Ore Generation (Luck-Based)
+
+Each block is generated using weighted chance:
+
+Example Base Probabilities:
+
+Ore	Base Chance	Value
+Stone	80%	1
+Copper	15%	5
+Iron	4%	15
+Gold	0.8%	50
+Diamond	0.2%	250
+Luck Applied:
+
+If player has 20% luck:
+
+AdjustedChance = BaseChance × (1 + Luck)
+
+
+Percentages renormalize to 100%.
+
+7. Mine Reset System (NEW)
+
+Mining session lasts 2 minutes flat.
+
+Timer starts when player enters the mine.
+
+At 2:00:
+
+Teleport the player to the surface world.
+
+Clear mine instance.
+
+Reset mine depth to 0.
+
+This loop gives:
+
+High replayability
+
+Fast sessions
+
+Ores → money → upgrades cycle
+
+8. Ore Inventory & Selling (NEW)
+8.1 Inventory Structure
+
+Tracks item type + amount:
+
+Inventory = {
+  Stone: 54,
+  Copper: 7,
+  Iron: 3,
+  Diamond: 1
+}
+
+8.2 Selling Flow
+
+Player goes to “Sell NPC” on surface.
+
+Sell UI appears:
+“Sell All” button OR “Sell Selected”.
+
+8.3 Sell Formula
+TotalGold = Σ (OreAmount_i × OreValue_i)
+
+
+Gold is the main currency for buying pickaxes.
+
+9. Combined Progression Loop
+Surface Loop
+
+Fight training rock
+
+Gain Power
+
+Spend money on pickaxes
+
+Rebirth → unlock new rocks
+
+Repeat
+
+Mine Loop
+
+Enter instanced mine
+
+Mine downwards
+
+Collect ores (luck-based)
+
+Inventory fills
+
+Timer ends → return to surface
+
+Sell ores → get money
+
+Buy pickaxes → increase speed + luck
+
+Return to mine
+
+Both loops feed each other.
+
+10. Updated Math Section
+10.1 Power Gain
+PowerGainPerHit = BasePower × TrainingRockMultiplier × (1 + Rebirths × 0.1)
+(REBALANCED: Pickaxes no longer affect power gain)
+
+10.2 Mining Damage
+MiningDamage = BaseDamage × (1 + Power / PowerConstant)
+BaseDamage = 1 (constant - pickaxes no longer affect damage)
+PowerConstant = 5 (balanced progression: 30 sec training = ~16 damage, 4 min = one-hit stone)
+
+10.6 Sell Value
+OreSellValue = BaseOreValue × PickaxeSellMultiplier
+(REBALANCED: Better pickaxes give more money per ore sold)
+
+10.3 Mining Speed
+MiningSpeed = PickaxeMiningSpeed
+
+10.4 Ore Rarity
+FinalChance(ore) = BaseChance(ore) × (1 + Luck)
+
+
+Then normalized.
+
+10.5 Income
+Income = Σ(ore_i.amount × ore_i.value)
+
+11. Teleport/Instance Flow Updated
+Lobby → Mine
+
+Pass Teleport Data:
+
+Pickaxe stats
+
+Power
+
+Luck
+
+Rebirths
+
+Mine → Lobby
+
+Pass:
+
+Ore inventory
+
+Fully updated stats
+
+12. Implementation Roadmap (Updated)
+
+Training System (surface)
+
+Rebirth System
+
+Ore Inventory
+
+Pickaxe System (Power Bonus + Luck)
+
+Instanced Mines
+
+Ore Generation
+
+2-Min Timer + Auto Teleport
+
+Selling System
+
+UI + Progression Polish

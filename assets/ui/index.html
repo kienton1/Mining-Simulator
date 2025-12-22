@@ -1,0 +1,3628 @@
+<!--
+This UI renders the mini power HUD, floating gain popups, and an interact prompt for training.
+-->
+
+<script>
+  // Register SceneUI templates as soon as hytopia is available
+  // This ensures templates are available when server creates SceneUIs
+  (function registerSceneUITemplates() {
+    if (window.__trainingSceneTemplatesRegistered) return;
+    
+    // Wait for hytopia to be available
+    if (typeof hytopia === 'undefined') {
+      setTimeout(registerSceneUITemplates, 10);
+      return;
+    }
+    
+    window.__trainingSceneTemplatesRegistered = true;
+
+    hytopia.registerSceneUITemplate('training:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-training-prompt visible'; // Start visible
+
+      // Icon (explosion/starburst)
+      const icon = document.createElement('div');
+      icon.className = 'scene-training-prompt__icon';
+      icon.textContent = '💥';
+      root.appendChild(icon);
+
+      const copy = document.createElement('div');
+      copy.className = 'scene-training-prompt__copy';
+      root.appendChild(copy);
+
+      // Power requirement
+      const requirementText = document.createElement('div');
+      requirementText.className = 'scene-training-prompt__requirement';
+      requirementText.textContent = '0 Required';
+      copy.appendChild(requirementText);
+
+      // OR separator
+      const orText = document.createElement('div');
+      orText.className = 'scene-training-prompt__or';
+      orText.textContent = 'OR';
+      copy.appendChild(orText);
+
+      // Rebirth requirement
+      const rebirthText = document.createElement('div');
+      rebirthText.className = 'scene-training-prompt__rebirth';
+      rebirthText.textContent = '0 Rebirths';
+      copy.appendChild(rebirthText);
+
+      // Power gain
+      const powerGainText = document.createElement('div');
+      powerGainText.className = 'scene-training-prompt__power-gain';
+      powerGainText.textContent = '+1 Power';
+      copy.appendChild(powerGainText);
+
+      // Handle state updates
+      onState(state => {
+        const data = state || {};
+        
+        if (data.requirementText !== undefined) {
+          requirementText.textContent = data.requirementText;
+        }
+        if (data.rebirthText !== undefined) {
+          rebirthText.textContent = data.rebirthText;
+        }
+        if (data.powerGainText !== undefined) {
+          powerGainText.textContent = data.powerGainText;
+        }
+        
+        // Toggle visibility based on state
+        if (data.visible === false) {
+          root.classList.remove('visible');
+        } else {
+          root.classList.add('visible');
+        }
+        
+        // Toggle locked state
+        if (data.canTrain === false) {
+          root.classList.add('locked');
+        } else {
+          root.classList.remove('locked');
+        }
+      });
+
+      return root;
+    });
+
+  })();
+
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('[UI] DOMContentLoaded, setting up UI');
+    setupMobileButtons();
+    setupRightClickCamera();
+    setupPowerHud();
+    setupMerchantUI();
+    setupMineResetUpgradeUI();
+    setupKeyboardDebug();
+    console.log('[UI] UI setup complete');
+  });
+
+  // Also try setting up immediately if DOM is already loaded
+  if (document.readyState === 'loading') {
+    console.log('[UI] DOM is still loading, waiting for DOMContentLoaded');
+  } else {
+    console.log('[UI] DOM already loaded, setting up UI immediately');
+    setupMobileButtons();
+    setupRightClickCamera();
+    setupPowerHud();
+    setupMerchantUI();
+    setupMineResetUpgradeUI();
+    setupKeyboardDebug();
+  }
+
+  /**
+   * Debug keyboard input to see what's blocking movement
+   */
+  function setupKeyboardDebug() {
+    // Log all keydown events
+    window.addEventListener('keydown', (e) => {
+      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+      if (wasdKeys.includes(e.code)) {
+        console.log('[DEBUG] Keydown:', e.code, {
+          defaultPrevented: e.defaultPrevented,
+          target: e.target?.tagName,
+          targetId: e.target?.id,
+          targetClass: e.target?.className,
+          isTrusted: e.isTrusted
+        });
+      }
+    }, true); // Use capture phase to catch early
+
+    // Log all keyup events
+    window.addEventListener('keyup', (e) => {
+      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+      if (wasdKeys.includes(e.code)) {
+        console.log('[DEBUG] Keyup:', e.code, {
+          defaultPrevented: e.defaultPrevented,
+          target: e.target?.tagName
+        });
+      }
+    }, true);
+
+    // Check if hytopia is available and can receive input
+    if (typeof hytopia !== 'undefined') {
+      console.log('[DEBUG] Hytopia available:', {
+        hasPressInput: typeof hytopia.pressInput === 'function',
+        hasLockPointer: typeof hytopia.lockPointer === 'function'
+      });
+    } else {
+      console.warn('[DEBUG] Hytopia not available yet');
+    }
+
+    // Check document focus
+    console.log('[DEBUG] Document focus:', {
+      activeElement: document.activeElement?.tagName,
+      activeElementId: document.activeElement?.id,
+      hasFocus: document.hasFocus()
+    });
+
+    // Monitor focus changes
+    window.addEventListener('focus', () => {
+      console.log('[DEBUG] Window gained focus');
+      // Ensure document can receive keyboard input
+      if (document.activeElement && document.activeElement.tagName === 'BODY') {
+        document.body.focus();
+      }
+    });
+    window.addEventListener('blur', () => {
+      console.log('[DEBUG] Window lost focus');
+    });
+
+    // Ensure body can receive focus for keyboard events
+    document.body.setAttribute('tabindex', '-1');
+    
+    // Click on body to ensure focus
+    document.addEventListener('click', (e) => {
+      // If clicking on UI root (which has pointer-events: none), focus body
+      if (e.target && e.target.closest && e.target.closest('.ui-root')) {
+        // Don't interfere with UI clicks
+        return;
+      }
+      // Focus body to ensure keyboard events work
+      if (document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        document.body.focus();
+      }
+    }, true);
+  }
+
+  function setupMobileButtons() {
+    const mobileInteractButton = document.getElementById('mobile-interact-button');
+    const mobileJumpButton = document.getElementById('mobile-jump-button');
+
+    if (mobileInteractButton) {
+      mobileInteractButton.addEventListener('touchstart', e => {
+        e.preventDefault();
+        mobileInteractButton.classList.add('active');
+        hytopia.pressInput('ml', true);
+      });
+
+      mobileInteractButton.addEventListener('touchend', e => {
+        e.preventDefault();
+        mobileInteractButton.classList.remove('active');
+        hytopia.pressInput('ml', false);
+      });
+    }
+
+    if (mobileJumpButton) {
+      mobileJumpButton.addEventListener('touchstart', e => {
+        e.preventDefault();
+        mobileJumpButton.classList.add('active');
+        hytopia.pressInput(' ', true);
+      });
+
+      mobileJumpButton.addEventListener('touchend', e => {
+        e.preventDefault();
+        mobileJumpButton.classList.remove('active');
+        hytopia.pressInput(' ', false);
+      });
+    }
+  }
+
+  /**
+   * Roblox-style camera: mouse stays free; hold right click to look around.
+   * Uses lockPointer(lock, maintainInput=true) so movement keys keep working
+   * even when the pointer is unlocked for UI interaction.
+   */
+  function setupRightClickCamera() {
+    let rightMouseHeld = false;
+
+    const lockPointerSafe = (lock) => {
+      if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
+      try {
+        hytopia.lockPointer(lock, true);
+        console.log('[DEBUG] Pointer lock set to:', lock);
+      } catch (err) {
+        console.warn('[UI] lockPointer failed', err);
+      }
+    };
+
+    // Try locking pointer initially - Hytopia may require this for keyboard input
+    // The maintainInput=true parameter should allow movement even when locked
+    console.log('[DEBUG] Attempting initial pointer lock for keyboard input');
+    lockPointerSafe(true);
+    
+    // If that doesn't work, unlock after a short delay to allow UI interaction
+    setTimeout(() => {
+      console.log('[DEBUG] Unlocking pointer after initial lock attempt');
+      lockPointerSafe(false);
+    }, 100);
+
+    // Prevent context menu so RMB can be used for camera look
+    window.addEventListener('contextmenu', e => {
+      e.preventDefault();
+    });
+
+    // Prevent mouse wheel from zooming the camera
+    window.addEventListener('wheel', e => {
+      // Only prevent zoom if not over a scrollable UI element
+      const target = e.target;
+      const isScrollable = target && (
+        target.closest('.merchant-ui__content') ||
+        target.closest('[style*="overflow"]') ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'INPUT'
+      );
+      
+      if (!isScrollable) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    }, { passive: false, capture: true });
+
+    window.addEventListener('mousedown', e => {
+      if (e.button !== 2) return;
+      e.preventDefault();
+      rightMouseHeld = true;
+      lockPointerSafe(true);
+    });
+
+    window.addEventListener('mouseup', e => {
+      if (e.button !== 2) return;
+      rightMouseHeld = false;
+      lockPointerSafe(false);
+    });
+
+    // Safety: release pointer if focus is lost
+    window.addEventListener('blur', () => {
+      if (!rightMouseHeld) return;
+      rightMouseHeld = false;
+      lockPointerSafe(false);
+    });
+  }
+
+
+  /**
+   * Setup Merchant UI
+   * Handles merchant selling interface
+   */
+  function setupMerchantUI() {
+    const merchantUI = document.getElementById('merchant-ui');
+    const merchantUIClose = document.getElementById('merchant-ui-close');
+    const merchantUISellAll = document.getElementById('merchant-ui-sell-all');
+
+    if (!merchantUI || !merchantUIClose || !merchantUISellAll) {
+      console.warn('[UI] Merchant UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    merchantUIClose.addEventListener('click', () => {
+      console.log('[UI] Merchant UI close clicked');
+      merchantUI.classList.remove('visible');
+      hytopia.sendData({ type: 'CLOSE_MERCHANT_UI' });
+    });
+
+    // Sell All button handler
+    merchantUISellAll.addEventListener('click', () => {
+      console.log('[UI] Sell All clicked');
+      hytopia.sendData({ type: 'SELL_ALL' });
+    });
+  }
+
+  /**
+   * Setup Mine Reset Upgrade UI
+   * Handles mine reset upgrade interface
+   */
+  function setupMineResetUpgradeUI() {
+    const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+    const upgradeUIClose = document.getElementById('mine-reset-upgrade-ui-close');
+    const upgradeButton = document.getElementById('mine-reset-upgrade-button');
+
+    if (!upgradeUI || !upgradeUIClose || !upgradeButton) {
+      console.warn('[UI] Mine Reset Upgrade UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    upgradeUIClose.addEventListener('click', () => {
+      console.log('[UI] Mine Reset Upgrade UI close clicked');
+      upgradeUI.classList.remove('visible');
+      hytopia.sendData({ type: 'CLOSE_MINE_RESET_UPGRADE_UI' });
+    });
+
+    // Purchase button handler - only process if not bought/disabled
+    upgradeButton.addEventListener('click', (e) => {
+      // Prevent click if button is disabled or bought
+      if (upgradeButton.disabled || upgradeButton.classList.contains('bought')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      console.log('[UI] Mine Reset Upgrade button clicked');
+      hytopia.sendData({ type: 'PURCHASE_MINE_RESET_UPGRADE' });
+    });
+
+    // Hover effect for button - only if not bought/disabled
+    upgradeButton.addEventListener('mouseenter', () => {
+      if (!upgradeButton.disabled && !upgradeButton.classList.contains('bought')) {
+        console.log('[UI] Hovering over 2M button - button should increase in size');
+        upgradeButton.style.transform = 'scale(1.05)';
+      }
+    });
+
+    upgradeButton.addEventListener('mouseleave', () => {
+      upgradeButton.style.transform = 'scale(1)';
+    });
+  }
+
+  /**
+   * Update Mine Reset Upgrade UI with player data
+   */
+  function updateMineResetUpgradeUI(hasUpgrade, cost, gold) {
+    const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+    const upgradeButton = document.getElementById('mine-reset-upgrade-button');
+    const upgradeStatus = document.getElementById('mine-reset-upgrade-status');
+    const buttonText = upgradeButton?.querySelector('.mine-reset-upgrade-ui__button-text');
+
+    if (!upgradeUI || !upgradeButton || !upgradeStatus || !buttonText) return;
+
+    const formatNumber = (value) => {
+      if (value >= 1_000_000) {
+        const num = value / 1_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M';
+      }
+      if (value >= 1_000) {
+        const num = value / 1_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K';
+      }
+      return value.toLocaleString();
+    };
+
+    if (hasUpgrade) {
+      buttonText.textContent = 'Bought!';
+      upgradeButton.disabled = true;
+      upgradeButton.classList.add('bought');
+      upgradeButton.classList.add('disabled'); // Also add disabled class for styling
+      upgradeButton.style.pointerEvents = 'none'; // Prevent any interaction
+      upgradeButton.style.cursor = 'default';
+      upgradeStatus.textContent = 'You have already purchased this upgrade!';
+      upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--bought';
+    } else {
+      buttonText.textContent = formatNumber(cost);
+      upgradeButton.disabled = false;
+      upgradeButton.classList.remove('bought');
+      upgradeButton.style.pointerEvents = 'auto'; // Re-enable interaction
+      upgradeButton.style.cursor = 'pointer';
+      const canAfford = gold >= cost;
+      if (canAfford) {
+        upgradeButton.classList.remove('disabled');
+        upgradeStatus.textContent = `You have ${formatNumber(gold)} gold`;
+        upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--can-afford';
+      } else {
+        upgradeButton.classList.add('disabled');
+        upgradeStatus.textContent = `You need ${formatNumber(cost - gold)} more gold`;
+        upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--cannot-afford';
+      }
+    }
+  }
+
+  /**
+   * Update Merchant UI with inventory data
+   */
+  function updateMerchantUI(inventory, totalValue, gold) {
+    const merchantUIContent = document.getElementById('merchant-ui-content');
+    if (!merchantUIContent) return;
+
+    // Clear existing items
+    merchantUIContent.innerHTML = '';
+
+    // Get ore data for values (matching NEW ORE_DATABASE from OreData.ts - 24 ores)
+    const oreData = {
+      'stone': { name: 'Stone', value: 2, color: 'stone' },
+      'deepslate': { name: 'Deepslate', value: 5, color: 'stone' },
+      'coal': { name: 'Coal', value: 6, color: 'coal' },
+      'iron': { name: 'Iron', value: 10, color: 'iron' },
+      'tin': { name: 'Tin', value: 15, color: 'iron' },
+      'cobalt': { name: 'Cobalt', value: 50, color: 'cobalt' },
+      'pyrite': { name: 'Pyrite', value: 100, color: 'gold' },
+      'gold': { name: 'Gold', value: 250, color: 'gold' },
+      'obsidian': { name: 'Obsidian', value: 500, color: 'obsidian' },
+      'ruby': { name: 'Ruby', value: 1000, color: 'ruby' },
+      'diamond': { name: 'Diamond', value: 2000, color: 'diamond' },
+      'amber': { name: 'Amber', value: 3500, color: 'amber' },
+      'quartz': { name: 'Quartz', value: 5000, color: 'quartz' },
+      'topaz': { name: 'Topaz', value: 10000, color: 'topaz' },
+      'emerald': { name: 'Emerald', value: 20000, color: 'emerald' },
+      'fossil': { name: 'Fossil', value: 50000, color: 'fossil' },
+      'amethyst': { name: 'Amethyst', value: 75000, color: 'amethyst' },
+      'sapphire': { name: 'Sapphire', value: 150000, color: 'sapphire' },
+      'uranium': { name: 'Uranium', value: 250000, color: 'uranium' },
+      'crystalite': { name: 'Crystalite', value: 350000, color: 'crystalite' },
+      'solarite': { name: 'Solarite', value: 450000, color: 'solarite' },
+      'mythril': { name: 'Mythril', value: 600000, color: 'mythril' },
+      'stallite': { name: 'Stallite', value: 800000, color: 'stallite' },
+      'draconium': { name: 'Draconium', value: 1500000, color: 'draconium' },
+    };
+
+    // Format number for display (2 decimals for money/power, but hide .00)
+    const formatNumber = (value) => {
+      if (value >= 1_000_000_000_000_000_000) {
+        const num = value / 1_000_000_000_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'S'; // Sextillion
+      }
+      if (value >= 1_000_000_000_000_000) {
+        const num = value / 1_000_000_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'Q'; // Quadrillion
+      }
+      if (value >= 1_000_000_000_000) {
+        const num = value / 1_000_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'T'; // Trillion
+      }
+      if (value >= 1_000_000_000) {
+        const num = value / 1_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'B'; // Billion
+      }
+      if (value >= 1_000_000) {
+        const num = value / 1_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M'; // Million
+      }
+      if (value >= 1_000) {
+        const num = value / 1_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K'; // Thousand
+      }
+      const formatted = value.toFixed(2);
+      return formatted.endsWith('.00') ? Math.round(value).toString() : formatted;
+    };
+
+    // Create ore items
+    const oreTypes = Object.keys(inventory).filter(oreType => inventory[oreType] > 0);
+    
+    if (oreTypes.length === 0) {
+      const emptyMessage = document.createElement('div');
+      emptyMessage.style.padding = '20px';
+      emptyMessage.style.textAlign = 'center';
+      emptyMessage.style.color = '#aaa';
+      emptyMessage.textContent = 'No ores in inventory';
+      merchantUIContent.appendChild(emptyMessage);
+      return;
+    }
+
+    // Sort ores by value (highest first)
+    oreTypes.sort((a, b) => {
+      const valueA = oreData[a]?.value || 0;
+      const valueB = oreData[b]?.value || 0;
+      return valueB - valueA;
+    });
+
+    for (const oreType of oreTypes) {
+      const amount = inventory[oreType];
+      const data = oreData[oreType];
+      
+      if (!data || amount <= 0) continue;
+
+      const item = document.createElement('div');
+      item.className = 'merchant-ui__ore-item';
+
+      // Ore info (left side)
+      const oreInfo = document.createElement('div');
+      oreInfo.className = 'merchant-ui__ore-info';
+
+      const oreName = document.createElement('div');
+      oreName.className = `merchant-ui__ore-name ${data.color}`;
+      oreName.textContent = `${data.name} (x${amount})`;
+      oreInfo.appendChild(oreName);
+
+      item.appendChild(oreInfo);
+
+      // Value (middle)
+      const oreValue = document.createElement('div');
+      oreValue.className = 'merchant-ui__ore-value';
+      const coinIcon = document.createElement('span');
+      coinIcon.className = 'merchant-ui__coin-icon';
+      oreValue.appendChild(coinIcon);
+      const valueText = document.createElement('span');
+      valueText.textContent = formatNumber(data.value);
+      oreValue.appendChild(valueText);
+      item.appendChild(oreValue);
+
+      // Sell button (right side)
+      const sellButton = document.createElement('button');
+      sellButton.className = 'merchant-ui__sell-button';
+      sellButton.textContent = 'Sell';
+      sellButton.addEventListener('click', () => {
+        console.log(`[UI] Sell ${oreType} clicked`);
+        hytopia.sendData({ type: 'SELL_ORE', oreType });
+      });
+      item.appendChild(sellButton);
+
+      merchantUIContent.appendChild(item);
+    }
+  }
+
+  function setupPowerHud() {
+    const powerValueEl = document.getElementById('power-value');
+    const moneyValueEl = document.getElementById('money-value');
+    const winsValueEl = document.getElementById('wins-value');
+    const rebirthsValueEl = document.getElementById('rebirths-value');
+    const powerGainLayer = document.getElementById('power-gain-layer');
+    const trainingPromptEl = document.getElementById('training-prompt');
+    const trainingPromptTitleEl = document.getElementById('training-prompt-title');
+    const trainingPromptSubtitleEl = document.getElementById('training-prompt-subtitle');
+    const trainingPromptKeyEl = document.getElementById('training-prompt-key');
+
+    // Mining UI elements
+    const miningHudEl = document.getElementById('mining-hud');
+    const currentOreEl = document.getElementById('current-ore');
+    const damageDisplayEl = document.getElementById('damage-display');
+    const minedOreLayerEl = document.getElementById('mined-ore-layer');
+    const blockHealthBarEl = document.getElementById('block-health-bar');
+    const blockHealthBarNameEl = document.getElementById('block-health-bar-name');
+    const blockHealthBarFillEl = document.getElementById('block-health-bar-fill');
+    const blockHealthBarTextEl = document.getElementById('block-health-bar-text');
+    const mineResetTimerEl = document.getElementById('mine-reset-timer');
+    const mineResetTimerTextEl = document.getElementById('mine-reset-timer-text');
+
+    console.log('[UI] Setting up power HUD');
+    console.log('[UI] powerValueEl:', powerValueEl);
+    console.log('[UI] powerGainLayer:', powerGainLayer);
+
+    const pickaxeButton = document.getElementById('pickaxe-button');
+    const rebirthButton = document.getElementById('rebirth-button');
+    const pickaxeModal = document.getElementById('pickaxe-modal');
+    const rebirthModal = document.getElementById('rebirth-modal');
+    const pickaxeGridEl = document.getElementById('pickaxe-grid');
+    const pickaxeActionButton = document.getElementById('pickaxe-action-button');
+    const pickaxeDetailName = document.getElementById('pickaxe-detail-name');
+    const pickaxeDetailStats = document.getElementById('pickaxe-detail-stats');
+    const pickaxeDetailCost = document.getElementById('pickaxe-detail-cost');
+
+    // Setup pickaxe button click handler
+    if (pickaxeButton) {
+      pickaxeButton.addEventListener('click', () => {
+        console.log('[UI] Pickaxe button clicked');
+        hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+      });
+    }
+
+    // Setup rebirth button click handler
+    if (rebirthButton) {
+      rebirthButton.addEventListener('click', () => {
+        console.log('[UI] Rebirth button clicked');
+        hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
+      });
+    }
+
+    // Setup modal close handlers
+    document.addEventListener('click', (e) => {
+      // Handle all modal close button classes
+      if (e.target && e.target.classList && 
+          (e.target.classList.contains('modal__close') || 
+           e.target.classList.contains('pickaxe-modal__close') ||
+           e.target.classList.contains('rebirth-modal__close'))) {
+        const closeButton = e.target;
+        const modalId = closeButton.getAttribute('data-close');
+        if (modalId) {
+          const modal = document.getElementById(modalId);
+          if (modal) {
+            modal.classList.remove('visible');
+            console.log(`[UI] Closed modal: ${modalId}`);
+          }
+        }
+      }
+    });
+    const rebirthOptionsEl = document.getElementById('rebirth-options');
+    const rebirthBadge = document.getElementById('rebirth-badge');
+
+    const state = {
+      power: 0,
+      gold: 0,
+      wins: 0,
+      rebirths: 0,
+      pickaxe: {
+        currentTier: 0,
+        selectedTier: 0,
+        pickaxes: [],
+      },
+      rebirth: {
+        options: [],
+        power: 0,
+        rebirths: 0,
+        maxRebirths: 0,
+      },
+      prompt: {
+        visible: false,
+        rockName: 'Training Rock',
+        requirements: { power: 0, rebirths: 0 },
+        canTrain: false,
+        powerPerHit: 0,
+        actionKey: 'E',
+      },
+      mining: {
+        isMining: false,
+        currentOre: null,
+        damage: 0,
+      },
+    };
+
+    const formatNumber = value => {
+      // Format: Max 3 digits before decimal, max 2 after, then letter suffix
+      // Abbreviations: T, Qd, Qn, Sx, Sp, c, Oc, No, De, UDe
+      
+      // Helper to format and remove trailing zeros
+      const formatValue = (num, suffix) => {
+        const formatted = num.toFixed(2);
+        const cleaned = formatted.endsWith('.00') ? Math.round(num).toString() : formatted.replace(/\.?0+$/, '');
+        return cleaned + suffix;
+      };
+      
+      if (value >= 1e36) {
+        // Undecillion (1e36)
+        const num = value / 1e36;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'UDe');
+        }
+        return formatValue(num, 'UDe');
+      }
+      if (value >= 1e33) {
+        // Decillion (1e33)
+        const num = value / 1e33;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'UDe');
+        }
+        return formatValue(num, 'De');
+      }
+      if (value >= 1e30) {
+        // Nonillion (1e30)
+        const num = value / 1e30;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'De');
+        }
+        return formatValue(num, 'No');
+      }
+      if (value >= 1e27) {
+        // Octillion (1e27)
+        const num = value / 1e27;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'No');
+        }
+        return formatValue(num, 'Oc');
+      }
+      if (value >= 1e26) {
+        // Custom 'c' tier (1e26, between Sp and Oc)
+        const num = value / 1e26;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'Oc');
+        }
+        return formatValue(num, 'c');
+      }
+      if (value >= 1e24) {
+        // Septillion (1e24)
+        const num = value / 1e24;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'c');
+        }
+        return formatValue(num, 'Sp');
+      }
+      if (value >= 1e21) {
+        // Sextillion (1e21)
+        const num = value / 1e21;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'Sp');
+        }
+        return formatValue(num, 'Sx');
+      }
+      if (value >= 1e18) {
+        // Quintillion (1e18)
+        const num = value / 1e18;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'Sx');
+        }
+        return formatValue(num, 'Qn');
+      }
+      if (value >= 1e15) {
+        // Quadrillion (1e15)
+        const num = value / 1e15;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'Qn');
+        }
+        return formatValue(num, 'Qd');
+      }
+      if (value >= 1e12) {
+        // Trillion (1e12)
+        const num = value / 1e12;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'Qd');
+        }
+        return formatValue(num, 'T');
+      }
+      if (value >= 1_000_000_000) {
+        // Billion
+        const num = value / 1_000_000_000;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'T');
+        }
+        return formatValue(num, 'B');
+      }
+      if (value >= 1_000_000) {
+        // Million
+        const num = value / 1_000_000;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'B');
+        }
+        return formatValue(num, 'M');
+      }
+      if (value >= 1_000) {
+        // Thousand
+        const num = value / 1_000;
+        if (num >= 1000) {
+          return formatValue(num / 1000, 'M');
+        }
+        return formatValue(num, 'K');
+      }
+      // Less than 1000 - show as integer
+      return Math.round(value).toString();
+    };
+
+    const showModal = (el) => {
+      if (!el) return;
+      el.classList.add('visible');
+    };
+
+    const hideModal = (el) => {
+      if (!el) return;
+      el.classList.remove('visible');
+    };
+
+    const renderPickaxeDetails = () => {
+      // Show equipped pickaxe in left panel (per planning document)
+      const equipped = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
+      if (!equipped) {
+        // Fallback to current tier
+        const current = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.currentTier);
+        if (current) {
+          renderEquippedPickaxe(current);
+        }
+        return;
+      }
+      renderEquippedPickaxe(equipped);
+    };
+
+    const renderEquippedPickaxe = (pickaxe) => {
+      if (!pickaxe) return;
+      
+      // Update name
+      if (pickaxeDetailName) {
+        pickaxeDetailName.textContent = `${pickaxe.name} Pickaxe`;
+      }
+
+      // Update stats display (per planning document format)
+      // REBALANCED: Pickaxes now only affect Speed, Luck, and Sell Value Multiplier
+      if (pickaxeDetailStats) {
+        pickaxeDetailStats.innerHTML = '';
+        
+        // Speed
+        const speed = pickaxe.miningSpeed ? pickaxe.miningSpeed.toFixed(1) : '0';
+        const speedStat = document.createElement('div');
+        speedStat.className = 'pickaxe-stat pickaxe-stat--speed';
+        speedStat.textContent = `${speed} Swings/sec`;
+        pickaxeDetailStats.appendChild(speedStat);
+        
+        // Luck bonus
+        const luckBonus = pickaxe.luckBonus ? (pickaxe.luckBonus * 100).toFixed(0) : '0';
+        const luckStat = document.createElement('div');
+        luckStat.className = 'pickaxe-stat pickaxe-stat--luck';
+        luckStat.textContent = `+${luckBonus}% Ore Luck`;
+        pickaxeDetailStats.appendChild(luckStat);
+        
+        // Sell Value Multiplier
+        const sellMultiplier = pickaxe.sellValueMultiplier ? pickaxe.sellValueMultiplier.toFixed(2) : '1.00';
+        const sellStat = document.createElement('div');
+        sellStat.className = 'pickaxe-stat pickaxe-stat--sell';
+        sellStat.textContent = `${sellMultiplier}× Sell Value`;
+        pickaxeDetailStats.appendChild(sellStat);
+      }
+
+      // Cost display (should show "Equipped" for equipped pickaxe)
+      if (pickaxeDetailCost) {
+        pickaxeDetailCost.textContent = pickaxe.availability === 'equipped' ? 'Equipped' : `Cost: ${formatNumber(pickaxe.cost)}`;
+      }
+
+      // Action button (hide for equipped, show buy for available)
+      if (pickaxeActionButton) {
+        // Remove existing click listeners by cloning
+        const newButton = pickaxeActionButton.cloneNode(true);
+        pickaxeActionButton.parentNode.replaceChild(newButton, pickaxeActionButton);
+        const actionButton = document.getElementById('pickaxe-action-button');
+        
+        if (pickaxe.availability === 'equipped') {
+          actionButton.textContent = 'Equipped';
+          actionButton.classList.add('disabled');
+        } else if (pickaxe.availability === 'available' && pickaxe.purchasable) {
+          actionButton.textContent = `Buy (${formatNumber(pickaxe.cost)})`;
+          actionButton.classList.toggle('disabled', state.gold < pickaxe.cost);
+          actionButton.dataset.tier = String(pickaxe.tier);
+          actionButton.addEventListener('click', () => {
+            console.log(`[UI] Buy pickaxe tier ${pickaxe.tier} from action button`);
+            hytopia.sendData({ type: 'BUY_PICKAXE', tier: pickaxe.tier });
+          });
+        } else {
+          actionButton.textContent = 'Locked';
+          actionButton.classList.add('disabled');
+        }
+      }
+    };
+
+    const renderPickaxeGrid = () => {
+      if (!pickaxeGridEl) return;
+      pickaxeGridEl.innerHTML = '';
+      const currentTier = state.pickaxe.currentTier;
+      
+      state.pickaxe.pickaxes.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'pickaxe-card';
+        
+        // Determine state based on tier comparison
+        const isPurchased = p.tier < currentTier;
+        const isNextTier = p.tier === currentTier + 1;
+        const isLocked = p.tier > currentTier + 1;
+        const isEquipped = p.tier === currentTier;
+
+        // Apply appropriate classes
+        if (isEquipped) {
+          card.classList.add('equipped');
+        } else if (isNextTier) {
+          card.classList.add('next-tier'); // Greyed out but purchasable
+        } else if (isLocked) {
+          card.classList.add('locked'); // Greyed out with lock
+        } else if (isPurchased) {
+          card.classList.add('purchased'); // Normal, no grey
+        }
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'pickaxe-card__icon';
+        iconEl.textContent = '⛏️';
+        card.appendChild(iconEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pickaxe-card__name';
+        nameEl.textContent = p.name;
+        card.appendChild(nameEl);
+
+        // Cost display (only if not equipped and not purchased)
+        if (!isEquipped && !isPurchased) {
+          const costEl = document.createElement('div');
+          costEl.className = 'pickaxe-card__cost';
+          costEl.innerHTML = `<span>🪙</span> ${formatNumber(p.cost)}`;
+          card.appendChild(costEl);
+        }
+
+        // Buy button (only for next tier if affordable)
+        if (isNextTier && p.purchasable && state.gold >= p.cost) {
+          const buyButton = document.createElement('button');
+          buyButton.className = 'pickaxe-card__buy-button';
+          buyButton.textContent = 'Buy';
+          buyButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log(`[UI] Buy pickaxe tier ${p.tier} clicked`);
+            hytopia.sendData({ type: 'BUY_PICKAXE', tier: p.tier });
+          });
+          card.appendChild(buyButton);
+        }
+
+        // Equipped checkmark
+        if (isEquipped) {
+          const checkmark = document.createElement('div');
+          checkmark.className = 'pickaxe-card__checkmark';
+          checkmark.textContent = '✓';
+          card.appendChild(checkmark);
+        }
+
+        // Lock icon (if locked)
+        if (isLocked) {
+          const lock = document.createElement('div');
+          lock.className = 'pickaxe-card__lock';
+          lock.textContent = '🔒';
+          card.appendChild(lock);
+        }
+
+        // Click to select (for details view) - only for purchased/equipped
+        if (isPurchased || isEquipped) {
+          card.addEventListener('click', () => {
+            state.pickaxe.selectedTier = p.tier;
+            renderPickaxeGrid();
+            renderPickaxeDetails();
+          });
+        }
+
+        pickaxeGridEl.appendChild(card);
+      });
+    };
+
+    const updatePickaxeModal = (data) => {
+      state.pickaxe.pickaxes = data.pickaxes || [];
+      state.pickaxe.currentTier = data.currentTier ?? 0;
+      state.gold = data.gold ?? state.gold;
+      if (!state.pickaxe.selectedTier) {
+        state.pickaxe.selectedTier = state.pickaxe.currentTier;
+      }
+      // mark owned/equipped flags
+      state.pickaxe.pickaxes = state.pickaxe.pickaxes.map(p => ({
+        ...p,
+        isEquipped: p.tier === state.pickaxe.currentTier,
+      }));
+      renderPickaxeGrid();
+      renderPickaxeDetails();
+      showModal(pickaxeModal);
+    };
+
+    const renderRebirthOptions = () => {
+      if (!rebirthOptionsEl) return;
+      rebirthOptionsEl.innerHTML = '';
+      // Sort options to put max last
+      const sortedOptions = [...state.rebirth.options].sort((a, b) => {
+        // Max option (count === maxRebirths) goes last
+        if (a.count === state.rebirth.maxRebirths) return 1;
+        if (b.count === state.rebirth.maxRebirths) return -1;
+        return a.count - b.count;
+      });
+
+      sortedOptions.forEach(opt => {
+        const card = document.createElement('div');
+        card.className = 'rebirth-option';
+        
+        // Check if this is the Max option (count equals maxRebirths and is not 1, 5, or 20)
+        const isMax = opt.count === state.rebirth.maxRebirths && 
+                     opt.count !== 1 && opt.count !== 5 && opt.count !== 20;
+        if (isMax) {
+          card.classList.add('rebirth-option--max');
+        }
+
+        // Left side: Rebirth count and cost
+        const info = document.createElement('div');
+        info.className = 'rebirth-option__info';
+        
+        const title = document.createElement('div');
+        title.className = 'rebirth-option__title';
+        if (isMax) {
+          title.textContent = `${opt.count} Rebirths`;
+        } else {
+          title.textContent = `${opt.count} Rebirth${opt.count > 1 ? 's' : ''}`;
+        }
+        info.appendChild(title);
+        
+        const cost = document.createElement('div');
+        cost.className = 'rebirth-option__cost';
+        cost.textContent = `${formatNumber(opt.cost)} Power`;
+        info.appendChild(cost);
+        
+        card.appendChild(info);
+
+        // Right side: Button
+        const actionWrapper = document.createElement('div');
+        actionWrapper.className = 'rebirth-option__action';
+        const btn = document.createElement('button');
+        btn.className = isMax ? 'rebirth-button--max' : 'rebirth-button';
+        btn.textContent = isMax ? 'Max' : 'Rebirth';
+        const affordable = state.power >= opt.cost;
+        if (!affordable) {
+          btn.classList.add('disabled');
+          card.classList.add('unavailable');
+        }
+        btn.addEventListener('click', () => {
+          if (!affordable) return;
+          const count = isMax ? state.rebirth.maxRebirths : opt.count;
+          console.log(`[UI] Performing rebirth: ${count}`);
+          hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: count });
+        });
+        actionWrapper.appendChild(btn);
+        card.appendChild(actionWrapper);
+
+        rebirthOptionsEl.appendChild(card);
+      });
+    };
+
+    const updateRebirthModal = (data) => {
+      state.power = data.currentPower ?? state.power;
+      state.rebirths = data.currentRebirths ?? state.rebirths;
+      state.rebirth.options = data.options || [];
+      state.rebirth.maxRebirths = data.maxRebirths ?? 0;
+      renderRebirthOptions();
+      showModal(rebirthModal);
+      if (rebirthBadge) rebirthBadge.hidden = !(data.canRebirth);
+    };
+
+    const spawnMinedOrePopup = (oreName) => {
+      console.log('[UI] spawnMinedOrePopup called with oreName:', oreName);
+      if (!minedOreLayerEl) {
+        console.error('[UI] minedOreLayerEl not found! Cannot spawn popup.');
+        return;
+      }
+      
+      const popup = document.createElement('div');
+      popup.className = 'mined-ore-popup';
+      
+      const oreText = document.createElement('span');
+      oreText.className = 'mined-ore-popup__text';
+      oreText.textContent = oreName;
+      popup.appendChild(oreText);
+      
+      const plusIcon = document.createElement('span');
+      plusIcon.className = 'mined-ore-popup__icon';
+      plusIcon.textContent = '+';
+      popup.appendChild(plusIcon);
+      
+      // Position at bottom middle right
+      popup.style.right = '40px';
+      popup.style.bottom = '120px';
+      
+      minedOreLayerEl.appendChild(popup);
+      
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+      
+      // Add active class to trigger animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+      
+      setTimeout(() => {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 300); // Wait for fade out animation
+      }, 1000); // Disappear after 1 second
+    };
+
+    const spawnPowerGain = (amount, rockPosition) => {
+      console.log('[UI] spawnPowerGain called with amount:', amount, 'rockPosition:', rockPosition);
+      if (!powerGainLayer) {
+        console.error('[UI] powerGainLayer not found! Cannot spawn popup.');
+        return;
+      }
+      console.log('[UI] powerGainLayer found, creating popup');
+      
+      const popup = document.createElement('div');
+      popup.className = 'power-gain';
+      
+      // Add explosion icon and power amount
+      const icon = document.createElement('span');
+      icon.className = 'power-gain__icon';
+      icon.textContent = '💥';
+      popup.appendChild(icon);
+      
+      const text = document.createElement('span');
+      text.className = 'power-gain__text';
+      text.textContent = `+${Math.round(amount)}`;
+      popup.appendChild(text);
+      
+      // Position popup near the rock if position is provided
+      if (rockPosition && typeof hytopia !== 'undefined' && hytopia.worldToScreen) {
+        try {
+          // Convert world position to screen coordinates
+          const screenPos = hytopia.worldToScreen(rockPosition.x, rockPosition.y + 2, rockPosition.z);
+          if (screenPos && screenPos.x !== undefined && screenPos.y !== undefined) {
+            // Position near the rock with slight random offset
+            const offsetX = (Math.random() - 0.5) * 60; // -30 to +30 pixels
+            const offsetY = (Math.random() - 0.5) * 60; // -30 to +30 pixels
+            popup.style.left = `${screenPos.x + offsetX}px`;
+            popup.style.top = `${screenPos.y + offsetY}px`;
+            popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+          } else {
+            // Fallback to center screen with random offset
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const offsetX = (Math.random() - 0.5) * 200;
+            const offsetY = (Math.random() - 0.5) * 200;
+            popup.style.left = `${centerX + offsetX}px`;
+            popup.style.top = `${centerY + offsetY}px`;
+            popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+          }
+        } catch (e) {
+          console.warn('[UI] Failed to convert world to screen position:', e);
+          // Fallback to center screen
+          popup.style.left = '50%';
+          popup.style.top = '50%';
+          popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        }
+      } else {
+        // Fallback: center of screen with random offset
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const offsetX = (Math.random() - 0.5) * 200;
+        const offsetY = (Math.random() - 0.5) * 200;
+        popup.style.left = `${centerX + offsetX}px`;
+        popup.style.top = `${centerY + offsetY}px`;
+        popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+      }
+      
+      powerGainLayer.appendChild(popup);
+      
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+      
+      // Add active class to trigger animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+      
+      setTimeout(() => {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 600); // Wait for fade out animation
+      }, 1000); // Disappear after 1 second
+    };
+
+    const renderTrainingPrompt = () => {
+      if (!trainingPromptEl || !trainingPromptTitleEl || !trainingPromptSubtitleEl || !trainingPromptKeyEl) return;
+      if (!state.prompt.visible) {
+        trainingPromptEl.classList.remove('visible');
+        return;
+      }
+
+      // Show "Hold E to interact" message
+      trainingPromptTitleEl.textContent = state.prompt.rockName;
+      trainingPromptSubtitleEl.textContent = `Hold ${state.prompt.actionKey || 'E'} to interact`;
+      trainingPromptKeyEl.textContent = (state.prompt.actionKey || 'E').toUpperCase();
+      trainingPromptEl.classList.toggle('locked', state.prompt.canTrain === false);
+      trainingPromptEl.classList.add('visible');
+    };
+
+    // Setup button handlers
+    const autoMineButton = document.getElementById('auto-mine-button');
+    const autoTrainButton = document.getElementById('auto-train-button');
+    const toSurfaceButton = document.getElementById('to-surface-button');
+
+    // Ensure buttons don't have focus on load - blur them immediately
+    if (autoMineButton) autoMineButton.blur();
+    if (autoTrainButton) autoTrainButton.blur();
+    if (toSurfaceButton) toSurfaceButton.blur();
+    
+    // Ensure body has focus for keyboard input
+    if (document.body) {
+      document.body.focus();
+    }
+
+  // Default auto-mine state to inactive (green) until server sends state
+  if (autoMineButton) {
+    // Prevent focus so space/enter (jump) don't trigger the button
+    autoMineButton.setAttribute('tabindex', '-1');
+    autoMineButton.setAttribute('role', 'button');
+    
+    // Prevent keyboard events from triggering the button
+    autoMineButton.addEventListener('keydown', e => {
+      // Only prevent Space and Enter from triggering the button
+      // Let all other keys (WASD, etc.) pass through to the game
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    });
+    
+    // Prevent mousedown from focusing the button
+    autoMineButton.addEventListener('mousedown', e => {
+      e.preventDefault();
+      // Don't let mousedown focus the button
+      autoMineButton.blur();
+    });
+    
+    autoMineButton.classList.add('inactive');
+    
+    // Set up click handler - only trigger on actual mouse clicks, not keyboard
+    autoMineButton.addEventListener('click', (e) => {
+      // Only process if it's a mouse click (not keyboard activation)
+      if (e.detail === 0) {
+        // Keyboard activation, ignore it
+        return;
+      }
+      
+      console.log('[UI] AUTO MINE button clicked');
+      // Optimistically toggle UI state for instant feedback
+      const nextEnabled = !autoMineButton.classList.contains('active');
+      updateAutoMineButton(nextEnabled);
+
+      // Send data to server using correct Hytopia SDK method
+      console.log('[UI] Sending TOGGLE_AUTO_MINE to server');
+      hytopia.sendData({ type: 'TOGGLE_AUTO_MINE' });
+
+      // Return focus to game so movement keys keep working
+      autoMineButton.blur();
+      window.focus();
+    });
+  }
+
+    // Default auto-train state to inactive (green) until server sends state
+    if (autoTrainButton) {
+      // Prevent focus so space/enter (jump) don't trigger the button
+      autoTrainButton.setAttribute('tabindex', '-1');
+      autoTrainButton.setAttribute('role', 'button');
+      
+      // Prevent keyboard events from triggering the button
+      autoTrainButton.addEventListener('keydown', e => {
+        // Only prevent Space and Enter from triggering the button
+        // Let all other keys (WASD, etc.) pass through to the game
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Prevent mousedown from focusing the button
+      autoTrainButton.addEventListener('mousedown', e => {
+        e.preventDefault();
+        // Don't let mousedown focus the button
+        autoTrainButton.blur();
+      });
+      
+      autoTrainButton.classList.add('inactive');
+      
+      // Set up click handler - only trigger on actual mouse clicks, not keyboard
+      autoTrainButton.addEventListener('click', (e) => {
+        // Only process if it's a mouse click (not keyboard activation)
+        if (e.detail === 0) {
+          // Keyboard activation, ignore it
+          return;
+        }
+        
+        console.log('[UI] AUTO TRAIN button clicked');
+        // Optimistically toggle UI state for instant feedback
+        const nextEnabled = !autoTrainButton.classList.contains('active');
+        updateAutoTrainButton(nextEnabled);
+
+        // Send data to server using correct Hytopia SDK method
+        console.log('[UI] Sending TOGGLE_AUTO_TRAIN to server');
+        hytopia.sendData({ type: 'TOGGLE_AUTO_TRAIN' });
+
+        // Return focus to game so movement keys keep working
+        autoTrainButton.blur();
+        window.focus();
+      });
+    }
+
+    if (toSurfaceButton) {
+      // Prevent focus so space/enter (jump) don't trigger the button
+      toSurfaceButton.setAttribute('tabindex', '-1');
+      toSurfaceButton.setAttribute('role', 'button');
+      
+      // Prevent keyboard events from triggering the button
+      toSurfaceButton.addEventListener('keydown', e => {
+        // Only prevent Space and Enter from triggering the button
+        // Let all other keys (WASD, etc.) pass through to the game
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Prevent mousedown from focusing the button
+      toSurfaceButton.addEventListener('mousedown', e => {
+        e.preventDefault();
+        // Don't let mousedown focus the button
+        toSurfaceButton.blur();
+      });
+      
+      // Set up click handler - only trigger on actual mouse clicks, not keyboard
+      toSurfaceButton.addEventListener('click', (e) => {
+        // Only process if it's a mouse click (not keyboard activation)
+        if (e.detail === 0) {
+          // Keyboard activation, ignore it
+          return;
+        }
+        
+        console.log('[UI] TELEPORT TO SURFACE button clicked');
+        hytopia.sendData({ type: 'TELEPORT_TO_SURFACE' });
+
+        // Return focus to game so movement keys keep working
+        toSurfaceButton.blur();
+        window.focus();
+      });
+    }
+
+    function updateProgressBar(currentDepth, goalDepth) {
+      const progressBarFillEl = document.getElementById('progress-bar-fill');
+      const progressBarMarkerEl = document.getElementById('progress-bar-marker');
+      const progressBarEl = document.getElementById('progress-bar');
+
+      if (!progressBarFillEl || !progressBarMarkerEl || !progressBarEl) return;
+
+      const progress = Math.min(100, (currentDepth / goalDepth) * 100);
+      progressBarFillEl.style.width = `${progress}%`;
+      progressBarMarkerEl.style.left = `${progress}%`;
+    }
+
+    function updateAutoMineButton(enabled) {
+      if (!autoMineButton) return;
+      if (enabled) {
+        autoMineButton.classList.add('active');
+        autoMineButton.classList.remove('inactive');
+      } else {
+        autoMineButton.classList.remove('active');
+        autoMineButton.classList.add('inactive');
+      }
+    }
+
+    function updateAutoTrainButton(enabled) {
+      if (!autoTrainButton) return;
+      if (enabled) {
+        autoTrainButton.classList.add('active');
+        autoTrainButton.classList.remove('inactive');
+      } else {
+        autoTrainButton.classList.remove('active');
+        autoTrainButton.classList.add('inactive');
+      }
+    }
+
+    hytopia.onData(data => {
+      console.log('[UI] Received data:', data.type, data);
+      switch (data.type) {
+        case 'POWER_STATS':
+          state.power = data.power ?? 0;
+          state.gold = data.gold ?? state.gold;
+          state.wins = data.wins ?? state.wins;
+          state.rebirths = data.rebirths ?? state.rebirths;
+          if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          break;
+        case 'GOLD_STATS':
+          state.gold = data.gold ?? 0;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          console.log('[UI] Updated gold stats:', state.gold);
+          break;
+        case 'WINS_STATS':
+          state.wins = data.wins ?? 0;
+          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          console.log('[UI] Updated wins stats:', state.wins);
+          break;
+        case 'REBIRTHS_STATS':
+          state.rebirths = data.rebirths ?? 0;
+          if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          console.log('[UI] Updated rebirths stats:', state.rebirths);
+          break;
+        case 'POWER_GAIN':
+          console.log('[UI] Processing POWER_GAIN:', data);
+          state.power = data.totalPower ?? state.power + (data.amount ?? 0);
+          console.log('[UI] New power total:', state.power);
+          if (powerValueEl) {
+            powerValueEl.textContent = formatNumber(state.power);
+            console.log('[UI] Updated power value element');
+          } else {
+            console.warn('[UI] powerValueEl is null!');
+          }
+          if (typeof data.amount === 'number' && data.amount > 0) {
+            console.log('[UI] Spawning power gain popup:', data.amount, 'at rock position:', data.rockPosition);
+            spawnPowerGain(data.amount, data.rockPosition);
+          } else {
+            console.warn('[UI] Invalid amount for popup:', data.amount);
+          }
+          break;
+        case 'TRAINING_PROMPT':
+          // Show or hide the training prompt based on visibility
+          state.prompt.visible = data.visible ?? false;
+          if (data.visible) {
+            // Update prompt data when showing
+            state.prompt.rockName = data.rockName || 'Training Rock';
+            state.prompt.requirements = data.requirements || { power: 0, rebirths: 0 };
+            state.prompt.canTrain = data.canTrain ?? false;
+            state.prompt.actionKey = data.actionKey || 'E';
+          }
+          renderTrainingPrompt();
+          break;
+        case 'MINING_STATE':
+          state.mining.isMining = data.isMining ?? false;
+          if (miningHudEl) {
+            if (state.mining.isMining) {
+              miningHudEl.classList.add('visible');
+            } else {
+              miningHudEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MERCHANT_PROXIMITY':
+          console.log('[UI] Merchant proximity:', data.inProximity);
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const merchantUI = document.getElementById('merchant-ui');
+          if (merchantUI) {
+            if (data.inProximity) {
+              merchantUI.classList.add('visible');
+              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0);
+            } else {
+              merchantUI.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MINE_RESET_UPGRADE_PROXIMITY':
+          console.log('[UI] Mine Reset Upgrade proximity:', data.inProximity);
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+          if (upgradeUI) {
+            if (data.inProximity) {
+              upgradeUI.classList.add('visible');
+              updateMineResetUpgradeUI(
+                data.hasUpgrade ?? false,
+                data.cost ?? 2_000_000,
+                data.gold ?? 0
+              );
+            } else {
+              upgradeUI.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MINE_RESET_UPGRADE_PURCHASED':
+          console.log('[UI] Mine Reset Upgrade purchase result:', data);
+          state.gold = data.remainingGold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const upgradeUIVisible = document.getElementById('mine-reset-upgrade-ui')?.classList.contains('visible');
+          if (upgradeUIVisible) {
+            // Always update with the hasUpgrade flag from server
+            updateMineResetUpgradeUI(
+              data.hasUpgrade ?? true, // Default to true if purchase was successful
+              data.cost ?? 2_000_000,
+              data.remainingGold ?? 0
+            );
+          }
+          break;
+        case 'INVENTORY_UPDATE':
+          console.log('[UI] Inventory update received');
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const merchantUIVisible = document.getElementById('merchant-ui')?.classList.contains('visible');
+          if (merchantUIVisible) {
+            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0);
+            if (data.goldEarned && data.goldEarned > 0) {
+              // Show gold earned notification
+              console.log(`[UI] Gold earned: ${data.goldEarned}`);
+            }
+          }
+          break;
+        case 'ORE_MINED':
+          console.log('[UI] Ore mined:', data.oreName);
+          if (data.oreName) {
+            spawnMinedOrePopup(data.oreName);
+          }
+          break;
+        case 'MINING_UPDATE':
+          state.mining.damage = data.damage ?? 0;
+          state.mining.currentOre = data.currentOreName ?? null;
+          const blockHP = data.blockHP ?? 0;
+          const maxHP = data.maxHP ?? 100;
+          
+          // Update block health bar (top center)
+          if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl) {
+            if (state.mining.currentOre && blockHP > 0) {
+              // Show health bar
+              blockHealthBarNameEl.textContent = state.mining.currentOre;
+              blockHealthBarTextEl.textContent = `${Math.floor(blockHP).toLocaleString()}/${Math.floor(maxHP).toLocaleString()} HP`;
+              
+              // Calculate fill percentage
+              const fillPercent = Math.max(0, Math.min(100, (blockHP / maxHP) * 100));
+              blockHealthBarFillEl.style.width = `${fillPercent}%`;
+              
+              blockHealthBarEl.classList.add('visible');
+            } else {
+              blockHealthBarEl.classList.remove('visible');
+            }
+          }
+          
+          // Update current ore display (bottom middle)
+          if (currentOreEl) {
+            if (state.mining.currentOre) {
+              currentOreEl.textContent = state.mining.currentOre;
+              currentOreEl.classList.add('visible');
+            } else {
+              currentOreEl.classList.remove('visible');
+            }
+          }
+          
+          // Update damage display (bottom middle right)
+          if (damageDisplayEl) {
+            if (state.mining.damage > 0) {
+              damageDisplayEl.textContent = `${Math.round(state.mining.damage)} Dmg`;
+              damageDisplayEl.classList.add('visible');
+            } else {
+              damageDisplayEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'PROGRESS_UPDATE':
+          updateProgressBar(data.currentDepth ?? 0, data.goalDepth ?? 1000);
+          break;
+        case 'MINING_STATE_UPDATE':
+          // Show/hide mining controls
+          const miningControlsEl = document.getElementById('mining-controls');
+          if (miningControlsEl) {
+            if (data.isInMine) {
+              miningControlsEl.classList.add('visible');
+            } else {
+              miningControlsEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MINE_RESET_TIMER':
+          // Update mine reset timer display
+          if (mineResetTimerEl && mineResetTimerTextEl) {
+            if (data.timeRemaining !== null && data.timeRemaining !== undefined) {
+              mineResetTimerTextEl.textContent = `Mines will reset in: ${data.timeRemaining}`;
+              mineResetTimerEl.classList.add('visible');
+            } else {
+              mineResetTimerEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'AUTO_MINE_STATE':
+          updateAutoMineButton(data.enabled ?? false);
+          break;
+        case 'AUTO_TRAIN_STATE':
+          updateAutoTrainButton(data.enabled ?? false);
+          break;
+        case 'PICKAXE_SHOP_DATA':
+          console.log('[UI] Pickaxe shop data received');
+          updatePickaxeModal(data);
+          break;
+        case 'PICKAXE_PURCHASED':
+          console.log('[UI] Pickaxe purchase result:', data);
+          if (data.success) {
+            state.gold = data.remainingGold ?? state.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+            // Update pickaxe state
+            state.pickaxe.currentTier = data.newTier ?? state.pickaxe.currentTier;
+            // Refresh shop data
+            hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+          } else {
+            console.warn('[UI] Pickaxe purchase failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'REBIRTH_UI_DATA':
+          console.log('[UI] Rebirth UI data received');
+          updateRebirthModal(data);
+          break;
+        case 'REBIRTH_COMPLETE':
+          console.log('[UI] Rebirth complete:', data);
+          if (data.success) {
+            state.power = data.newPower ?? state.power;
+            state.rebirths = data.newRebirths ?? state.rebirths;
+            if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
+            if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+            // Refresh rebirth UI data
+            hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
+          } else {
+            console.warn('[UI] Rebirth failed:', data.message);
+          }
+          break;
+        default:
+          console.log('[UI] Unknown event type:', data.type);
+          break;
+      }
+    });
+  }
+</script>
+
+<div class="ui-root">
+  <div class="mobile-controls">
+    <a id="mobile-interact-button" class="mobile-button">
+      <img src="{{CDN_ASSETS_URL}}/icons/target.png" />
+    </a>
+
+    <a id="mobile-jump-button" class="mobile-button">
+      <img src="{{CDN_ASSETS_URL}}/icons/jump.png" />
+    </a>
+  </div>
+
+  <!-- Stats HUD Container (Middle Right) -->
+  <div class="stats-hud-container">
+    <!-- Trophy (Wins) -->
+    <div class="stat-hud stat-hud--wins">
+      <div class="stat-hud__value" id="wins-value">0</div>
+      <div class="stat-hud__icon">🏆</div>
+    </div>
+    
+    <!-- Money -->
+    <div class="stat-hud stat-hud--money">
+      <div class="stat-hud__value" id="money-value">0</div>
+      <div class="stat-hud__icon">💰</div>
+    </div>
+    
+    <!-- Power -->
+    <div class="stat-hud stat-hud--power">
+      <div class="stat-hud__value" id="power-value">0</div>
+      <div class="stat-hud__icon">💥</div>
+    </div>
+    
+    <!-- Rebirths -->
+    <div class="stat-hud stat-hud--rebirths">
+      <div class="stat-hud__value" id="rebirths-value">0</div>
+      <div class="stat-hud__icon">🔄</div>
+    </div>
+  </div>
+
+  <!-- Left-side action buttons -->
+  <div class="left-actions">
+    <button id="pickaxe-button" class="action-card action-card--pickaxe">
+      <span class="action-card__icon">⛏️</span>
+    </button>
+    <button id="rebirth-button" class="action-card action-card--rebirth">
+      <span class="action-card__icon">🔁</span>
+      <span class="action-card__badge" id="rebirth-badge" hidden>!</span>
+    </button>
+  </div>
+
+  <!-- Pickaxe Shop Modal -->
+  <div id="pickaxe-modal" class="modal pickaxe-modal">
+    <div class="pickaxe-modal__container">
+      <div class="pickaxe-modal__header">
+        <div class="pickaxe-modal__title">Pickaxe</div>
+        <button class="pickaxe-modal__close" data-close="pickaxe-modal">×</button>
+      </div>
+      <div class="pickaxe-modal__body">
+        <!-- Left Panel: Equipped Pickaxe Details -->
+        <div class="pickaxe-modal__left-panel">
+          <div class="pickaxe-details">
+            <div class="pickaxe-details__icon" id="pickaxe-detail-icon">⛏️</div>
+            <div class="pickaxe-details__name" id="pickaxe-detail-name">Pickaxe</div>
+            <div class="pickaxe-details__stats" id="pickaxe-detail-stats"></div>
+            <div class="pickaxe-details__badge">Equipped</div>
+          </div>
+        </div>
+        <!-- Right Panel: Pickaxe Grid -->
+        <div class="pickaxe-modal__right-panel">
+          <div class="pickaxe-grid" id="pickaxe-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rebirth Modal -->
+  <div id="rebirth-modal" class="modal rebirth-modal">
+    <div class="rebirth-modal__container">
+      <div class="rebirth-modal__header">
+        <div class="rebirth-modal__title">Rebirth</div>
+        <button class="rebirth-modal__close" data-close="rebirth-modal">×</button>
+      </div>
+      <div class="rebirth-modal__body">
+        <div class="rebirth-modal__instruction">Click a button to rebirth!</div>
+        <div class="rebirth-modal__explanation">
+          <span class="rebirth-icon">🔄</span>
+          <span class="rebirth-text">1</span>
+          <span class="rebirth-equals">=</span>
+          <span class="power-icon">💥</span>
+          <span class="power-text">+10%</span>
+        </div>
+        <div class="rebirth-options" id="rebirth-options"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="training-prompt" class="training-prompt">
+    <div id="training-prompt-key" class="training-prompt__key">E</div>
+    <div class="training-prompt__copy">
+      <div id="training-prompt-title" class="training-prompt__title">Interact</div>
+      <div id="training-prompt-subtitle" class="training-prompt__subtitle">0 Power OR 0 Rebirths</div>
+    </div>
+  </div>
+
+  <div id="power-gain-layer" class="power-gain-layer"></div>
+
+  <!-- Mine Reset Timer (Top Center) -->
+  <div id="mine-reset-timer" class="mine-reset-timer">
+    <div id="mine-reset-timer-text" class="mine-reset-timer__text">Mines will reset in: 02:00</div>
+  </div>
+
+  <!-- Block Health Bar (Top Center) -->
+  <div id="block-health-bar" class="block-health-bar">
+    <div id="block-health-bar-name" class="block-health-bar__name">Diamond</div>
+    <div class="block-health-bar__container">
+      <div class="block-health-bar__outline">
+        <div id="block-health-bar-fill" class="block-health-bar__fill"></div>
+      </div>
+      <div id="block-health-bar-text" class="block-health-bar__text">0/100 HP</div>
+    </div>
+  </div>
+
+  <!-- Mining HUD -->
+  <div id="mining-hud" class="mining-hud">
+    <!-- Bottom Middle: Current Ore Display -->
+    <div id="current-ore" class="mining-hud__current-ore"></div>
+    
+    <!-- Bottom Middle Right: Damage Display -->
+    <div id="damage-display" class="mining-hud__damage"></div>
+  </div>
+
+  <!-- Mined Ore Popup Layer -->
+
+  <!-- Merchant Selling UI -->
+  <div id="merchant-ui" class="merchant-ui">
+    <div class="merchant-ui__header">
+      <div class="merchant-ui__title">Ores</div>
+      <button id="merchant-ui-close" class="merchant-ui__close">×</button>
+    </div>
+    <div id="merchant-ui-content" class="merchant-ui__content">
+      <!-- Ore items will be dynamically added here -->
+    </div>
+    <div class="merchant-ui__footer">
+      <button id="merchant-ui-sell-all" class="merchant-ui__sell-all-button">Sell All</button>
+    </div>
+  </div>
+
+  <!-- Mine Reset Upgrade UI -->
+  <div id="mine-reset-upgrade-ui" class="mine-reset-upgrade-ui">
+    <div class="mine-reset-upgrade-ui__header">
+      <div class="mine-reset-upgrade-ui__title">Mine Reset Upgrade</div>
+      <button id="mine-reset-upgrade-ui-close" class="mine-reset-upgrade-ui__close">×</button>
+    </div>
+    <div class="mine-reset-upgrade-ui__body">
+      <div class="mine-reset-upgrade-ui__description">
+        Increase your mine reset timer from 2 minutes to 5 minutes!
+      </div>
+      <div class="mine-reset-upgrade-ui__button-container">
+        <button id="mine-reset-upgrade-button" class="mine-reset-upgrade-ui__button">
+          <span class="mine-reset-upgrade-ui__button-text">2M</span>
+        </button>
+      </div>
+      <div class="mine-reset-upgrade-ui__status" id="mine-reset-upgrade-status">
+        <!-- Status will be updated dynamically -->
+      </div>
+    </div>
+  </div>
+
+
+  <div id="mined-ore-layer" class="mined-ore-layer"></div>
+
+  <!-- Progress Bar (Bottom) -->
+  <div id="progress-bar" class="progress-bar">
+    <div class="progress-bar__container">
+      <div class="progress-bar__outline">
+        <div id="progress-bar-fill" class="progress-bar__fill"></div>
+        <div id="progress-bar-marker" class="progress-bar__marker"></div>
+      </div>
+      <div class="progress-bar__markers">
+        <span class="progress-bar__marker-label">0</span>
+        <span class="progress-bar__marker-label">250</span>
+        <span class="progress-bar__marker-label">500</span>
+        <span class="progress-bar__marker-label">750</span>
+        <span class="progress-bar__marker-label">1000</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mining Controls (Visible when in mines) -->
+  <div id="mining-controls" class="mining-controls">
+    <!-- Mining controls content here if needed -->
+  </div>
+
+  <!-- To Surface Button (Always Visible) -->
+  <button id="to-surface-button" class="mining-control-button mining-control-button--surface">
+    To Surface
+  </button>
+
+  <!-- Auto Controls (Right Side) -->
+  <div class="auto-controls">
+    <!-- Auto Mine Button -->
+    <button id="auto-mine-button" class="auto-control-button auto-control-button--mine inactive">
+      Auto Mine
+    </button>
+    <!-- Auto Train Button -->
+    <button id="auto-train-button" class="auto-control-button auto-control-button--train">
+      Auto Train
+    </button>
+  </div>
+</div>
+
+<style>
+  :root {
+    font-family: 'Inter', sans-serif;
+    color: #fff;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .ui-root {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Mobile controls (existing boilerplate) */
+  .mobile-controls {
+    display: none;
+  }
+
+  body.mobile .mobile-controls {
+    display: flex;
+    gap: 14px;
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    pointer-events: auto;
+  }
+
+  .mobile-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    width: 50px;
+    height: 50px;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    font-size: 14px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
+  }
+  
+  .mobile-button img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mobile-button.active {
+    transform: scale(0.92);
+    background-color: rgba(0, 0, 0, 0.75);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Stats HUD Container (Middle Right) */
+  .stats-hud-container {
+    position: fixed;
+    top: 50%;
+    right: 40px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 1000;
+  }
+
+  /* Stat HUD (Blue Box Style) */
+  .stat-hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    min-width: 180px;
+    border-radius: 12px;
+    border: 3px solid #1a3a5c;
+    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .stat-hud__value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffd700;
+    text-shadow: 
+      0 0 8px rgba(255, 215, 0, 0.6),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+    flex: 1;
+    text-align: left;
+  }
+
+  .stat-hud--money .stat-hud__value {
+    color: #ffd700;
+  }
+
+  .stat-hud--power .stat-hud__value {
+    color: #ff5252;
+  }
+
+  .stat-hud--rebirths .stat-hud__value {
+    color: #4caf50;
+  }
+
+  .stat-hud--wins .stat-hud__value {
+    color: #ffd700;
+  }
+
+  .stat-hud__icon {
+    font-size: 32px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+    margin-left: 12px;
+  }
+
+  /* Left-side action buttons */
+  .left-actions {
+    position: fixed;
+    left: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 1000;
+  }
+
+  .action-card {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    border: 3px solid #1a3a5c;
+    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    pointer-events: auto;
+  }
+
+  .action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+  }
+
+  .action-card:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+  }
+
+  .action-card__icon {
+    font-size: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  }
+
+  .action-card__badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    background: #e53935;
+    color: #fff;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Modals */
+  .modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    background: rgba(0, 0, 0, 0.55);
+    pointer-events: auto;
+  }
+
+  .modal.visible {
+    display: flex;
+  }
+
+  .modal__body {
+    padding: 16px;
+  }
+
+  .modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 3px solid #1a3a5c;
+  }
+
+  .modal__title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal__close {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 3px solid #c0392b;
+    background: linear-gradient(180deg, #e74c3c, #c0392b);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .rebirth-modal__container {
+    width: 700px;
+    max-width: 95vw;
+    max-height: 85vh;
+    background: rgba(21, 26, 60, 0.98);
+    border: 3px solid #4a90e2;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    margin: auto;
+  }
+
+  .rebirth-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #4a90e2;
+    background: rgba(21, 26, 60, 0.98);
+  }
+
+  .rebirth-modal__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .rebirth-modal__close {
+    width: 32px;
+    height: 32px;
+    background: rgba(244, 67, 54, 0.8);
+    border: 2px solid #f44336;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .rebirth-modal__close:hover {
+    background: rgba(244, 67, 54, 1);
+    transform: scale(1.1);
+  }
+
+  .pickaxe-modal__container {
+    width: 1800px;
+    max-width: 95vw;
+    max-height: 85vh;
+    background: rgba(21, 26, 60, 0.98);
+    border: 3px solid #4a90e2;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    margin: auto; /* Ensure it's centered */
+  }
+
+  .pickaxe-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #4a90e2;
+    background: rgba(21, 26, 60, 0.98);
+  }
+
+  .pickaxe-modal__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .pickaxe-modal__close {
+    width: 32px;
+    height: 32px;
+    background: rgba(244, 67, 54, 0.8);
+    border: 2px solid #f44336;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .pickaxe-modal__close:hover {
+    background: rgba(244, 67, 54, 1);
+    transform: scale(1.1);
+  }
+
+  .pickaxe-modal__body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .pickaxe-modal__left-panel {
+    width: 300px;
+    min-width: 300px;
+    padding: 20px;
+    border-right: 2px solid #4a90e2;
+    background: rgba(15, 20, 50, 0.95);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pickaxe-modal__right-panel {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: rgba(21, 26, 60, 0.98);
+  }
+
+  .rebirth-modal__body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: rgba(21, 26, 60, 0.98);
+    overflow-y: auto;
+    max-height: calc(85vh - 80px);
+  }
+
+  .rebirth-modal__instruction {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffd700;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  .rebirth-modal__explanation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 2px solid #1a3a5c;
+  }
+
+  .rebirth-icon {
+    font-size: 24px;
+  }
+
+  .rebirth-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .rebirth-equals {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .power-icon {
+    font-size: 24px;
+  }
+
+  .power-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ff5252;
+  }
+
+  .rebirth-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .rebirth-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(30, 40, 80, 0.8);
+    border: 2px solid #1a3a5c;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .rebirth-option:hover:not(.unavailable) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .rebirth-option--max {
+    border: 3px solid;
+    border-image: linear-gradient(90deg, #ff0000, #ff8800, #ffd700, #4caf50, #2196f3, #9c27b0) 1;
+    background: rgba(30, 40, 80, 0.9);
+  }
+
+  .rebirth-option.unavailable {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .rebirth-option__info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .rebirth-option__title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #4caf50;
+  }
+
+  .rebirth-option__cost {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ff5252;
+  }
+
+  .rebirth-option__action {
+    margin-left: 20px;
+  }
+
+  .rebirth-button {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 2px solid #4caf50;
+    background: linear-gradient(180deg, #66bb6a, #2e7d32);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .rebirth-button:hover:not(.disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+  }
+
+  .rebirth-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
+  .rebirth-button--max {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 3px solid #000;
+    background: linear-gradient(180deg, #ffd700, #ffaa00);
+    color: #000;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .rebirth-button--max:hover:not(.disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.6);
+  }
+
+  .rebirth-button--max.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
+  .pickaxe-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: rgba(30, 40, 80, 0.8);
+    border: 2px solid #4a90e2;
+    border-radius: 12px;
+  }
+
+  .pickaxe-details__icon {
+    width: 120px;
+    height: 120px;
+    border-radius: 12px;
+    border: 3px solid #1a3a5c;
+    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.95));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .pickaxe-details__name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+  }
+
+  .pickaxe-details__badge {
+    margin-top: 8px;
+    padding: 6px 16px;
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    border: 2px solid #4caf50;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .pickaxe-details__stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .pickaxe-stat {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .pickaxe-stat--power {
+    color: #ff5252;
+  }
+
+  .pickaxe-stat--luck {
+    color: #4caf50;
+  }
+
+  .pickaxe-stat--speed {
+    color: #87ceeb;
+  }
+
+  .pickaxe-stat--damage {
+    color: #ffd700;
+  }
+
+  .pickaxe-stat--sell {
+    color: #ffd700;
+  }
+
+  .pickaxe-details__cost {
+    font-size: 16px;
+    color: #e0f2ff;
+    margin-top: 4px;
+  }
+
+  .pickaxe-actions {
+    margin: 12px 0;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .primary-button {
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 3px solid #4caf50;
+    background: linear-gradient(180deg, #66bb6a, #2e7d32);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  }
+
+  .primary-button.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+  }
+
+  .pickaxe-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    overflow-x: hidden;
+    min-width: 0; /* Prevent grid from overflowing */
+    padding-right: 8px; /* Add padding for scrollbar */
+  }
+
+  .pickaxe-card {
+    position: relative;
+    border-radius: 12px;
+    border: 3px solid #1a3a5c;
+    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    padding: 16px;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-height: 140px;
+    min-width: 0; /* Prevent cards from overflowing grid */
+    max-width: 100%; /* Ensure cards don't exceed grid cell */
+    justify-content: space-between;
+    box-sizing: border-box; /* Include padding and border in width calculation */
+  }
+
+  .pickaxe-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .pickaxe-card.selected {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 2px #ffd700, 0 5px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .pickaxe-card__name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    width: 100%;
+  }
+
+  .pickaxe-card__icon {
+    font-size: 48px;
+    margin: 4px 0;
+  }
+
+  .pickaxe-card__cost {
+    color: #ffd700;
+    font-weight: 700;
+  }
+
+  .pickaxe-card__lock {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #fff;
+  }
+
+  .pickaxe-card__checkmark {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: #4caf50;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .pickaxe-card__buy-button {
+    width: 100%;
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 8px;
+    border: 2px solid #4caf50;
+    background: linear-gradient(180deg, #66bb6a, #2e7d32);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+
+  .pickaxe-card__buy-button:hover {
+    transform: scale(1.05);
+  }
+
+  .pickaxe-card.purchased {
+    /* Normal appearance for purchased pickaxes */
+    opacity: 1;
+    cursor: pointer;
+  }
+
+  .pickaxe-card.equipped {
+    border-color: #4caf50;
+    box-shadow: 0 0 0 2px #4caf50, 0 5px 18px rgba(0, 0, 0, 0.45);
+    opacity: 1;
+  }
+
+  .pickaxe-card.next-tier {
+    /* Greyed out but purchasable (next tier) */
+    opacity: 0.5;
+    filter: grayscale(0.3);
+    cursor: pointer;
+  }
+
+  .pickaxe-card.locked {
+    /* Greyed out with lock (future tiers) */
+    opacity: 0.4;
+    filter: grayscale(0.6);
+    cursor: not-allowed;
+  }
+
+  /* Rebirth UI */
+  .rebirth-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 2px solid #1a3a5c;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 12px;
+  }
+
+  .rebirth-summary__row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    color: #e0f2ff;
+  }
+
+  .rebirth-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rebirth-card {
+    border-radius: 12px;
+    border: 3px solid #1a3a5c;
+    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #fff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .rebirth-card__title {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .rebirth-card__cost {
+    color: #ff5252;
+    font-weight: 800;
+    margin-top: 4px;
+  }
+
+  .rebirth-card__bonus {
+    color: #4caf50;
+    font-weight: 700;
+  }
+
+  .rebirth-card__action {
+    margin-left: 12px;
+  }
+
+  /* Power gain floating text */
+  .power-gain-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .power-gain {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ff5252;
+    font-size: 34px;
+    font-weight: 800;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s, filter 0.6s;
+    pointer-events: none;
+    z-index: 10000;
+    white-space: nowrap;
+  }
+
+  .power-gain__icon {
+    font-size: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  }
+
+  .power-gain__text {
+    color: #ff5252;
+    text-shadow: 
+      0 0 10px rgba(255, 82, 82, 0.8),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .power-gain.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+    filter: drop-shadow(0 0 12px rgba(255, 99, 132, 0.9));
+  }
+
+  /* Training prompt */
+  .training-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: 120px;
+    transform: translate(-50%, 20px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    border-radius: 18px;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    background: rgba(21, 26, 60, 0.92);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .training-prompt.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .training-prompt.locked {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(50, 50, 70, 0.8);
+  }
+
+  .training-prompt__key {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .training-prompt__title {
+    font-size: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .training-prompt__subtitle {
+    font-size: 13px;
+    opacity: 0.8;
+  }
+
+  /* Scene UI prompt */
+  .scene-training-prompt {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 20px;
+    border-radius: 16px;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    background: rgba(23, 27, 61, 0.95);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+    color: #fff;
+    text-transform: uppercase;
+    opacity: 1; /* Start visible */
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    transform: scale(0.75); /* Make it 0.75x smaller */
+    min-width: 180px;
+  }
+
+  .scene-training-prompt:not(.visible) {
+    opacity: 0;
+  }
+
+  .scene-training-prompt.visible {
+    opacity: 1;
+  }
+
+  .scene-training-prompt.locked {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(60, 60, 80, 0.9);
+  }
+
+  .scene-training-prompt__icon {
+    font-size: 32px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .scene-training-prompt__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .scene-training-prompt__requirement {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 
+      0 0 10px rgba(255, 255, 255, 0.8),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+  }
+
+  .scene-training-prompt__or {
+    font-size: 14px;
+    font-weight: 700;
+    color: #4a9eff;
+    text-shadow: 
+      0 0 8px rgba(74, 158, 255, 0.6),
+      0 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
+  }
+
+  .scene-training-prompt__rebirth {
+    font-size: 18px;
+    font-weight: 800;
+    color: #4caf50;
+    text-shadow: 
+      0 0 10px rgba(76, 175, 80, 0.8),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+  }
+
+  .scene-training-prompt__power-gain {
+    font-size: 18px;
+    font-weight: 800;
+    color: #ff5252;
+    text-shadow: 
+      0 0 10px rgba(255, 82, 82, 0.8),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+
+  /* Mining HUD */
+  .mining-hud {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .mining-hud.visible {
+    opacity: 1;
+  }
+
+  /* Bottom Middle: Current Ore Display */
+  .mining-hud__current-ore {
+    position: fixed;
+    left: 50%;
+    bottom: 120px;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .mining-hud__current-ore.visible {
+    opacity: 1;
+  }
+
+  /* Bottom Middle Right: Damage Display */
+  .mining-hud__damage {
+    position: fixed;
+    right: 40px;
+    bottom: 200px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: rgba(185, 0, 0, 0.8);
+    border: 2px solid rgba(255, 0, 0, 0.5);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    text-shadow: 
+      0 0 10px rgba(255, 0, 0, 0.8),
+      0 2px 4px rgba(0, 0, 0, 0.8),
+      -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .mining-hud__damage.visible {
+    opacity: 1;
+  }
+
+  /* Mined Ore Popup Layer */
+  .mined-ore-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Bottom Middle Right: Mined Ore Popup */
+  .mined-ore-popup {
+    position: fixed;
+    right: 40px;
+    bottom: 120px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    pointer-events: none;
+  }
+
+  .mined-ore-popup.active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .mined-ore-popup__text {
+    color: #fff;
+  }
+
+  .mined-ore-popup__icon {
+    color: #4caf50;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  /* Mine Reset Timer (Top Center) */
+  .mine-reset-timer {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1001;
+  }
+
+  .mine-reset-timer.visible {
+    opacity: 1;
+  }
+
+  .mine-reset-timer__text {
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 0 10px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+  }
+
+  /* Block Health Bar (Bottom Center) */
+  .block-health-bar {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+  }
+
+  .block-health-bar.visible {
+    opacity: 1;
+  }
+
+  .block-health-bar__name {
+    font-size: 24px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 0 10px rgba(0, 0, 0, 0.8);
+  }
+
+  .block-health-bar__container {
+    position: relative;
+    width: 300px;
+  }
+
+  .block-health-bar__outline {
+    width: 100%;
+    height: 32px;
+    border: 3px solid #1a3a5c;
+    background: #0d2440;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .block-health-bar__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%);
+    transition: width 0.3s ease;
+    border-radius: 3px;
+  }
+
+  .block-health-bar__text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 
+      -1px -1px 0 #000,
+      1px -1px 0 #000,
+      -1px 1px 0 #000,
+      1px 1px 0 #000,
+      0 0 8px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Progress Bar (Bottom) */
+  .progress-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 40px;
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  .progress-bar__container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .progress-bar__outline {
+    position: relative;
+    width: 100%;
+    height: 40px;
+    border: 4px solid #1a3a5c;
+    background: #0d2440;
+    border-radius: 8px;
+    overflow: visible;
+  }
+
+  .progress-bar__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50 0%, #66bb6a 50%, #81c784 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .progress-bar__marker {
+    position: absolute;
+    top: -8px;
+    width: 24px;
+    height: 56px;
+    background: radial-gradient(circle, #fff 0%, #ffd166 50%, #ff4b5c 100%);
+    border: 3px solid #1a3a5c;
+    border-radius: 12px;
+    transform: translateX(-50%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    transition: left 0.3s ease;
+    left: 0%;
+  }
+
+  .progress-bar__markers {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding: 0 8px;
+  }
+
+  .progress-bar__marker-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 
+      -1px -1px 0 #000,
+      1px -1px 0 #000,
+      -1px 1px 0 #000,
+      1px 1px 0 #000;
+  }
+
+  /* Mining Controls */
+  .mining-controls {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 900;
+  }
+
+  .mining-controls.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* To Surface button is always visible, positioned at top of HUD */
+  #to-surface-button {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: 901;
+  }
+
+  .mining-control-button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    background: rgba(21, 26, 60, 0.92);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .mining-control-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .mining-control-button:active {
+    transform: scale(0.98);
+  }
+
+  .mining-control-button--surface {
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    border-color: #4caf50;
+  }
+
+  /* Auto Controls (Right Side) */
+  .auto-controls {
+    position: fixed;
+    right: 40px;
+    bottom: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: auto;
+    z-index: 900;
+  }
+
+  .auto-control-button {
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    background: rgba(21, 26, 60, 0.92);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 140px;
+  }
+
+  .auto-control-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .auto-control-button:active {
+    transform: scale(0.98);
+  }
+
+  /* Green when inactive (off) */
+  .auto-control-button.inactive {
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    border-color: #4caf50;
+  }
+
+  /* Red when active (on) */
+  .auto-control-button.active {
+    background: linear-gradient(180deg, rgba(244, 67, 54, 0.9), rgba(183, 28, 28, 0.95));
+    border-color: #f44336;
+  }
+
+  /* Merchant Selling UI */
+  .merchant-ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    max-height: 600px;
+    background: rgba(21, 26, 60, 0.98);
+    border: 3px solid #4a90e2;
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .merchant-ui.visible {
+    display: flex;
+  }
+
+  .merchant-ui__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #4a90e2;
+  }
+
+  .merchant-ui__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .merchant-ui__close {
+    width: 32px;
+    height: 32px;
+    background: rgba(244, 67, 54, 0.8);
+    border: 2px solid #f44336;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .merchant-ui__close:hover {
+    background: rgba(244, 67, 54, 1);
+    transform: scale(1.1);
+  }
+
+  .merchant-ui__content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    max-height: 450px;
+  }
+
+  .merchant-ui__ore-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    margin: 8px 0;
+    background: rgba(30, 40, 80, 0.8);
+    border: 2px solid #4a90e2;
+    border-radius: 8px;
+    min-height: 60px;
+  }
+
+  .merchant-ui__ore-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .merchant-ui__ore-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .merchant-ui__ore-name.stone { color: #9e9e9e; }
+  .merchant-ui__ore-name.coal { color: #424242; }
+  .merchant-ui__ore-name.copper { color: #b87333; }
+  .merchant-ui__ore-name.iron { color: #d4d4d4; }
+  .merchant-ui__ore-name.silver { color: #c0c0c0; }
+  .merchant-ui__ore-name.gold { color: #ffd700; }
+  .merchant-ui__ore-name.platinum { color: #e5e4e2; }
+  .merchant-ui__ore-name.titanium { color: #878681; }
+  .merchant-ui__ore-name.emerald { color: #50c878; }
+  .merchant-ui__ore-name.ruby { color: #e0115f; }
+  .merchant-ui__ore-name.sapphire { color: #0f52ba; }
+  .merchant-ui__ore-name.topaz { color: #ffc87c; }
+  .merchant-ui__ore-name.diamond { color: #b9f2ff; }
+  .merchant-ui__ore-name.mythril { color: #9b59b6; }
+  .merchant-ui__ore-name.adamantite { color: #4a90e2; }
+  .merchant-ui__ore-name.cosmic { color: #ff00ff; }
+
+  .merchant-ui__ore-quantity {
+    font-size: 14px;
+    color: #aaa;
+  }
+
+  .merchant-ui__ore-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffd700;
+    margin-right: 15px;
+  }
+
+  .merchant-ui__coin-icon {
+    width: 20px;
+    height: 20px;
+    background: #ffd700;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .merchant-ui__sell-button {
+    padding: 8px 16px;
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    border: 2px solid #4caf50;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+  }
+
+  .merchant-ui__sell-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  }
+
+  .merchant-ui__sell-button:active {
+    transform: scale(0.98);
+  }
+
+  .merchant-ui__footer {
+    padding: 15px 20px;
+    border-top: 2px solid #4a90e2;
+    display: flex;
+    justify-content: center;
+  }
+
+  .merchant-ui__sell-all-button {
+    padding: 12px 40px;
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    border: 3px solid #4caf50;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .merchant-ui__sell-all-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+  }
+
+  .merchant-ui__sell-all-button:active {
+    transform: scale(0.98);
+  }
+
+  /* Scrollbar styling */
+  .merchant-ui__content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .merchant-ui__content::-webkit-scrollbar-track {
+    background: rgba(30, 40, 80, 0.5);
+    border-radius: 4px;
+  }
+
+  .merchant-ui__content::-webkit-scrollbar-thumb {
+    background: #4a90e2;
+    border-radius: 4px;
+  }
+
+  .merchant-ui__content::-webkit-scrollbar-thumb:hover {
+    background: #5aa0f2;
+  }
+
+  /* Mine Reset Upgrade UI */
+  .mine-reset-upgrade-ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    background: rgba(21, 26, 60, 0.98);
+    border: 3px solid #4caf50;
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .mine-reset-upgrade-ui.visible {
+    display: flex;
+  }
+
+  .mine-reset-upgrade-ui__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #4caf50;
+  }
+
+  .mine-reset-upgrade-ui__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .mine-reset-upgrade-ui__close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(244, 67, 54, 0.8);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+  }
+
+  .mine-reset-upgrade-ui__close:hover {
+    background: rgba(244, 67, 54, 1);
+    transform: scale(1.1);
+  }
+
+  .mine-reset-upgrade-ui__body {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .mine-reset-upgrade-ui__description {
+    font-size: 16px;
+    color: #fff;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .mine-reset-upgrade-ui__button-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .mine-reset-upgrade-ui__button {
+    padding: 18px 40px;
+    border-radius: 12px;
+    border: 3px solid #4caf50;
+    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 200px;
+    pointer-events: auto;
+  }
+
+  .mine-reset-upgrade-ui__button:hover:not(.disabled):not(.bought) {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+    background: linear-gradient(180deg, rgba(96, 195, 100, 0.95), rgba(66, 145, 70, 1));
+  }
+
+  .mine-reset-upgrade-ui__button:active:not(.disabled):not(.bought) {
+    transform: scale(0.98);
+  }
+
+  .mine-reset-upgrade-ui__button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+    background: linear-gradient(180deg, rgba(100, 100, 100, 0.9), rgba(70, 70, 70, 0.95));
+    border-color: #666;
+  }
+
+  .mine-reset-upgrade-ui__button.bought {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.8);
+    background: linear-gradient(180deg, rgba(100, 100, 100, 0.9), rgba(70, 70, 70, 0.95));
+    border-color: #666;
+    pointer-events: none;
+  }
+
+  .mine-reset-upgrade-ui__button.bought:hover {
+    transform: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    background: linear-gradient(180deg, rgba(100, 100, 100, 0.9), rgba(70, 70, 70, 0.95)) !important;
+  }
+
+  .mine-reset-upgrade-ui__button-text {
+    display: block;
+    text-shadow: 
+      -1px -1px 0 #000,
+      1px -1px 0 #000,
+      -1px 1px 0 #000,
+      1px 1px 0 #000;
+  }
+
+  .mine-reset-upgrade-ui__status {
+    font-size: 14px;
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
+    min-height: 20px;
+  }
+
+  .mine-reset-upgrade-ui__status--can-afford {
+    color: #4caf50;
+  }
+
+  .mine-reset-upgrade-ui__status--cannot-afford {
+    color: #f44336;
+  }
+
+  .mine-reset-upgrade-ui__status--bought {
+    color: #4caf50;
+    font-weight: 700;
+  }
+
+</style>
