@@ -82,9 +82,6 @@ export class TrainingSystem {
     const canAccess = meetsPower || meetsRebirth;
     
     if (!canAccess) {
-      console.warn(
-        `Player cannot access ${rock.name} (requires ${rock.requiredPower} power OR ${rock.requiredRebirths} rebirths)`
-      );
       return;
     }
 
@@ -113,7 +110,6 @@ export class TrainingSystem {
     const performHit = () => {
       const currentState = this.trainingStates.get(player);
       if (!currentState || !currentState.isTraining) {
-        console.log('[TrainingSystem] Training stopped, exiting loop');
         return; // Training was stopped
       }
 
@@ -126,19 +122,14 @@ export class TrainingSystem {
 
       // Play pickaxe swing animation
       currentState.animationPlaying = true;
-      console.log('[TrainingSystem] Playing swing animation and granting power');
-      
       // Grant power immediately (don't wait for animation)
-      // REBALANCED: Pickaxes no longer affect power gain
-      // Formula: PowerPerHit = BasePowerGain × RockMultiplier × RebirthMultiplier
-      // Reference: Planning/TrainingPowerBalanceBlueprint.md section 2
+      // UPDATED: Power gain uses piecewise functions based on rock tier and rebirths
+      // Pickaxes no longer affect power gain - only rock selection and rebirth count matter
+      // Reference: Planning/PowerSystemPlan.md section 4
       const powerGain = calculatePowerGainPerHit(
-        rock.powerGainMultiplier,
+        rock.tier,
         playerData.rebirths
       );
-
-      console.log(`[TrainingSystem] Granting ${powerGain} power`);
-
       // Notify that power was gained
       onPowerGain(player, powerGain);
 
@@ -152,7 +143,6 @@ export class TrainingSystem {
           currentStateAfterAnim.animationPlaying = false;
         }
       }).catch((error) => {
-        console.warn('[TrainingSystem] Animation error:', error);
         const currentStateAfterError = this.trainingStates.get(player);
         if (currentStateAfterError) {
           currentStateAfterError.animationPlaying = false;
@@ -166,7 +156,6 @@ export class TrainingSystem {
     };
 
     // Perform first hit immediately
-    console.log('[TrainingSystem] Starting training loop');
     performHit();
   }
 
@@ -254,7 +243,6 @@ export class TrainingSystem {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     } catch (error) {
-      console.warn('[TrainingSystem] Pickaxe animation failed:', error);
       await new Promise(resolve => setTimeout(resolve, 400));
     }
   }
@@ -278,7 +266,6 @@ export class TrainingSystem {
     }
 
     this.trainingStates.delete(player);
-    console.log(`[TrainingSystem] Player stopped training`);
   }
 
   /**

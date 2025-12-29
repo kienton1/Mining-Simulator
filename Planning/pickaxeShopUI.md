@@ -154,22 +154,19 @@ function getPickaxeAvailability(tier: number, currentTier: number, playerGold: n
 - Example: `luckBonus = 0.5` → "+50% Ore Luck"
 
 **Speed**:
-- From `PickaxeData.miningSpeed` (swings per second)
+- From `PickaxeData.miningSpeed` (percentage increase over base speed)
 - Display as integer: `Math.round(miningSpeed)`
-- Example: `miningSpeed = 2.3` → "+2 Speed"
+- Example: `miningSpeed = 5.0` → "+5 Speed" (means +5% speed increase)
+- Example: `miningSpeed = 30.0` → "+30 Speed" (means +30% speed increase)
 
-**Power Bonus**:
-- From `PickaxeData.powerBonusMultiplier`
-- Display as multiplier: `(powerBonusMultiplier * 100 - 100).toFixed(0) + '%'`
-- Example: `powerBonusMultiplier = 1.5` → "+50% Power"
+**Note**: Pickaxes no longer provide power bonuses. Power is gained through training rocks only (see PowerSystemPlan.md).
 
 ### 5.2 Stat Display Format
 
 ```
 +50% Coins        (yellow text)
 +5% Ore Luck      (green text)
-+20 Speed         (light blue text)
-+50% Power        (red text, if we add this)
++20 Speed         (light blue text) - means +20% speed increase
 ```
 
 ## 6. Implementation Tasks
@@ -257,7 +254,7 @@ function getPickaxeAvailability(tier: number, currentTier: number, playerGold: n
         coinBonus: number,
         luckBonus: number,
         speed: number,
-        powerBonus: number
+        // powerBonus removed - pickaxes no longer provide power bonuses (see PowerSystemPlan.md)
       }
     }>
   }
@@ -288,7 +285,7 @@ function getPickaxeAvailability(tier: number, currentTier: number, playerGold: n
   - Coins: Yellow (#FFD700)
   - Luck: Green (#4CAF50)
   - Speed: Light blue (#87CEEB)
-  - Power: Red (#FF5252)
+  - Note: Power is not displayed in pickaxe shop (pickaxes no longer provide power bonuses - see PowerSystemPlan.md)
 
 ### 8.2 Icons
 

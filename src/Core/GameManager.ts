@@ -18,6 +18,7 @@ import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START } from './GameC
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
+import { GemTraderUpgradeSystem } from '../Shop/GemTraderUpgradeSystem';
 import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
 
@@ -37,15 +38,26 @@ interface PlayerAutoState {
   lastAutoTrainPosition?: { x: number; y: number; z: number };
 }
 
+/**
+ * UI modal state for a player
+ */
+interface PlayerModalState {
+  pickaxeModalOpen: boolean;
+  rebirthModalOpen: boolean;
+  lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
+}
+
 export class GameManager {
   private world: World;
   private playerDataMap: Map<Player, PlayerData> = new Map();
   private playerAutoStates: Map<Player, PlayerAutoState> = new Map();
+  private playerModalStates: Map<Player, PlayerModalState> = new Map();
   private trainingController?: TrainingController;
   private miningController?: MiningController;
   private inventoryManager: InventoryManager;
   private sellingSystem: SellingSystem;
   private pickaxeShop: PickaxeShop;
+  private gemTraderUpgradeSystem: GemTraderUpgradeSystem;
   private pickaxeManager: PickaxeManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
@@ -80,6 +92,7 @@ export class GameManager {
     this.inventoryManager = new InventoryManager();
     this.sellingSystem = new SellingSystem(this.inventoryManager);
     this.pickaxeShop = new PickaxeShop(pickaxeManager);
+    this.gemTraderUpgradeSystem = new GemTraderUpgradeSystem();
     
     // Set up callbacks for inventory and shop systems
     this.inventoryManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
@@ -87,9 +100,13 @@ export class GameManager {
     
     this.sellingSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.sellingSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+    this.sellingSystem.setGetMoreCoinsMultiplierCallback((player) => this.gemTraderUpgradeSystem.getMoreCoinsMultiplier(player));
     
     this.pickaxeShop.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.pickaxeShop.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+    
+    this.gemTraderUpgradeSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.gemTraderUpgradeSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
     
     // Initialize training system
     this.trainingController = new TrainingController(world, this);
@@ -101,6 +118,31 @@ export class GameManager {
     
     // Note: UI event handlers are now set up per-player in index.ts
     // This follows the Hytopia SDK pattern of using player.ui.on() instead of world.on()
+  }
+
+  /**
+   * Initializes the player's mine state (creates mining state and generates mine)
+   * Should be called when player joins the server
+   * 
+   * @param player - Player whose mine to initialize
+   */
+  initializePlayerMine(player: Player): void {
+    const pickaxe = this.getPlayerPickaxe(player);
+    if (!pickaxe) {
+      // Can't initialize mine without a pickaxe, skip for now
+      // This should rarely happen as pickaxe is attached during join
+      return;
+    }
+
+    const miningSystem = this.miningController?.getMiningSystem();
+    if (!miningSystem) {
+      return;
+    }
+
+    // Get or create the mining state (this will generate the mine)
+    // We access the private method through a workaround - call preparePlayerMine
+    // which internally calls getOrCreateState, but we don't need the return value
+    miningSystem.preparePlayerMine(player, pickaxe);
   }
 
   /**
@@ -120,6 +162,13 @@ export class GameManager {
     this.playerAutoStates.set(player, {
       autoMineEnabled: false,
       autoTrainEnabled: false,
+    });
+    
+    // Initialize modal state
+    this.playerModalStates.set(player, {
+      pickaxeModalOpen: false,
+      rebirthModalOpen: false,
+      lastModalOpenTime: 0,
     });
     
     this.trainingController?.registerPlayer(player);
@@ -236,7 +285,7 @@ export class GameManager {
     
     const playerData = this.playerDataMap.get(player);
     if (!playerData) {
-      console.warn(`[GameManager] Cannot save - no data for player ${player.username}`);
+
       return false;
     }
     
@@ -250,8 +299,7 @@ export class GameManager {
   private startPeriodicSaves(): void {
     this.periodicSaveInterval = setInterval(async () => {
       const playersToSave = Array.from(this.playerDataMap.keys());
-      console.log(`[GameManager] Periodic save: saving ${playersToSave.length} players`);
-      
+
       for (const player of playersToSave) {
         const playerData = this.playerDataMap.get(player);
         if (playerData) {
@@ -271,14 +319,14 @@ export class GameManager {
   addPower(player: Player, amount: number): number {
     const data = this.getPlayerData(player);
     if (!data) {
-      console.warn('[GameManager] Cannot add power - no player data');
+
       return 0;
     }
 
     const oldPower = data.power;
     data.power += amount;
     this.updatePlayerData(player, data);
-    console.log(`[GameManager] Added ${amount} power. Old: ${oldPower}, New: ${data.power}`);
+
     this.sendPowerStatsToUI(player);
     return data.power;
   }
@@ -298,6 +346,25 @@ export class GameManager {
       player.ui.sendData({
         type: 'GOLD_STATS',
         gold: data.gold,
+      });
+    }
+  }
+
+  /**
+   * Adds gems to player
+   * 
+   * @param player - Player to add gems to
+   * @param amount - Amount of gems to add
+   */
+  addGems(player: Player, amount: number): void {
+    const data = this.getPlayerData(player);
+    if (data) {
+      data.gems += amount;
+      this.updatePlayerData(player, data);
+      // Send gems update to UI
+      player.ui.sendData({
+        type: 'GEMS_STATS',
+        gems: data.gems,
       });
     }
   }
@@ -372,30 +439,99 @@ export class GameManager {
   }
 
   /**
+   * Gets the gem trader upgrade system instance
+   * 
+   * @returns Gem trader upgrade system
+   */
+  getGemTraderUpgradeSystem(): GemTraderUpgradeSystem {
+    return this.gemTraderUpgradeSystem;
+  }
+
+  /**
    * Calculates the cost for a single rebirth
    * Formula: BASE_COST × (1.1 ^ currentRebirths)
    * 
    * @param currentRebirths - Current number of rebirths
    * @returns Cost in power
    */
+  /**
+   * Calculates rebirth cost using piecewise linear function
+   * Reference: Planning/PowerSystemPlan.md section 6 - Rebirth Cost Formula
+   * 
+   * @param currentRebirths - Current number of rebirths (x)
+   * @returns Cost in power for next rebirth (y)
+   */
   calculateRebirthCost(currentRebirths: number): number {
-    const BASE_COST = 1500;
-    return BASE_COST * Math.pow(1.1, currentRebirths);
+    const x = currentRebirths;
+    
+    // Piecewise linear function with multiple segments
+    // Each segment increases cost by 500 power per rebirth, with different base costs
+    if (x >= 1 && x < 6) {
+      return 500 * (x - 1) + 1000; // Ensures continuity at x=6 (cost = 3500)
+    } else if (x >= 6 && x < 11) {
+      return 500 * (x - 6) + 3500;
+    } else if (x >= 11 && x < 16) {
+      return 500 * (x - 11) + 6000;
+    } else if (x >= 16 && x < 21) {
+      return 500 * (x - 16) + 8500;
+    } else if (x >= 21 && x < 26) {
+      return 500 * (x - 21) + 11000;
+    } else if (x >= 26 && x < 31) {
+      return 500 * (x - 26) + 13500;
+    } else if (x >= 31 && x < 36) {
+      return 500 * (x - 31) + 16000;
+    } else if (x >= 36 && x < 41) {
+      return 500 * (x - 36) + 18500;
+    } else if (x >= 41 && x < 47) {
+      return 500 * (x - 41) + 21000;
+    } else if (x >= 47 && x < 57) {
+      return 500 * (x - 47) + 24000;
+    } else if (x >= 57 && x < 77) {
+      return 500 * (x - 57) + 29000;
+    } else if (x >= 77 && x < 97) {
+      return 500 * (x - 77) + 39000;
+    } else if (x >= 97 && x < 117) {
+      return 500 * (x - 97) + 49000;
+    } else if (x >= 117 && x < 137) {
+      return 500 * (x - 117) + 59000;
+    } else if (x >= 137 && x < 157) {
+      return 500 * (x - 137) + 69000;
+    } else if (x >= 157 && x < 207) {
+      return 500 * (x - 157) + 79000;
+    } else if (x >= 207 && x < 257) {
+      return 500 * (x - 207) + 104000;
+    } else if (x >= 257 && x < 307) {
+      return 500 * (x - 257) + 129000;
+    } else if (x >= 307 && x < 357) {
+      return 500 * (x - 307) + 154000;
+    } else if (x >= 357 && x < 457) {
+      return 500 * (x - 357) + 179000;
+    } else if (x >= 457 && x < 2510) {
+      return 500 * (x - 457) + 229000;
+    } else if (x >= 2510 && x < 3760) {
+      return 500 * (x - 2510) + 1250000;
+    } else if (x >= 3760) {
+      return 500 * (x - 3760) + 1880000;
+    } else {
+      // x < 1 (first rebirth)
+      return 1000;
+    }
   }
 
   /**
    * Calculates the total cost for multiple rebirths
+   * When buying multiple rebirths at once, the cost is the NEXT rebirth cost × quantity
+   * This keeps the bundle price constant even though individual rebirth costs increase
    * 
    * @param currentRebirths - Current number of rebirths
    * @param count - Number of rebirths to perform
-   * @returns Total cost in power
+   * @returns Total cost in power (NEXT rebirth cost × count)
    */
   calculateRebirthCostMultiple(currentRebirths: number, count: number): number {
-    let totalCost = 0;
-    for (let i = 0; i < count; i++) {
-      totalCost += this.calculateRebirthCost(currentRebirths + i);
-    }
-    return totalCost;
+    // Get the cost of the NEXT rebirth (currentRebirths + 0)
+    const nextRebirthCost = this.calculateRebirthCost(currentRebirths);
+    // Multiply by the quantity to get the total bundle cost
+    return nextRebirthCost * count;
   }
 
   /**
@@ -458,12 +594,11 @@ export class GameManager {
 
     const currentPower = playerData.power;
     const currentRebirths = playerData.rebirths;
-    const maxRebirths = this.calculateMaxRebirths(player);
-    const maxCost = this.calculateRebirthCostMultiple(currentRebirths, maxRebirths);
 
-    // Predefined options: 1, 5, 20, and max
-    const predefinedCounts = [1, 5, 20];
-    const options = predefinedCounts.map(count => {
+    // Get available rebirth packages based on More Rebirths upgrade level
+    const availablePackages = this.gemTraderUpgradeSystem.getAvailableRebirthPackages(player);
+    
+    const options = availablePackages.map(count => {
       const cost = this.calculateRebirthCostMultiple(currentRebirths, count);
       return {
         count,
@@ -472,21 +607,12 @@ export class GameManager {
       };
     });
 
-    // Add max option
-    if (maxRebirths > 0) {
-      options.push({
-        count: maxRebirths,
-        cost: maxCost,
-        available: true,
-      });
-    }
-
     return {
       currentPower,
       currentRebirths,
       options,
-      maxRebirths,
-      maxCost,
+      maxRebirths: 0, // No longer used, kept for backwards compatibility
+      maxCost: 0, // No longer used, kept for backwards compatibility
     };
   }
 
@@ -566,6 +692,7 @@ export class GameManager {
       type: 'POWER_STATS',
       power: data.power,
       gold: data.gold,
+      gems: data.gems || 0,
       wins: data.wins || 0,
       rebirths: data.rebirths,
     });
@@ -585,8 +712,6 @@ export class GameManager {
 
     autoState.autoMineEnabled = !autoState.autoMineEnabled;
     this.playerAutoStates.set(player, autoState);
-
-    console.log(`[GameManager] Toggling auto mine: ${autoState.autoMineEnabled ? 'ON' : 'OFF'}`);
 
     if (autoState.autoMineEnabled) {
       // Disable auto train when enabling auto mine
@@ -613,15 +738,12 @@ export class GameManager {
    * @param player - Player to start auto mine for
    */
   private startAutoMine(player: Player): void {
-    console.log('[GameManager] Starting auto mine...');
-    
+
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
-      console.warn('[GameManager] Cannot start auto mine - player entity not found');
+
       return;
     }
-
-    console.log('[GameManager] Player entity found, calculating mining area center...');
 
     const miningSystem = this.miningController?.getMiningSystem();
     const mineCenter = miningSystem?.getMineCenter(player);
@@ -632,8 +754,6 @@ export class GameManager {
     const miningState = this.miningController?.getMiningState(player);
     const currentDepth = miningState?.currentDepth ?? MINING_AREA_BOUNDS.y;
 
-    console.log(`[GameManager] Mining area center: (${centerX}, ${currentDepth + 1}, ${centerZ}), currentDepth: ${currentDepth}`);
-
     // Teleport player to center of mining area at current depth
     const targetPosition = {
       x: centerX,
@@ -641,33 +761,29 @@ export class GameManager {
       z: centerZ,
     };
 
-    console.log(`[GameManager] Teleporting player to: (${targetPosition.x}, ${targetPosition.y}, ${targetPosition.z})`);
     this.teleportPlayer(player, targetPosition);
 
     // Wait a moment for teleport, then start mining
     setTimeout(() => {
       const autoState = this.playerAutoStates.get(player);
       if (!autoState?.autoMineEnabled) {
-        console.log('[GameManager] Auto mine was disabled during teleport delay');
+
         return;
       }
-      
-      console.log('[GameManager] Starting mining loop after teleport...');
-      
+
       // Start mining loop
       if (!this.miningController) {
-        console.warn('[GameManager] Cannot start mining - mining controller not available');
+
         return;
       }
       
       if (this.miningController.isPlayerMining(player)) {
-        console.log('[GameManager] Player is already mining, skipping start');
+
         return;
       }
-      
-      console.log('[GameManager] Calling startMiningLoop...');
+
       this.miningController.startMiningLoop(player);
-      console.log('[GameManager] Mining loop started successfully');
+
     }, 500);
 
     // Check periodically if player needs to be recentered after falling down a level
@@ -706,7 +822,7 @@ export class GameManager {
         
         if (isOutsideMiningArea) {
           // Player left the mining area, teleport them back to center
-          console.log(`[GameManager] Player left mining area (pos: ${currentPos.x}, ${currentPos.y}, ${currentPos.z}), teleporting back to center`);
+
           this.teleportPlayer(player, {
             x: centerX,
             y: expectedY,
@@ -722,7 +838,7 @@ export class GameManager {
         if (yDifference > 1.5) {
           // Player fell down a level, recenter them vertically but keep their X/Z position
           // This allows horizontal movement while still keeping them at the right depth
-          console.log(`[GameManager] Player fell down (Y diff: ${yDifference}), recentering vertically`);
+
           this.teleportPlayer(player, {
             x: currentPos.x, // Keep current X position (allow horizontal movement)
             y: expectedY,     // Recenter Y to correct depth
@@ -734,22 +850,97 @@ export class GameManager {
   }
 
   /**
+   * Gets the auto state for a player
+   * 
+   * @param player - Player to get auto state for
+   * @returns Auto state or undefined if not found
+   */
+  getPlayerAutoState(player: Player): PlayerAutoState | undefined {
+    return this.playerAutoStates.get(player);
+  }
+
+  /**
+   * Gets the modal state for a player
+   * 
+   * @param player - Player to get modal state for
+   * @returns Modal state or undefined if not found
+   */
+  getPlayerModalState(player: Player): PlayerModalState | undefined {
+    return this.playerModalStates.get(player);
+  }
+
+  /**
+   * Sets modal open state for a player
+   * 
+   * @param player - Player to update
+   * @param modalType - Type of modal ('pickaxe' or 'rebirth')
+   * @param isOpen - Whether the modal is open
+   */
+  setModalState(player: Player, modalType: 'pickaxe' | 'rebirth', isOpen: boolean): void {
+    const modalState = this.playerModalStates.get(player) || {
+      pickaxeModalOpen: false,
+      rebirthModalOpen: false,
+      lastModalOpenTime: 0,
+    };
+    
+    if (modalType === 'pickaxe') {
+      modalState.pickaxeModalOpen = isOpen;
+    } else if (modalType === 'rebirth') {
+      modalState.rebirthModalOpen = isOpen;
+    }
+    
+    // Update timestamp when opening a modal (to prevent race conditions with clicks)
+    if (isOpen) {
+      modalState.lastModalOpenTime = Date.now();
+    }
+    
+    this.playerModalStates.set(player, modalState);
+  }
+
+  /**
+   * Checks if any blocking modal is open for a player
+   * Blocking modals prevent manual mining
+   * Also checks if a modal was opened very recently (within 200ms) to prevent race conditions
+   * 
+   * @param player - Player to check
+   * @returns True if pickaxe or rebirth modal is open, or if one was opened very recently
+   */
+  isBlockingModalOpen(player: Player): boolean {
+    const modalState = this.playerModalStates.get(player);
+    if (!modalState) return false;
+    
+    // Check if modal is currently open
+    if (modalState.pickaxeModalOpen || modalState.rebirthModalOpen) {
+      return true;
+    }
+    
+    // Check if modal was opened very recently (within 200ms) to prevent race conditions
+    // This handles the case where the click happens before the server receives MODAL_OPENED
+    const timeSinceModalOpen = Date.now() - modalState.lastModalOpenTime;
+    if (timeSinceModalOpen < 200) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
    * Stops auto mine mode
    * 
    * @param player - Player to stop auto mine for
    */
   private stopAutoMine(player: Player): void {
-    console.log('[GameManager] Stopping auto mine...');
+
     const autoState = this.playerAutoStates.get(player);
     if (autoState?.autoMineInterval) {
       clearInterval(autoState.autoMineInterval);
       autoState.autoMineInterval = undefined;
-      console.log('[GameManager] Cleared auto mine interval');
+
     }
     
     // Stop mining loop if active
     if (this.miningController?.isPlayerMining(player)) {
-      console.log('[GameManager] Stopping mining loop...');
+
       this.miningController.stopMiningLoop(player);
     }
   }
@@ -768,8 +959,6 @@ export class GameManager {
 
     autoState.autoTrainEnabled = !autoState.autoTrainEnabled;
     this.playerAutoStates.set(player, autoState);
-
-    console.log(`[GameManager] Toggling auto train: ${autoState.autoTrainEnabled ? 'ON' : 'OFF'}`);
 
     if (autoState.autoTrainEnabled) {
       // Disable auto mine when enabling auto train
@@ -792,89 +981,188 @@ export class GameManager {
 
   /**
    * Starts auto train mode - teleports to best training rock and starts training
+   * Uses the same teleport position and function as manually holding E
    * 
    * @param player - Player to start auto train for
    */
   private startAutoTrain(player: Player): void {
-    console.log('[GameManager] Starting auto train...');
-    
+
     const playerData = this.getPlayerData(player);
     if (!playerData) {
-      console.warn('[GameManager] Cannot start auto train - no player data');
+
       return;
     }
 
     // Find the highest tier training rock the player can access
     const bestRockLocation = this.trainingController?.findBestAccessibleTrainingRock(player);
     if (!bestRockLocation) {
-      console.log('[GameManager] No accessible training rock found');
+
       return;
     }
 
-    console.log(`[GameManager] Found best training rock: ${bestRockLocation.rockData.name} at (${bestRockLocation.position.x}, ${bestRockLocation.position.y}, ${bestRockLocation.position.z})`);
-
-    // Calculate teleport position (same as TrainingController uses)
-    const standPosition = {
-      x: bestRockLocation.position.x,
-      y: bestRockLocation.position.y + 1.6, // Position on top with offset
-      z: bestRockLocation.position.z + 1, // Move back slightly
+    // First, teleport player to a position within the training rock bounds
+    // This is required because startTraining checks proximity before teleporting
+    // Calculate a position within the bounds (center of the bounds area)
+    const bounds = bestRockLocation.bounds;
+    let teleportX = bestRockLocation.position.x;
+    let teleportZ = -9.27; // Default Z (forward of the ore blocks)
+    
+    // If bounds exist, use a position within them
+    if (bounds) {
+      teleportX = (bounds.minX + bounds.maxX) / 2; // Center of bounds in X
+      teleportZ = (bounds.minZ + bounds.maxZ) / 2; // Center of bounds in Z
+    }
+    
+    const initialTeleportPosition = {
+      x: teleportX,
+      y: 1.75, // Ground level
+      z: teleportZ,
     };
+    
+    // Teleport player to be within bounds first
 
-    // Teleport player to the training rock
-    console.log(`[GameManager] Teleporting player to training rock: (${standPosition.x}, ${standPosition.y}, ${standPosition.z})`);
-    this.teleportPlayer(player, standPosition);
-
-    // Wait a moment, then start training automatically
+    this.teleportPlayer(player, initialTeleportPosition);
+    
+    // Wait a moment for teleport to complete, then start training
     setTimeout(() => {
       const autoState = this.playerAutoStates.get(player);
       if (!autoState?.autoTrainEnabled) {
-        console.log('[GameManager] Auto train was disabled during teleport delay');
+
         return;
       }
 
-      console.log('[GameManager] Starting training automatically...');
-      
-      // Start training automatically (pass the full location)
-      // This will start training without needing to hold E
+      // Now use the same function as holding E - this will teleport to exact position and start training
+      // startTraining will teleport to: x: rock.position.x, y: 1.75, z: -9.27
       const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
       
       if (!trainingStarted) {
-        console.warn('[GameManager] Failed to start training');
+
         return;
       }
 
       // Store position to detect if player leaves training area
+      // Use the same teleport position that startTraining uses
+      const standPosition = {
+        x: bestRockLocation.position.x, // Same X as the ore block
+        y: 1.75, // Fixed Y position
+        z: -9.27, // Fixed Z position (forward of the ore blocks)
+      };
+
       const playerEntity = this.getPlayerEntity(player);
       if (playerEntity && autoState) {
-        autoState.lastAutoTrainPosition = {
-          x: standPosition.x,
-          y: standPosition.y,
-          z: standPosition.z,
-        };
+        autoState.lastAutoTrainPosition = standPosition;
 
         // Check periodically if player moved away from training rock
-        // Stop auto train if they move (unlike auto mine which teleports back)
+        // Also check if player can access a higher-tier training rock
         autoState.autoTrainStopCheckInterval = setInterval(() => {
           if (!autoState.autoTrainEnabled) return;
+
+          // If training was stopped (e.g., by velocity monitoring detecting movement), turn off auto-train
+          if (!this.trainingController?.isPlayerTraining(player)) {
+
+            this.toggleAutoTrain(player);
+            return;
+          }
 
           const playerEnt = this.getPlayerEntity(player);
           if (!playerEnt || !autoState.lastAutoTrainPosition) return;
 
-          const currentPos = playerEnt.position;
-          const distance = Math.sqrt(
-            Math.pow(currentPos.x - autoState.lastAutoTrainPosition.x, 2) +
-            Math.pow(currentPos.y - autoState.lastAutoTrainPosition.y, 2) +
-            Math.pow(currentPos.z - autoState.lastAutoTrainPosition.z, 2)
+          // FIRST: Check for movement - if player moves, turn off auto-train immediately
+          // Check for movement input first (WASD or space/jump)
+          const input = player.input;
+          const hasMovementInput = Boolean(
+            input?.['w'] || input?.['a'] || input?.['s'] || input?.['d'] ||
+            input?.['W'] || input?.['A'] || input?.['S'] || input?.['D'] ||
+            input?.[' '] // Space bar for jumping
           );
 
-          // If player moved more than 1.5 blocks away, stop auto train
-          if (distance > 1.5) {
-            console.log(`[GameManager] Player moved away from training rock (distance: ${distance.toFixed(2)}), stopping auto train`);
-            this.toggleAutoTrain(player);
+          // Check velocity if available
+          let hasVelocityMovement = false;
+          try {
+            const velocity = (playerEnt as any).velocity;
+            if (velocity) {
+              const vx = velocity.x || 0;
+              const vy = velocity.y || 0;
+              const vz = velocity.z || 0;
+              const horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
+              const verticalVelocity = Math.abs(vy);
+              hasVelocityMovement = horizontalVelocity > 0.1 || verticalVelocity > 0.1;
+            }
+          } catch (e) {
+            // Velocity not available, use position-based check
           }
-        }, 500); // Check every 0.5 seconds
+
+          // Check position distance
+          const currentPos = playerEnt.position;
+          const dx = currentPos.x - autoState.lastAutoTrainPosition.x;
+          const dy = currentPos.y - autoState.lastAutoTrainPosition.y;
+          const dz = currentPos.z - autoState.lastAutoTrainPosition.z;
+          const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+          const verticalDistance = Math.abs(dy);
+          const hasPositionMovement = horizontalDistance > 0.3 || verticalDistance > 0.3;
+
+          // If ANY movement detected (input, velocity, or position), turn off auto-train immediately
+          if (hasMovementInput || hasVelocityMovement || hasPositionMovement) {
+
+            this.toggleAutoTrain(player);
+            return; // Stop checking - auto-train is being turned off
+          }
+
+          // SECOND: Check if player can access a better training rock (higher tier)
+          const bestRockLocation = this.trainingController?.findBestAccessibleTrainingRock(player);
+          if (bestRockLocation) {
+            // Get the current training rock the player is on
+            const currentTrainingRock = this.trainingController?.getCurrentTrainingRock(player);
+            
+            // If we're not on the best rock (or not training), switch to it
+            // This allows players to automatically upgrade to higher-tier rocks as they gain power/rebirths
+            if (!currentTrainingRock || currentTrainingRock.rockData.id !== bestRockLocation.rockData.id) {
+
+              // Stop current training if any
+              if (this.trainingController?.isPlayerTraining(player)) {
+                this.trainingController.stopTraining(player);
+              }
+              
+              // Teleport to the new training rock and start training
+              const bounds = bestRockLocation.bounds;
+              let teleportX = bestRockLocation.position.x;
+              let teleportZ = -9.27;
+              
+              if (bounds) {
+                teleportX = (bounds.minX + bounds.maxX) / 2;
+                teleportZ = (bounds.minZ + bounds.maxZ) / 2;
+              }
+              
+              const initialTeleportPosition = {
+                x: teleportX,
+                y: 1.75,
+                z: teleportZ,
+              };
+              
+              this.teleportPlayer(player, initialTeleportPosition);
+              
+              // Wait a moment, then start training on the new rock
+              setTimeout(() => {
+                if (!autoState?.autoTrainEnabled) return;
+                
+                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+                if (trainingStarted) {
+                  const newStandPosition = {
+                    x: bestRockLocation.position.x,
+                    y: 1.75,
+                    z: -9.27,
+                  };
+                  autoState.lastAutoTrainPosition = newStandPosition;
+
+                }
+              }, 200);
+              
+              return; // Skip rest of checks this cycle since we're switching rocks
+            }
+          }
+        }, 2000); // Check every 2 seconds (less frequent since we're also checking for upgrades)
       }
-    }, 500);
+    }, 200); // Small delay to allow initial teleport to complete
   }
 
   /**
@@ -883,17 +1171,17 @@ export class GameManager {
    * @param player - Player to stop auto train for
    */
   private stopAutoTrain(player: Player): void {
-    console.log('[GameManager] Stopping auto train...');
+
     const autoState = this.playerAutoStates.get(player);
     if (autoState?.autoTrainStopCheckInterval) {
       clearInterval(autoState.autoTrainStopCheckInterval);
       autoState.autoTrainStopCheckInterval = undefined;
-      console.log('[GameManager] Cleared auto train interval');
+
     }
     
     // Stop training if active
     if (this.trainingController?.isPlayerTraining(player)) {
-      console.log('[GameManager] Stopping training...');
+
       this.trainingController.stopTraining(player);
     }
   }
@@ -921,6 +1209,9 @@ export class GameManager {
 
     // Stop mining if active
     this.miningController?.stopMiningLoop(player);
+    
+    // Stop block detection when leaving mine (this also clears the UI)
+    this.miningController?.stopBlockDetection(player);
 
     // NOTE: Do NOT stop the mine reset timer when manually teleporting
     // The timer should continue running and be visible even on surface
@@ -951,7 +1242,7 @@ export class GameManager {
 
     const pickaxe = this.getPlayerPickaxe(player);
     if (!pickaxe) {
-      console.warn('[GameManager] Cannot enter mine - no pickaxe');
+
       return;
     }
 
@@ -968,6 +1259,14 @@ export class GameManager {
     if (this.mineResetTimers.has(player)) {
       this.updateMineResetTimerUI(player);
     }
+
+    // Start block detection to show what block player is standing on
+    // Wait a moment for teleport to complete
+    setTimeout(() => {
+      if (this.miningController) {
+        this.miningController.startBlockDetection(player);
+      }
+    }, 300);
   }
 
   /**
@@ -988,8 +1287,6 @@ export class GameManager {
 
     const startTime = Date.now();
     this.mineResetStartTimes.set(player, startTime);
-
-    console.log(`[GameManager] Starting mine reset timer for ${player.username} (${hasUpgrade ? '5 minutes' : '2 minutes'})`);
 
     // Update UI immediately
     this.updateMineResetTimerUI(player);
@@ -1083,8 +1380,6 @@ export class GameManager {
       gold: playerData.gold,
     });
 
-    console.log(`[GameManager] Player ${player.username} purchased mine reset upgrade`);
-
     return {
       success: true,
       remainingGold: playerData.gold,
@@ -1098,7 +1393,6 @@ export class GameManager {
    * @param player - Player whose timer expired
    */
   private onMineResetTimerExpired(player: Player): void {
-    console.log(`[GameManager] Mine reset timer expired for ${player.username}`);
 
     // Stop timer updates
     this.stopMineResetTimer(player);
@@ -1186,7 +1480,7 @@ export class GameManager {
     if (rigidBody && typeof rigidBody.setPosition === 'function') {
       rigidBody.setPosition(position);
     } else {
-      console.warn('[GameManager] Could not teleport player - no setPosition method available');
+
     }
   }
 
@@ -1213,9 +1507,7 @@ export class GameManager {
     // MINE_DEPTH_START is 0, so if currentDepth is -20, blocksMined = 0 - (-20) = 20
     // Ensure we always get a positive value (player should be at or below starting depth)
     const blocksMined = Math.max(0, MINE_DEPTH_START - currentDepth);
-    
-    console.log(`[GameManager] Progress update: currentDepth=${currentDepth}, blocksMined=${blocksMined}, MINE_DEPTH_START=${MINE_DEPTH_START}`);
-    
+
     player.ui.sendData({
       type: 'PROGRESS_UPDATE',
       currentDepth: blocksMined, // Blocks mined from start (should be positive)
@@ -1301,7 +1593,7 @@ export class GameManager {
           try {
             this.world.chunkLattice.setBlock({ x, y, z }, 0);
           } catch (err) {
-            console.warn(`[GameManager] Failed to carve shaft block at ${x},${y},${z}`, err);
+
           }
         }
       }
@@ -1316,7 +1608,7 @@ export class GameManager {
           try {
             this.world.chunkLattice.setBlock({ x, y, z }, dirtId);
           } catch (err) {
-            console.warn(`[GameManager] Failed to place wall block at ${x},${y},${z}`, err);
+
           }
         }
       }
@@ -1329,12 +1621,11 @@ export class GameManager {
         try {
           this.world.chunkLattice.setBlock({ x, y: voidY, z }, voidId);
         } catch (err) {
-          console.warn(`[GameManager] Failed to place void block at ${x},${voidY},${z}`, err);
+
         }
       }
     }
 
-    console.log('[GameManager] Shared mine shaft carved with dirt walls and full void floor.');
   }
 
   /**

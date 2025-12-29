@@ -29,6 +29,7 @@ import {
   PlayerEvent,
   PlayerUIEvent,
 } from 'hytopia';
+import { ORE_DATABASE, OreType } from './src/Mining/Ore/OreData';
 
 import worldMap from './assets/map.json';
 import { GameManager } from './src/Core/GameManager';
@@ -36,6 +37,8 @@ import { PickaxeManager } from './src/Pickaxe/PickaxeManager';
 import { MiningPlayerEntity } from './src/Core/MiningPlayerEntity';
 import { MerchantEntity } from './src/Shop/MerchantEntity';
 import { MineResetUpgradeNPC } from './src/Shop/MineResetUpgradeNPC';
+import { GemTraderEntity } from './src/Shop/GemTraderEntity';
+import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 
 /**
  * startServer is always the entry point for our game.
@@ -61,7 +64,7 @@ startServer(world => {
   
   world.simulation.enableDebugRendering(true);
   if ((world.simulation as any).enableDebugRaycasting) {
-    console.log('[Server] Enabling simulation debug raycasting visuals');
+
     (world.simulation as any).enableDebugRaycasting(true);
   }
 
@@ -111,6 +114,17 @@ startServer(world => {
   mineResetUpgradeNPC.spawn();
 
   /**
+   * Spawn Gem Trader Entity
+   * NPC is located at the specified position and allows players to purchase gem upgrades
+   */
+  const gemTraderEntity = new GemTraderEntity(
+    world,
+    { x: 14.83, y: 1.75, z: 9.29 },
+    'models/npcs/villager.gltf'
+  );
+  gemTraderEntity.spawn();
+
+  /**
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
@@ -120,16 +134,35 @@ startServer(world => {
       const inventory = gameManager.getInventoryManager().getInventory(player);
       const playerData = gameManager.getPlayerData(player);
       
-      // Get player's pickaxe for sell value multiplier (REBALANCED)
+      // Use SellingSystem to get total value with all multipliers (pickaxe + More Coins)
+      const totalValue = gameManager.getSellingSystem().getSellValue(player);
+      
+      // Calculate sell values per ore with all multipliers for UI display
       const pickaxe = gameManager.getPlayerPickaxe(player);
-      const sellMultiplier = pickaxe?.sellValueMultiplier ?? 1.0;
-      const totalValue = gameManager.getInventoryManager().calculateTotalValue(player, sellMultiplier);
+      const pickaxeMultiplier = pickaxe?.sellValueMultiplier ?? 1.0;
+      const moreCoinsMultiplier = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
+      const sellMultiplier = pickaxeMultiplier * moreCoinsMultiplier;
+      
+      const oreSellValues: Record<string, number> = {};
+      for (const [oreType, amount] of Object.entries(inventory)) {
+        if (amount > 0) {
+          const oreData = ORE_DATABASE[oreType as OreType];
+          if (oreData) {
+            // Calculate sell value per unit with multipliers
+            let sellValue = oreData.value * sellMultiplier;
+            // Round to nearest 5
+            sellValue = Math.round(sellValue / 5) * 5;
+            oreSellValues[oreType] = sellValue;
+          }
+        }
+      }
       
       player.ui.sendData({
         type: 'MERCHANT_PROXIMITY',
         inProximity: true,
         inventory,
         totalValue,
+        oreSellValues, // Send sell values per ore with multipliers
         gold: playerData?.gold || 0,
       });
     } else {
@@ -170,6 +203,58 @@ startServer(world => {
   };
 
   /**
+   * Handle gem trader proximity events
+   * When player enters/leaves gem trader proximity, show/hide upgrades UI
+   */
+  gemTraderEntity.onProximityChange = (player, inProximity, distance) => {
+    if (inProximity) {
+      // Player entered proximity - send upgrade data to show UI
+      const playerData = gameManager.getPlayerData(player);
+      const upgradeSystem = gameManager.getGemTraderUpgradeSystem();
+      
+      // Get upgrade info for all upgrade types
+      const moreGemsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_GEMS);
+      const moreRebirthsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_REBIRTHS);
+      const moreCoinsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_COINS);
+      const moreDamageInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_DAMAGE);
+
+      player.ui.sendData({
+        type: 'GEM_TRADER_PROXIMITY',
+        inProximity: true,
+        gems: playerData?.gems || 0,
+        upgrades: {
+          moreGems: {
+            level: moreGemsInfo.currentLevel,
+            cost: moreGemsInfo.nextLevelCost,
+            canAfford: moreGemsInfo.canAfford,
+          },
+          moreRebirths: {
+            level: moreRebirthsInfo.currentLevel,
+            cost: moreRebirthsInfo.nextLevelCost,
+            canAfford: moreRebirthsInfo.canAfford,
+          },
+          moreCoins: {
+            level: moreCoinsInfo.currentLevel,
+            cost: moreCoinsInfo.nextLevelCost,
+            canAfford: moreCoinsInfo.canAfford,
+          },
+          moreDamage: {
+            level: moreDamageInfo.currentLevel,
+            cost: moreDamageInfo.nextLevelCost,
+            canAfford: moreDamageInfo.canAfford,
+          },
+        },
+      });
+    } else {
+      // Player left proximity - hide UI
+      player.ui.sendData({
+        type: 'GEM_TRADER_PROXIMITY',
+        inProximity: false,
+      });
+    }
+  };
+
+  /**
    * Handle player joining the game. The PlayerEvent.JOINED_WORLD
    * event is emitted to the world when a new player connects to
    * the game. From here, we create a basic player
@@ -186,6 +271,8 @@ startServer(world => {
     merchantEntity.addPlayer(player);
     // Add player to mine reset upgrade NPC tracking
     mineResetUpgradeNPC.addPlayer(player);
+    // Add player to gem trader tracking
+    gemTraderEntity.addPlayer(player);
     
     // Initialize player data with defaults first (synchronous)
     // This ensures entity can spawn immediately for proper camera setup
@@ -221,12 +308,15 @@ startServer(world => {
       
       // Store interval ID for cleanup
       (player as any).__zoomLockInterval = zoomLockInterval;
-      
-      console.log(`[Server] Set camera zoom to ${LOCKED_ZOOM} and locked for ${player.username}`);
+
     }, 300);
 
     // Attach pickaxe to player (spawns with default tier 0 - Rusty pickaxe)
     pickaxeManager.attachPickaxeToPlayer(player, defaultPlayerData.currentPickaxeTier);
+    
+    // Initialize player's mine (creates mining state and generates mine)
+    // This ensures the mine is ready for auto-mine and manual mining
+    gameManager.initializePlayerMine(player);
     
     // Load saved data in background and update if different
     // This doesn't block entity spawning, so camera works correctly
@@ -240,13 +330,15 @@ startServer(world => {
         // Update pickaxe if tier changed
         if (loadedData.currentPickaxeTier !== defaultPlayerData.currentPickaxeTier) {
           pickaxeManager.attachPickaxeToPlayer(player, loadedData.currentPickaxeTier);
+          // Re-initialize mine with new pickaxe (in case mine generation depends on pickaxe)
+          gameManager.initializePlayerMine(player);
         }
         
         // IMPORTANT: Update UI with loaded data after a brief delay
         // This ensures the UI is fully loaded before we send the update
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
-          console.log(`[Server] ✅ Updated UI with loaded data for ${player.username} (Power: ${loadedData.power}, Gold: ${loadedData.gold})`);
+
         }, 100);
       } else if (currentData) {
         // Even if no saved data, ensure UI is updated with current data
@@ -255,7 +347,7 @@ startServer(world => {
         }, 100);
       }
     }).catch(error => {
-      console.error(`[Server] Failed to load player data for ${player.username}:`, error);
+
       // Still update UI with defaults if load fails
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
@@ -275,77 +367,108 @@ startServer(world => {
     // Set up per-player UI event handler (as per Hytopia SDK guide)
     // This listens for data sent from this specific player's UI
     player.ui.on(PlayerUIEvent.DATA, ({ playerUI, data }) => {
-      console.log(`[Server] Received UI data from player ${player.username}:`, data);
-      
+
       if (!data || typeof data !== 'object') {
-        console.warn(`[Server] Invalid UI data from ${player.username}:`, data);
+
         return;
       }
 
-      console.log(`[Server] Processing UI event type: ${data.type} for player: ${player.username}`);
-
       switch (data.type) {
         case 'TOGGLE_AUTO_MINE':
-          console.log(`[Server] TOGGLE_AUTO_MINE event received for ${player.username}, calling toggleAutoMine`);
+
           gameManager.toggleAutoMine(player);
           break;
         case 'TOGGLE_AUTO_TRAIN':
-          console.log(`[Server] TOGGLE_AUTO_TRAIN event received for ${player.username}, calling toggleAutoTrain`);
+
           gameManager.toggleAutoTrain(player);
           break;
         case 'TELEPORT_TO_SURFACE':
-          console.log(`[Server] TELEPORT_TO_SURFACE event received for ${player.username}, calling teleportToSurface`);
+
           gameManager.teleportToSurface(player);
           break;
         case 'SELL_ORE':
-          console.log(`[Server] SELL_ORE event received for ${player.username}, oreType: ${data.oreType}`);
           const goldEarned = gameManager.getSellingSystem().sellOre(player, data.oreType, 1);
           // Send updated inventory and gold
           const inventoryAfterSell = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSell = gameManager.getPlayerData(player);
           
-          // Get player's pickaxe for sell value multiplier (REBALANCED)
+          // Calculate totalValue with all multipliers using SellingSystem
+          const totalValueAfterSell = gameManager.getSellingSystem().getSellValue(player);
+          
+          // Calculate sell values per ore with all multipliers for UI display
           const pickaxeAfterSell = gameManager.getPlayerPickaxe(player);
-          const sellMultiplierAfterSell = pickaxeAfterSell?.sellValueMultiplier ?? 1.0;
-          const totalValueAfterSell = gameManager.getInventoryManager().calculateTotalValue(player, sellMultiplierAfterSell);
+          const pickaxeMultiplierAfterSell = pickaxeAfterSell?.sellValueMultiplier ?? 1.0;
+          const moreCoinsMultiplierAfterSell = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
+          const sellMultiplierAfterSell = pickaxeMultiplierAfterSell * moreCoinsMultiplierAfterSell;
+          
+          const oreSellValuesAfterSell: Record<string, number> = {};
+          for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
+            if (amount > 0) {
+              const oreData = ORE_DATABASE[oreType as OreType];
+              if (oreData) {
+                let sellValue = oreData.value * sellMultiplierAfterSell;
+                sellValue = Math.round(sellValue / 5) * 5;
+                oreSellValuesAfterSell[oreType] = sellValue;
+              }
+            }
+          }
           
           player.ui.sendData({
             type: 'INVENTORY_UPDATE',
             inventory: inventoryAfterSell,
             totalValue: totalValueAfterSell,
+            oreSellValues: oreSellValuesAfterSell,
             gold: playerDataAfterSell?.gold || 0,
             goldEarned,
           });
           break;
         case 'SELL_ALL':
-          console.log(`[Server] SELL_ALL event received for ${player.username}`);
           const totalGoldEarned = gameManager.getSellingSystem().sellAll(player);
           // Send updated inventory and gold
           const inventoryAfterSellAll = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSellAll = gameManager.getPlayerData(player);
           
-          // Get player's pickaxe for sell value multiplier (REBALANCED)
+          // Calculate totalValue with all multipliers using SellingSystem
+          const totalValueAfterSellAll = gameManager.getSellingSystem().getSellValue(player);
+          
+          // Calculate sell values per ore with all multipliers for UI display
           const pickaxeAfterSellAll = gameManager.getPlayerPickaxe(player);
-          const sellMultiplierAfterSellAll = pickaxeAfterSellAll?.sellValueMultiplier ?? 1.0;
-          const totalValueAfterSellAll = gameManager.getInventoryManager().calculateTotalValue(player, sellMultiplierAfterSellAll);
+          const pickaxeMultiplierAfterSellAll = pickaxeAfterSellAll?.sellValueMultiplier ?? 1.0;
+          const moreCoinsMultiplierAfterSellAll = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
+          const sellMultiplierAfterSellAll = pickaxeMultiplierAfterSellAll * moreCoinsMultiplierAfterSellAll;
+          
+          const oreSellValuesAfterSellAll: Record<string, number> = {};
+          for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
+            if (amount > 0) {
+              const oreData = ORE_DATABASE[oreType as OreType];
+              if (oreData) {
+                let sellValue = oreData.value * sellMultiplierAfterSellAll;
+                sellValue = Math.round(sellValue / 5) * 5;
+                oreSellValuesAfterSellAll[oreType] = sellValue;
+              }
+            }
+          }
           
           player.ui.sendData({
             type: 'INVENTORY_UPDATE',
             inventory: inventoryAfterSellAll,
             totalValue: totalValueAfterSellAll,
+            oreSellValues: oreSellValuesAfterSellAll,
             gold: playerDataAfterSellAll?.gold || 0,
             goldEarned: totalGoldEarned,
           });
           break;
         case 'CLOSE_MERCHANT_UI':
-          console.log(`[Server] CLOSE_MERCHANT_UI event received for ${player.username}`);
+
           player.ui.sendData({
             type: 'MERCHANT_PROXIMITY',
             inProximity: false,
           });
           break;
         case 'OPEN_PICKAXE_SHOP':
-          console.log(`[Server] OPEN_PICKAXE_SHOP event received for ${player.username}`);
+
+          // Modal state should already be set by MODAL_OPENED event, but set it here too as backup
+          gameManager.setModalState(player, 'pickaxe', true);
           const shopData = gameManager.getPickaxeShop().getShopData(player);
           player.ui.sendData({
             type: 'PICKAXE_SHOP_DATA',
@@ -354,8 +477,30 @@ startServer(world => {
             pickaxes: shopData.pickaxes,
           });
           break;
+        case 'MODAL_OPENED':
+
+          if (data.modalType === 'pickaxe' || data.modalType === 'rebirth') {
+            gameManager.setModalState(player, data.modalType, true);
+            // Stop any active manual mining when modal opens
+            const miningController = gameManager.getMiningController();
+            if (miningController && miningController.isPlayerMining(player)) {
+              const autoState = gameManager.getPlayerAutoState(player);
+              // Only stop if auto-mine is NOT enabled (manual mining)
+              if (!autoState?.autoMineEnabled) {
+
+                miningController.stopMiningLoop(player);
+              }
+            }
+          }
+          break;
+        case 'MODAL_CLOSED':
+
+          if (data.modalType === 'pickaxe' || data.modalType === 'rebirth') {
+            gameManager.setModalState(player, data.modalType, false);
+          }
+          break;
         case 'BUY_PICKAXE':
-          console.log(`[Server] BUY_PICKAXE event received for ${player.username}, tier: ${data.tier}`);
+
           const result = gameManager.getPickaxeShop().buyPickaxe(player, data.tier);
           const playerDataAfterPurchase = gameManager.getPlayerData(player);
           if (result.success) {
@@ -376,8 +521,36 @@ startServer(world => {
             });
           }
           break;
+        case 'EQUIP_PICKAXE':
+
+          const equipResult = gameManager.getPickaxeShop().equipPickaxe(player, data.tier);
+          if (equipResult.success) {
+            player.ui.sendData({
+              type: 'PICKAXE_EQUIPPED',
+              success: true,
+              newTier: data.tier,
+              message: equipResult.message,
+            });
+            // Refresh shop data to show updated equipped status
+            const updatedShopData = gameManager.getPickaxeShop().getShopData(player);
+            player.ui.sendData({
+              type: 'PICKAXE_SHOP_DATA',
+              currentTier: updatedShopData.currentTier,
+              gold: updatedShopData.playerGold,
+              pickaxes: updatedShopData.pickaxes,
+            });
+          } else {
+            player.ui.sendData({
+              type: 'PICKAXE_EQUIPPED',
+              success: false,
+              message: equipResult.message,
+            });
+          }
+          break;
         case 'OPEN_REBIRTH_UI':
-          console.log(`[Server] OPEN_REBIRTH_UI event received for ${player.username}`);
+
+          // Modal state should already be set by MODAL_OPENED event, but set it here too as backup
+          gameManager.setModalState(player, 'rebirth', true);
           const rebirthData = gameManager.getRebirthUIData(player);
           player.ui.sendData({
             type: 'REBIRTH_UI_DATA',
@@ -386,10 +559,11 @@ startServer(world => {
             options: rebirthData.options,
             maxRebirths: rebirthData.maxRebirths,
             maxCost: rebirthData.maxCost,
+            canRebirth: rebirthData.options.some(opt => opt.available),
           });
           break;
         case 'PERFORM_REBIRTH':
-          console.log(`[Server] PERFORM_REBIRTH event received for ${player.username}, count: ${data.rebirthCount}`);
+
           const rebirthResult = gameManager.performRebirth(player, data.rebirthCount);
           if (rebirthResult.success) {
             player.ui.sendData({
@@ -410,8 +584,89 @@ startServer(world => {
             });
           }
           break;
+        case 'PURCHASE_UPGRADE':
+
+          // Map UI upgrade type string to enum
+          let upgradeType: UpgradeType;
+          switch (data.upgradeType) {
+            case 'moreGems':
+              upgradeType = UpgradeType.MORE_GEMS;
+              break;
+            case 'moreRebirths':
+              upgradeType = UpgradeType.MORE_REBIRTHS;
+              break;
+            case 'moreCoins':
+              upgradeType = UpgradeType.MORE_COINS;
+              break;
+            case 'moreDamage':
+              upgradeType = UpgradeType.MORE_DAMAGE;
+              break;
+            default:
+
+              return;
+          }
+          
+          const upgradeSystem = gameManager.getGemTraderUpgradeSystem();
+          const upgradePurchaseResult = upgradeSystem.purchaseUpgrade(player, upgradeType);
+          const upgradePlayerDataAfterPurchase = gameManager.getPlayerData(player);
+          
+          if (upgradePurchaseResult.success) {
+            // Send success response and update UI
+            player.ui.sendData({
+              type: 'UPGRADE_PURCHASED',
+              success: true,
+              upgradeType: data.upgradeType,
+              newLevel: upgradePurchaseResult.newLevel,
+              cost: upgradePurchaseResult.cost,
+              remainingGems: upgradePurchaseResult.remainingGems,
+            });
+            // Send updated stats
+            gameManager.sendPowerStatsToUI(player);
+            // Re-send proximity data to refresh UI with updated upgrade info
+            const updatedPlayerData = gameManager.getPlayerData(player);
+            const updatedMoreGemsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_GEMS);
+            const updatedMoreRebirthsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_REBIRTHS);
+            const updatedMoreCoinsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_COINS);
+            const updatedMoreDamageInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_DAMAGE);
+            
+            player.ui.sendData({
+              type: 'GEM_TRADER_PROXIMITY',
+              inProximity: true,
+              gems: updatedPlayerData?.gems || 0,
+              upgrades: {
+                moreGems: {
+                  level: updatedMoreGemsInfo.currentLevel,
+                  cost: updatedMoreGemsInfo.nextLevelCost,
+                  canAfford: updatedMoreGemsInfo.canAfford,
+                },
+                moreRebirths: {
+                  level: updatedMoreRebirthsInfo.currentLevel,
+                  cost: updatedMoreRebirthsInfo.nextLevelCost,
+                  canAfford: updatedMoreRebirthsInfo.canAfford,
+                },
+                moreCoins: {
+                  level: updatedMoreCoinsInfo.currentLevel,
+                  cost: updatedMoreCoinsInfo.nextLevelCost,
+                  canAfford: updatedMoreCoinsInfo.canAfford,
+                },
+                moreDamage: {
+                  level: updatedMoreDamageInfo.currentLevel,
+                  cost: updatedMoreDamageInfo.nextLevelCost,
+                  canAfford: updatedMoreDamageInfo.canAfford,
+                },
+              },
+            });
+          } else {
+            player.ui.sendData({
+              type: 'UPGRADE_PURCHASED',
+              success: false,
+              error: upgradePurchaseResult.error,
+              upgradeType: data.upgradeType,
+            });
+          }
+          break;
         case 'PURCHASE_MINE_RESET_UPGRADE':
-          console.log(`[Server] PURCHASE_MINE_RESET_UPGRADE event received for ${player.username}`);
+
           const purchaseResult = gameManager.purchaseMineResetUpgrade(player);
           const updatedPlayerData = gameManager.getPlayerData(player);
           const hasUpgrade = updatedPlayerData?.mineResetUpgradePurchased ?? false;
@@ -438,14 +693,14 @@ startServer(world => {
           }
           break;
         case 'CLOSE_MINE_RESET_UPGRADE_UI':
-          console.log(`[Server] CLOSE_MINE_RESET_UPGRADE_UI event received for ${player.username}`);
+
           player.ui.sendData({
             type: 'MINE_RESET_UPGRADE_PROXIMITY',
             inProximity: false,
           });
           break;
         default:
-          console.log(`[Server] Unknown UI event type from ${player.username}:`, data.type);
+
       }
     });
     
@@ -461,14 +716,43 @@ startServer(world => {
     
     // Set up left click callbacks (like NewGame does with shoot)
     playerEntity.setOnLeftClickStart(() => {
-      // Just started holding - start mining loop
+      // Don't allow manual mining if:
+      // 1. Auto-mine is enabled (it handles mining automatically)
+      // 2. A blocking modal (pickaxe or rebirth) is open
+      const autoState = gameManager.getPlayerAutoState(player);
+      if (autoState?.autoMineEnabled) {
+        // Auto-mine is on - don't allow manual clicks to mine
+        return;
+      }
+      
+      // Check if any blocking modal is open
+      if (gameManager.isBlockingModalOpen(player)) {
+        // Modal is open - don't allow manual mining
+        // Auto-mine can still work, but manual clicks are blocked
+        return;
+      }
+      
+      // Auto-mine is off and no blocking modals - allow manual mining
       if (miningController && !miningController.isPlayerMining(player)) {
         miningController.startMiningLoop(player);
       }
     });
     
     playerEntity.setOnLeftClickStop(() => {
-      // Just released - stop mining loop
+      // Only stop manual mining if auto-mine is disabled and no blocking modals
+      const autoState = gameManager.getPlayerAutoState(player);
+      if (autoState?.autoMineEnabled) {
+        // Auto-mine is on - don't stop mining on click release
+        return;
+      }
+      
+      // Check if any blocking modal is open
+      if (gameManager.isBlockingModalOpen(player)) {
+        // Modal is open - don't process click release
+        return;
+      }
+      
+      // Auto-mine is off and no blocking modals - allow stopping manual mining
       if (miningController && miningController.isPlayerMining(player)) {
         miningController.stopMiningLoop(player);
       }

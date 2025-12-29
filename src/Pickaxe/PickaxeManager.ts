@@ -60,14 +60,12 @@ export class PickaxeManager {
 
     const pickaxe = getPickaxeByTier(pickaxeTier);
     if (!pickaxe) {
-      console.warn(`Pickaxe tier ${pickaxeTier} not found`);
       return;
     }
 
     // Get player entity
     const playerEntities = this.world.entityManager.getPlayerEntitiesByPlayer(player);
     if (playerEntities.length === 0) {
-      console.warn('Player entity not found when trying to attach pickaxe');
       return;
     }
 
@@ -151,7 +149,6 @@ export class PickaxeManager {
       }
       
       if (!attached) {
-        console.warn(`[PickaxeManager] Could not attach to any hand anchor, attaching to root`);
         try {
           pickaxeEntity.setParent(
             playerEntity,
@@ -160,7 +157,6 @@ export class PickaxeManager {
             { x: 0, y: 0, z: 0, w: 1 }
           );
         } catch (error) {
-          console.error(`[PickaxeManager] Failed to attach pickaxe:`, error);
         }
       }
     }, 100);

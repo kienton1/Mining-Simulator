@@ -15,13 +15,21 @@ import {
 
 /**
  * Training rock tier enumeration
+ * Updated to 6 tiers based on block types:
+ * - DIRT: Cobblestone block (+1 Power) - always available
+ * - COBBLESTONE: Deepslate Iron Ore block (+3 Power)
+ * - IRON_DEEPSLATE: Deepslate Gold Ore block (+15 Power)
+ * - GOLD_DEEPSLATE: Deepslate Diamond Ore block (+45 Power)
+ * - DIAMOND_DEEPSLATE: Deepslate Emerald Ore block (+80 Power)
+ * - EMERALD_DEEPSLATE: Deepslate Ruby Ore block (+175 Power)
  */
 export enum TrainingRockTier {
-  STONE = 'stone',
-  IRON = 'iron',
-  GOLD = 'gold',
-  DIAMOND = 'diamond',
-  CRYSTAL = 'crystal',
+  DIRT = 'dirt',              // Rock 1 - Cobblestone block (+1 Power, always available)
+  COBBLESTONE = 'cobblestone', // Rock 2 - Deepslate Iron Ore block (+3 Power)
+  IRON_DEEPSLATE = 'iron_deepslate', // Rock 3 - Deepslate Gold Ore block (+15 Power)
+  GOLD_DEEPSLATE = 'gold_deepslate', // Rock 4 - Deepslate Diamond Ore block (+45 Power)
+  DIAMOND_DEEPSLATE = 'diamond_deepslate', // Rock 5 - Deepslate Emerald Ore block (+80 Power)
+  EMERALD_DEEPSLATE = 'emerald_deepslate', // Rock 6 - Deepslate Ruby Ore block (+175 Power)
 }
 
 /**
@@ -53,48 +61,57 @@ export interface TrainingRockData {
 
 /**
  * Database of all training rocks
- * Based on TDD section 3.2: Example set
+ * Updated to 6 tiers with piecewise power gain functions based on rebirths
+ * Reference: Planning/PowerSystemPlan.md section 4
  */
 export const TRAINING_ROCK_DATABASE: Record<TrainingRockTier, TrainingRockData> = {
-  [TrainingRockTier.STONE]: {
-    id: 'stone-rock',
-    tier: TrainingRockTier.STONE,
-    name: 'Stone Rock',
-    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.STONE,
-    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.STONE,
-    powerGainMultiplier: TRAINING_ROCK_MULTIPLIERS.STONE,
+  [TrainingRockTier.DIRT]: {
+    id: 'cobblestone-rock',
+    tier: TrainingRockTier.DIRT,
+    name: 'Cobblestone Training Area', // +1 Power (cobblestone block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.DIRT,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.DIRT,
+    powerGainMultiplier: 1, // UI display value: "+1 Power" (actual power uses piecewise function)
   },
-  [TrainingRockTier.IRON]: {
-    id: 'iron-rock',
-    tier: TrainingRockTier.IRON,
-    name: 'Iron Rock',
-    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.IRON,
-    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.IRON,
-    powerGainMultiplier: TRAINING_ROCK_MULTIPLIERS.IRON,
+  [TrainingRockTier.COBBLESTONE]: {
+    id: 'iron-deepslate-rock',
+    tier: TrainingRockTier.COBBLESTONE,
+    name: 'Iron Deepslate Training Area', // +3 Power (deepslate-iron-ore block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.COBBLESTONE,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.COBBLESTONE,
+    powerGainMultiplier: 3, // UI display value: "+3 Power" (actual power uses piecewise function)
   },
-  [TrainingRockTier.GOLD]: {
-    id: 'gold-rock',
-    tier: TrainingRockTier.GOLD,
-    name: 'Gold Rock',
-    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.GOLD,
-    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.GOLD,
-    powerGainMultiplier: TRAINING_ROCK_MULTIPLIERS.GOLD,
+  [TrainingRockTier.IRON_DEEPSLATE]: {
+    id: 'gold-deepslate-rock',
+    tier: TrainingRockTier.IRON_DEEPSLATE,
+    name: 'Gold Deepslate Training Area', // +15 Power (deepslate-gold-ore block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.IRON_DEEPSLATE,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.IRON_DEEPSLATE,
+    powerGainMultiplier: 15, // UI display value: "+15 Power" (actual power uses piecewise function)
   },
-  [TrainingRockTier.DIAMOND]: {
-    id: 'diamond-rock',
-    tier: TrainingRockTier.DIAMOND,
-    name: 'Diamond Rock',
-    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.DIAMOND,
-    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.DIAMOND,
-    powerGainMultiplier: TRAINING_ROCK_MULTIPLIERS.DIAMOND,
+  [TrainingRockTier.GOLD_DEEPSLATE]: {
+    id: 'diamond-deepslate-rock',
+    tier: TrainingRockTier.GOLD_DEEPSLATE,
+    name: 'Diamond Deepslate Training Area', // +45 Power (deepslate-diamond-ore block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.GOLD_DEEPSLATE,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.GOLD_DEEPSLATE,
+    powerGainMultiplier: 45, // UI display value: "+45 Power" (actual power uses piecewise function)
   },
-  [TrainingRockTier.CRYSTAL]: {
-    id: 'crystal-rock',
-    tier: TrainingRockTier.CRYSTAL,
-    name: 'Crystal Rock',
-    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.CRYSTAL,
-    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.CRYSTAL,
-    powerGainMultiplier: TRAINING_ROCK_MULTIPLIERS.CRYSTAL,
+  [TrainingRockTier.DIAMOND_DEEPSLATE]: {
+    id: 'emerald-deepslate-rock',
+    tier: TrainingRockTier.DIAMOND_DEEPSLATE,
+    name: 'Emerald Deepslate Training Area', // +80 Power (deepslate-emerald-ore block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.DIAMOND_DEEPSLATE,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.DIAMOND_DEEPSLATE,
+    powerGainMultiplier: 80, // UI display value: "+80 Power" (actual power uses piecewise function)
+  },
+  [TrainingRockTier.EMERALD_DEEPSLATE]: {
+    id: 'ruby-deepslate-rock',
+    tier: TrainingRockTier.EMERALD_DEEPSLATE,
+    name: 'Ruby Deepslate Training Area', // +175 Power (deepslate-ruby-ore block)
+    requiredRebirths: TRAINING_ROCK_REQUIRED_REBIRTHS.EMERALD_DEEPSLATE,
+    requiredPower: TRAINING_ROCK_POWER_REQUIREMENTS.EMERALD_DEEPSLATE,
+    powerGainMultiplier: 175, // UI display value: "+175 Power" (actual power uses piecewise function)
   },
 };
 
@@ -109,27 +126,30 @@ export function getTrainingRockByTier(tier: TrainingRockTier): TrainingRockData 
 }
 
 /**
- * Gets all training rocks that a player can access based on their rebirth count
+ * Gets all training rocks that a player can access based on their rebirth count OR power
  * 
  * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
  * @returns Array of accessible training rock data
  */
-export function getAccessibleTrainingRocks(rebirths: number): TrainingRockData[] {
+export function getAccessibleTrainingRocks(rebirths: number, power: number): TrainingRockData[] {
   return Object.values(TRAINING_ROCK_DATABASE).filter(
-    rock => rock.requiredRebirths <= rebirths
+    rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
   );
 }
 
 /**
  * Checks if a player can access a training rock
+ * Player can unlock via EITHER power requirement OR rebirth requirement
  * 
  * @param tier - Training rock tier to check
  * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
  * @returns True if player can access this rock
  */
-export function canAccessTrainingRock(tier: TrainingRockTier, rebirths: number): boolean {
+export function canAccessTrainingRock(tier: TrainingRockTier, rebirths: number, power: number): boolean {
   const rock = getTrainingRockByTier(tier);
   if (!rock) return false;
-  return rock.requiredRebirths <= rebirths;
+  return rock.requiredRebirths <= rebirths || rock.requiredPower <= power;
 }
 

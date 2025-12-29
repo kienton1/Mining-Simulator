@@ -12,6 +12,7 @@ import { MiningSystem } from './MiningSystem';
 import { GameManager } from '../Core/GameManager';
 import { OreType } from './Ore/OreData';
 import { ORE_DATABASE } from './Ore/OreData';
+import type { PickaxeData } from '../Pickaxe/PickaxeData';
 
 /**
  * Mining Controller class
@@ -21,6 +22,7 @@ export class MiningController {
   private world: World;
   private miningSystem: MiningSystem;
   private gameManager: GameManager;
+  private blockDetectionIntervals: Map<Player, NodeJS.Timeout> = new Map();
 
   constructor(world: World, gameManager: GameManager) {
     this.world = world;
@@ -38,6 +40,14 @@ export class MiningController {
     this.miningSystem.setGetPickaxeCallback((player) => {
       return this.gameManager.getPlayerPickaxe(player);
     });
+    // Set callback for when a chest is broken (to award gems)
+    this.miningSystem.setChestBrokenCallback((player, baseGems) => {
+      // Apply More Gems upgrade multiplier
+      const moreGemsMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreGemsMultiplier(player);
+      const finalGems = Math.round(baseGems * moreGemsMultiplier);
+      this.gameManager.addGems(player, finalGems);
+      console.log(`[MiningController] Chest broken: awarded ${finalGems} gems (base: ${baseGems}, multiplier: ${moreGemsMultiplier}x)`);
+    });
   }
 
   /**
@@ -46,19 +56,34 @@ export class MiningController {
    * @param player - Player who clicked
    */
   handleMiningClick(player: Player): void {
+    // First check if player is in the mine - if not, do nothing
+    const miningState = this.miningSystem.getMiningState(player);
+    if (!miningState) {
+      // Player is not in the mine, ignore mining click
+      return;
+    }
+
+    // Player is in the mine, proceed with mining
+    // Don't process mining click if a blocking modal is open
+    if (this.gameManager.isBlockingModalOpen(player)) {
+      return;
+    }
+
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
-      console.warn('[MiningController] Player data not found');
       return;
     }
 
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
-      console.warn('[MiningController] Player has no pickaxe');
       return;
     }
 
+    // Get More Damage multiplier from upgrade system
+    const damageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+
     // Handle single click mining
+    // Pass callback to check if blocking modal is open
     this.miningSystem.handleMiningClick(
       player,
       pickaxe,
@@ -66,16 +91,134 @@ export class MiningController {
         // Add ore to inventory
         this.gameManager.addOreToInventory(p, oreType, amount);
         
-        // Send UI event for mined ore popup
-        const oreData = ORE_DATABASE[oreType];
-        this.sendOreMinedEvent(p, oreData.name);
+        // Note: Removed ore mined popup notification - info is shown in mining target display
       },
-      (p, damage, currentOre, blockHP, maxHP) => {
+      (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
         const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
-        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP);
-      }
+        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward);
+        
+        // If block was destroyed (HP reached 0), update indicator for new block after a short delay
+        // This ensures the UI shows the new block at the new depth
+        if (blockHP <= 0) {
+          setTimeout(() => {
+            const pickaxe = this.gameManager.getPlayerPickaxe(p);
+            if (pickaxe) {
+              this.updateBlockIndicator(p, pickaxe);
+            }
+          }, 100); // Small delay to allow player to fall and depth to update
+        }
+      },
+      damageMultiplier,
+      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
     );
+  }
+
+  /**
+   * Starts periodic block detection to show what block player is standing on
+   * Runs continuously while player is in the mine
+   * 
+   * @param player - Player to start detection for
+   */
+  startBlockDetection(player: Player): void {
+    // Stop any existing detection
+    this.stopBlockDetection(player);
+
+    const pickaxe = this.gameManager.getPlayerPickaxe(player);
+    if (!pickaxe) {
+      return;
+    }
+
+    // Check block immediately
+    this.updateBlockIndicator(player, pickaxe);
+
+    // Then check periodically (every 0.5 seconds)
+    const interval = setInterval(() => {
+      this.updateBlockIndicator(player, pickaxe);
+    }, 500);
+
+    this.blockDetectionIntervals.set(player, interval);
+  }
+
+  /**
+   * Stops periodic block detection
+   * 
+   * @param player - Player to stop detection for
+   */
+  stopBlockDetection(player: Player): void {
+    const interval = this.blockDetectionIntervals.get(player);
+    if (interval) {
+      clearInterval(interval);
+      this.blockDetectionIntervals.delete(player);
+    }
+    
+    // Clear the UI when stopping detection (e.g., when leaving mine)
+    player.ui.sendData({
+      type: 'MINING_UPDATE',
+      damage: 0,
+      currentOreName: null,
+      blockHP: 0,
+      maxHP: 0,
+      isChest: false,
+      sellValue: null,
+      gemReward: null,
+    });
+  }
+
+  /**
+   * Updates the block indicator UI for a player
+   * 
+   * @param player - Player to update for
+   * @param pickaxe - Player's pickaxe
+   */
+  private updateBlockIndicator(player: Player, pickaxe: PickaxeData): void {
+    try {
+      const blockInfo = this.miningSystem.detectCurrentBlock(player, pickaxe);
+      
+      if (!blockInfo) {
+        // No valid block - hide indicator
+        player.ui.sendData({
+          type: 'MINING_UPDATE',
+          damage: 0,
+          currentOreName: null,
+          blockHP: 0,
+          maxHP: 0,
+          isChest: false,
+          sellValue: null,
+          gemReward: null,
+        });
+        return;
+      }
+
+      // Send update with block info (0 damage since we're just detecting, not mining)
+      if (blockInfo.isChest) {
+        this.sendMiningUpdateEvent(
+          player,
+          0, // No damage, just detection
+          null,
+          blockInfo.blockHP,
+          blockInfo.maxHP,
+          true,
+          blockInfo.chestType,
+          blockInfo.gemReward
+        );
+      } else {
+        const oreData = blockInfo.oreType ? ORE_DATABASE[blockInfo.oreType] : null;
+        this.sendMiningUpdateEvent(
+          player,
+          0, // No damage, just detection
+          oreData?.name || null,
+          blockInfo.blockHP,
+          blockInfo.maxHP,
+          false,
+          null,
+          null
+        );
+      }
+    } catch (error) {
+      // Silently handle errors (player might not be in mine, entity not ready, etc.)
+      console.warn(`[MiningController] Error updating block indicator for ${player.username}:`, error);
+    }
   }
 
   /**
@@ -84,15 +227,28 @@ export class MiningController {
    * @param player - Player who is mining
    */
   startMiningLoop(player: Player): void {
+    // First check if player is in the mine - if not, do nothing
+    const initialMiningState = this.miningSystem.getMiningState(player);
+    if (!initialMiningState) {
+      // Player is not in the mine, cannot start mining loop
+      return;
+    }
+
+    // Player is in the mine, proceed with mining
+    // Don't start mining if a blocking modal is open
+    if (this.gameManager.isBlockingModalOpen(player)) {
+      return;
+    }
+
+    // Get More Damage multiplier from upgrade system
+    const damageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
-      console.warn('[MiningController] Player data not found');
       return;
     }
 
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
-      console.warn('[MiningController] Player has no pickaxe');
       return;
     }
 
@@ -105,29 +261,39 @@ export class MiningController {
         // Add ore to inventory
         this.gameManager.addOreToInventory(p, oreType, amount);
         
-        // Send UI event for mined ore popup
-        const oreData = ORE_DATABASE[oreType];
-        this.sendOreMinedEvent(p, oreData.name);
+        // Note: Removed ore mined popup notification - info is shown in mining target display
       },
-      (p, damage, currentOre, blockHP, maxHP) => {
+      (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
         const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
-        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP);
+        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward);
         
         // Send progress update when depth changes
-        const miningState = this.miningSystem.getMiningState(p);
-        if (miningState) {
+        const currentMiningState = this.miningSystem.getMiningState(p);
+        if (currentMiningState) {
           // Pass the actual depth (negative value) - sendProgressUpdate will calculate blocks mined
-          this.gameManager.sendProgressUpdate(p, miningState.currentDepth);
+          this.gameManager.sendProgressUpdate(p, currentMiningState.currentDepth);
         }
-      }
+        
+        // If block was destroyed (HP reached 0), update indicator for new block after a short delay
+        // This ensures the UI shows the new block at the new depth
+        if (blockHP <= 0) {
+          setTimeout(() => {
+            const pickaxe = this.gameManager.getPlayerPickaxe(p);
+            if (pickaxe) {
+              this.updateBlockIndicator(p, pickaxe);
+            }
+          }, 200); // Small delay to allow player to fall and depth to update
+        }
+      },
+      damageMultiplier,
+      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
     );
 
     // Send initial progress update and mining state
-    const miningState = this.miningSystem.getMiningState(player);
-    if (miningState) {
+    if (initialMiningState) {
       // Pass the actual depth (negative value) - sendProgressUpdate will calculate blocks mined
-      this.gameManager.sendProgressUpdate(player, miningState.currentDepth);
+      this.gameManager.sendProgressUpdate(player, initialMiningState.currentDepth);
     }
     
     player.ui.sendData({
@@ -139,6 +305,9 @@ export class MiningController {
       type: 'MINING_STATE_UPDATE',
       isInMine: true,
     });
+
+    // Start block detection to show what block player is standing on
+    this.startBlockDetection(player);
   }
 
   /**
@@ -158,6 +327,9 @@ export class MiningController {
       type: 'MINING_STATE_UPDATE',
       isInMine: false,
     });
+
+    // Stop block detection when leaving mine
+    this.stopBlockDetection(player);
   }
 
   /**
@@ -196,6 +368,7 @@ export class MiningController {
    */
   cleanupPlayer(player: Player): void {
     this.stopMiningLoop(player);
+    this.stopBlockDetection(player);
     this.miningSystem.cleanupPlayer(player);
   }
 
@@ -218,20 +391,49 @@ export class MiningController {
 
   /**
    * Sends mining update event to UI (damage and current ore)
+   * Now includes sell value for ores and gem rewards for chests
    */
   private sendMiningUpdateEvent(
     player: Player,
     damage: number,
     currentOreName: string | null,
     blockHP: number,
-    maxHP: number
+    maxHP: number,
+    isChest: boolean = false,
+    chestType: string | null = null,
+    gemReward: number | null = null
   ): void {
+    // Calculate sell value for ores (if not a chest)
+    let sellValue: number | null = null;
+    let finalGemReward: number | null = null;
+    
+    if (isChest && gemReward !== null) {
+      // Apply More Gems upgrade multiplier to chest gem reward for display
+      const moreGemsMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreGemsMultiplier(player);
+      finalGemReward = Math.round(gemReward * moreGemsMultiplier);
+    } else if (!isChest && currentOreName) {
+      // Find ore type from name
+      const oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      if (oreEntry) {
+        const oreType = oreEntry[0] as OreType;
+        const oreData = ORE_DATABASE[oreType];
+        const pickaxe = this.gameManager.getPlayerPickaxe(player);
+        const pickaxeMultiplier = pickaxe?.sellValueMultiplier ?? 1.0;
+        const moreCoinsMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
+        const sellMultiplier = pickaxeMultiplier * moreCoinsMultiplier;
+        sellValue = Math.round(oreData.value * sellMultiplier);
+      }
+    }
+
     player.ui.sendData({
       type: 'MINING_UPDATE',
       damage,
-      currentOreName,
+      currentOreName: isChest ? chestType : currentOreName,
       blockHP,
       maxHP,
+      isChest,
+      sellValue, // For ores: how much gold this ore will sell for (with pickaxe and More Coins multipliers)
+      gemReward: finalGemReward, // For chests: how many gems this chest will give (with More Gems multiplier)
     });
   }
 

@@ -95,6 +95,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     setupPowerHud();
     setupMerchantUI();
     setupMineResetUpgradeUI();
+    setupGemTraderUI();
     setupKeyboardDebug();
     console.log('[UI] UI setup complete');
   });
@@ -109,6 +110,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     setupPowerHud();
     setupMerchantUI();
     setupMineResetUpgradeUI();
+    setupGemTraderUI();
     setupKeyboardDebug();
   }
 
@@ -423,9 +425,215 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   }
 
   /**
+   * Setup Gem Trader UI
+   * Handles gem trader upgrades interface
+   */
+  function setupGemTraderUI() {
+    const gemTraderUI = document.getElementById('gem-trader-ui');
+    const gemTraderUIClose = document.getElementById('gem-trader-ui-close');
+
+    if (!gemTraderUI || !gemTraderUIClose) {
+      console.warn('[UI] Gem Trader UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    gemTraderUIClose.addEventListener('click', () => {
+      console.log('[UI] Gem Trader UI close clicked');
+      gemTraderUI.classList.remove('visible');
+    });
+  }
+
+  /**
+   * Update Gem Trader UI with upgrade data
+   */
+  function updateGemTraderUI(upgrades, gems) {
+    const gemTraderUIContent = document.getElementById('gem-trader-ui-content');
+    if (!gemTraderUIContent) return;
+
+    // Clear existing items
+    gemTraderUIContent.innerHTML = '';
+
+    // Format number for display
+    const formatNumber = (value) => {
+      if (value >= 1_000_000_000_000) {
+        const num = value / 1_000_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'T';
+      }
+      if (value >= 1_000_000_000) {
+        const num = value / 1_000_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'B';
+      }
+      if (value >= 1_000_000) {
+        const num = value / 1_000_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M';
+      }
+      if (value >= 1_000) {
+        const num = value / 1_000;
+        const formatted = num.toFixed(2);
+        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K';
+      }
+      return value.toLocaleString();
+    };
+
+    // Upgrade definitions
+    const upgradeDefs = [
+      {
+        key: 'moreGems',
+        title: 'More Gems',
+        icon: '💎',
+        getEffect: (level) => {
+          // UI shows level, backend is level + 1 (always 1 ahead)
+          const displayLevel = level;
+          const nextDisplayLevel = level + 1;
+          return `${displayLevel}x -> ${nextDisplayLevel}x`;
+        },
+        getLevelProgress: (level) => {
+          // TODO: Get max level from somewhere when defined
+          const maxLevel = 50;
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreRebirths',
+        title: 'More Rebirths',
+        icon: '🔄',
+        getEffect: (level) => {
+          return `${level} -> ${level + 1}`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 35;
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreCoins',
+        title: 'More Coins',
+        icon: '💰',
+        getEffect: (level) => {
+          // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
+          // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
+          const currentPercent = level * 10;
+          const nextPercent = (level + 1) * 10;
+          return `${currentPercent}% -> ${nextPercent}%`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 160; // 0-159 = 160 total levels
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreDamage',
+        title: 'More Damage',
+        icon: '⛏️',
+        getEffect: (level) => {
+          // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
+          // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
+          const currentPercent = level * 10;
+          const nextPercent = (level + 1) * 10;
+          return `${currentPercent}% -> ${nextPercent}%`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 50; // 0-49 = 50 total levels
+          return `${level}/${maxLevel}`;
+        },
+      },
+    ];
+
+    for (const upgradeDef of upgradeDefs) {
+      const upgradeData = upgrades[upgradeDef.key];
+      if (!upgradeData) continue;
+
+      const level = upgradeData.level || 0;
+      const cost = upgradeData.cost || 0;
+      const canAfford = upgradeData.canAfford || false;
+
+      // Create upgrade item container
+      const item = document.createElement('div');
+      item.className = 'gem-trader-ui__upgrade-item';
+
+      // Icon with arrow overlay
+      const iconContainer = document.createElement('div');
+      iconContainer.className = 'gem-trader-ui__icon-container';
+      const icon = document.createElement('div');
+      icon.className = 'gem-trader-ui__icon';
+      icon.textContent = upgradeDef.icon;
+      const arrowOverlay = document.createElement('div');
+      arrowOverlay.className = 'gem-trader-ui__arrow-overlay';
+      arrowOverlay.textContent = '↑';
+      iconContainer.appendChild(icon);
+      iconContainer.appendChild(arrowOverlay);
+      item.appendChild(iconContainer);
+
+      // Upgrade details (title, effect, level, cost)
+      const details = document.createElement('div');
+      details.className = 'gem-trader-ui__details';
+
+      // Title
+      const title = document.createElement('div');
+      title.className = 'gem-trader-ui__upgrade-title';
+      title.textContent = upgradeDef.title;
+      details.appendChild(title);
+
+      // Effect (current -> next)
+      const effect = document.createElement('div');
+      effect.className = 'gem-trader-ui__effect';
+      effect.textContent = upgradeDef.getEffect(level);
+      details.appendChild(effect);
+
+      // Level progress and cost container
+      const levelCostContainer = document.createElement('div');
+      levelCostContainer.className = 'gem-trader-ui__level-cost-container';
+
+      // Level progress
+      const levelProgress = document.createElement('div');
+      levelProgress.className = 'gem-trader-ui__level-progress';
+      const levelArrow = document.createElement('span');
+      levelArrow.className = 'gem-trader-ui__level-arrow';
+      levelArrow.textContent = '↑';
+      levelProgress.appendChild(levelArrow);
+      const levelText = document.createElement('span');
+      levelText.textContent = upgradeDef.getLevelProgress(level);
+      levelProgress.appendChild(levelText);
+      levelCostContainer.appendChild(levelProgress);
+
+      // Cost
+      const costContainer = document.createElement('div');
+      costContainer.className = 'gem-trader-ui__cost';
+      const gemIcon = document.createElement('span');
+      gemIcon.className = 'gem-trader-ui__gem-icon';
+      gemIcon.textContent = '💎';
+      costContainer.appendChild(gemIcon);
+      const costText = document.createElement('span');
+      costText.textContent = formatNumber(cost);
+      costContainer.appendChild(costText);
+      levelCostContainer.appendChild(costContainer);
+
+      details.appendChild(levelCostContainer);
+      item.appendChild(details);
+
+      // Upgrade button
+      const upgradeButton = document.createElement('button');
+      upgradeButton.className = `gem-trader-ui__upgrade-button ${canAfford ? 'can-afford' : 'cannot-afford'}`;
+      upgradeButton.textContent = '+';
+      upgradeButton.disabled = !canAfford;
+      upgradeButton.addEventListener('click', () => {
+        console.log(`[UI] Upgrade ${upgradeDef.key} clicked`);
+        hytopia.sendData({ type: 'PURCHASE_UPGRADE', upgradeType: upgradeDef.key });
+      });
+      item.appendChild(upgradeButton);
+
+      gemTraderUIContent.appendChild(item);
+    }
+  }
+
+  /**
    * Update Merchant UI with inventory data
    */
-  function updateMerchantUI(inventory, totalValue, gold) {
+  function updateMerchantUI(inventory, totalValue, gold, oreSellValues) {
     const merchantUIContent = document.getElementById('merchant-ui-content');
     if (!merchantUIContent) return;
 
@@ -543,7 +751,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       coinIcon.className = 'merchant-ui__coin-icon';
       oreValue.appendChild(coinIcon);
       const valueText = document.createElement('span');
-      valueText.textContent = formatNumber(data.value);
+      // Use oreSellValues if provided (includes all multipliers), otherwise use base value
+      const sellPrice = oreSellValues && oreSellValues[oreType] !== undefined 
+        ? oreSellValues[oreType] 
+        : data.value;
+      valueText.textContent = formatNumber(sellPrice);
       oreValue.appendChild(valueText);
       item.appendChild(oreValue);
 
@@ -564,6 +776,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   function setupPowerHud() {
     const powerValueEl = document.getElementById('power-value');
     const moneyValueEl = document.getElementById('money-value');
+    const gemsValueEl = document.getElementById('gems-value');
     const winsValueEl = document.getElementById('wins-value');
     const rebirthsValueEl = document.getElementById('rebirths-value');
     const powerGainLayer = document.getElementById('power-gain-layer');
@@ -574,13 +787,14 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
     // Mining UI elements
     const miningHudEl = document.getElementById('mining-hud');
-    const currentOreEl = document.getElementById('current-ore');
     const damageDisplayEl = document.getElementById('damage-display');
     const minedOreLayerEl = document.getElementById('mined-ore-layer');
+    const damagePopupLayerEl = document.getElementById('damage-popup-layer');
     const blockHealthBarEl = document.getElementById('block-health-bar');
     const blockHealthBarNameEl = document.getElementById('block-health-bar-name');
     const blockHealthBarFillEl = document.getElementById('block-health-bar-fill');
     const blockHealthBarTextEl = document.getElementById('block-health-bar-text');
+    const blockRewardDisplayEl = document.getElementById('block-reward-display');
     const mineResetTimerEl = document.getElementById('mine-reset-timer');
     const mineResetTimerTextEl = document.getElementById('mine-reset-timer-text');
 
@@ -600,16 +814,26 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
     // Setup pickaxe button click handler
     if (pickaxeButton) {
-      pickaxeButton.addEventListener('click', () => {
+      pickaxeButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         console.log('[UI] Pickaxe button clicked');
+        // Immediately notify server that modal is opening (before sending shop data request)
+        // This prevents any click events from triggering mining
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pickaxe' });
         hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
       });
     }
 
     // Setup rebirth button click handler
     if (rebirthButton) {
-      rebirthButton.addEventListener('click', () => {
+      rebirthButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         console.log('[UI] Rebirth button clicked');
+        // Immediately notify server that modal is opening (before sending rebirth data request)
+        // This prevents any click events from triggering mining
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'rebirth' });
         hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
       });
     }
@@ -626,7 +850,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         if (modalId) {
           const modal = document.getElementById(modalId);
           if (modal) {
-            modal.classList.remove('visible');
+            hideModal(modal); // Use hideModal to notify server
             console.log(`[UI] Closed modal: ${modalId}`);
           }
         }
@@ -638,6 +862,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const state = {
       power: 0,
       gold: 0,
+      gems: 0,
       wins: 0,
       rebirths: 0,
       pickaxe: {
@@ -663,6 +888,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         isMining: false,
         currentOre: null,
         damage: 0,
+        lastBlockInfo: null, // Store last known block info to prevent UI disappearing during fast mining
       },
     };
 
@@ -788,11 +1014,22 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const showModal = (el) => {
       if (!el) return;
       el.classList.add('visible');
+      
+      // Note: MODAL_OPENED is already sent from button click handlers
+      // This ensures the modal state is set before any click processing
+      // No need to send it again here
     };
 
     const hideModal = (el) => {
       if (!el) return;
       el.classList.remove('visible');
+      
+      // Notify server that a modal is closed (allows manual mining again)
+      if (el.id === 'pickaxe-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pickaxe' });
+      } else if (el.id === 'rebirth-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
+      }
     };
 
     const renderPickaxeDetails = () => {
@@ -822,11 +1059,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       if (pickaxeDetailStats) {
         pickaxeDetailStats.innerHTML = '';
         
-        // Speed
-        const speed = pickaxe.miningSpeed ? pickaxe.miningSpeed.toFixed(1) : '0';
+        // Speed (display as percentage increase, e.g., "+5 Speed" means +5% speed)
+        const speed = pickaxe.miningSpeed ? Math.round(pickaxe.miningSpeed) : 0;
         const speedStat = document.createElement('div');
         speedStat.className = 'pickaxe-stat pickaxe-stat--speed';
-        speedStat.textContent = `${speed} Swings/sec`;
+        speedStat.textContent = `+${speed} Speed`;
         pickaxeDetailStats.appendChild(speedStat);
         
         // Luck bonus
@@ -859,6 +1096,15 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         if (pickaxe.availability === 'equipped') {
           actionButton.textContent = 'Equipped';
           actionButton.classList.add('disabled');
+        } else if (pickaxe.availability === 'owned') {
+          // Player owns this pickaxe but it's not equipped - show Equip button
+          actionButton.textContent = 'Equip';
+          actionButton.classList.remove('disabled');
+          actionButton.dataset.tier = String(pickaxe.tier);
+          actionButton.addEventListener('click', () => {
+            console.log(`[UI] Equip pickaxe tier ${pickaxe.tier} from action button`);
+            hytopia.sendData({ type: 'EQUIP_PICKAXE', tier: pickaxe.tier });
+          });
         } else if (pickaxe.availability === 'available' && pickaxe.purchasable) {
           actionButton.textContent = `Buy (${formatNumber(pickaxe.cost)})`;
           actionButton.classList.toggle('disabled', state.gold < pickaxe.cost);
@@ -883,21 +1129,22 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         const card = document.createElement('div');
         card.className = 'pickaxe-card';
         
-        // Determine state based on tier comparison
-        const isPurchased = p.tier < currentTier;
+        // Determine state based on availability from backend
+        const isEquipped = p.availability === 'equipped';
+        const isOwned = p.availability === 'owned';
+        const isAvailable = p.availability === 'available';
+        const isLocked = p.availability === 'locked';
         const isNextTier = p.tier === currentTier + 1;
-        const isLocked = p.tier > currentTier + 1;
-        const isEquipped = p.tier === currentTier;
 
         // Apply appropriate classes
         if (isEquipped) {
           card.classList.add('equipped');
-        } else if (isNextTier) {
-          card.classList.add('next-tier'); // Greyed out but purchasable
+        } else if (isOwned) {
+          card.classList.add('purchased'); // Owned but not equipped - normal appearance
+        } else if (isAvailable) {
+          card.classList.add('next-tier'); // Available to purchase
         } else if (isLocked) {
           card.classList.add('locked'); // Greyed out with lock
-        } else if (isPurchased) {
-          card.classList.add('purchased'); // Normal, no grey
         }
 
         const iconEl = document.createElement('div');
@@ -910,16 +1157,28 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         nameEl.textContent = p.name;
         card.appendChild(nameEl);
 
-        // Cost display (only if not equipped and not purchased)
-        if (!isEquipped && !isPurchased) {
+        // Cost display (only if not equipped and not owned)
+        if (!isEquipped && !isOwned) {
           const costEl = document.createElement('div');
           costEl.className = 'pickaxe-card__cost';
           costEl.innerHTML = `<span>🪙</span> ${formatNumber(p.cost)}`;
           card.appendChild(costEl);
         }
 
-        // Buy button (only for next tier if affordable)
-        if (isNextTier && p.purchasable && state.gold >= p.cost) {
+        // Equip button (for owned but not equipped pickaxes)
+        if (isOwned && !isEquipped) {
+          const equipButton = document.createElement('button');
+          equipButton.className = 'pickaxe-card__buy-button';
+          equipButton.textContent = 'Equip';
+          equipButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log(`[UI] Equip pickaxe tier ${p.tier} clicked`);
+            hytopia.sendData({ type: 'EQUIP_PICKAXE', tier: p.tier });
+          });
+          card.appendChild(equipButton);
+        }
+        // Buy button (only for available pickaxes)
+        else if (isAvailable && p.purchasable && state.gold >= p.cost) {
           const buyButton = document.createElement('button');
           buyButton.className = 'pickaxe-card__buy-button';
           buyButton.textContent = 'Buy';
@@ -947,14 +1206,12 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           card.appendChild(lock);
         }
 
-        // Click to select (for details view) - only for purchased/equipped
-        if (isPurchased || isEquipped) {
-          card.addEventListener('click', () => {
-            state.pickaxe.selectedTier = p.tier;
-            renderPickaxeGrid();
-            renderPickaxeDetails();
-          });
-        }
+        // Click to select (for details view) - for all pickaxes
+        card.addEventListener('click', () => {
+          state.pickaxe.selectedTier = p.tier;
+          renderPickaxeGrid();
+          renderPickaxeDetails();
+        });
 
         pickaxeGridEl.appendChild(card);
       });
@@ -980,24 +1237,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const renderRebirthOptions = () => {
       if (!rebirthOptionsEl) return;
       rebirthOptionsEl.innerHTML = '';
-      // Sort options to put max last
-      const sortedOptions = [...state.rebirth.options].sort((a, b) => {
-        // Max option (count === maxRebirths) goes last
-        if (a.count === state.rebirth.maxRebirths) return 1;
-        if (b.count === state.rebirth.maxRebirths) return -1;
-        return a.count - b.count;
-      });
+      
+      // Sort options by count (1, 5, 20)
+      const sortedOptions = [...state.rebirth.options].sort((a, b) => a.count - b.count);
 
       sortedOptions.forEach(opt => {
         const card = document.createElement('div');
         card.className = 'rebirth-option';
-        
-        // Check if this is the Max option (count equals maxRebirths and is not 1, 5, or 20)
-        const isMax = opt.count === state.rebirth.maxRebirths && 
-                     opt.count !== 1 && opt.count !== 5 && opt.count !== 20;
-        if (isMax) {
-          card.classList.add('rebirth-option--max');
-        }
 
         // Left side: Rebirth count and cost
         const info = document.createElement('div');
@@ -1005,11 +1251,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         
         const title = document.createElement('div');
         title.className = 'rebirth-option__title';
-        if (isMax) {
-          title.textContent = `${opt.count} Rebirths`;
-        } else {
-          title.textContent = `${opt.count} Rebirth${opt.count > 1 ? 's' : ''}`;
-        }
+        // Format the count using formatNumber for readability (e.g., "1K Rebirths" instead of "1000 Rebirths")
+        const formattedCount = formatNumber(opt.count);
+        title.textContent = `${formattedCount} Rebirth${opt.count > 1 ? 's' : ''}`;
         info.appendChild(title);
         
         const cost = document.createElement('div');
@@ -1023,8 +1267,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         const actionWrapper = document.createElement('div');
         actionWrapper.className = 'rebirth-option__action';
         const btn = document.createElement('button');
-        btn.className = isMax ? 'rebirth-button--max' : 'rebirth-button';
-        btn.textContent = isMax ? 'Max' : 'Rebirth';
+        btn.className = 'rebirth-button';
+        btn.textContent = 'Rebirth';
         const affordable = state.power >= opt.cost;
         if (!affordable) {
           btn.classList.add('disabled');
@@ -1032,9 +1276,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         }
         btn.addEventListener('click', () => {
           if (!affordable) return;
-          const count = isMax ? state.rebirth.maxRebirths : opt.count;
-          console.log(`[UI] Performing rebirth: ${count}`);
-          hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: count });
+          console.log(`[UI] Performing rebirth: ${opt.count}`);
+          hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: opt.count });
         });
         actionWrapper.appendChild(btn);
         card.appendChild(actionWrapper);
@@ -1169,6 +1412,67 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         popup.classList.remove('active');
         setTimeout(() => popup.remove(), 600); // Wait for fade out animation
       }, 1000); // Disappear after 1 second
+    };
+
+    const spawnDamagePopup = (damage) => {
+      if (!damagePopupLayerEl) {
+        console.error('[UI] damagePopupLayerEl not found! Cannot spawn damage popup.');
+        return;
+      }
+      
+      if (damage <= 0) {
+        return; // Don't show popup for 0 damage
+      }
+      
+      const popup = document.createElement('div');
+      popup.className = 'damage-popup';
+      
+      // Format damage number (e.g., 1140000000 -> "1.14B")
+      const formatDamage = (value) => {
+        if (value >= 1000000000) {
+          const bValue = value / 1000000000;
+          return bValue.toFixed(2).replace(/\.?0+$/, '') + 'B';
+        } else if (value >= 1000000) {
+          const mValue = value / 1000000;
+          return mValue.toFixed(2).replace(/\.?0+$/, '') + 'M';
+        } else if (value >= 1000) {
+          const kValue = value / 1000;
+          return kValue.toFixed(2).replace(/\.?0+$/, '') + 'K';
+        } else {
+          return Math.round(value).toString();
+        }
+      };
+      
+      const damageText = document.createElement('span');
+      damageText.className = 'damage-popup__text';
+      damageText.textContent = `${formatDamage(damage)} Dmg`;
+      popup.appendChild(damageText);
+      
+      // Position to the right of the HP bar (which is centered at bottom: 120px)
+      // HP bar container is 300px wide, centered, so right edge is at 50% + 150px
+      // Position damage popup to the right of the HP bar with some gap
+      const hpBarCenter = window.innerWidth / 2;
+      const hpBarRightEdge = hpBarCenter + 150; // HP bar container is 300px wide
+      const gap = 240; // Gap between HP bar and damage popup (increased for more spacing)
+      const leftPosition = hpBarRightEdge + gap + (Math.random() * 20 - 10); // Slight random variation
+      const bottomOffset = 180 + (Math.random() * 10 - 5); // Same vertical position as HP bar with slight variation
+      popup.style.left = `${leftPosition}px`;
+      popup.style.bottom = `${bottomOffset}px`;
+      
+      damagePopupLayerEl.appendChild(popup);
+      
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+      
+      // Add active class to trigger animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+      
+      setTimeout(() => {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 400); // Wait for fade out animation after removing active class
+      }, 1500); // Total duration: drift up for 1.5 seconds, then fade out
     };
 
     const renderTrainingPrompt = () => {
@@ -1379,18 +1683,25 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         case 'POWER_STATS':
           state.power = data.power ?? 0;
           state.gold = data.gold ?? state.gold;
+          state.gems = data.gems ?? state.gems;
           state.wins = data.wins ?? state.wins;
           state.rebirths = data.rebirths ?? state.rebirths;
           if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
-          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           console.log('[UI] Updated gold stats:', state.gold);
+          break;
+        case 'GEMS_STATS':
+          state.gems = data.gems ?? 0;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          console.log('[UI] Updated gems stats:', state.gems);
           break;
         case 'WINS_STATS':
           state.wins = data.wins ?? 0;
@@ -1449,7 +1760,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           if (merchantUI) {
             if (data.inProximity) {
               merchantUI.classList.add('visible');
-              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0);
+              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
             } else {
               merchantUI.classList.remove('visible');
             }
@@ -1473,6 +1784,32 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             }
           }
           break;
+        case 'GEM_TRADER_PROXIMITY':
+          console.log('[UI] Gem Trader proximity:', data.inProximity);
+          state.gems = data.gems ?? state.gems;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          const gemTraderUI = document.getElementById('gem-trader-ui');
+          if (gemTraderUI) {
+            if (data.inProximity) {
+              gemTraderUI.classList.add('visible');
+              updateGemTraderUI(data.upgrades || {}, data.gems || 0);
+            } else {
+              gemTraderUI.classList.remove('visible');
+            }
+          }
+          break;
+        case 'UPGRADE_PURCHASED':
+          console.log('[UI] Upgrade purchased:', data);
+          state.gems = data.remainingGems ?? state.gems;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          // Refresh the UI by requesting updated data (if UI is visible)
+          const gemTraderUIVisible = document.getElementById('gem-trader-ui')?.classList.contains('visible');
+          if (gemTraderUIVisible && data.success) {
+            // Request refresh - in a real implementation, we'd re-request the data
+            // For now, the server will send GEM_TRADER_PROXIMITY again to refresh
+            console.log('[UI] Upgrade purchased successfully, UI should refresh');
+          }
+          break;
         case 'MINE_RESET_UPGRADE_PURCHASED':
           console.log('[UI] Mine Reset Upgrade purchase result:', data);
           state.gold = data.remainingGold ?? state.gold;
@@ -1493,7 +1830,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           const merchantUIVisible = document.getElementById('merchant-ui')?.classList.contains('visible');
           if (merchantUIVisible) {
-            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0);
+            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
             if (data.goldEarned && data.goldEarned > 0) {
               // Show gold earned notification
               console.log(`[UI] Gold earned: ${data.goldEarned}`);
@@ -1511,33 +1848,75 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           state.mining.currentOre = data.currentOreName ?? null;
           const blockHP = data.blockHP ?? 0;
           const maxHP = data.maxHP ?? 100;
+          const isChest = data.isChest ?? false;
+          const sellValue = data.sellValue ?? null;
+          const gemReward = data.gemReward ?? null;
           
-          // Update block health bar (top center)
-          if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl) {
-            if (state.mining.currentOre && blockHP > 0) {
-              // Show health bar
-              blockHealthBarNameEl.textContent = state.mining.currentOre;
-              blockHealthBarTextEl.textContent = `${Math.floor(blockHP).toLocaleString()}/${Math.floor(maxHP).toLocaleString()} HP`;
+          // Spawn damage popup for each mining swing
+          if (state.mining.damage > 0) {
+            spawnDamagePopup(state.mining.damage);
+          }
+          
+          // Update block health bar (bottom center, above progress bar)
+          if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl && blockRewardDisplayEl) {
+            // Store current block info if valid
+            let currentBlockInfo = null;
+            if (state.mining.currentOre && blockHP > 0 && maxHP > 0) {
+              currentBlockInfo = {
+                name: state.mining.currentOre,
+                blockHP: blockHP,
+                maxHP: maxHP,
+                isChest: isChest,
+                sellValue: sellValue,
+                gemReward: gemReward
+              };
+              state.mining.lastBlockInfo = currentBlockInfo; // Update last known block
+            }
+            
+            // Use current block info if available, otherwise use last known block info
+            // This prevents UI from disappearing during fast mining transitions
+            const displayInfo = currentBlockInfo || state.mining.lastBlockInfo;
+            
+            if (displayInfo) {
+              // Update ALL content FIRST before showing (prevents flicker when switching ores quickly)
+              // This ensures the UI never disappears - it just updates content instantly
+              blockHealthBarNameEl.textContent = displayInfo.name;
+              blockHealthBarTextEl.textContent = `${Math.floor(displayInfo.blockHP).toLocaleString()}/${Math.floor(displayInfo.maxHP).toLocaleString()} HP`;
               
               // Calculate fill percentage
-              const fillPercent = Math.max(0, Math.min(100, (blockHP / maxHP) * 100));
+              const fillPercent = Math.max(0, Math.min(100, (displayInfo.blockHP / displayInfo.maxHP) * 100));
               blockHealthBarFillEl.style.width = `${fillPercent}%`;
               
+              // Update reward display (sell value for ores, gem reward for chests)
+              if (displayInfo.isChest && displayInfo.gemReward !== null && displayInfo.gemReward > 0) {
+                // Display gem reward for chests
+                blockRewardDisplayEl.innerHTML = `<span style="color: #4caf50;">💎</span> <span style="color: #4caf50; font-weight: 700;">${formatNumber(displayInfo.gemReward)} Gems</span>`;
+                blockRewardDisplayEl.style.display = 'flex';
+              } else if (!displayInfo.isChest && displayInfo.sellValue !== null && displayInfo.sellValue > 0) {
+                // Display sell value for ores
+                blockRewardDisplayEl.innerHTML = `<span style="color: #ffd700;">🪙</span> <span style="color: #ffd700; font-weight: 700;">${formatNumber(displayInfo.sellValue)} Gold</span>`;
+                blockRewardDisplayEl.style.display = 'flex';
+              } else {
+                blockRewardDisplayEl.style.display = 'none';
+              }
+              
+              // Show UI instantly with no transition - ensures UI is always visible
+              // Use both class and inline style to override any transitions
+              blockHealthBarEl.style.opacity = '1';
+              blockHealthBarEl.style.transition = 'none';
               blockHealthBarEl.classList.add('visible');
             } else {
+              // Only hide if we truly have no block info at all
+              // Clear last known block when leaving mine
+              state.mining.lastBlockInfo = null;
+              blockHealthBarEl.style.opacity = '0';
+              blockHealthBarEl.style.transition = 'none';
               blockHealthBarEl.classList.remove('visible');
+              blockRewardDisplayEl.style.display = 'none';
             }
           }
           
-          // Update current ore display (bottom middle)
-          if (currentOreEl) {
-            if (state.mining.currentOre) {
-              currentOreEl.textContent = state.mining.currentOre;
-              currentOreEl.classList.add('visible');
-            } else {
-              currentOreEl.classList.remove('visible');
-            }
-          }
+          // Old current ore display removed - now using mining target display
           
           // Update damage display (bottom middle right)
           if (damageDisplayEl) {
@@ -1560,6 +1939,23 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
               miningControlsEl.classList.add('visible');
             } else {
               miningControlsEl.classList.remove('visible');
+            }
+          }
+          
+          // Clear block health bar when leaving mine
+          if (!data.isInMine) {
+            // Clear last known block info when leaving mine
+            state.mining.lastBlockInfo = null;
+            if (blockHealthBarEl) {
+              blockHealthBarEl.style.opacity = '0';
+              blockHealthBarEl.style.transition = 'none';
+              blockHealthBarEl.classList.remove('visible');
+            }
+            if (blockRewardDisplayEl) {
+              blockRewardDisplayEl.style.display = 'none';
+            }
+            if (damageDisplayEl) {
+              damageDisplayEl.classList.remove('visible');
             }
           }
           break;
@@ -1595,6 +1991,17 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
           } else {
             console.warn('[UI] Pickaxe purchase failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'PICKAXE_EQUIPPED':
+          console.log('[UI] Pickaxe equip result:', data);
+          if (data.success) {
+            // Update pickaxe state
+            state.pickaxe.currentTier = data.newTier ?? state.pickaxe.currentTier;
+            // Refresh shop data (server already sent updated data)
+          } else {
+            console.warn('[UI] Pickaxe equip failed:', data.message);
             // Could show error message to user here
           }
           break;
@@ -1646,6 +2053,12 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     <div class="stat-hud stat-hud--money">
       <div class="stat-hud__value" id="money-value">0</div>
       <div class="stat-hud__icon">💰</div>
+    </div>
+    
+    <!-- Gems -->
+    <div class="stat-hud stat-hud--gems">
+      <div class="stat-hud__value" id="gems-value">0</div>
+      <div class="stat-hud__icon">💎</div>
     </div>
     
     <!-- Power -->
@@ -1733,7 +2146,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     <div id="mine-reset-timer-text" class="mine-reset-timer__text">Mines will reset in: 02:00</div>
   </div>
 
-  <!-- Block Health Bar (Top Center) -->
+  <!-- Mining Target Display (Bottom Center, Above Progress Bar) -->
   <div id="block-health-bar" class="block-health-bar">
     <div id="block-health-bar-name" class="block-health-bar__name">Diamond</div>
     <div class="block-health-bar__container">
@@ -1742,18 +2155,22 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       </div>
       <div id="block-health-bar-text" class="block-health-bar__text">0/100 HP</div>
     </div>
+    <!-- Sell Value (for ores) or Gem Reward (for chests) -->
+    <div id="block-reward-display" class="block-health-bar__reward"></div>
   </div>
 
   <!-- Mining HUD -->
   <div id="mining-hud" class="mining-hud">
-    <!-- Bottom Middle: Current Ore Display -->
-    <div id="current-ore" class="mining-hud__current-ore"></div>
     
     <!-- Bottom Middle Right: Damage Display -->
     <div id="damage-display" class="mining-hud__damage"></div>
   </div>
 
   <!-- Mined Ore Popup Layer -->
+  <div id="mined-ore-layer" class="mined-ore-layer"></div>
+
+  <!-- Damage Popup Layer -->
+  <div id="damage-popup-layer" class="damage-popup-layer"></div>
 
   <!-- Merchant Selling UI -->
   <div id="merchant-ui" class="merchant-ui">
@@ -1790,6 +2207,17 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     </div>
   </div>
 
+  <!-- Gem Trader Upgrades UI -->
+  <div id="gem-trader-ui" class="gem-trader-ui">
+    <div class="gem-trader-ui__header">
+      <button class="gem-trader-ui__help-button">?</button>
+      <div class="gem-trader-ui__title">Upgrades</div>
+      <button id="gem-trader-ui-close" class="gem-trader-ui__close">×</button>
+    </div>
+    <div id="gem-trader-ui-content" class="gem-trader-ui__content">
+      <!-- Upgrade items will be dynamically added here -->
+    </div>
+  </div>
 
   <div id="mined-ore-layer" class="mined-ore-layer"></div>
 
@@ -1848,6 +2276,17 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     position: fixed;
     inset: 0;
     pointer-events: none;
+  }
+
+  /* Ensure all interactive UI elements capture clicks and prevent them from reaching the game */
+  .ui-root button,
+  .ui-root .action-card,
+  .ui-root .modal,
+  .ui-root .pickaxe-card,
+  .ui-root .rebirth-option,
+  .ui-root .merchant-ui__item,
+  .ui-root .gem-trader-ui__item {
+    pointer-events: auto;
   }
 
   /* Mobile controls (existing boilerplate) */
@@ -1935,6 +2374,10 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
   .stat-hud--money .stat-hud__value {
     color: #ffd700;
+  }
+
+  .stat-hud--gems .stat-hud__value {
+    color: #4caf50;
   }
 
   .stat-hud--power .stat-hud__value {
@@ -2874,30 +3317,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     opacity: 1;
   }
 
-  /* Bottom Middle: Current Ore Display */
-  .mining-hud__current-ore {
-    position: fixed;
-    left: 50%;
-    bottom: 120px;
-    transform: translateX(-50%);
-    padding: 12px 24px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.7);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
-    font-size: 18px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-  }
-
-  .mining-hud__current-ore.visible {
-    opacity: 1;
-  }
+  /* Old current ore display removed - now using mining target display */
 
   /* Bottom Middle Right: Damage Display */
   .mining-hud__damage {
@@ -2974,6 +3394,48 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     font-weight: 800;
   }
 
+  /* Damage Popup Layer */
+  .damage-popup-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1000;
+  }
+
+  /* Damage Popup (To the right of HP bar) */
+  .damage-popup {
+    position: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(0) scale(0.9);
+    transition: opacity 0.4s ease, transform 1.5s ease-out;
+  }
+
+  .damage-popup.active {
+    opacity: 1;
+    transform: translateY(-80px) scale(1);
+  }
+
+  .damage-popup__text {
+    color: #ff0000;
+    font-size: 32px;
+    font-weight: 800;
+    font-family: 'Arial', sans-serif;
+    text-shadow: 
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 0 10px rgba(0, 0, 0, 0.8),
+      0 4px 8px rgba(0, 0, 0, 0.6);
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
   /* Mine Reset Timer (Top Center) */
   .mine-reset-timer {
     position: fixed;
@@ -3021,12 +3483,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     gap: 8px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s ease;
+    /* Removed transition to prevent UI disappearing when switching ores quickly */
     z-index: 1000;
   }
 
   .block-health-bar.visible {
     opacity: 1;
+    /* Instant show - no transition */
   }
 
   .block-health-bar__name {
@@ -3085,6 +3548,21 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     white-space: nowrap;
     pointer-events: none;
     z-index: 1;
+  }
+
+  .block-health-bar__reward {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 4px;
+    text-shadow: 
+      -1px -1px 0 #000,
+      1px -1px 0 #000,
+      -1px 1px 0 #000,
+      1px 1px 0 #000,
+      0 0 8px rgba(0, 0, 0, 0.8);
   }
 
   /* Progress Bar (Bottom) */
@@ -3623,6 +4101,245 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   .mine-reset-upgrade-ui__status--bought {
     color: #4caf50;
     font-weight: 700;
+  }
+
+  /* Gem Trader Upgrades UI */
+  .gem-trader-ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-height: 700px;
+    background: rgba(21, 26, 60, 0.98);
+    border: 3px solid #4caf50;
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .gem-trader-ui.visible {
+    display: flex;
+  }
+
+  .gem-trader-ui__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #4caf50;
+  }
+
+  .gem-trader-ui__help-button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(76, 175, 80, 0.8);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .gem-trader-ui__help-button:hover {
+    background: rgba(76, 175, 80, 1);
+    transform: scale(1.05);
+  }
+
+  .gem-trader-ui__title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.5),
+      1px -1px 0 rgba(0, 0, 0, 0.5),
+      -1px 1px 0 rgba(0, 0, 0, 0.5),
+      1px 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .gem-trader-ui__close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(244, 67, 54, 0.8);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+  }
+
+  .gem-trader-ui__close:hover {
+    background: rgba(244, 67, 54, 1);
+    transform: scale(1.1);
+  }
+
+  .gem-trader-ui__content {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .gem-trader-ui__upgrade-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(30, 35, 70, 0.8);
+    border-radius: 8px;
+    border: 2px solid rgba(76, 175, 80, 0.3);
+  }
+
+  .gem-trader-ui__icon-container {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+  }
+
+  .gem-trader-ui__icon {
+    font-size: 48px;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gem-trader-ui__arrow-overlay {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 16px;
+    color: #ff9800;
+    font-weight: 700;
+    text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.8),
+      1px -1px 0 rgba(0, 0, 0, 0.8),
+      -1px 1px 0 rgba(0, 0, 0, 0.8),
+      1px 1px 0 rgba(0, 0, 0, 0.8);
+  }
+
+  .gem-trader-ui__details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gem-trader-ui__upgrade-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .gem-trader-ui__effect {
+    font-size: 16px;
+    color: #4caf50;
+    font-weight: 600;
+  }
+
+  .gem-trader-ui__level-cost-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .gem-trader-ui__level-progress {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    color: #4caf50;
+    font-weight: 600;
+  }
+
+  .gem-trader-ui__level-arrow {
+    color: #ff9800;
+  }
+
+  .gem-trader-ui__cost {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    color: #4caf50;
+    font-weight: 600;
+  }
+
+  .gem-trader-ui__gem-icon {
+    font-size: 16px;
+  }
+
+  .gem-trader-ui__upgrade-button {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 8px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .gem-trader-ui__upgrade-button.can-afford {
+    background: rgba(76, 175, 80, 0.9);
+    border: 2px solid #4caf50;
+  }
+
+  .gem-trader-ui__upgrade-button.can-afford:hover {
+    background: rgba(76, 175, 80, 1);
+    transform: scale(1.1);
+  }
+
+  .gem-trader-ui__upgrade-button.cannot-afford {
+    background: rgba(244, 67, 54, 0.7);
+    border: 2px solid #f44336;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .gem-trader-ui__upgrade-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .gem-trader-ui__content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .gem-trader-ui__content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  .gem-trader-ui__content::-webkit-scrollbar-thumb {
+    background: rgba(76, 175, 80, 0.6);
+    border-radius: 4px;
+  }
+
+  .gem-trader-ui__content::-webkit-scrollbar-thumb:hover {
+    background: rgba(76, 175, 80, 0.8);
   }
 
 </style>

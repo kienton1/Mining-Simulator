@@ -24,29 +24,34 @@ const FALLBACK_TRAINING_ROCKS: Array<{
   tier: TrainingRockTier;
 }> = [
   {
-    tier: TrainingRockTier.STONE,
-    position: { x: -12.5, y: 0, z: -9.5 },
-    bounds: { minX: -15, maxX: -10, minZ: -13, maxZ: -7 },
+    tier: TrainingRockTier.DIRT, // cobblestone block → +1 Power
+    position: { x: -11.5, y: 2.5, z: -10.5 }, // cobblestone at x:-12, y:2, z:-11
+    bounds: { minX: -13, maxX: -11, minZ: -12, maxZ: -8 }, // Interact area: (-13,1,-12) to (-11,1,-8)
   },
   {
-    tier: TrainingRockTier.IRON,
-    position: { x: -6.5, y: 0, z: -9.5 },
-    bounds: { minX: -9, maxX: -4, minZ: -13, maxZ: -7 },
+    tier: TrainingRockTier.COBBLESTONE, // deepslate-iron-ore → +3 Power
+    position: { x: -7.5, y: 2.5, z: -10.5 }, // deepslate-iron-ore at x:-8, y:2, z:-11
+    bounds: { minX: -9, maxX: -5, minZ: -12, maxZ: -6 }, // Dirt patch bounds (from map.json)
   },
   {
-    tier: TrainingRockTier.GOLD,
-    position: { x: -0.5, y: 0, z: -9.5 },
-    bounds: { minX: -3, maxX: 1, minZ: -13, maxZ: -7 },
+    tier: TrainingRockTier.IRON_DEEPSLATE, // deepslate-gold-ore → +15 Power
+    position: { x: -3.5, y: 2.5, z: -10.5 }, // deepslate-gold-ore at x:-4, y:2, z:-11
+    bounds: { minX: -5, maxX: -1, minZ: -12, maxZ: -6 }, // Dirt patch bounds (from map.json)
   },
   {
-    tier: TrainingRockTier.DIAMOND,
-    position: { x: 5.5, y: 0, z: -9.5 },
-    bounds: { minX: 3, maxX: 7, minZ: -13, maxZ: -7 },
+    tier: TrainingRockTier.GOLD_DEEPSLATE, // deepslate-diamond-ore → +45 Power
+    position: { x: 3.5, y: 2.5, z: -10.5 }, // deepslate-diamond-ore at x:3, y:2, z:-11
+    bounds: { minX: 2, maxX: 6, minZ: -12, maxZ: -6 }, // Dirt patch bounds (from map.json)
   },
   {
-    tier: TrainingRockTier.CRYSTAL,
-    position: { x: 11.5, y: 0, z: -9.5 },
-    bounds: { minX: 9, maxX: 13, minZ: -13, maxZ: -7 },
+    tier: TrainingRockTier.DIAMOND_DEEPSLATE, // deepslate-emerald-ore → +80 Power
+    position: { x: 7.5, y: 2.5, z: -10.5 }, // deepslate-emerald-ore at x:7, y:2, z:-11
+    bounds: { minX: 6, maxX: 10, minZ: -12, maxZ: -6 }, // Dirt patch bounds (from map.json)
+  },
+  {
+    tier: TrainingRockTier.EMERALD_DEEPSLATE, // deepslate-ruby-ore → +175 Power
+    position: { x: 11.5, y: 2.5, z: -10.5 }, // deepslate-ruby-ore at x:11, y:2, z:-11
+    bounds: { minX: 10, maxX: 14, minZ: -12, maxZ: -6 }, // Dirt patch bounds (from map.json)
   },
 ];
 
@@ -60,7 +65,8 @@ interface PlayerTrainingState {
   interactHeld: boolean;
   velocityCheckInterval?: NodeJS.Timeout;
   trainingRockLocation?: TrainingRockLocation;
-  trainingStartPosition?: { x: number; y: number; z: number };
+  trainingStartPosition?: { x: number; y: number; z: number }; // Position after teleport (for movement detection baseline)
+  originalPosition?: { x: number; y: number; z: number }; // Original position before teleport (for restoration)
 }
 
 /**
@@ -98,7 +104,7 @@ export class TrainingController {
     this.trainingRockSpawns = dynamicSpawns.length ? dynamicSpawns : FALLBACK_TRAINING_ROCKS;
 
     if (dynamicSpawns.length === 0) {
-      console.warn('[TrainingController] Using fallback training rock positions.');
+    } else {
     }
 
     this.rockManager.registerTrainingRocksFromMap(this.trainingRockSpawns);
@@ -155,7 +161,7 @@ export class TrainingController {
       const { x, y, z } = rockLocation.position;
       const uiPos = {
         x,
-        y: y + 2.5, // float above rock
+        y: y + 3.5, // float above rock (lowered from 4.5, matching updateRockSceneUIPosition)
         z,
       };
       sceneUI.setPosition(uiPos);
@@ -203,7 +209,7 @@ export class TrainingController {
     const { x, y, z } = rockLocation.position;
     const uiPos = {
       x,
-      y: y + 4.5, // float above rock
+      y: y + 3.5, // float above rock (lowered from 4.5)
       z,
     };
     sceneUI.setPosition(uiPos);
@@ -237,7 +243,6 @@ export class TrainingController {
 
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
-      console.warn(`[TrainingController] Player data not found`);
       return false;
     }
 
@@ -246,7 +251,6 @@ export class TrainingController {
     if (!targetRock) {
       targetRock = this.getNearbyTrainingRock(player);
       if (!targetRock) {
-        console.warn(`[TrainingController] No training rock nearby`);
         return false;
       }
     }
@@ -254,22 +258,17 @@ export class TrainingController {
     // Verify player is still near the rock (proximity check)
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
-      console.warn(`[TrainingController] Player entity not found`);
       return false;
     }
 
     const nearbyRock = this.rockManager.findNearbyTrainingRock(playerEntity.position);
     if (!nearbyRock || nearbyRock.rockData.id !== targetRock.rockData.id) {
-      console.warn(`[TrainingController] Player is not near the training rock`);
       return false;
     }
 
     // Check if player can access this rock
     const access = this.getAccessState(playerData, targetRock.rockData);
     if (!access.canTrain) {
-      console.warn(
-        `[TrainingController] Cannot access ${targetRock.rockData.name} yet (needs ${targetRock.rockData.requiredPower} power or ${targetRock.rockData.requiredRebirths} rebirths)`
-      );
       this.showInteractPrompt(player, targetRock, access);
       return false;
     }
@@ -277,17 +276,18 @@ export class TrainingController {
     // Get player's pickaxe
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
-      console.warn(`[TrainingController] Player has no pickaxe`);
       return false;
     }
 
+    // Store original position before teleporting (for restoration on exit)
+    const originalPosition = { ...playerEntity.position };
+    
     // Move player next to the rock so swings visibly hit it
-    // Add extra Y offset to avoid teleporting into blocks
-    // Move back by 0.5 units to prevent clipping into the cobblestone block
+    // Teleport to same X as the ore block, but with fixed Y and Z positions
     const standPosition = {
-      x: targetRock.position.x,
-      y: targetRock.position.y + 1.6, // Moved up by 0.5 (was 1.5)
-      z: targetRock.position.z + 1, // Moved back by 0.5 (was +0.5)
+      x: targetRock.position.x, // Same X as the ore block
+      y: 1.75, // Fixed Y position
+      z: -9.27, // Fixed Z position (forward of the ore blocks)
     };
     playerEntity.setPosition(standPosition);
 
@@ -295,16 +295,15 @@ export class TrainingController {
     this.hideInteractPrompt(player);
     this.hideRockSceneUI(targetRock.rockData.id);
 
-    // Store the training rock location and initial position for movement detection
+    // Store the training rock location and positions
     const state = this.playerStates.get(player);
     if (state) {
       state.trainingRockLocation = targetRock || undefined;
-      // Store initial position to detect movement (including jumping)
-      state.trainingStartPosition = {
-        x: standPosition.x,
-        y: standPosition.y,
-        z: standPosition.z,
-      };
+      // Store the teleported position as start position (so movement detection uses it as baseline)
+      // This prevents the teleport from triggering movement detection
+      state.trainingStartPosition = standPosition;
+      // Store original position separately for restoration
+      state.originalPosition = originalPosition;
     }
 
     // Start velocity monitoring to detect movement (including jumping)
@@ -318,9 +317,7 @@ export class TrainingController {
       playerData,
       playerEntity,
       (p, powerGain) => {
-        console.log(`[TrainingController] Power gain callback: ${powerGain}, calling addPower`);
         const newTotal = this.gameManager.addPower(p, powerGain);
-        console.log(`[TrainingController] New total power: ${newTotal}, sending UI event`);
         this.sendPowerGainEvent(p, powerGain, newTotal, targetRock.position);
       }
     );
@@ -330,9 +327,6 @@ export class TrainingController {
       isTraining: true,
       rockName: targetRock.rockData.name,
     });
-
-    console.log(`[TrainingController] Started training on ${targetRock.rockData.name}`);
-
     return true;
   }
 
@@ -351,15 +345,35 @@ export class TrainingController {
     
     this.trainingSystem.stopTraining(player);
     
+    // Restore player position: teleport down by 1 block to counteract the +1 block teleport on start
+    const playerEntity = this.getPlayerEntity(player);
+    const state = this.playerStates.get(player);
+    if (playerEntity && state) {
+      // Get original position before teleport (stored separately)
+      if (state.originalPosition) {
+        // Teleport down by 1 block from original position to counteract the +1 teleport on start
+        const restorePosition = {
+          x: state.originalPosition.x,
+          y: Math.max(0, state.originalPosition.y - 1), // One block down (but not below ground)
+          z: state.originalPosition.z,
+        };
+        playerEntity.setPosition(restorePosition);
+      } else if (state.trainingStartPosition) {
+        // Fallback: use trainingStartPosition and teleport down by 1
+        const restorePosition = {
+          x: state.trainingStartPosition.x,
+          y: Math.max(0, state.trainingStartPosition.y - 1), // One block down
+          z: state.trainingStartPosition.z,
+        };
+        playerEntity.setPosition(restorePosition);
+      }
+    }
+    
     player.ui.sendData({
       type: 'TRAINING_STATE',
       isTraining: false,
     });
-
-    console.log(`[TrainingController] Stopped training on ${rockName}`);
-
     // Show prompt again if still in area
-    const state = this.playerStates.get(player);
     if (state?.trainingRockLocation) {
       const currentNearbyRock = this.getNearbyTrainingRock(player);
       if (currentNearbyRock && currentNearbyRock.rockData.id === state.trainingRockLocation.rockData.id) {
@@ -373,6 +387,7 @@ export class TrainingController {
       // Clear training state
       state.trainingRockLocation = undefined;
       state.trainingStartPosition = undefined;
+      state.originalPosition = undefined;
     }
   }
 
@@ -384,6 +399,17 @@ export class TrainingController {
    */
   isPlayerTraining(player: Player): boolean {
     return this.trainingSystem.isPlayerTraining(player);
+  }
+
+  /**
+   * Gets the current training rock location a player is training on
+   * 
+   * @param player - Player to check
+   * @returns Training rock location or null if not training
+   */
+  getCurrentTrainingRock(player: Player): TrainingRockLocation | null {
+    const state = this.playerStates.get(player);
+    return state?.trainingRockLocation || null;
   }
 
   /**
@@ -422,13 +448,14 @@ export class TrainingController {
     const allRocks = this.rockManager.getAllTrainingRocks();
     
     // Filter to accessible rocks and sort by tier (highest first)
-    // Tier order: CRYSTAL > DIAMOND > GOLD > IRON > STONE
+    // Tier order: EMERALD_DEEPSLATE > DIAMOND_DEEPSLATE > GOLD_DEEPSLATE > IRON_DEEPSLATE > COBBLESTONE > DIRT
     const tierOrder = {
-      [TrainingRockTier.CRYSTAL]: 4,
-      [TrainingRockTier.DIAMOND]: 3,
-      [TrainingRockTier.GOLD]: 2,
-      [TrainingRockTier.IRON]: 1,
-      [TrainingRockTier.STONE]: 0,
+      [TrainingRockTier.EMERALD_DEEPSLATE]: 5,
+      [TrainingRockTier.DIAMOND_DEEPSLATE]: 4,
+      [TrainingRockTier.GOLD_DEEPSLATE]: 3,
+      [TrainingRockTier.IRON_DEEPSLATE]: 2,
+      [TrainingRockTier.COBBLESTONE]: 1,
+      [TrainingRockTier.DIRT]: 0,
     };
 
     const accessibleRocks = allRocks.filter(rock => {
@@ -602,7 +629,6 @@ export class TrainingController {
   }
 
   private sendPowerGainEvent(player: Player, amount: number, totalPower: number, rockPosition?: { x: number; y: number; z: number }): void {
-    console.log(`[TrainingController] Sending POWER_GAIN event: amount=${amount}, total=${totalPower}, rockPos=`, rockPosition);
     player.ui.sendData({
       type: 'POWER_GAIN',
       amount,

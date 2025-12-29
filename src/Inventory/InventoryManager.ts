@@ -51,12 +51,10 @@ export class InventoryManager {
   addOre(player: Player, oreType: OreType, amount: number = 1): boolean {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
-      console.warn('[InventoryManager] Player data not found');
       return false;
     }
 
     if (amount <= 0) {
-      console.warn('[InventoryManager] Invalid amount to add:', amount);
       return false;
     }
 
@@ -71,8 +69,6 @@ export class InventoryManager {
 
     // Update player data
     this.updatePlayerDataCallback?.(player, playerData);
-
-    console.log(`[InventoryManager] Added ${amount} ${oreType} to ${player.username}'s inventory (total: ${playerData.inventory[oreType]})`);
     return true;
   }
 
@@ -87,7 +83,6 @@ export class InventoryManager {
   removeOre(player: Player, oreType: OreType, amount?: number): boolean {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData || !playerData.inventory) {
-      console.warn('[InventoryManager] Player data or inventory not found');
       return false;
     }
 
@@ -97,17 +92,14 @@ export class InventoryManager {
     if (amount === undefined) {
       delete playerData.inventory[oreType];
       this.updatePlayerDataCallback?.(player, playerData);
-      console.log(`[InventoryManager] Removed all ${oreType} from ${player.username}'s inventory`);
       return true;
     }
 
     if (amount <= 0) {
-      console.warn('[InventoryManager] Invalid amount to remove:', amount);
       return false;
     }
 
     if (currentAmount < amount) {
-      console.warn(`[InventoryManager] Insufficient ${oreType} in inventory (have: ${currentAmount}, need: ${amount})`);
       return false;
     }
 
@@ -121,8 +113,6 @@ export class InventoryManager {
 
     // Update player data
     this.updatePlayerDataCallback?.(player, playerData);
-
-    console.log(`[InventoryManager] Removed ${amount} ${oreType} from ${player.username}'s inventory (remaining: ${newAmount})`);
     return true;
   }
 
@@ -213,14 +203,11 @@ export class InventoryManager {
   clearInventory(player: Player): void {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
-      console.warn('[InventoryManager] Player data not found');
       return;
     }
 
     playerData.inventory = {};
     this.updatePlayerDataCallback?.(player, playerData);
-
-    console.log(`[InventoryManager] Cleared inventory for ${player.username}`);
   }
 }
 

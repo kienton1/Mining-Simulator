@@ -25,14 +25,26 @@ export interface PlayerData {
   /** Current gold/currency amount */
   gold: number;
   
+  /** Current gems/currency amount (secondary currency) */
+  gems: number;
+  
   /** Number of wins (reaching bottom of mines) */
   wins: number;
   
   /** Current pickaxe tier (0 = Rusty, 1 = Stone, etc.) */
   currentPickaxeTier: number;
   
+  /** Array of owned pickaxe tiers (all pickaxes the player has purchased) */
+  ownedPickaxes?: number[];
+  
   /** Whether the mine reset upgrade (5 minutes) has been purchased */
   mineResetUpgradePurchased?: boolean;
+  
+  /** Gem Trader upgrade levels */
+  moreGemsLevel?: number;
+  moreRebirthsLevel?: number;
+  moreCoinsLevel?: number;
+  moreDamageLevel?: number;
   
   /** Inventory of ores */
   inventory: InventoryData;
@@ -47,29 +59,44 @@ export const CURRENT_DATA_VERSION = 1;
 /**
  * Inventory data structure
  * Maps ore type to quantity
- * Supports all 20 ore types from OreData
+ * Supports all 24 ore types from OreData
  */
 export interface InventoryData {
+  // Common Ores (Available Early)
   [OreType.STONE]?: number;
+  [OreType.DEEPSLATE]?: number;
   [OreType.COAL]?: number;
-  [OreType.CLAY]?: number;
-  [OreType.SAND]?: number;
-  [OreType.COPPER]?: number;
   [OreType.IRON]?: number;
-  [OreType.LEAD]?: number;
-  [OreType.NICKEL]?: number;
-  [OreType.SILVER]?: number;
+  
+  // Uncommon Ores (Early-Mid Game)
+  [OreType.TIN]?: number;
+  [OreType.COBALT]?: number;
+  [OreType.PYRITE]?: number;
   [OreType.GOLD]?: number;
-  [OreType.PLATINUM]?: number;
-  [OreType.TITANIUM]?: number;
-  [OreType.EMERALD]?: number;
+  
+  // Rare Ores (Mid Game)
+  [OreType.OBSIDIAN]?: number;
   [OreType.RUBY]?: number;
-  [OreType.SAPPHIRE]?: number;
-  [OreType.TOPAZ]?: number;
   [OreType.DIAMOND]?: number;
+  [OreType.AMBER]?: number;
+  
+  // Very Rare Ores (Mid-Late Game)
+  [OreType.QUARTZ]?: number;
+  [OreType.TOPAZ]?: number;
+  [OreType.EMERALD]?: number;
+  [OreType.FOSSIL]?: number;
+  
+  // Ultra Rare Ores (Late Game)
+  [OreType.AMETHYST]?: number;
+  [OreType.SAPPHIRE]?: number;
+  [OreType.URANIUM]?: number;
+  [OreType.CRYSTALITE]?: number;
+  
+  // Legendary Ores (End Game)
+  [OreType.SOLARITE]?: number;
   [OreType.MYTHRIL]?: number;
-  [OreType.ADAMANTITE]?: number;
-  [OreType.COSMIC]?: number;
+  [OreType.STALLITE]?: number;
+  [OreType.DRACONIUM]?: number;
 }
 
 /**
@@ -83,8 +110,14 @@ export function createDefaultPlayerData(): PlayerData {
     power: 1, // Base power when players join
     rebirths: 0,
     gold: 0,
+    gems: 0,
     wins: 0,
     currentPickaxeTier: 0,
+    ownedPickaxes: [0], // Start with tier 0 (Wooden) pickaxe
+    moreGemsLevel: 0,
+    moreRebirthsLevel: 0,
+    moreCoinsLevel: 0,
+    moreDamageLevel: 0,
     inventory: {},
   };
 }

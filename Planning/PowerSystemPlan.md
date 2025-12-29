@@ -2,7 +2,9 @@
 ## Complete Power Mechanics for Mining Game
 
 ### Overview
-This document consolidates all power-related planning content from the Mining Game project. Power is the primary stat for increasing mining damage and is gained through training rocks. This system has been rebalanced to make power the ONLY source of mining damage, with pickaxes providing speed, luck, and economic bonuses instead.
+This document consolidates **ALL power-related planning content** from the Mining Game project. Power is the primary stat for increasing mining damage and is gained through training rocks. This system has been rebalanced to make power the ONLY source of mining damage, with pickaxes providing speed, luck, and economic bonuses instead.
+
+**This is the single source of truth for all power mechanics, formulas, and planning.**
 
 ---
 
@@ -10,15 +12,13 @@ This document consolidates all power-related planning content from the Mining Ga
 1. [Power System Goals](#1-power-system-goals)
 2. [Power Gain System](#2-power-gain-system)
 3. [Power Impact on Mining](#3-power-impact-on-mining)
-4. [Power Scaling Analysis](#4-power-scaling-analysis)
-5. [Training Rock Balance](#5-training-rock-balance)
-6. [Training vs Mining Time Investment](#6-training-vs-mining-time-investment)
-7. [Power Constants & Formulas](#7-power-constants--formulas)
-8. [Power Scaling Examples](#8-power-scaling-examples)
-9. [Power & Rebirth Integration](#9-power--rebirth-integration)
-10. [Power Persistence & Saving](#10-power-persistence--saving)
-11. [Power UI References](#11-power-ui-references)
-12. [Implementation Checklist](#12-implementation-checklist)
+4. [Training Rock Balance](#4-training-rock-balance)
+5. [Power Constants & Formulas](#5-power-constants--formulas)
+6. [Power & Rebirth Integration](#6-power--rebirth-integration)
+7. [Rebirth System UI & Implementation](#7-rebirth-system-ui--implementation)
+8. [Power Persistence & Saving](#8-power-persistence--saving)
+9. [Power UI References](#9-power-ui-references)
+10. [Implementation Checklist](#10-implementation-checklist)
 
 ---
 
@@ -39,339 +39,701 @@ This document consolidates all power-related planning content from the Mining Ga
 
 ---
 
-## 2. Power Gain System
+## 2. Power Gain System (UPDATED - Flat Power Bonuses)
 
-### Base Power Gain
-- **Base Power Gain**: 1 power per hit (unchanged)
-- This is the foundation that all multipliers build on
+### Power Gain System Overview
+- **UPDATED SYSTEM**: All training rocks (Rocks 1-6) provide power bonuses per hit that scale based on rebirths
+- **Rock 1** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- **Rock 2** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- **Rock 3** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- **Rock 4** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- **Rock 5** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- **Rock 6** uses a piecewise function based on rebirth count (x = rebirths, y = power per hit)
+- Players can unlock higher-tier rocks by meeting either a power requirement OR rebirth requirement
+- Pickaxes no longer affect power gain - only training rock selection and rebirth count matter
 
-### Power Gain Formula
+### Power Gain Formula (UPDATED)
 ```
-PowerPerHit = BasePowerGain × RockMultiplier × RebirthMultiplier
+For Rock 1:
+PowerPerHit = Rock1PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 1 Power Formula below)
 
-BasePowerGain = 1
-RockMultiplier = Training rock tier multiplier (1 to 25)
-RebirthMultiplier = 1 + (Rebirths × 0.10)
+For Rock 2:
+PowerPerHit = Rock2PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 2 Power Formula below)
+
+For Rock 3:
+PowerPerHit = Rock3PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 3 Power Formula below)
+
+For Rock 4:
+PowerPerHit = Rock4PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 4 Power Formula below)
+
+For Rock 5:
+PowerPerHit = Rock5PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 5 Power Formula below)
+
+For Rock 6:
+PowerPerHit = Rock6PowerBonus(rebirths)
+  - Uses piecewise function based on rebirth count (see Rock 6 Power Formula below)
 ```
 
-**REBALANCED**: Pickaxes no longer affect power gain. Power gain comes from training rocks and rebirths only.
+**KEY CHANGE**: All rocks (Rocks 1-6) have power gain that scales with rebirth count using piecewise functions. Rebirths now directly affect all rocks' power gain per hit, while also serving as unlock requirements for higher-tier rocks.
+
+### Training Rock Unlock Requirements
+- Each rock requires EITHER:
+  - A minimum power threshold (current power >= requirement), OR
+  - A minimum rebirth count
+- Players can unlock rocks using whichever requirement they meet first
+- Once unlocked, a rock remains available for training
 
 ### Training Speed
 - **Training uses same swing rate as mining**
 - Base: 2.0 swings/second (1 hit per 0.5 seconds)
 - Scales with pickaxe tier (same as mining)
 - This means training speed improves as players get better pickaxes
+- Power gain per hit is fixed based on selected rock, but faster swings = more power per second
 
-### Power Per Second Calculation
+### Power Per Second Calculation (UPDATED)
 ```
-PowerPerSecond = PowerPerHit × SwingRate
-
-Example with Tier 0 (Wooden) on Stone Rock (1× multiplier), 0 rebirths:
-- PowerPerHit = 1 × 1 × 1.0 = 1
-- SwingRate = 2.0 swings/sec
-- PowerPerSecond = 1 × 2.0 = 2.0 power/sec
-
-Example with Tier 10 pickaxe on Diamond Rock (10× multiplier), 5 rebirths:
-- PowerPerHit = 1 × 10 × 1.5 = 15
-- SwingRate = 8.0 swings/sec
-- PowerPerSecond = 15 × 8.0 = 120 power/sec
+PowerPerSecond = RockPowerBonus × SwingRate
 ```
 
-**Note**: Training speed still scales with pickaxe tier (mining speed), but power gain per hit no longer benefits from pickaxe power bonuses.
+**Note**: Training speed still scales with pickaxe tier (mining speed). All rocks' (Rocks 1-6) power gain per hit scale with rebirth count.
 
 ---
 
 ## 3. Power Impact on Mining
 
-### Mining Damage Formula
+### Mining Damage Formula (UPDATED - Power-Based Scaling)
+
+The damage calculation uses a two-part formula that scales power into damage:
+
 ```
-MiningDamage = BaseDamage × (1 + Power / PowerScalingConstant)
+EarlyBoost = 1 + 2 / (1 + (Power / 398107.17)^0.3)
 
-BaseDamage = 1 (constant - pickaxes no longer affect damage)
-PowerScalingConstant = 5
+Damage = 1 + 0.072 * Power^0.553 * EarlyBoost
 ```
 
-**REBALANCED**: Damage now comes from Power only. Pickaxes provide speed, luck, and sell value multipliers instead.
+**Where**:
+- `Power` is the player's current power stat (input)
+- `EarlyBoost` is a scaling factor that provides enhanced damage scaling at lower power levels
+- `Damage` is the resulting mining damage (output)
 
-**Design Goal**: Balanced progression where training helps significantly but doesn't trivialize all content immediately.
+**REBALANCED**: Damage now comes from Power only using a power-based scaling formula. Pickaxes provide speed, luck, and sell value multipliers instead.
 
-### Balance Verification Examples
-- **20 power** (10 sec training) = 1 × (1 + 20/5) = **5 damage** (takes ~20 hits for stone)
-- **75 power** (30 sec training) = 1 × (1 + 75/5) = **16 damage** (takes ~9-10 hits for coal)
-- **495 power** (~4 min training) = 1 × (1 + 495/5) = **100 damage** (one-hits stone)
-- **Coal (150 HP)**: Requires ~750 power (~6.25 min) to one-hit
+**Design Goal**: The formula uses a power function (Power^0.553) for smooth non-linear scaling, with the EarlyBoost multiplier providing enhanced scaling at lower power levels. This creates meaningful progression throughout the game without trivializing content.
 
-### Why PowerScalingConstant = 5?
-- **Primary Goal**: Allow meaningful progression without trivializing content
-- Every 5 power = +100% damage (2× total)
-- Every 25 power = +500% damage (6× total)
-- Every 100 power = +2,000% damage (21× total)
-- **10 seconds training (20 power)**: 5× damage - Helps but doesn't one-hit everything
-- **30 seconds training (75 power)**: 16× damage - Noticeable improvement, still requires effort
-- **4 minutes training (495 power)**: One-hits stone
-- **6.25 minutes training (750 power)**: One-hits coal
-- Provides meaningful progression curve where training investment is rewarded but doesn't break balance
+### Formula Behavior
+
+- **Early Game**: The EarlyBoost factor provides significant scaling at lower power levels (when Power < 398107.17)
+- **Mid-Late Game**: As power increases, EarlyBoost approaches 1, and damage scales primarily through the Power^0.553 term
+- **Non-Linear Scaling**: The 0.553 exponent creates a smooth diminishing returns curve where each additional point of power provides less absolute damage increase, but remains meaningful
 
 ---
 
-## 4. Power Scaling Analysis
-
-### Early Game (Power 0-1,000)
-- **With 20 Power** (10 sec training): +400% damage (5× total) - Helps but stone still takes effort
-- **With 75 Power** (30 sec): +1,500% damage (16× total) - Noticeable improvement, coal becomes easier
-- **With 100 Power**: +2,000% damage (21× total)
-- **With 500 Power**: +10,000% damage (101× total) - Can one-hit stone
-- **With 1,000 Power**: +20,000% damage (201× total)
-
-### Mid Game (Power 1,000-10,000)
-- **With 5,000 Power**: +100,000% damage (1,001× total)
-- **With 10,000 Power**: +200,000% damage (2,001× total)
-
-### Late Game (Power 10,000-100,000+)
-- **With 50,000 Power**: +1,000,000% damage (10,001× total)
-- **With 100,000 Power**: +2,000,000% damage (20,001× total)
-
-### Impact Examples - All Pickaxes Deal Same Base Damage (1)
-- Power 0: 1 damage
-- Power 20 (10 sec): 5 damage (+400%) - Stone takes ~20 hits
-- Power 75 (30 sec): 16 damage (+1,500%) - Coal takes ~9-10 hits
-- Power 495 (~4 min): 100 damage (+9,900%) - **One-hits stone**
-- Power 750 (~6.25 min): 151 damage (+15,000%) - **One-hits coal**
-- Power 1,000: 201 damage (+20,000%)
-- Power 10,000: 2,001 damage (+200,000%)
-- Power 100,000: 20,001 damage (+2,000,000%)
-
-**Note**: All pickaxes now deal the same base damage (1). Damage scaling comes entirely from Power. Pickaxes provide speed, luck, and sell value multipliers instead.
+**Note**: All pickaxes now deal the same base damage calculation. Damage scaling comes entirely from Power using the formula above. Pickaxes provide speed, luck, and sell value multipliers instead.
 
 ---
 
-## 5. Training Rock Balance
+## 4. Training Rock Balance (UPDATED - 6 Rocks with Flat Power Bonuses)
 
-### Training Rock Tiers
+### Training Rock System Overview
+- **6 Training Rocks** total
+- **Rock 1**: Power gain scales with rebirth count using a piecewise function
+- **Rock 2**: Power gain scales with rebirth count using a piecewise function
+- **Rock 3**: Power gain scales with rebirth count using a piecewise function
+- **Rock 4**: Power gain scales with rebirth count using a piecewise function
+- **Rock 6**: Power gain scales with rebirth count using a piecewise function
+- Each rock requires EITHER a power threshold OR rebirth count to unlock
+- Once unlocked, rocks remain available for training
+- Higher-tier rocks provide significantly more power per hit
 
-| Rock | Required Rebirths | Power Multiplier | Required Power | Best For |
-|------|-------------------|------------------|----------------|----------|
-| Stone | 0 | 1× | 0 | Early game, Power 0-1,000 |
-| Iron | 5 | 2× | 1,000 | Early-mid game, Power 1,000-10,000 |
-| Gold | 15 | 4× | 5,000 | Mid game, Power 5,000-50,000 |
-| Diamond | 50 | 10× | 20,000 | Late game, Power 20,000-200,000 |
-| Crystal | 150 | 25× | 50,000 | End game, Power 50,000+ |
+### Rock 1 Power Gain Formula (Piecewise Function Based on Rebirths)
 
-### Training Rock Recommendations
-- **Stone Rock**: Start here, good for Power 0-500
-- **Iron Rock**: Accessible after first rebirth, good for Power 500-5,000
-- **Gold Rock**: Mid-game progression, good for Power 5,000-25,000
-- **Diamond Rock**: Late-game training, good for Power 25,000-100,000
-- **Crystal Rock**: End-game training, good for Power 100,000+
+Rock 1's power gain per hit scales with rebirth count (x = rebirths, y = power per hit):
+
+```
+For 1 <= x <= 36:
+  y(x) = floor((x + 4) / 5)
+
+For 36 < x <= 457:
+  y(x) = floor((x + 7) / 6)
+
+For x >= 2510:
+  y(x) = floor(x / 10 + 0.5)
+```
+
+**Notes**:
+- Function uses floor operations to ensure integer power values
+- Power gain increases with rebirth count for Rock 1
+- **Note**: Function is not defined for 457 < x < 2510 - this gap should be handled in implementation
+- Higher rebirth count = more power per hit when training on Rock 1
+
+### Rock 2 Power Gain Formula (Piecewise Function Based on Rebirths)
+
+Rock 2's power gain per hit scales with rebirth count (x = rebirths, y = power per hit):
+
+```
+For 1 <= x < 57:
+  y(x) = floor(x / 5)
+
+For 57 <= x < 2510:
+  y(x) = floor(0.15x + 2.5)
+
+For x >= 2510:
+  y(x) = floor(0.15x + 2)
+```
+
+**Notes**:
+- Function uses floor operations to ensure integer power values
+- Power gain increases with rebirth count for Rock 2
+- Higher rebirth count = more power per hit when training on Rock 2
+
+### Rock 3 Power Gain Formula (Piecewise Function Based on Rebirths)
+
+Rock 3's power gain per hit scales with rebirth count (x = rebirths, y = power per hit):
+
+```
+For 1 <= x <= 47:
+  y(x) = floor(0.8x + 7)
+
+For 47 < x < 2510:
+  y(x) = floor(0.75x + 8)
+
+For x >= 2510:
+  y(x) = floor(0.75x)
+```
+
+**Notes**:
+- Function uses floor operations to ensure integer power values
+- Power gain increases with rebirth count for Rock 3
+- Higher rebirth count = more power per hit when training on Rock 3
+
+### Rock 4 Power Gain Formula (Piecewise Function Based on Rebirths)
+
+Rock 4's power gain per hit scales with rebirth count (x = rebirths, y = power per hit):
+
+```
+For x <= 457:
+  y(x) = RH((9x + 91) / 4)
+
+For 457 < x <= 2510:
+  y(x) = RH(1051 + (4613 / 2053) * (x - 457))
+
+For 2510 < x <= 3760:
+  y(x) = RH(5664 + (1407 / 625) * (x - 2510))
+
+For 3760 < x <= 6260:
+  y(x) = RH(8478 + (2813 / 1250) * (x - 3760))
+
+For 6260 < x <= 20260:
+  y(x) = RH((9x / 4) + 19)
+
+For 20260 < x <= 59040:
+  y(x) = RH(45604 + (21824 / 9695) * (x - 20260))
+
+For 59040 < x <= 209040:
+  y(x) = RH((9x / 4) + 60)
+
+For x > 209040:
+  y(x) = RH((4297 / 1910) * x + (21912 / 191))
+```
+
+**Notes**:
+- Function uses RH() rounding operations (likely "Round Half" or similar rounding function)
+- Power gain increases with rebirth count for Rock 4
+- Function has 8 distinct pieces covering different rebirth ranges
+- Higher rebirth count = more power per hit when training on Rock 4
+
+### Rock 5 Power Gain Formula (Piecewise Linear Function Based on Rebirths)
+
+Rock 5's power gain per hit scales with rebirth count (x = rebirths, y = power per hit) using a piecewise linear function defined by 32 knot points:
+
+**Function Definition**:
+```
+For x_i <= x <= x_{i+1} (between consecutive knot points):
+  y(x) = y_i + ((y_{i+1} - y_i) / (x_{i+1} - x_i)) * (x - x_i)
+
+For x >= 400040:
+  y(x) = 4x - 160
+```
+
+**Knot Points (x, y) in order**:
+1. (1, 44)
+2. (6, 64)
+3. (11, 84)
+4. (16, 104)
+5. (21, 124)
+6. (26, 144)
+7. (31, 164)
+8. (36, 184)
+9. (41, 204)
+10. (47, 228)
+11. (57, 268)
+12. (77, 348)
+13. (97, 428)
+14. (117, 508)
+15. (137, 588)
+16. (157, 668)
+17. (207, 869)
+18. (257, 1068)
+19. (307, 1268)
+20. (357, 1468)
+21. (457, 1868)
+22. (2510, 10069)
+23. (3760, 15072)
+24. (6260, 25073)
+25. (12760, 51703)
+26. (20260, 81072)
+27. (59040, 236200)
+28. (79040, 316200)
+29. (119040, 476200)
+30. (129040, 516200)
+31. (209040, 836200)
+32. (400040, 1600000)
+
+**Notes**:
+- Function uses linear interpolation between consecutive knot points
+- For x >= 400040, the function follows the linear equation y = 4x - 160
+- Power gain increases with rebirth count for Rock 5
+- Function passes through all 32 specified knot points exactly
+- Higher rebirth count = more power per hit when training on Rock 5
+
+### Rock 6 Power Gain Formula (Piecewise Linear Function Based on Rebirths)
+
+Rock 6's power gain per hit scales with rebirth count (x = rebirths, y = power per hit) using a piecewise linear function defined by 32 knot points:
+
+**Function Definition**:
+```
+For x_i <= x <= x_{i+1} (between consecutive knot points):
+  y(x) = y_i + ((y_{i+1} - y_i) / (x_{i+1} - x_i)) * (x - x_i)
+
+For x >= 400040:
+  y(x) = 5.75x - 100230
+```
+
+**Knot Points (x, y) in order**:
+1. (1, 620)
+2. (6, 650)
+3. (11, 680)
+4. (16, 710)
+5. (21, 740)
+6. (26, 770)
+7. (31, 800)
+8. (36, 830)
+9. (41, 860)
+10. (47, 900)
+11. (57, 970)
+12. (77, 1120)
+13. (97, 1270)
+14. (117, 1420)
+15. (137, 1570)
+16. (157, 1720)
+17. (207, 2000)
+18. (257, 2150)
+19. (307, 1849)
+20. (357, 2141)
+21. (457, 2724)
+22. (2510, 14683)
+23. (3760, 21980)
+24. (6260, 36564)
+25. (12760, 74480)
+26. (20260, 118200)
+27. (59040, 344400)
+28. (79040, 461100)
+29. (119040, 694400)
+30. (129040, 752800)
+31. (209040, 1200000)
+32. (400040, 2300000)
+
+**Notes**:
+- Function uses linear interpolation between consecutive knot points
+- For x >= 400040, the function follows the linear equation y = 5.75x - 100230
+- Power gain increases with rebirth count for Rock 6
+- Function passes through all 32 specified knot points exactly
+- Higher rebirth count = more power per hit when training on Rock 6
+
+### Training Rock Database
+
+| Rock # | UI Display (Power Gain) | Unlock Requirement (Power) | Unlock Requirement (Rebirths) | Actual Power Gain | Best For |
+|--------|------------------------|----------------------------|-------------------------------|-------------------|----------|
+| Rock 1 (Dirt) | +1 Power | FREE (always available) | FREE (always available) | Piecewise function (scales with rebirths) | Early game, scales with rebirths |
+| Rock 2 (Cobblestone) | +3 Power | 250 Power | 5 Rebirths | Piecewise function (scales with rebirths) | Early game progression, scales with rebirths |
+| Rock 3 (Iron Deepslate) | +15 Power | 5,000 Power | 15 Rebirths | Piecewise function (scales with rebirths) | Early-mid game, scales with rebirths |
+| Rock 4 (Gold Deepslate) | +45 Power | 75,000 Power | 50 Rebirths | Piecewise function (scales with rebirths) | Mid game, scales with rebirths |
+| Rock 5 (Diamond Deepslate) | +80 Power | 500,000 Power | 250 Rebirths | Piecewise function (scales with rebirths) | Late game, scales with rebirths |
+| Rock 6 (Emerald Deepslate) | +175 Power | 10,000,000 Power | 1,000 Rebirths | Piecewise function (scales with rebirths) | End game, scales with rebirths |
+
+**Note**: The "UI Display" column shows the static power value displayed in the training area UI cards. The actual power gain per hit uses piecewise functions based on rebirth count as defined in the formulas above.
+
+### Unlock Mechanism
+- **Dual Requirements**: Each rock (except Rock 1) can be unlocked via either:
+  - **Power Path**: Reaching the required power threshold through training/mining
+  - **Rebirth Path**: Reaching the required rebirth count
+- Players can unlock rocks using whichever path they achieve first
+- Once a rock is unlocked, it remains permanently available
+- No need to maintain the requirement - unlocking is permanent
+
+### Training Rock Progression Strategy
+
+**Early Game (Rock 1 - Dirt - Scaling Power Based on Rebirths)**:
+- UI Display: "+1 Power" (shows "FREE")
+- Always available, no requirements
+- Starting point for all players
+- Power gain per hit scales with rebirth count using piecewise function (see Rock 1 Power Formula above)
+- Starts at 1 power per hit (1 rebirth)
+- Increases with rebirth count
+- Good for initial power accumulation and continues to scale with rebirth progression
+
+**Early Game Progression (Rock 2 - Cobblestone - Scaling Power Based on Rebirths)**:
+- UI Display: "+3 Power"
+- Unlock at 250 Power OR 5 Rebirths
+- Power gain per hit scales with rebirth count using piecewise function (see Rock 2 Power Formula above)
+- Significant early game boost that continues to scale with rebirth progression
+
+**Early-Mid Game (Rock 3 - Iron Deepslate - Scaling Power Based on Rebirths)**:
+- UI Display: "+15 Power"
+- Unlock at 5,000 Power OR 15 Rebirths
+- Power gain per hit scales with rebirth count using piecewise function (see Rock 3 Power Formula above)
+- Major progression milestone that continues to scale with rebirth progression
+
+**Mid Game (Rock 4 - Gold Deepslate - Scaling Power Based on Rebirths)**:
+- UI Display: "+45 Power"
+- Unlock at 75,000 Power OR 50 Rebirths
+- Power gain per hit scales with rebirth count using piecewise function (see Rock 4 Power Formula above)
+- Substantial mid-game acceleration that continues to scale with rebirth progression
+
+**Late Game (Rock 5 - Diamond Deepslate - Scaling Power Based on Rebirths)**:
+- UI Display: "+80 Power"
+- Unlock at 500,000 Power OR 250 Rebirths
+- Power gain per hit scales with rebirth count using piecewise linear function defined by 32 knot points (see Rock 5 Power Formula above)
+- Starts at 44 power per hit (1 rebirth) and increases with rebirth count
+- Late game power farming that continues to scale with rebirth progression
+
+**End Game (Rock 6 - Emerald Deepslate - Scaling Power Based on Rebirths)**:
+- UI Display: "+175 Power"
+- Unlock at 10,000,000 Power OR 1,000 Rebirths
+- Power gain per hit scales with rebirth count using piecewise linear function defined by 32 knot points (see Rock 6 Power Formula above)
+- Starts at 620 power per hit (1 rebirth) and increases with rebirth count
+- Maximum power generation rate that continues to scale with rebirth progression
 
 ---
 
-## 6. Training vs Mining Time Investment
 
-### Training Efficiency Analysis
-
-#### Early Game Training (Stone Rock, Tier 0 Pickaxe)
-- **Power Gain**: 2.0 power/second
-- **Time to gain 20 Power**: 10 seconds - +400% damage (5× total), stone takes ~20 hits
-- **Time to gain 75 Power**: 37.5 seconds - +1,500% damage (16× total), coal takes ~9-10 hits
-- **Time to gain 495 Power**: ~4 minutes - **One-hits stone (100 HP)**
-- **Time to gain 750 Power**: ~6.25 minutes - **One-hits coal (150 HP)**
-- **Time to gain 1,000 Power**: 8.3 minutes - +20,000% damage (201× total)
-
-#### Mid Game Training (Diamond Rock, Tier 10 Pickaxe, 5 rebirths)
-- **Power Gain**: ~420 power/second
-- **Time to gain 1,000 Power**: 2.4 seconds
-- **Time to gain 10,000 Power**: 24 seconds
-- **Time to gain 100,000 Power**: 4 minutes
-- **Impact**: Massive damage boost
-
-### Power Targets by Mining Phase
-
-#### Phase 1: Depths 1-100 (Early Game)
-- **Available ores**: Stone, Deepslate, Coal, Iron, Tin, Cobalt, Pyrite, Gold, Ruby
-- **Average HP**: ~50-3,000 (linear scaling per ore)
-- **Pickaxe**: Tier 0-4 (2.0-22.0 swings/sec)
-- **Power needed**: ~20-100 (damage = 5-21 per swing)
-- **Target Power**: 20-500 (10 seconds - ~4 minutes)
-- **Training Time**: ~10 seconds for noticeable boost, ~4 minutes to one-hit stone
-- **Benefit**: 5× to 101× mining damage boost
-- **Goal**: Training helps significantly but requires investment to one-hit materials
-
-#### Phase 2: Depths 100-400 (Mid Game)
-- **Available ores**: All ores up to Amethyst unlock
-- **Average HP**: ~5,000-150,000 (mix of scaling ores)
-- **Pickaxe**: Tier 5-10 (25.0-85.0 swings/sec)
-- **Power needed**: ~100-1,000 (damage = 21-201 per swing)
-- **Target Power**: 1,000-5,000
-- **Training Time**: ~5-30 minutes (early) or ~2-12 seconds (late)
-- **Benefit**: 5,001× to 25,001× mining damage boost
-
-#### Phase 3: Depths 400-700 (Late Mid Game)
-- **Available ores**: All ores up to Stallite unlock
-- **Average HP**: ~200,000-2,000,000 (rare ores scaling up)
-- **Pickaxe**: Tier 11-20 (100.0-700.0 swings/sec)
-- **Power needed**: ~1,000-10,000 (damage = 201-2,001 per swing)
-- **Target Power**: 5,000-25,000
-- **Training Time**: ~2-10 minutes (with good setup)
-- **Benefit**: 25,001× to 125,001× mining damage boost
-
-#### Phase 4: Depths 700-900 (Late Game)
-- **Available ores**: All ores including Draconium (depth 850+)
-- **Average HP**: ~2,000,000-6,000,000 (ultra-rare ores)
-- **Pickaxe**: Tier 21-35 (850.0-55,000.0 swings/sec)
-- **Power needed**: ~10,000-50,000 (damage = 2,001-10,001 per swing)
-- **Target Power**: 25,000-100,000
-- **Training Time**: ~1-4 minutes (with best setup)
-- **Benefit**: 125,001× to 500,001× mining damage boost
-
-#### Phase 5: Depths 900-1000 (End Game)
-- **Available ores**: All 24 ores at near-maximum health
-- **Average HP**: ~6,000,000-9,000,000 (end-game scaling)
-- **Pickaxe**: Tier 36-53 (70,000.0-4,000,000.0 swings/sec)
-- **Power needed**: ~50,000-200,000 (damage = 10,001-40,001 per swing)
-
-**Note**: Hardest materials (e.g., Cosmic at depth 1000) require significant power investment
-
----
-
-## 7. Power Constants & Formulas
+## 5. Power Constants & Formulas
 
 ### Recommended Constants
 
 ```typescript
-BASE_POWER_GAIN = 1                    // Base power per hit (keep at 1)
-POWER_SCALING_CONSTANT = 5             // Power scaling divisor (balanced for meaningful progression)
-REBIRTH_MULTIPLIER_PER_REBIRTH = 0.10 // +10% per rebirth (keep at 0.10)
+// Damage Formula Constants
+EARLY_BOOST_DIVISOR = 398107.17        // Early boost scaling constant
+EARLY_BOOST_EXPONENT = 0.3              // Early boost power exponent
+DAMAGE_COEFFICIENT = 0.072              // Damage coefficient
+DAMAGE_POWER_EXPONENT = 0.553           // Power exponent for damage scaling
+BASE_DAMAGE = 1                         // Base damage constant
+
 REBIRTH_POWER_THRESHOLD = 1000         // Power needed to rebirth (keep at 1000)
+
+// Training Rock Power Bonuses
+ROCK_POWER_BONUSES = {
+  1: "piecewise_function",  // Rock 1: Uses piecewise function based on rebirths (see Rock 1 Power Formula)
+  2: "piecewise_function",  // Rock 2: Uses piecewise function based on rebirths (see Rock 2 Power Formula)
+  3: "piecewise_function",  // Rock 3: Uses piecewise function based on rebirths (see Rock 3 Power Formula)
+  4: "piecewise_function",  // Rock 4: Uses piecewise function based on rebirths (see Rock 4 Power Formula)
+  5: "piecewise_function",  // Rock 5: Uses piecewise linear function based on rebirths (see Rock 5 Power Formula)
+  6: "piecewise_function",  // Rock 6: Uses piecewise linear function based on rebirths (see Rock 6 Power Formula)
+}
+
+// Rock 1 Power Gain Function (x = rebirths, y = power per hit)
+// For 1 <= x <= 36: y(x) = floor((x + 4) / 5)
+// For 36 < x <= 457: y(x) = floor((x + 7) / 6)
+// For x >= 2510: y(x) = floor(x / 10 + 0.5)
+// Note: Function not defined for 457 < x < 2510 - implementation should handle this gap
+
+// Rock 2 Power Gain Function (x = rebirths, y = power per hit)
+// For 1 <= x < 57: y(x) = floor(x / 5)
+// For 57 <= x < 2510: y(x) = floor(0.15x + 2.5)
+// For x >= 2510: y(x) = floor(0.15x + 2)
+
+// Rock 3 Power Gain Function (x = rebirths, y = power per hit)
+// For 1 <= x <= 47: y(x) = floor(0.8x + 7)
+// For 47 < x < 2510: y(x) = floor(0.75x + 8)
+// For x >= 2510: y(x) = floor(0.75x)
+
+// Rock 4 Power Gain Function (x = rebirths, y = power per hit, RH = rounding function)
+// For x <= 457: y(x) = RH((9x + 91) / 4)
+// For 457 < x <= 2510: y(x) = RH(1051 + (4613 / 2053) * (x - 457))
+// For 2510 < x <= 3760: y(x) = RH(5664 + (1407 / 625) * (x - 2510))
+// For 3760 < x <= 6260: y(x) = RH(8478 + (2813 / 1250) * (x - 3760))
+// For 6260 < x <= 20260: y(x) = RH((9x / 4) + 19)
+// For 20260 < x <= 59040: y(x) = RH(45604 + (21824 / 9695) * (x - 20260))
+// For 59040 < x <= 209040: y(x) = RH((9x / 4) + 60)
+// For x > 209040: y(x) = RH((4297 / 1910) * x + (21912 / 191))
+
+// Rock 5 Power Gain Function (x = rebirths, y = power per hit, piecewise linear with 32 knot points)
+// For x_i <= x <= x_{i+1}: y(x) = y_i + ((y_{i+1} - y_i) / (x_{i+1} - x_i)) * (x - x_i)
+// For x >= 400040: y(x) = 4x - 160
+// Knot points: (1,44), (6,64), (11,84), (16,104), (21,124), (26,144), (31,164), (36,184), (41,204), (47,228), 
+//              (57,268), (77,348), (97,428), (117,508), (137,588), (157,668), (207,869), (257,1068), (307,1268), 
+//              (357,1468), (457,1868), (2510,10069), (3760,15072), (6260,25073), (12760,51703), (20260,81072), 
+//              (59040,236200), (79040,316200), (119040,476200), (129040,516200), (209040,836200), (400040,1600000)
+
+// Rock 6 Power Gain Function (x = rebirths, y = power per hit, piecewise linear with 32 knot points)
+// For x_i <= x <= x_{i+1}: y(x) = y_i + ((y_{i+1} - y_i) / (x_{i+1} - x_i)) * (x - x_i)
+// For x >= 400040: y(x) = 5.75x - 100230
+// Knot points: (1,620), (6,650), (11,680), (16,710), (21,740), (26,770), (31,800), (36,830), (41,860), (47,900),
+//              (57,970), (77,1120), (97,1270), (117,1420), (137,1570), (157,1720), (207,2000), (257,2150), (307,1849),
+//              (357,2141), (457,2724), (2510,14683), (3760,21980), (6260,36564), (12760,74480), (20260,118200),
+//              (59040,344400), (79040,461100), (119040,694400), (129040,752800), (209040,1200000), (400040,2300000)
+
+// Training Rock Unlock Requirements
+ROCK_UNLOCK_REQUIREMENTS = {
+  1: { power: 0, rebirths: 0 },           // Always available
+  2: { power: 250, rebirths: 5 },
+  3: { power: 5000, rebirths: 15 },
+  4: { power: 75000, rebirths: 50 },
+  5: { power: 500000, rebirths: 250 },
+  6: { power: 10000000, rebirths: 1000 }
+}
 ```
 
 ### Why These Values Work
 
-1. **BASE_POWER_GAIN = 1**
-   - Simple, clean number
-   - Easy to understand (1× multiplier = 1 power per hit)
-   - Works well with multipliers
-
-2. **POWER_SCALING_CONSTANT = 5** (BALANCED)
+1. **Damage Formula Constants** (UPDATED)
+   - **EarlyBoost Formula**: Provides enhanced damage scaling at lower power levels
+     - When Power is low, EarlyBoost provides significant multiplier (up to 3× at very low power)
+     - As Power approaches 398107.17, EarlyBoost approaches 1 (no additional boost)
+   - **Damage Formula**: Uses Power^0.553 for smooth non-linear scaling
+     - The 0.553 exponent creates diminishing returns where each additional power provides meaningful but decreasing absolute damage gains
+     - Combined with EarlyBoost, creates strong early game scaling that smooths out in late game
    - **Design Goal**: Training provides meaningful progression without trivializing content
-   - Every 5 power = +100% damage (2× total)
-   - Every 25 power = +500% damage (6× total)
-   - Every 100 power = +2,000% damage (21× total)
-   - Provides meaningful progression curve where training investment is rewarded but doesn't break balance
+     - Early game: Strong scaling from EarlyBoost helps new players feel progress quickly
+     - Late game: Power^0.553 provides steady progression without breaking balance
 
-3. **REBIRTH_MULTIPLIER = 0.10**
-   - 10 rebirths = 2× power gain (100% bonus)
-   - 50 rebirths = 6× power gain (500% bonus)
-   - Provides long-term progression incentive
+2. **Training Rock Power Bonuses** (UPDATED)
+   - **Rock 1**: Uses piecewise function based on rebirth count, scales from 1+ power per hit
+   - **Rock 2**: Uses piecewise function based on rebirth count, scales with rebirths, early unlock (250 Power OR 5 Rebirths)
+   - **Rock 3**: Uses piecewise function based on rebirth count, scales with rebirths, significant milestone (5K Power OR 15 Rebirths)
+   - **Rock 4**: Uses piecewise function based on rebirth count, scales with rebirths, mid-game boost (75K Power OR 50 Rebirths)
+   - **Rock 5**: Uses piecewise linear function based on rebirth count, scales with rebirths, late game (500K Power OR 250 Rebirths)
+   - **Rock 6**: Uses piecewise linear function based on rebirth count, scales with rebirths, end game (10M Power OR 1K Rebirths)
+   - Progression provides clear milestones and incentives
+   - Rock 1's scaling with rebirths provides ongoing progression without needing to unlock new rocks
 
-### Complete Formula Summary
+3. **Dual Unlock Paths** (NEW)
+   - Players can unlock rocks via **Power Path** (training/mining) OR **Rebirth Path** (rebirth count)
+   - Provides flexibility - players can choose their progression style
+   - Rebirth path allows faster access to higher-tier rocks for players focused on rebirths
+   - Power path rewards players who focus on training/mining progression
 
-#### Power Gain Formula
+### Complete Formula Summary (UPDATED)
+
+#### Power Gain Formula (UPDATED - All Rocks Scale with Rebirths)
 ```
-PowerPerHit = 1 × RockMultiplier × (1 + Rebirths × 0.10)
+For Rock 1:
+PowerPerHit = Rock1PowerBonus(rebirths)
+  - Uses piecewise function: see Rock 1 Power Formula above
+
+For Rock 2:
+PowerPerHit = Rock2PowerBonus(rebirths)
+  - Uses piecewise function: see Rock 2 Power Formula above
+
+For Rock 3:
+PowerPerHit = Rock3PowerBonus(rebirths)
+  - Uses piecewise function: see Rock 3 Power Formula above
+
+For Rock 4:
+PowerPerHit = Rock4PowerBonus(rebirths)
+  - Uses piecewise function: see Rock 4 Power Formula above
+
+For Rock 5:
+PowerPerHit = Rock5PowerBonus(rebirths)
+  - Uses piecewise linear function: see Rock 5 Power Formula above
+
+For Rock 6:
+PowerPerHit = Rock6PowerBonus(rebirths)
+  - Uses piecewise linear function: see Rock 6 Power Formula above
+
 PowerPerSecond = PowerPerHit × SwingRate
 ```
 
-**REBALANCED**: Pickaxes no longer provide power bonus multipliers. Power gain comes from training rocks and rebirths only.
+**REBALANCED**: All rocks' (Rocks 1-6) power gain scale with rebirth count using piecewise functions. Training swing rate scales with pickaxe tier (mining speed), but power per hit is determined by the selected rock and rebirth count.
 
-#### Mining Damage Formula
+#### Mining Damage Formula (UPDATED)
 ```
-MiningDamage = BaseDamage × (1 + Power / 5)
+EarlyBoost = 1 + 2 / (1 + (Power / 398107.17)^0.3)
 
-BaseDamage = 1 (constant - pickaxes don't affect damage)
-PowerScalingConstant = 5 (every 5 power = +100% damage)
+Damage = 1 + 0.072 * Power^0.553 * EarlyBoost
 ```
 
-**REBALANCED**: Damage now comes from Power only, not pickaxes.
+**Where**:
+- `Power` is the player's current power stat (input)
+- `EarlyBoost` is a scaling factor that provides enhanced damage scaling at lower power levels
+- `Damage` is the resulting mining damage (output)
+
+**REBALANCED**: Damage now comes from Power only using a power-based scaling formula, not pickaxes.
+
+### Complete Mining Formula Integration
+
+Power integrates into the complete mining system as follows:
+
+```
+BlockHP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
+  - Linear interpolation between first and last health based on depth
+
+EarlyBoost = 1 + 2 / (1 + (Power / 398107.17)^0.3)
+MiningDamage = 1 + 0.072 * Power^0.553 * EarlyBoost
+  - Power is the player's current power stat (input)
+  - EarlyBoost provides enhanced scaling at lower power levels
+  - Damage is calculated from power using power-based formula (pickaxes don't affect damage)
+
+SwingsNeeded = BlockHP / MiningDamage
+SwingRate = BaseSwingRate × (1 + PickaxeSpeedBonus / 100)
+  - BaseSwingRate = 2.0 swings/second (0.5s per swing)
+  - PickaxeSpeedBonus is percentage increase (0% to 4,000,000%+)
+  - Example: Speed = 5.0 means +5% = 2.0 × 1.05 = 2.1 swings/sec
+  - Example: Speed = 30.0 means +30% = 2.0 × 1.30 = 2.6 swings/sec
+  
+TimePerBlock = SwingsNeeded / SwingRate
+TimePerLevel = TimePerBlock × 1 (since each level = 1 block)
+```
+
+**Key Points**:
+- Power is the ONLY source of mining damage using the power-based scaling formula
+- Pickaxes affect swing rate (speed) but not damage
+- Higher power = fewer swings needed = faster progression
+- Damage scales non-linearly with power (Power^0.553) with enhanced early game scaling from EarlyBoost
 
 ---
 
-## 8. Power Scaling Examples
 
-### Example Progression Scenarios
+## 6. Power & Rebirth Integration
 
-#### Scenario 1: New Player
-- **Starting Power**: 0 (or 50 for debugging)
-- **Pickaxe**: Tier 0 (Wooden, base damage = 1)
-- **Training**: Stone Rock, Tier 0 pickaxe
-- **Power Gain**: 2.0 power/sec
-- **After 5 minutes training**: +600 power = 650 total
-- **Mining Damage**: 1 × (1 + 650/5) = 131 damage (+13,000%)
-- **Impact**: Significant early game boost
+### Rebirth Core Concept (UPDATED)
 
-#### Scenario 2: Mid-Game Player
-- **Current Power**: 1,000
-- **Pickaxe**: Tier 5 (base damage = 1)
-- **Training**: Iron Rock, Tier 5 pickaxe, 3 rebirths
-- **Power Gain**: ~67.2 power/sec
-- **After 5 minutes training**: +20,160 power = 21,160 total
-- **Mining Damage**: 1 × (1 + 21,160/5) = 4,233 damage (+423,200%)
-- **Impact**: Massive mid-game boost
-
-#### Scenario 3: Late-Game Player
-- **Current Power**: 50,000
-- **Pickaxe**: Tier 15 (base damage = 1)
-- **Training**: Crystal Rock, Tier 15 pickaxe, 25 rebirths
-- **Power Gain**: ~1,440 power/sec
-- **After 5 minutes training**: +432,000 power = 482,000 total
-- **Mining Damage**: 1 × (1 + 482,000/5) = 96,401 damage (+9,640,000%)
-- **Impact**: Extreme end-game boost
-
-### Training Efficiency by Setup
-
-#### Tier 0 Pickaxe (Wooden) on Stone Rock
-- **Power/sec**: 2.0
-- **Time to 1,000 Power**: 8.3 minutes
-- **Verdict**: ✅ Good for early game
-
-#### Tier 5 Pickaxe on Iron Rock, 5 rebirths
-- **Power/sec**: ~35.2
-- **Time to 1,000 Power**: 28 seconds
-- **Verdict**: ✅ Good for mid-game
-
-#### Tier 10 Pickaxe on Diamond Rock, 15 rebirths
-- **Power/sec**: ~336
-- **Time to 10,000 Power**: 30 seconds
-- **Verdict**: ✅ Good for late-game
-
-#### Tier 19+ Pickaxe on Crystal Rock, 50 rebirths
-- **Power/sec**: ~2,100
-- **Time to 100,000 Power**: 48 seconds
-- **Verdict**: ✅ Excellent for end-game
-
-### Balance Conclusion
-✅ **Training rates are well-balanced** - they scale appropriately with pickaxe tiers and provide meaningful power gains relative to mining progression.
-
----
-
-## 9. Power & Rebirth Integration
-
-### Rebirth Core Concept
-
-**Rebirth = Reset + Permanent Power Bonus**
+**Rebirth = Reset + Training Rock Unlock Path**
 
 - Player spends Power to perform a rebirth
-- Each rebirth grants +10% power gain per hit (multiplicative)
+- Rebirths serve as an **alternative unlock requirement** for training rocks
 - Power is reset to a base value (typically 1)
 - Rebirths are permanent and cumulative
-- Formula: `PowerGainMultiplier = 1 + (Rebirths × 0.10)`
+- **NOTE**: Rebirths no longer directly multiply power gain - they unlock higher-tier training rocks faster via the rebirth path
+- Players can unlock rocks via either power accumulation OR rebirth count (whichever they achieve first)
 
-### Rebirth Cost Formula
+### Rebirth Cost Formula (UPDATED - Piecewise Linear Function)
 
-**Base Cost**: 1,500 Power per rebirth
+**NEW SYSTEM**: Rebirth cost uses a piecewise linear function with multiple segments. Each segment increases cost by 500 power per rebirth, with different base costs at segment boundaries.
 
-**Scaling**: Cost increases with number of rebirths
-- Formula: `Cost = BaseCost × (1 + Rebirths × 0.1)`
-- Example:
-  - 1st rebirth: 1,500 × 1.0 = 1,500 Power
-  - 2nd rebirth: 1,500 × 1.1 = 1,650 Power
-  - 10th rebirth: 1,500 × 2.0 = 3,000 Power
+**Cost Function** (where x = rebirth number, y = cost in power):
 
-**Recommended Formula**:
+**Note**: The formula for x between 1 and 6 was not provided. Based on continuity requirements (cost at x=6 must be 3500), the inferred formula is:
+- For x between 1 and 6: `y = 500(x - 1) + 1000`
+
+**Provided Formulas**:
+- For x between 6 and 11: `y = 500(x - 6) + 3500`
+- For x between 11 and 16: `y = 500(x - 11) + 6000`
+- For x between 16 and 21: `y = 500(x - 16) + 8500`
+- For x between 21 and 26: `y = 500(x - 21) + 11000`
+- For x between 26 and 31: `y = 500(x - 26) + 13500`
+- For x between 31 and 36: `y = 500(x - 31) + 16000`
+- For x between 36 and 41: `y = 500(x - 36) + 18500`
+- For x between 41 and 47: `y = 500(x - 41) + 21000`
+- For x between 47 and 57: `y = 500(x - 47) + 24000`
+- For x between 57 and 77: `y = 500(x - 57) + 29000`
+- For x between 77 and 97: `y = 500(x - 77) + 39000`
+- For x between 97 and 117: `y = 500(x - 97) + 49000`
+- For x between 117 and 137: `y = 500(x - 117) + 59000`
+- For x between 137 and 157: `y = 500(x - 137) + 69000`
+- For x between 157 and 207: `y = 500(x - 157) + 79000`
+- For x between 207 and 257: `y = 500(x - 207) + 104000`
+- For x between 257 and 307: `y = 500(x - 257) + 129000`
+- For x between 307 and 357: `y = 500(x - 307) + 154000`
+- For x between 357 and 457: `y = 500(x - 357) + 179000`
+- For x between 457 and 2510: `y = 500(x - 457) + 229000`
+- For x between 2510 and 3760: `y = 500(x - 2510) + 1250000`
+- For x ≥ 3760: `y = 500(x - 3760) + 1880000`
+
+**Implementation**:
 ```typescript
 function calculateRebirthCost(rebirths: number): number {
-  const BASE_COST = 1500;
-  return BASE_COST * Math.pow(1.1, rebirths); // 10% increase per rebirth
+  const x = rebirths;
+  
+  // Infer formula for x=1-6 (ensures continuity at x=6)
+  if (x >= 1 && x < 6) {
+    return 500 * (x - 1) + 1000;
+  }
+  // Provided formulas
+  else if (x >= 6 && x < 11) {
+    return 500 * (x - 6) + 3500;
+  }
+  else if (x >= 11 && x < 16) {
+    return 500 * (x - 11) + 6000;
+  }
+  else if (x >= 16 && x < 21) {
+    return 500 * (x - 16) + 8500;
+  }
+  else if (x >= 21 && x < 26) {
+    return 500 * (x - 21) + 11000;
+  }
+  else if (x >= 26 && x < 31) {
+    return 500 * (x - 26) + 13500;
+  }
+  else if (x >= 31 && x < 36) {
+    return 500 * (x - 31) + 16000;
+  }
+  else if (x >= 36 && x < 41) {
+    return 500 * (x - 36) + 18500;
+  }
+  else if (x >= 41 && x < 47) {
+    return 500 * (x - 41) + 21000;
+  }
+  else if (x >= 47 && x < 57) {
+    return 500 * (x - 47) + 24000;
+  }
+  else if (x >= 57 && x < 77) {
+    return 500 * (x - 57) + 29000;
+  }
+  else if (x >= 77 && x < 97) {
+    return 500 * (x - 77) + 39000;
+  }
+  else if (x >= 97 && x < 117) {
+    return 500 * (x - 97) + 49000;
+  }
+  else if (x >= 117 && x < 137) {
+    return 500 * (x - 117) + 59000;
+  }
+  else if (x >= 137 && x < 157) {
+    return 500 * (x - 137) + 69000;
+  }
+  else if (x >= 157 && x < 207) {
+    return 500 * (x - 157) + 79000;
+  }
+  else if (x >= 207 && x < 257) {
+    return 500 * (x - 207) + 104000;
+  }
+  else if (x >= 257 && x < 307) {
+    return 500 * (x - 257) + 129000;
+  }
+  else if (x >= 307 && x < 357) {
+    return 500 * (x - 307) + 154000;
+  }
+  else if (x >= 357 && x < 457) {
+    return 500 * (x - 357) + 179000;
+  }
+  else if (x >= 457 && x < 2510) {
+    return 500 * (x - 457) + 229000;
+  }
+  else if (x >= 2510 && x < 3760) {
+    return 500 * (x - 2510) + 1250000;
+  }
+  else if (x >= 3760) {
+    return 500 * (x - 3760) + 1880000;
+  }
+  
+  // Fallback for x < 1 (shouldn't happen, but handle gracefully)
+  return 1000;
 }
 
 // For multiple rebirths at once:
@@ -405,20 +767,22 @@ After rebirth:
 
 **Recommendation**: Option A (reset to 1) for true rebirth feel, but make it configurable.
 
-### Power Gain Multiplier
+### Power Gain System (UPDATED - No Longer Uses Rebirth Multiplier)
 
-```typescript
-function calculatePowerGainMultiplier(rebirths: number): number {
-  // Each rebirth adds 10% power gain
-  return 1 + (rebirths * 0.10);
-}
-```
+**NOTE**: Rebirths no longer multiply power gain directly. Instead, they serve as unlock requirements for training rocks.
 
-**Examples**:
-- 0 rebirths = 1.0× power gain
-- 5 rebirths = 1.5× power gain (+50%)
-- 10 rebirths = 2.0× power gain (+100%)
-- 50 rebirths = 6.0× power gain (+500%)
+**Power gain is now determined by the selected training rock**:
+- Rock 1: Piecewise function based on rebirth count (always available, see Rock 1 Power Formula)
+- Rock 2: Piecewise function based on rebirth count (unlock at 250 Power OR 5 Rebirths, see Rock 2 Power Formula)
+- Rock 3: Piecewise function based on rebirth count (unlock at 5K Power OR 15 Rebirths, see Rock 3 Power Formula)
+- Rock 4: Piecewise function based on rebirth count (unlock at 75K Power OR 50 Rebirths, see Rock 4 Power Formula)
+- Rock 5: Piecewise linear function based on rebirth count (unlock at 500K Power OR 250 Rebirths, see Rock 5 Power Formula)
+- Rock 6: Piecewise linear function based on rebirth count (unlock at 10M Power OR 1K Rebirths, see Rock 6 Power Formula)
+
+**Rebirth Benefits**:
+- Rebirths provide an alternative unlock path for training rocks
+- Higher rebirth counts allow faster access to higher-tier rocks
+- Players focused on rebirths can unlock better training rocks earlier via rebirth path
 
 ### Rebirth Implementation Details
 
@@ -455,7 +819,266 @@ function performRebirth(player: Player, count: number): RebirthResult {
 
 ---
 
-## 10. Power Persistence & Saving
+## 7. Rebirth System UI & Implementation
+
+### 10.1 UI Layout & Design
+
+#### Rebirth Button (Left Side Middle)
+
+**Position**: Left side, middle of screen (vertically centered, below Pickaxe Shop button)
+
+**Appearance**:
+- Blue background with starburst pattern
+- Green circular arrow/refresh icon (🔄)
+- Clickable button that opens rebirth modal
+- Optional: Red notification badge with exclamation mark (if rebirth available)
+
+**Behavior**:
+- Clicking opens the Rebirth modal
+- Button remains visible when modal is open
+- Highlights on hover
+
+#### Rebirth Modal Window
+
+**Layout**:
+- Large modal window, centered on screen
+- Blue background with geometric pattern (stars, squares, triangles)
+- White border, rounded corners
+- Red 'X' close button in top-right
+
+**Header Section**:
+- **Title**: "Rebirth" (large, bold, white text with black outline)
+- **Instruction**: "Click a button to rebirth!" (yellow text with black outline)
+- **Separator**: Horizontal line dividing header from content
+
+**Mechanic Explanation**:
+- Display: `♻️ 1 = 💥 +10%`
+  - ♻️ = Green refresh/recycle icon
+  - 1 = White text (number of rebirths)
+  - = = White text
+  - 💥 = Red explosion icon (power)
+  - +10% = Red text (power gain bonus)
+- Meaning: "1 Rebirth = +10% Power gain"
+
+**Rebirth Options Section**:
+- List of rebirth options, each as a horizontal row
+- Dark blue background, white border
+- Each row shows:
+  - Number of rebirths (green text)
+  - Power cost (red text)
+  - Action button (green "Rebirth" button or yellow "Max" button)
+
+#### Rebirth Options
+
+**Single Rebirth Options**:
+- **1 Rebirth**: Shows "1 Rebirth" (green), power cost (red), "Rebirth" button (green)
+- **5 Rebirths**: Shows "5 Rebirths" (green), power cost (red), "Rebirth" button (green)
+- **20 Rebirths**: Shows "20 Rebirths" (green), power cost (red), "Rebirth" button (green)
+
+**Max Rebirth Option**:
+- Special row with rainbow-colored border (red, orange, yellow, green, blue, purple gradient)
+- Shows maximum available rebirths (e.g., "315 Rebirths" in green)
+- Shows total power cost (e.g., "472.5K Power" in red)
+- Yellow "Max" button with black outline
+
+**Button States**:
+- **Available**: Green button, clickable, shows "Rebirth" or "Max"
+- **Unavailable**: Grayed out, disabled, if player doesn't have enough power
+
+### 10.2 Rebirth Calculation Logic
+
+#### Calculate Available Rebirths
+
+```typescript
+function calculateMaxRebirths(currentPower: number, currentRebirths: number): number {
+  let maxRebirths = 0;
+  let totalCost = 0;
+  
+  while (true) {
+    const nextCost = calculateRebirthCost(currentRebirths + maxRebirths);
+    if (totalCost + nextCost > currentPower) {
+      break; // Can't afford more
+    }
+    totalCost += nextCost;
+    maxRebirths++;
+    
+    // Safety limit (prevent infinite loop)
+    if (maxRebirths > 10000) break;
+  }
+  
+  return maxRebirths;
+}
+```
+
+### 10.3 Data Flow
+
+#### Opening Rebirth Modal
+
+```
+User clicks Rebirth button
+  → UI sends 'OPEN_REBIRTH_UI' event to server
+  → Server responds with 'REBIRTH_UI_DATA':
+     - currentPower
+     - currentRebirths
+     - availableRebirthOptions: [
+         { count: 1, cost: calculateRebirthCost(currentRebirths) },
+         { count: 5, cost: calculateRebirthCostMultiple(currentRebirths, 5) },
+         { count: 20, cost: calculateRebirthCostMultiple(currentRebirths, 20) },
+         { count: max, cost: totalMaxCost }
+       ]
+  → UI renders rebirth modal
+```
+
+#### Performing Rebirth
+
+```
+User clicks "Rebirth" or "Max" button
+  → UI sends 'PERFORM_REBIRTH' event with:
+     - rebirthCount: number (1, 5, 20, or max)
+  → Server validates:
+     - Check if player has enough power
+     - Calculate total cost for requested rebirths using calculateRebirthCostMultiple()
+     - Verify cost <= currentPower
+  → If valid:
+     - Deduct power: playerData.power -= totalCost
+     - Reset power to base: playerData.power = 1 (or keep deducted amount?)
+     - Increase rebirths: playerData.rebirths += rebirthCount
+     - Update power gain multiplier (stored in calculations)
+     - Send 'REBIRTH_COMPLETE' response
+  → UI updates:
+     - Close modal or refresh data
+     - Update power display in HUD
+     - Update rebirths display in HUD
+     - Show confirmation message
+```
+
+### 10.4 UI Events
+
+#### Client → Server
+- `OPEN_REBIRTH_UI` - Request rebirth data
+- `PERFORM_REBIRTH` - Execute rebirth (includes count)
+- `CLOSE_REBIRTH_UI` - Close rebirth modal
+
+#### Server → Client
+- `REBIRTH_UI_DATA` - Rebirth data response
+  ```typescript
+  {
+    type: 'REBIRTH_UI_DATA',
+    currentPower: number,
+    currentRebirths: number,
+    options: Array<{
+      count: number,
+      cost: number,
+      available: boolean
+    }>,
+    maxRebirths: number,
+    maxCost: number
+  }
+  ```
+
+- `REBIRTH_COMPLETE` - Rebirth execution confirmation
+  ```typescript
+  {
+    type: 'REBIRTH_COMPLETE',
+    success: boolean,
+    rebirthsPerformed: number,
+    newRebirths: number,
+    powerSpent: number,
+    newPower: number,
+    newPowerGainMultiplier: number
+  }
+  ```
+
+### 10.5 Visual Design Notes
+
+#### Color Scheme
+- **Modal Background**: Light blue (#B0E0E6) with geometric pattern
+- **Text**: White with black outline for readability
+- **Title**: Large, bold, white
+- **Instruction**: Yellow (#FFD700)
+- **Rebirth Count**: Green (#4CAF50)
+- **Power Cost**: Red (#FF5252)
+- **Buttons**: 
+  - Rebirth button: Green gradient
+  - Max button: Yellow with black outline
+  - Close button: Red
+- **Max Option Border**: Rainbow gradient (red → orange → yellow → green → blue → purple)
+
+#### Icons
+- **Refresh Icon**: Green circular arrow (🔄)
+- **Power Icon**: Red explosion (💥)
+- **Notification Badge**: Red square with white exclamation mark
+
+#### Layout Spacing
+- Modal padding: 30px
+- Option rows: 12px gap between rows
+- Button padding: 12px 24px
+- Header margin: 20px bottom
+
+### 10.6 Rebirth Options Configuration
+
+```typescript
+const REBIRTH_OPTIONS = [
+  { count: 1, label: '1 Rebirth' },
+  { count: 5, label: '5 Rebirths' },
+  { count: 20, label: '20 Rebirths' },
+  { count: 'max', label: 'Max' } // Special case
+];
+```
+
+#### Cost Display Format
+- Format numbers with K/M/B suffixes
+- Example: 1,000 → "1K", 472,500 → "472.5K", 1,500,000 → "1.5M"
+- Use `formatNumber()` function from UI
+
+### 10.7 Implementation Tasks
+
+#### UI Components
+1. **Rebirth Button** (Left side middle)
+   - Create button element
+   - Style with blue background and refresh icon
+   - Position: `left: 40px, top: calc(50% + 80px)` (below pickaxe button)
+   - Add click handler to open modal
+   - Optional: Add notification badge if rebirth available
+
+2. **Rebirth Modal Window**
+   - Create modal container
+   - Add close button (red X)
+   - Create header section (title, instruction, explanation)
+   - Create rebirth options list
+   - Style with blue background and pattern
+
+3. **Rebirth Options List**
+   - Render predefined options (1, 5, 20)
+   - Calculate and display "Max" option
+   - Show costs and availability
+   - Add click handlers for each option
+
+#### Server-Side Logic
+1. **Rebirth Controller Class**
+   - Create `RebirthController.ts`
+   - Methods:
+     - `calculateRebirthCost(rebirths: number): number`
+     - `calculateMaxRebirths(power: number, rebirths: number): number`
+     - `performRebirth(player: Player, count: number): RebirthResult`
+   - Validate power requirements
+   - Update player data
+
+2. **Rebirth Data Handler**
+   - Handle `OPEN_REBIRTH_UI` event
+   - Calculate available rebirth options using new cost function
+   - Send `REBIRTH_UI_DATA` response
+
+3. **Rebirth Execution Handler**
+   - Handle `PERFORM_REBIRTH` event
+   - Validate power and cost using new cost function
+   - Execute rebirth (deduct power, increase rebirths, reset power)
+   - Update power gain multiplier
+   - Send `REBIRTH_COMPLETE` response
+
+---
+
+## 8. Power Persistence & Saving
 
 ### Power in PlayerData Interface
 
@@ -521,25 +1144,14 @@ Save immediately when these events occur:
 5. **Store in memory** → `playerDataMap.set(player, playerData)`
 6. **Initialize game systems** → training, mining, inventory, etc.
 
-### Power Data Example Flow
-
-#### Player Gains Power
-```
-Training hit → TrainingController.onPowerGain()
-  → Update playerData.power
-  → GameManager.updatePlayerData()
-    → Store in playerDataMap
-    → world.persistence.setPlayerData(player, data) [async, debounced]
-```
-
 ---
 
-## 11. Power UI References
+## 9. Power UI References
 
 ### Power Gain Popup
 
 **Visual Design**:
-- Appears every swing during training, showing the exact power gained (e.g., `81`)
+- Appears every swing during training, showing the exact power gained
 - Red text with outlined explosion icon to emphasize impact
 - Each popup value instantly adds to the total Power stat displayed in the HUD
 - Use this when designing floating combat text or training feedback loops
@@ -565,25 +1177,25 @@ Training hit → TrainingController.onPowerGain()
 
 ---
 
-## 12. Implementation Checklist
+## 10. Implementation Checklist
 
 ### Core Power System
-- [x] Current constants are balanced (BASE_POWER_GAIN = 1, POWER_SCALING_CONSTANT = 5)
 - [x] Training uses same swing rate as mining (already implemented)
 - [x] Power gain formula works correctly
-- [x] Power scaling formula works correctly
-- [x] Remove pickaxe damage and power bonus (REBALANCED)
-- [x] Implement base damage = 1 (Power-only damage)
-- [x] Update training system to remove pickaxe power bonus
-- [x] Update shop UI to show sell multipliers instead of damage/power bonus
+- [x] Power to damage formula implemented (EarlyBoost and Damage formulas)
+- [ ] Remove pickaxe damage and power bonus (REBALANCED)
+- [ ] Implement power-based damage formula (Damage = 1 + 0.072 * Power^0.553 * EarlyBoost)
+- [ ] Update training system to remove pickaxe power bonus
+- [ ] Update shop UI to show sell multipliers instead of damage/power bonus
 
 ### Rebirth System Integration
-- [ ] Implement rebirth cost formula
+- [ ] Implement new piecewise linear rebirth cost formula
 - [ ] Implement power reset after rebirth
 - [ ] Implement power gain multiplier calculation
 - [ ] Integrate rebirth multiplier into power gain calculations
 - [ ] Create rebirth UI with power cost display
-- [ ] Test rebirth power mechanics
+- [ ] Test rebirth power mechanics with new cost function
+- [ ] Verify cost function continuity at segment boundaries
 
 ### Training System
 - [ ] Monitor player feedback on power gain rates
@@ -617,11 +1229,11 @@ Training hit → TrainingController.onPowerGain()
 ## Summary
 
 This power system creates a balanced progression where:
-1. **Power is the ONLY source of mining damage** (base damage = 1 for all pickaxes)
+1. **Power is the ONLY source of mining damage** (damage calculated via power-based formula: Damage = 1 + 0.072 * Power^0.553 * EarlyBoost)
 2. **Training is the primary way to gain power** (rocks × rebirths)
-3. **Rebirths provide exponential power gain scaling** (+10% per rebirth)
-4. **Training investment is meaningful but balanced** (10 sec = 5× damage, 4 min = one-hit stone)
-5. **Power scales smoothly from early to late game** (20 power to 200,000+ power)
+3. **Rebirths unlock higher-tier training rocks** (alternative unlock path for rocks)
+4. **Training investment is meaningful but balanced** (power scales non-linearly with enhanced early game scaling)
+5. **Power scales smoothly from early to late game** (20 power to 200,000+ power using Power^0.553 with EarlyBoost multiplier)
 6. **Pickaxes affect training speed** (faster swings = faster power gain) but not damage directly
 7. **Pickaxes provide speed, luck, and economic value** instead of damage
 
@@ -629,5 +1241,16 @@ This power system creates a balanced progression where:
 
 ---
 
-*This document consolidates all power-related planning from: ProgressionBalanceBlueprint.md, TrainingPowerBalanceBlueprint.md, rebirthSystem.md, ProgressionSaveSystemPlan.md, and UI references.*
+## Document Consolidation Note
+
+**This document is the single source of truth for all power-related planning.**
+
+All power-related content has been consolidated from:
+- `ProgressionBalanceBlueprint.md` - Power targets by mining phase, power in progression formulas
+- `TrainingPowerBalanceBlueprint.md` - Training and power balance (now redirects here)
+- `rebirthSystem.md` - Power mechanics, rebirth integration, and UI implementation (fully merged into this document)
+- `ProgressionSaveSystemPlan.md` - Power persistence (references this document)
+- UI references - Power gain popup, power display
+
+**This document now contains ALL power and rebirth planning. The separate `rebirthSystem.md` file is no longer needed as all content has been merged here.**
 

@@ -52,7 +52,6 @@ export class MineResetUpgradeNPC {
    */
   spawn(): void {
     if (this.npcEntity?.isSpawned) {
-      console.warn('[MineResetUpgradeNPC] NPC already spawned');
       return;
     }
 
@@ -72,8 +71,6 @@ export class MineResetUpgradeNPC {
 
     // Spawn at specified position
     this.npcEntity.spawn(this.world, this.npcPosition);
-    console.log(`[MineResetUpgradeNPC] NPC spawned at ${this.npcPosition.x}, ${this.npcPosition.y}, ${this.npcPosition.z}`);
-
     // Start proximity checking
     this.startProximityChecking();
   }
@@ -150,8 +147,6 @@ export class MineResetUpgradeNPC {
         if (this.onProximityChange) {
           this.onProximityChange(player, isInProximity, distance);
         }
-
-        console.log(`[MineResetUpgradeNPC] Player ${player.username} ${isInProximity ? 'entered' : 'left'} NPC proximity (distance: ${distance.toFixed(2)})`);
       }
     }
   }

@@ -11,19 +11,22 @@ This document defines the complete progression system including 24 ores with dep
 ### Base Swing Rate
 - **Base Rate**: 2.0 swings/second (0.5 seconds per swing / 1 hit per 0.5 seconds)
 - This is the slowest possible mining speed
-- All pickaxes increase this base rate
+- All pickaxes increase this base rate by a percentage
 
-### Swing Rate Formula
+### Swing Rate Formula (UPDATED - Percentage-Based)
 ```
 BaseRate = 1 / 0.5 = 2.0 swings/second
-EffectiveSwingRate = BaseRate × PickaxeSpeedMultiplier
+PickaxeSpeedBonus = miningSpeed (percentage value, e.g., 5.0 = +5%)
+EffectiveSwingRate = BaseRate × (1 + PickaxeSpeedBonus / 100)
 TimePerSwing = 1 / EffectiveSwingRate
 ```
 
 ### Example Calculations
-- Tier 0 (Rusty): 2.0 swings/sec = 0.5 seconds/swing
-- Tier 10 (Mid-game): ~8.0 swings/sec = 0.125 seconds/swing
-- Tier 19 (End-game): ~28.4 swings/sec = 0.035 seconds/swing
+- Tier 0 (Wooden): 0% bonus = 2.0 × 1.00 = 2.0 swings/sec = 0.5 seconds/swing
+- Tier 1 (Stone): 5% bonus = 2.0 × 1.05 = 2.1 swings/sec = 0.476 seconds/swing
+- Tier 6 (Solarite): 30% bonus = 2.0 × 1.30 = 2.6 swings/sec = 0.385 seconds/swing
+- Tier 12 (Quill): 120% bonus = 2.0 × 2.20 = 4.4 swings/sec = 0.227 seconds/swing
+- Tier 53 (Thunderstrike): 4,000,000% bonus = 2.0 × 40,001 = 80,002 swings/sec = 0.0000125 seconds/swing
 
 ---
 
@@ -104,86 +107,86 @@ This linear interpolation ensures smooth, predictable health scaling as players 
 **REBALANCED**: Pickaxes now only affect Speed, Luck, and Sell Value Multiplier
 
 #### Common Pickaxes (Tier 0-7)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 0 | Wooden | 0.0 | 0% | 1.0× | Free |
-| 1 | Stone | 5.0 | 1% | 1.1× | 50 |
-| 2 | Iron | 8.0 | 1% | 1.2× | 500 |
-| 3 | Golden | 15.0 | 1% | 1.3× | 2.5K |
-| 4 | Diamond | 20.0 | 5% | 1.5× | 10K |
-| 5 | Blossom | 25.0 | 5% | 1.7× | 40K |
-| 6 | Solarite | 30.0 | 5% | 1.9× | 250K |
-| 7 | Venomstrike | 45.0 | 5% | 2.1× | 1M |
+| 0 | Wooden | 0% | 0% | 1.0× | Free |
+| 1 | Stone | 5% | 1% | 1.1× | 50 |
+| 2 | Iron | 8% | 1% | 1.2× | 500 |
+| 3 | Golden | 15% | 1% | 1.3× | 2.5K |
+| 4 | Diamond | 20% | 5% | 1.5× | 10K |
+| 5 | Blossom | 25% | 5% | 1.7× | 40K |
+| 6 | Solarite | 30% | 5% | 1.9× | 250K |
+| 7 | Venomstrike | 45% | 5% | 2.1× | 1M |
 
 #### Rare Pickaxes (Tier 8-15)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 8 | Aurora Spire | 60.0 | 10% | 2.3× | 10M |
-| 9 | Frostcore | 70.0 | 10% | 2.5× | 30M |
-| 10 | Violet Wing | 85.0 | 10% | 3.0× | 150M |
-| 11 | Crystal Breaker | 100.0 | 10% | 3.5× | 750M |
-| 12 | Quill | 120.0 | 10% | 4.0× | 5B |
-| 13 | Demolisher | 150.0 | 10% | 4.5× | 25B |
-| 14 | Timber Crusher | 170.0 | 10% | 5.0× | 100B |
-| 15 | Jester's Mallet | 200.0 | 10% | 5.5× | 750B |
+| 8 | Aurora Spire | 60% | 10% | 2.3× | 10M |
+| 9 | Frostcore | 70% | 10% | 2.5× | 30M |
+| 10 | Violet Wing | 85% | 10% | 3.0× | 150M |
+| 11 | Crystal Breaker | 100% | 10% | 3.5× | 750M |
+| 12 | Quill | 120% | 10% | 4.0× | 5B |
+| 13 | Demolisher | 150% | 10% | 4.5× | 25B |
+| 14 | Timber Crusher | 170% | 10% | 5.0× | 100B |
+| 15 | Jester's Mallet | 200% | 10% | 5.5× | 750B |
 
 #### Epic Pickaxes (Tier 16-23)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 16 | Glacial Shard | 300.0 | 15% | 6.0× | 5T |
-| 17 | Shatterblade | 400.0 | 15% | 7.0× | 20T |
-| 18 | Voidrend | 500.0 | 15% | 8.0× | 75T |
-| 19 | Toxinspike | 600.0 | 15% | 9.0× | 150T |
-| 20 | Bonegrinder | 700.0 | 15% | 10.0× | 600T |
-| 21 | Frostbite Shard | 850.0 | 15% | 11.0× | 10Qd |
-| 22 | Pixel Blade | 1,000.0 | 15% | 13.0× | 75Qd |
-| 23 | Inferno Scythe | 1,250.0 | 15% | 16.0× | 500Qd |
+| 16 | Glacial Shard | 300% | 15% | 6.0× | 5T |
+| 17 | Shatterblade | 400% | 15% | 7.0× | 20T |
+| 18 | Voidrend | 500% | 15% | 8.0× | 75T |
+| 19 | Toxinspike | 600% | 15% | 9.0× | 150T |
+| 20 | Bonegrinder | 700% | 15% | 10.0× | 600T |
+| 21 | Frostbite Shard | 850% | 15% | 11.0× | 10Qd |
+| 22 | Pixel Blade | 1,000% | 15% | 13.0× | 75Qd |
+| 23 | Inferno Scythe | 1,250% | 15% | 16.0× | 500Qd |
 
 #### Legendary Pickaxes (Tier 24-31)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 24 | Prybar | 1,500.0 | 20% | 21.0× | 2.5Qn |
-| 25 | Crimson Blade | 2,000.0 | 20% | 26.0× | 10Qn |
-| 26 | Frozen Edge | 3,000.0 | 20% | 31.0× | 25Qn |
-| 27 | Skullgrinder Prime | 4,500.0 | 20% | 36.0× | 75Qn |
-| 28 | Gemstone Destroyer | 7,000.0 | 20% | 46.0× | 500Qn |
-| 29 | Thornspike | 10,000.0 | 20% | 61.0× | 7.5Sx |
-| 30 | Frost Cube | 12,500.0 | 25% | 76.0× | 500Sx |
-| 31 | Twin Flame Scythe | 17,500.0 | 25% | 91.0× | 1.55Sp |
+| 24 | Prybar | 1,500% | 20% | 21.0× | 2.5Qn |
+| 25 | Crimson Blade | 2,000% | 20% | 26.0× | 10Qn |
+| 26 | Frozen Edge | 3,000% | 20% | 31.0× | 25Qn |
+| 27 | Skullgrinder Prime | 4,500% | 20% | 36.0× | 75Qn |
+| 28 | Gemstone Destroyer | 7,000% | 20% | 46.0× | 500Qn |
+| 29 | Thornspike | 10,000% | 20% | 61.0× | 7.5Sx |
+| 30 | Frost Cube | 12,500% | 25% | 76.0× | 500Sx |
+| 31 | Twin Flame Scythe | 17,500% | 25% | 91.0× | 1.55Sp |
 
 #### Mythic Pickaxes (Tier 32-39)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 32 | Voidrend Prime | 22,500.0 | 30% | 121.0× | 5Sp |
-| 33 | Toxic Reaper | 30,000.0 | 30% | 151.0× | 20Sp |
-| 34 | Toxic Pixel | 40,000.0 | 30% | 201.0× | 50Sp |
-| 35 | Emberhorn Cleaver | 55,000.0 | 30% | 251.0× | 375Sp |
-| 36 | Crystal Cleaver | 70,000.0 | 30% | 351.0× | 2.5Oc |
-| 37 | Radiant Reaper | 70,000.0 | 30% | 451.0× | 15Oc |
-| 38 | Mailbox Pickaxe | 100,000.0 | 35% | 676.0× | 17.5Oc |
-| 39 | Crescent Hammer | 120,000.0 | 35% | 851.0× | 75Oc |
+| 32 | Voidrend Prime | 22,500% | 30% | 121.0× | 5Sp |
+| 33 | Toxic Reaper | 30,000% | 30% | 151.0× | 20Sp |
+| 34 | Toxic Pixel | 40,000% | 30% | 201.0× | 50Sp |
+| 35 | Emberhorn Cleaver | 55,000% | 30% | 251.0× | 375Sp |
+| 36 | Crystal Cleaver | 70,000% | 30% | 351.0× | 2.5Oc |
+| 37 | Radiant Reaper | 70,000% | 30% | 451.0× | 15Oc |
+| 38 | Mailbox Pickaxe | 100,000% | 35% | 676.0× | 17.5Oc |
+| 39 | Crescent Hammer | 120,000% | 35% | 851.0× | 75Oc |
 
 #### Exotic Pickaxes (Tier 40-47)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 40 | Stormfury Pickaxe | 140,000.0 | 35% | 1,001.0× | 350Oc |
-| 41 | Skybreaker Pickaxe | 160,000.0 | 35% | 1,201.0× | 1.5No |
-| 42 | Neon Purple Pickaxe | 225,000.0 | 35% | 1,501.0× | 4No |
-| 43 | Lumina Pickaxe | 275,000.0 | 35% | 1,851.0× | 15No |
-| 44 | Abyssal Twin Edge | 325,000.0 | 35% | 2,251.0× | 50No |
-| 45 | Inferno Cleaver | 400,000.0 | 35% | 2,751.0× | 200No |
-| 46 | Neon Crystal | 500,000.0 | 40% | 3,501.0× | 25De |
-| 47 | Star Scepter | 625,000.0 | 40% | 4,001.0× | 100De |
+| 40 | Stormfury Pickaxe | 140,000% | 35% | 1,001.0× | 350Oc |
+| 41 | Skybreaker Pickaxe | 160,000% | 35% | 1,201.0× | 1.5No |
+| 42 | Neon Purple Pickaxe | 225,000% | 35% | 1,501.0× | 4No |
+| 43 | Lumina Pickaxe | 275,000% | 35% | 1,851.0× | 15No |
+| 44 | Abyssal Twin Edge | 325,000% | 35% | 2,251.0× | 50No |
+| 45 | Inferno Cleaver | 400,000% | 35% | 2,751.0× | 200No |
+| 46 | Neon Crystal | 500,000% | 40% | 3,501.0× | 25De |
+| 47 | Star Scepter | 625,000% | 40% | 4,001.0× | 100De |
 
 #### Secret Pickaxes (Tier 48-53)
-| Tier | Name | Speed (swings/sec) | Luck | Sell Multiplier | Cost |
+| Tier | Name | Speed (% increase) | Luck | Sell Multiplier | Cost |
 |------|------|-------------------|------|-----------------|------|
-| 48 | Ancient Scythe | 785,000.0 | 40% | 4,501.0× | 500De |
-| 49 | Plunger | 1,000,000.0 | 40% | 5,001.0× | 3.5UDe |
-| 50 | Fire Axe | 1,500,000.0 | 40% | 6,001.0× | 10UDe |
-| 51 | Double Axe | 2,000,000.0 | 40% | 7,001.0× | 35UDe |
-| 52 | Skyforge | 3,000,000.0 | 40% | 8,001.0× | 100UDe |
-| 53 | Thunderstrike | 4,000,000.0 | 40% | 10,001.0× | 300UDe |
+| 48 | Ancient Scythe | 785,000% | 40% | 4,501.0× | 500De |
+| 49 | Plunger | 1,000,000% | 40% | 5,001.0× | 3.5UDe |
+| 50 | Fire Axe | 1,500,000% | 40% | 6,001.0× | 10UDe |
+| 51 | Double Axe | 2,000,000% | 40% | 7,001.0× | 35UDe |
+| 52 | Skyforge | 3,000,000% | 40% | 8,001.0× | 100UDe |
+| 53 | Thunderstrike | 4,000,000% | 40% | 10,001.0× | 300UDe |
 
 ### Stat Conversion Notes
 
@@ -197,8 +200,12 @@ This linear interpolation ensures smooth, predictable health scaling as players 
 
 **Speed**:
 - Direct conversion from website "+X Speed" values
-- Represents swings per second (mining speed)
-- Wooden pickaxe uses 1.0 as base (website shows +0)
+- Represents percentage increase over base swing rate (2.0 swings/second)
+- Formula: EffectiveRate = 2.0 × (1 + Speed / 100)
+- Example: Speed = 5% means +5% = 2.0 × 1.05 = 2.1 swings/sec
+- Example: Speed = 30% means +30% = 2.0 × 1.30 = 2.6 swings/sec
+- Wooden pickaxe has 0% (0% increase, uses base rate of 2.0 swings/sec)
+- Displayed in UI as "+X Speed" (e.g., "+5 Speed" means +5% speed increase)
 
 **Cost**:
 - Direct conversion from website costs
@@ -252,16 +259,17 @@ This linear interpolation ensures smooth, predictable health scaling as players 
 - **Time per level**: ~3-10 seconds
 - **Total time**: ~30-60 minutes
 
-**Note**: For power and damage calculations, see PowerSystemPlan.md
+**Note**: For power requirements, damage calculations, and power targets by phase, see `PowerSystemPlan.md` Section 6.
 
 **Total Estimated Time**: ~6-9 hours (requires testing and tuning)
 
 ### Mining Damage Formula
-See `PowerSystemPlan.md` for complete damage and power scaling formulas.
+See `PowerSystemPlan.md` Section 7 for complete damage and power scaling formulas.
 
 ### Time Per Block Formula
 ```
 SwingsNeeded = BlockHP / MiningDamage
+  - MiningDamage = See PowerSystemPlan.md Section 7
 TimePerBlock = SwingsNeeded / SwingRate
 TimePerLevel = TimePerBlock × 1 (since each level = 1 block)
 ```
@@ -275,7 +283,7 @@ TimePerLevel = TimePerBlock × 1 (since each level = 1 block)
 - Higher HP ores = higher value = more rare
 - Better pickaxes = more money per ore (1.0× to 10.0× multiplier)
 - Economic progression: Player should be able to afford next pickaxe tier after collecting reasonable amount of ores from their current tier
-- Pickaxes provide economic value through sell multipliers (see PowerSystemPlan.md for damage mechanics)
+- Pickaxes provide economic value through sell multipliers (for damage mechanics, see PowerSystemPlan.md)
 
 ### Income Projections (UPDATED FOR NEW ORE SYSTEM)
 
@@ -309,7 +317,8 @@ TimePerLevel = TimePerBlock × 1 (since each level = 1 block)
 
 ### Damage & Progression System
 - For complete power and damage mechanics, see `PowerSystemPlan.md`
-- Higher damage = faster progression = more gold per hour
+- Power is the ONLY source of mining damage (all pickaxes have base damage = 1)
+- Higher power = faster progression = more gold per hour
 - Pickaxes provide speed, luck, and economic bonuses (sell multipliers)
 
 ---
@@ -377,7 +386,7 @@ This means high luck makes rare ores MUCH more common while barely affecting com
 - All 24 ores available
 - Ultra-rare ores (Mythril, Stallite, Draconium) obtainable
 - Luck bonus makes rare ores more common
-- High health values require strong power/pickaxes
+- High health values require strong power (see PowerSystemPlan.md for power requirements by phase)
 
 ---
 
@@ -395,7 +404,7 @@ This means high luck makes rare ores MUCH more common while barely affecting com
 - [x] Implement pickaxe sell value multiplier system
 - [x] Update selling system to apply sell multipliers
 - [x] Update shop UI to show sell multipliers
-- [ ] See PowerSystemPlan.md for power-related implementation tasks
+- [ ] Implement power system (see PowerSystemPlan.md for all power-related implementation tasks)
 
 ### Balancing & Testing
 - [ ] Balance ore generation with luck system and depth unlocks
@@ -404,7 +413,7 @@ This means high luck makes rare ores MUCH more common while barely affecting com
 - [ ] Polish UI for all 24 ores
 - [ ] Create shop UI for all 54 pickaxes
 - [ ] Test rare ore excitement (should feel special to find)
-- [ ] See PowerSystemPlan.md for power-related testing tasks
+- [ ] Test power system integration (see PowerSystemPlan.md for all power-related testing tasks)
 
 ---
 
@@ -412,15 +421,19 @@ This means high luck makes rare ores MUCH more common while barely affecting com
 
 ### Mining Formulas (UPDATED)
 ```
-// For complete damage formulas, see PowerSystemPlan.md
+// For complete damage and power formulas, see PowerSystemPlan.md Section 7
 
 BlockHP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
   - Linear interpolation between first and last health based on depth
 
+MiningDamage = See PowerSystemPlan.md Section 7 (Power-based damage formula)
+
 SwingsNeeded = BlockHP / MiningDamage
-SwingRate = BaseSwingRate + PickaxeSpeedBonus
+SwingRate = BaseSwingRate × (1 + PickaxeSpeedBonus / 100)
   - BaseSwingRate = 2.0 swings/second (0.5s per swing)
-  - PickaxeSpeedBonus varies by pickaxe tier (0 to 4,000,000+)
+  - PickaxeSpeedBonus is percentage increase (0% to 4,000,000%+)
+  - Example: Speed = 5.0 means +5% = 2.0 × 1.05 = 2.1 swings/sec
+  - Example: Speed = 30.0 means +30% = 2.0 × 1.30 = 2.6 swings/sec
   
 TimePerBlock = SwingsNeeded / SwingRate
 ```
@@ -445,8 +458,8 @@ PickaxeLuck = Tier-based (0% to 40%)
 - Health scales linearly per ore based on depth
 - Ores unlock progressively as you descend
 - Selling applies pickaxe sell value multiplier
-- Pickaxes provide speed, luck, and economic value
-- For damage and power mechanics, see PowerSystemPlan.md
+- Pickaxes provide speed, luck, and economic value (NOT damage)
+- Power is the ONLY source of mining damage (see PowerSystemPlan.md for complete power mechanics)
 
 ---
 
@@ -464,7 +477,7 @@ PickaxeLuck = Tier-based (0% to 40%)
 - Pickaxe costs (adjust for economic balance)
 - Ore rarity (adjust for excitement)
 - Swing rates (adjust for feel)
-- Power scaling (see PowerSystemPlan.md)
+- Power scaling (see PowerSystemPlan.md for all power-related balance adjustments)
 
 ---
 

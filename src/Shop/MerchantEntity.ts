@@ -54,7 +54,6 @@ export class MerchantEntity {
    */
   spawn(): void {
     if (this.merchantEntity?.isSpawned) {
-      console.warn('[MerchantEntity] Merchant already spawned');
       return;
     }
 
@@ -74,8 +73,6 @@ export class MerchantEntity {
 
     // Spawn at specified position
     this.merchantEntity.spawn(this.world, this.merchantPosition);
-    console.log(`[MerchantEntity] Merchant spawned at ${this.merchantPosition.x}, ${this.merchantPosition.y}, ${this.merchantPosition.z}`);
-
     // Start proximity checking
     this.startProximityChecking();
   }
@@ -155,8 +152,6 @@ export class MerchantEntity {
         if (this.onProximityChange) {
           this.onProximityChange(player, isInProximity, distance);
         }
-
-        console.log(`[MerchantEntity] Player ${player.username} ${isInProximity ? 'entered' : 'left'} merchant proximity (distance: ${distance.toFixed(2)})`);
       }
     }
   }

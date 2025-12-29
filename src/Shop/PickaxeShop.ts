@@ -120,14 +120,21 @@ export class PickaxeShop {
     // Purchase pickaxe
     playerData.currentPickaxeTier = tier;
     playerData.gold = currentGold - pickaxe.cost;
+    
+    // Add to owned pickaxes list
+    if (!playerData.ownedPickaxes) {
+      playerData.ownedPickaxes = [0]; // Initialize with tier 0 if not set
+    }
+    if (!playerData.ownedPickaxes.includes(tier)) {
+      playerData.ownedPickaxes.push(tier);
+      playerData.ownedPickaxes.sort((a, b) => a - b); // Keep sorted
+    }
 
     // Update player data
     this.updatePlayerDataCallback?.(player, playerData);
 
     // Update pickaxe visual
     this.pickaxeManager.attachPickaxeToPlayer(player, tier);
-
-    console.log(`[PickaxeShop] ${player.username} purchased ${pickaxe.name} pickaxe (tier ${tier}) for ${pickaxe.cost} gold (remaining: ${playerData.gold})`);
 
     return {
       success: true,
@@ -142,6 +149,7 @@ export class PickaxeShop {
    * Returns all pickaxes with availability status
    * 
    * REBALANCED: Updated to reflect new pickaxe stats (no damage or power bonus)
+   * Now supports equipping any owned pickaxe, not just the highest tier
    * 
    * @param player - Player to get shop data for
    * @returns Shop data with pickaxes and availability
@@ -156,7 +164,7 @@ export class PickaxeShop {
       luckBonus: number;
       sellValueMultiplier: number;
       cost: number;
-      availability: 'equipped' | 'available' | 'locked';
+      availability: 'equipped' | 'owned' | 'available' | 'locked';
       purchasable: boolean;
     }>;
   } {
@@ -172,13 +180,17 @@ export class PickaxeShop {
     const currentTier = playerData.currentPickaxeTier;
     const playerGold = playerData.gold || 0;
     const nextTier = currentTier + 1;
+    const ownedPickaxes = playerData.ownedPickaxes || [0]; // Default to tier 0 if not set
 
     const pickaxes = PICKAXE_DATABASE.map(pickaxe => {
-      let availability: 'equipped' | 'available' | 'locked' = 'locked';
+      let availability: 'equipped' | 'owned' | 'available' | 'locked' = 'locked';
       let purchasable = false;
 
       if (pickaxe.tier === currentTier) {
         availability = 'equipped';
+      } else if (ownedPickaxes.includes(pickaxe.tier)) {
+        // Player owns this pickaxe but it's not equipped
+        availability = 'owned';
       } else if (pickaxe.tier === nextTier) {
         // Next tier - check if affordable
         if (playerGold >= pickaxe.cost) {
@@ -188,7 +200,7 @@ export class PickaxeShop {
           availability = 'locked'; // Can't afford
         }
       } else {
-        // Too far ahead or already passed
+        // Too far ahead
         availability = 'locked';
       }
 
@@ -208,6 +220,64 @@ export class PickaxeShop {
       currentTier,
       playerGold,
       pickaxes,
+    };
+  }
+
+  /**
+   * Equips a pickaxe that the player already owns
+   * 
+   * @param player - Player attempting to equip
+   * @param tier - Tier of pickaxe to equip
+   * @returns Equip result with success status and message
+   */
+  equipPickaxe(player: Player, tier: number): { success: boolean; message: string } {
+    const playerData = this.getPlayerDataCallback?.(player);
+    if (!playerData) {
+      return {
+        success: false,
+        message: 'Player data not found',
+      };
+    }
+
+    // Validate tier
+    if (tier < 0 || tier >= PICKAXE_DATABASE.length) {
+      return {
+        success: false,
+        message: `Invalid pickaxe tier: ${tier}`,
+      };
+    }
+
+    // Check if player owns this pickaxe
+    const ownedPickaxes = playerData.ownedPickaxes || [0];
+    if (!ownedPickaxes.includes(tier)) {
+      return {
+        success: false,
+        message: `You do not own this pickaxe. Purchase it first.`,
+      };
+    }
+
+    // Check if already equipped
+    if (playerData.currentPickaxeTier === tier) {
+      return {
+        success: false,
+        message: `This pickaxe is already equipped.`,
+      };
+    }
+
+    // Equip the pickaxe
+    playerData.currentPickaxeTier = tier;
+
+    // Update player data
+    this.updatePlayerDataCallback?.(player, playerData);
+
+    // Update pickaxe visual
+    this.pickaxeManager.attachPickaxeToPlayer(player, tier);
+
+    const pickaxe = getPickaxeByTier(tier);
+
+    return {
+      success: true,
+      message: `Equipped ${pickaxe?.name} pickaxe!`,
     };
   }
 

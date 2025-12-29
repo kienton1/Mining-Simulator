@@ -66,7 +66,6 @@ export class TrainingRockManager {
   ): void {
     const rockData = getTrainingRockByTier(tier);
     if (!rockData) {
-      console.warn(`Training rock tier ${tier} not found`);
       return;
     }
 
@@ -87,9 +86,7 @@ export class TrainingRockManager {
    * @returns Training rock location or null if none nearby
    */
   findNearbyTrainingRock(playerPosition: { x: number; y: number; z: number }): TrainingRockLocation | null {
-    let closestRock: TrainingRockLocation | null = null;
-    let closestDistance = this.PROXIMITY_DISTANCE;
-
+    // First check if player is within bounds (preferred method)
     for (const location of this.trainingRocks.values()) {
       if (location.bounds) {
         const withinX = playerPosition.x >= location.bounds.minX && playerPosition.x <= location.bounds.maxX;
@@ -97,6 +94,18 @@ export class TrainingRockManager {
         if (withinX && withinZ) {
           return location;
         }
+      }
+    }
+
+    // Fallback: only use distance check if no bounds are defined
+    // (This should rarely happen since all training rocks should have bounds)
+    let closestRock: TrainingRockLocation | null = null;
+    let closestDistance = this.PROXIMITY_DISTANCE;
+
+    for (const location of this.trainingRocks.values()) {
+      // Skip rocks that have bounds (we already checked them above)
+      if (location.bounds) {
+        continue;
       }
 
       const dx = location.position.x - playerPosition.x;
@@ -148,12 +157,12 @@ export class TrainingRockManager {
   }): void {
     // TODO: Implement block scanning when Hytopia API provides block iteration
     // For now, training rocks should be manually registered
-    console.log('[TrainingRockManager] Block scanning not yet implemented - register rocks manually');
   }
 
   /**
    * Manually registers training rocks based on known positions
    * This should be called during world initialization
+   * Ensures only one rock per tier is registered (prevents duplicates)
    * 
    * @param rockPositions - Array of { position, tier } objects
    */
@@ -164,8 +173,19 @@ export class TrainingRockManager {
       bounds?: TrainingRockLocation['bounds'];
     }>
   ): void {
+    // Track which tiers we've already registered to prevent duplicates
+    const registeredTiers = new Set<TrainingRockTier>();
+    
     for (const { position, tier, bounds } of rockPositions) {
+      // Skip if we've already registered this tier
+      if (registeredTiers.has(tier)) {
+        continue;
+      }
+      
       this.registerTrainingRock(position, tier, undefined, bounds);
+      if (bounds) {
+      }
+      registeredTiers.add(tier);
     }
   }
 }

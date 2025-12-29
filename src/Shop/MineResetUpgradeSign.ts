@@ -40,7 +40,6 @@ export class MineResetUpgradeSign {
    */
   spawn(): void {
     if (this.sceneUI) {
-      console.warn('[MineResetUpgradeSign] Sign already spawned');
       return;
     }
 
@@ -87,9 +86,6 @@ export class MineResetUpgradeSign {
     if (typeof (this.sceneUI as any).setRotation === 'function') {
       (this.sceneUI as any).setRotation(rotation);
     }
-
-    console.log(`[MineResetUpgradeSign] Floating sign spawned at ${this.signPosition.x}, ${this.signPosition.y}, ${this.signPosition.z}`);
-
     // Set up periodic updates to keep UI state current and position anchored
     this.startUpdateInterval();
   }

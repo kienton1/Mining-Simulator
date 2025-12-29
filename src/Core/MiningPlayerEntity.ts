@@ -26,7 +26,7 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
   public get playerController(): DefaultPlayerEntityController {
     if (!this.controller) {
       // Return a dummy object to prevent errors, but this shouldn't happen
-      console.error('[MiningPlayerEntity] Controller accessed before initialization!');
+
       return {} as DefaultPlayerEntityController;
     }
     return this.controller as DefaultPlayerEntityController;
@@ -65,20 +65,19 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       // This listens for left click input specifically for mining
       // Note: This doesn't interfere with WASD movement - DefaultPlayerEntity handles that automatically
       this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
-      
-      console.log('[MiningPlayerEntity] Controller set up successfully');
+
     } catch (error) {
-      console.warn('[MiningPlayerEntity] Error setting up controller:', error);
+
       // Retry once more after a longer delay
       setTimeout(() => {
         try {
           if (this.controller) {
             this.playerController.autoCancelMouseLeftClick = false;
             this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
-            console.log('[MiningPlayerEntity] Controller set up successfully on retry');
+
           }
         } catch (retryError) {
-          console.error('[MiningPlayerEntity] Failed to set up controller after retry:', retryError);
+
         }
       }, 300);
     }

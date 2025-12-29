@@ -10,21 +10,21 @@
 /**
  * Power System Constants
  * 
- * POWER_SCALING_CONSTANT: Controls how much power affects mining damage
- * Lower values = power has more impact (faster progression)
- * Balanced to allow ~10 seconds training to one-hit stone while maintaining meaningful progression
+ * DEPRECATED: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are no longer used.
  * 
- * Formula: MiningDamage = PickaxeDamage × (1 + Power / POWER_SCALING_CONSTANT)
+ * NEW SYSTEM (from PowerSystemPlan.md):
+ * - Damage Formula: EarlyBoost = 1 + 2 / (1 + (Power / 398107.17)^0.3)
+ *                    Damage = 1 + 0.072 * Power^0.553 * EarlyBoost
+ * - Power gain uses piecewise functions based on rock tier and rebirth count
+ * - Rebirths unlock training rocks and scale power gain per rock (no direct multiplier)
  * 
- * With POWER_SCALING_CONSTANT = 5:
- * - 20 power (10 sec training) = 1 × (1 + 20/5) = 5 damage (takes ~20 hits for stone)
- * - 95 power (~48 sec) = 1 × (1 + 95/5) = 20 damage (takes ~5 hits for stone)
- * - 495 power (~4 min) = 1 × (1 + 495/5) = 100 damage (one-hits stone)
- * - Coal (150 HP): Requires ~750 power (~6.25 min) to one-hit
+ * See StatCalculator.ts for actual implementation.
  */
-export const BASE_POWER_GAIN = 1; // Base power gained per hit
-export const POWER_SCALING_CONSTANT = 5; // Used in mining damage formula (balanced for progression)
-export const REBIRTH_MULTIPLIER_PER_REBIRTH = 0.10; // +10% per rebirth
+export const BASE_POWER_GAIN = 1; // DEPRECATED - kept for backwards compatibility only
+/** @deprecated No longer used - damage now uses power-based formula. See StatCalculator.calculateMiningDamage() */
+export const POWER_SCALING_CONSTANT = 5;
+/** @deprecated No longer used - rebirths now unlock rocks and scale rock power gain, no direct multiplier */
+export const REBIRTH_MULTIPLIER_PER_REBIRTH = 0.10;
 
 /**
  * Rebirth System Constants
@@ -65,39 +65,47 @@ export const BASE_SWING_RATE = 1 / 0.5; // 2.0 swings per second (1 hit per 0.5 
 
 /**
  * Training Rock Constants
- * Base power gain per hit for each training rock tier
- * These are the base values before rebirth multiplier is applied
+ * Base power gain per hit for each training rock tier (for UI display)
+ * NOTE: Actual power gain uses piecewise functions based on rebirths
+ * These values are shown in the UI as approximate power gains
+ * Reference: Planning/PowerSystemPlan.md section 4
  */
 export const TRAINING_ROCK_MULTIPLIERS = {
-  STONE: 1,
-  IRON: 3,
-  GOLD: 15,
-  DIAMOND: 40,
-  CRYSTAL: 60,
+  DIRT: 1,              // Rock 1 - Shows "+1 Power" in UI
+  COBBLESTONE: 3,       // Rock 2 - Shows "+3 Power" in UI
+  IRON_DEEPSLATE: 15,   // Rock 3 - Shows "+15 Power" in UI
+  GOLD_DEEPSLATE: 45,   // Rock 4 - Shows "+45 Power" in UI
+  DIAMOND_DEEPSLATE: 80, // Rock 5 - Shows "+80 Power" in UI
+  EMERALD_DEEPSLATE: 175, // Rock 6 - Shows "+175 Power" in UI
 } as const;
 
 /**
  * Training Rock Required Rebirths
- * Number of rebirths needed to access each training rock
+ * Number of rebirths needed to access each training rock (alternative unlock path)
+ * Reference: Planning/PowerSystemPlan.md section 4
  */
 export const TRAINING_ROCK_REQUIRED_REBIRTHS = {
-  STONE: 0,
-  IRON: 5,
-  GOLD: 15,
-  DIAMOND: 50,
-  CRYSTAL: 150,
+  DIRT: 0,           // Rock 1 - Always available
+  COBBLESTONE: 5,    // Rock 2
+  IRON_DEEPSLATE: 15, // Rock 3
+  GOLD_DEEPSLATE: 50, // Rock 4
+  DIAMOND_DEEPSLATE: 250, // Rock 5
+  EMERALD_DEEPSLATE: 1000, // Rock 6
 } as const;
 
 /**
  * Training Rock Power Requirements
  * Amount of power needed to access each training rock (alternative to rebirth requirement)
+ * Players can unlock via EITHER power OR rebirths
+ * Reference: Planning/PowerSystemPlan.md section 4
  */
 export const TRAINING_ROCK_POWER_REQUIREMENTS = {
-  STONE: 0,
-  IRON: 1000,
-  GOLD: 5000,
-  DIAMOND: 20000,
-  CRYSTAL: 50000,
+  DIRT: 0,           // Rock 1 - Always available
+  COBBLESTONE: 250,  // Rock 2
+  IRON_DEEPSLATE: 5000, // Rock 3
+  GOLD_DEEPSLATE: 75000, // Rock 4
+  DIAMOND_DEEPSLATE: 500000, // Rock 5
+  EMERALD_DEEPSLATE: 10000000, // Rock 6
 } as const;
 
 /**
