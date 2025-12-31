@@ -40,6 +40,25 @@ export class MiningController {
     this.miningSystem.setGetPickaxeCallback((player) => {
       return this.gameManager.getPlayerPickaxe(player);
     });
+    // Set callback to get miner ore luck bonus
+    this.miningSystem.setGetMinerOreLuckBonusCallback((player) => {
+      const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
+      return equippedMiner?.oreLuckBonus ?? 0;
+    });
+    // Set callback to get combined damage multiplier (for chest HP initialization)
+    this.miningSystem.setGetCombinedDamageMultiplierCallback((player: Player) => {
+      // Get More Damage multiplier from upgrade system (e.g., 1.2 = +20%)
+      const moreDamageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+      
+      // Get miner damage bonus percentage (e.g., 10 = +10%)
+      const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
+      const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
+      
+      // Convert multipliers to percentages, add them together, then convert back
+      const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
+      const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+      return 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
+    });
     // Set callback for when a chest is broken (to award gems)
     this.miningSystem.setChestBrokenCallback((player, baseGems) => {
       // Apply More Gems upgrade multiplier
@@ -79,8 +98,17 @@ export class MiningController {
       return;
     }
 
-    // Get More Damage multiplier from upgrade system
-    const damageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+    // Get More Damage multiplier from upgrade system (e.g., 1.2 = +20%)
+    const moreDamageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+    
+    // Get miner damage bonus percentage (e.g., 10 = +10%)
+    const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
+    const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
+    
+    // Convert multipliers to percentages, add them together, then convert back
+    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
 
     // Handle single click mining
     // Pass callback to check if blocking modal is open
@@ -240,8 +268,17 @@ export class MiningController {
       return;
     }
 
-    // Get More Damage multiplier from upgrade system
-    const damageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+    // Get More Damage multiplier from upgrade system (e.g., 1.2 = +20%)
+    const moreDamageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
+    
+    // Get miner damage bonus percentage (e.g., 10 = +10%)
+    const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
+    const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
+    
+    // Convert multipliers to percentages, add them together, then convert back
+    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
       return;
@@ -323,13 +360,12 @@ export class MiningController {
       isMining: false,
     });
     
-    player.ui.sendData({
-      type: 'MINING_STATE_UPDATE',
-      isInMine: false,
-    });
-
-    // Stop block detection when leaving mine
-    this.stopBlockDetection(player);
+    // NOTE: Do NOT set isInMine: false here - the player is still in the mine,
+    // they just stopped actively mining. The GameManager controls the in-mine state.
+    
+    // NOTE: Do NOT stop block detection here - the ore info should stay visible
+    // as long as the player is in the mine, even when not actively mining.
+    // Block detection is stopped by GameManager.teleportToSurface() when leaving the mine.
   }
 
   /**
@@ -359,6 +395,16 @@ export class MiningController {
    */
   getMiningState(player: Player) {
     return this.miningSystem.getMiningState(player);
+  }
+
+  /**
+   * Gets the current mine level (0-based) for a player
+   * 
+   * @param player - Player to get mine level for
+   * @returns Current mine level (0, 1, 2, ...) or 0 if not in mine
+   */
+  getCurrentMineLevel(player: Player): number {
+    return this.miningSystem.getCurrentMineLevel(player);
   }
 
   /**
@@ -411,17 +457,24 @@ export class MiningController {
       // Apply More Gems upgrade multiplier to chest gem reward for display
       const moreGemsMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreGemsMultiplier(player);
       finalGemReward = Math.round(gemReward * moreGemsMultiplier);
-    } else if (!isChest && currentOreName) {
+    }
+    
+    // Get ore color for display (only for ores, not chests)
+    let oreColor: string | null = null;
+    if (!isChest && currentOreName) {
       // Find ore type from name
       const oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
       if (oreEntry) {
         const oreType = oreEntry[0] as OreType;
         const oreData = ORE_DATABASE[oreType];
-        const pickaxe = this.gameManager.getPlayerPickaxe(player);
-        const pickaxeMultiplier = pickaxe?.sellValueMultiplier ?? 1.0;
-        const moreCoinsMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
-        const sellMultiplier = pickaxeMultiplier * moreCoinsMultiplier;
-        sellValue = Math.round(oreData.value * sellMultiplier);
+        // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)
+        const sellMultiplier = this.gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
+        let calculatedValue = oreData.value * sellMultiplier;
+        // Round to nearest 5 with no decimals (matching selling system)
+        calculatedValue = Math.round(calculatedValue / 5) * 5;
+        sellValue = calculatedValue;
+        // Get ore color for text display
+        oreColor = oreData.color;
       }
     }
 
@@ -434,6 +487,7 @@ export class MiningController {
       isChest,
       sellValue, // For ores: how much gold this ore will sell for (with pickaxe and More Coins multipliers)
       gemReward: finalGemReward, // For chests: how many gems this chest will give (with More Gems multiplier)
+      oreColor, // For ores: color to display the ore name in
     });
   }
 

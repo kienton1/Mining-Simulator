@@ -86,6 +86,51 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       return root;
     });
 
+    hytopia.registerSceneUITemplate('egg:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-egg-prompt visible';
+
+      const icon = document.createElement('div');
+      icon.className = 'scene-egg-prompt__icon';
+      icon.textContent = '🥚';
+      root.appendChild(icon);
+
+      const copy = document.createElement('div');
+      copy.className = 'scene-egg-prompt__copy';
+      root.appendChild(copy);
+
+      const title = document.createElement('div');
+      title.className = 'scene-egg-prompt__title';
+      title.textContent = 'Egg';
+      copy.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-egg-prompt__subtitle';
+      subtitle.textContent = 'Open eggs here';
+      copy.appendChild(subtitle);
+
+      const cost = document.createElement('div');
+      cost.className = 'scene-egg-prompt__cost';
+      cost.textContent = '0 gold';
+      copy.appendChild(cost);
+
+      onState(state => {
+        const data = state || {};
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) {
+          subtitle.textContent = data.subtitle;
+          // Hide subtitle if empty so this looks like the reference (name + cost only).
+          subtitle.style.display = data.subtitle ? 'block' : 'none';
+        }
+        if (data.costText !== undefined) cost.textContent = data.costText;
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
   })();
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -96,6 +141,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     setupMerchantUI();
     setupMineResetUpgradeUI();
     setupGemTraderUI();
+    setupEggStationUI();
     setupKeyboardDebug();
     console.log('[UI] UI setup complete');
   });
@@ -111,6 +157,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     setupMerchantUI();
     setupMineResetUpgradeUI();
     setupGemTraderUI();
+    setupEggStationUI();
     setupKeyboardDebug();
   }
 
@@ -797,20 +844,74 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const blockRewardDisplayEl = document.getElementById('block-reward-display');
     const mineResetTimerEl = document.getElementById('mine-reset-timer');
     const mineResetTimerTextEl = document.getElementById('mine-reset-timer-text');
+    const miningDepthCounterEl = document.getElementById('mining-depth-counter');
+    const miningDepthCounterTextEl = document.getElementById('mining-depth-counter-text');
 
     console.log('[UI] Setting up power HUD');
     console.log('[UI] powerValueEl:', powerValueEl);
     console.log('[UI] powerGainLayer:', powerGainLayer);
 
+    const minerButton = document.getElementById('miner-button');
     const pickaxeButton = document.getElementById('pickaxe-button');
     const rebirthButton = document.getElementById('rebirth-button');
+    const petsButton = document.getElementById('pets-button');
+    const minerModal = document.getElementById('miner-modal');
     const pickaxeModal = document.getElementById('pickaxe-modal');
     const rebirthModal = document.getElementById('rebirth-modal');
+    const petsModal = document.getElementById('pets-modal');
+    const eggModal = document.getElementById('egg-modal');
+    const minerGridEl = document.getElementById('miner-grid');
+    const minerDetailName = document.getElementById('miner-detail-name');
+    const minerDetailStats = document.getElementById('miner-detail-stats');
+    const minerDetailBadge = document.getElementById('miner-detail-badge');
+    const minerDetailIcon = document.getElementById('miner-detail-icon');
     const pickaxeGridEl = document.getElementById('pickaxe-grid');
     const pickaxeActionButton = document.getElementById('pickaxe-action-button');
     const pickaxeDetailName = document.getElementById('pickaxe-detail-name');
     const pickaxeDetailStats = document.getElementById('pickaxe-detail-stats');
     const pickaxeDetailCost = document.getElementById('pickaxe-detail-cost');
+
+    // Pets UI elements (grid)
+    const petsGridEl = document.getElementById('pets-grid');
+    const petsOwnedCountEl = document.getElementById('pets-owned-count');
+    const petsEquippedCountEl = document.getElementById('pets-equipped-count');
+    const petsMultiplierSumEl = document.getElementById('pets-multiplier-sum');
+    const petsEquipBestBtn = document.getElementById('pets-equip-best');
+    const petsUnequipAllBtn = document.getElementById('pets-unequip-all');
+    const petsTrashToggleBtn = document.getElementById('pets-trash-toggle');
+    const petsDeleteBarEl = document.getElementById('pets-delete-bar');
+    const petsDeleteTextEl = document.getElementById('pets-delete-text');
+    const petsDeleteConfirmBtn = document.getElementById('pets-delete-confirm');
+    const petsDeleteCancelBtn = document.getElementById('pets-delete-cancel');
+    const petDetailPanelEl = document.getElementById('pet-detail-panel');
+    const petDetailCloseEl = document.getElementById('pet-detail-close');
+    const petDetailNameEl = document.getElementById('pet-detail-name');
+    const petDetailImageEl = document.getElementById('pet-detail-image');
+    const petDetailMultEl = document.getElementById('pet-detail-mult');
+    const petDetailRarityEl = document.getElementById('pet-detail-rarity');
+    const petDetailActionEl = document.getElementById('pet-detail-action');
+
+    // Egg station UI elements
+    const eggModalTitleEl = document.getElementById('egg-modal-title');
+    const eggStationNameEl = document.getElementById('egg-station-name');
+    const eggStationCostEl = document.getElementById('egg-station-cost');
+    const eggStationGoldEl = document.getElementById('egg-station-gold');
+    const eggStationInvEl = document.getElementById('egg-station-inv');
+    const eggStationStatusEl = document.getElementById('egg-station-status');
+    const eggOpen1Btn = document.getElementById('egg-open-1');
+    const eggOpen3Btn = document.getElementById('egg-open-3');
+    const eggAutoBtn = document.getElementById('egg-auto');
+    const eggResultsListEl = document.getElementById('egg-results-list');
+
+    // Setup miner button click handler
+    if (minerButton) {
+      minerButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'miner' });
+        hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+      });
+    }
 
     // Setup pickaxe button click handler
     if (pickaxeButton) {
@@ -838,18 +939,39 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       });
     }
 
+    // Setup pets button click handler (HUD below rebirth)
+    if (petsButton) {
+      petsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Always start with delete mode OFF when opening the pets UI.
+        // This ensures the delete bar stays hidden until the trashcan is clicked.
+        state.pets.deleteMode = false;
+        state.pets.deleteSelected = {};
+        state.pets.selectedPetInstanceId = null;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+        if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pets' });
+        hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+        showModal(petsModal);
+        petsButton.blur();
+        window.focus();
+      });
+    }
+
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
-      // Handle all modal close button classes
-      if (e.target && e.target.classList && 
-          (e.target.classList.contains('modal__close') || 
-           e.target.classList.contains('pickaxe-modal__close') ||
-           e.target.classList.contains('rebirth-modal__close'))) {
-        const closeButton = e.target;
+      // Use closest to find the close button (handles clicks on text/children inside button)
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close');
+      
+      if (closeButton) {
         const modalId = closeButton.getAttribute('data-close');
         if (modalId) {
           const modal = document.getElementById(modalId);
           if (modal) {
+            e.preventDefault();
+            e.stopPropagation();
             hideModal(modal); // Use hideModal to notify server
             console.log(`[UI] Closed modal: ${modalId}`);
           }
@@ -865,6 +987,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       gems: 0,
       wins: 0,
       rebirths: 0,
+      miner: {
+        currentTier: -1,
+        selectedTier: -1,
+        miners: [],
+      },
       pickaxe: {
         currentTier: 0,
         selectedTier: 0,
@@ -889,6 +1016,28 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         currentOre: null,
         damage: 0,
         lastBlockInfo: null, // Store last known block info to prevent UI disappearing during fast mining
+      },
+      pets: {
+        pets: [],
+        ownedCount: 0,
+        ownedCap: 50,
+        equippedCount: 0,
+        equippedCap: 8,
+        multiplierSum: 0,
+        trainingMultiplier: 1,
+        selectedPetInstanceId: null,
+        deleteMode: false,
+        deleteSelected: {}, // map instanceId -> true (inventory only)
+      },
+      eggStation: {
+        inProximity: false,
+        stationId: null,
+        stationName: 'Egg Station',
+        eggType: 'stone',
+        defaultOpenCount: 1,
+        costGold: 0,
+        lastHatch: [],
+        autoEnabled: false,
       },
     };
 
@@ -1011,9 +1160,394 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       return Math.round(value).toString();
     };
 
+    // Egg station local auto-open loop (client-side)
+    let eggAutoInterval = null;
+    const stopEggAuto = () => {
+      state.eggStation.autoEnabled = false;
+      if (eggAutoInterval) {
+        clearInterval(eggAutoInterval);
+        eggAutoInterval = null;
+      }
+      if (eggAutoBtn) {
+        eggAutoBtn.textContent = 'Auto';
+      }
+    };
+
+    const startEggAuto = () => {
+      stopEggAuto();
+      state.eggStation.autoEnabled = true;
+      if (eggAutoBtn) {
+        eggAutoBtn.textContent = 'Stop';
+      }
+      // Send first hatch immediately, then every ~600ms (server-side rate limits still apply)
+      const doHatch = () => {
+        if (!state.eggStation.inProximity) {
+          stopEggAuto();
+          return;
+        }
+        const count = state.eggStation.defaultOpenCount === 3 ? 3 : 1;
+        hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count });
+      };
+      doHatch();
+      eggAutoInterval = setInterval(doHatch, 600);
+    };
+
+    const renderEggStation = () => {
+      if (!eggModal) return;
+      if (!state.eggStation.inProximity) return;
+
+      if (eggModalTitleEl) eggModalTitleEl.textContent = 'Egg Station';
+      if (eggStationNameEl) eggStationNameEl.textContent = state.eggStation.stationName || 'Egg Station';
+      if (eggStationCostEl) eggStationCostEl.textContent = formatNumber(state.eggStation.costGold || 0);
+      if (eggStationGoldEl) eggStationGoldEl.textContent = formatNumber(state.gold || 0);
+      if (eggStationInvEl) eggStationInvEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
+      if (eggStationStatusEl) {
+        eggStationStatusEl.textContent = state.eggStation.autoEnabled ? 'Auto Opening...' : 'Ready';
+      }
+
+      if (eggOpen1Btn) {
+        const c = state.eggStation.costGold || 0;
+        eggOpen1Btn.textContent = `Open 1 (${formatNumber(c)})`;
+      }
+      if (eggOpen3Btn) {
+        const c = (state.eggStation.costGold || 0) * 3;
+        eggOpen3Btn.textContent = `Open 3 (${formatNumber(c)})`;
+      }
+
+      if (eggResultsListEl) {
+        eggResultsListEl.innerHTML = '';
+        const last = Array.isArray(state.eggStation.lastHatch) ? state.eggStation.lastHatch : [];
+        if (last.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.opacity = '0.8';
+          empty.textContent = 'No hatches yet.';
+          eggResultsListEl.appendChild(empty);
+        } else {
+          for (const pet of last.slice(0, 12)) {
+            const row = document.createElement('div');
+            row.className = 'egg-result-item';
+            const left = document.createElement('div');
+            left.className = 'egg-result-item__name';
+            left.textContent = pet.name || pet.id || 'Pet';
+            const right = document.createElement('div');
+            right.className = 'egg-result-item__mult';
+            right.textContent = `+${pet.multiplier ?? 0}`;
+            row.appendChild(left);
+            row.appendChild(right);
+            eggResultsListEl.appendChild(row);
+          }
+        }
+      }
+    };
+
+    const renderPets = () => {
+      // Top counters
+      if (petsOwnedCountEl) petsOwnedCountEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
+      if (petsEquippedCountEl) petsEquippedCountEl.textContent = `${state.pets.equippedCount}/${state.pets.equippedCap}`;
+      if (petsMultiplierSumEl) petsMultiplierSumEl.textContent = String(state.pets.multiplierSum ?? 0);
+
+      // Delete bar
+      if (petsDeleteBarEl) {
+        const selectedCount = state.pets.deleteSelected ? Object.keys(state.pets.deleteSelected).length : 0;
+        // Show whenever delete mode is enabled (even at 0 selected), like the reference UX.
+        petsDeleteBarEl.hidden = !state.pets.deleteMode;
+        if (petsDeleteTextEl) petsDeleteTextEl.textContent = `Delete ${selectedCount} Pets!`;
+        if (petsDeleteConfirmBtn) petsDeleteConfirmBtn.disabled = selectedCount === 0;
+      }
+
+      // Disable bulk actions during delete mode
+      if (petsEquipBestBtn) petsEquipBestBtn.disabled = Boolean(state.pets.deleteMode);
+      if (petsUnequipAllBtn) petsUnequipAllBtn.disabled = Boolean(state.pets.deleteMode);
+
+      if (!petsGridEl) return;
+      petsGridEl.innerHTML = '';
+
+      const rarityToClass = (rarity) => {
+        switch ((rarity || '').toLowerCase()) {
+          case 'legendary': return 'pet-tile--legendary';
+          case 'epic': return 'pet-tile--epic';
+          case 'rare': return 'pet-tile--rare';
+          default: return 'pet-tile--common';
+        }
+      };
+
+      const list = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+      // Sort like typical pet inventories: equipped first, then highest multiplier.
+      list.sort((a, b) => {
+        const ea = Boolean(a.equipped);
+        const eb = Boolean(b.equipped);
+        if (ea !== eb) return ea ? -1 : 1;
+        return (b.multiplier ?? 0) - (a.multiplier ?? 0);
+      });
+
+      const getSelectedPet = () => {
+        if (!state.pets.selectedPetInstanceId) return null;
+        return list.find(p => p.instanceId === state.pets.selectedPetInstanceId) || null;
+      };
+
+      const renderPetDetail = (pet) => {
+        if (!petDetailPanelEl) return;
+        if (!pet) {
+          petDetailPanelEl.hidden = true;
+          return;
+        }
+        petDetailPanelEl.hidden = false;
+
+        if (petDetailNameEl) petDetailNameEl.textContent = pet.name || pet.id || 'Pet';
+        if (petDetailMultEl) petDetailMultEl.textContent = String(pet.multiplier ?? 0);
+        if (petDetailRarityEl) petDetailRarityEl.textContent = (pet.rarity || '').toUpperCase();
+
+        if (petDetailImageEl) {
+          petDetailImageEl.innerHTML = '';
+          const img = document.createElement('img');
+          img.alt = pet.name || pet.petId || 'Pet';
+          img.src = `{{CDN_ASSETS_URL}}/ui/pets/${pet.petId}.png`;
+          img.className = 'pet-detail__img-el';
+          img.onerror = () => {
+            petDetailImageEl.textContent = '🐾';
+          };
+          petDetailImageEl.appendChild(img);
+        }
+
+        if (petDetailActionEl) {
+          const isEquipped = Boolean(pet.equipped);
+          petDetailActionEl.textContent = isEquipped ? 'Unequip' : 'Equip';
+          petDetailActionEl.classList.toggle('pet-detail__action--equip', !isEquipped);
+          petDetailActionEl.classList.toggle('pet-detail__action--unequip', isEquipped);
+        }
+      };
+
+      // Keep detail panel synced with latest state
+      renderPetDetail(getSelectedPet());
+
+      for (const pet of list) {
+        const tile = document.createElement('button');
+        const isMarkedForDelete = Boolean(state.pets.deleteSelected?.[pet.instanceId]);
+        tile.className = `pet-tile ${rarityToClass(pet.rarity)} ${pet.equipped ? 'pet-tile--equipped' : ''} ${state.pets.deleteMode ? 'pet-tile--delete-mode' : ''} ${isMarkedForDelete ? 'pet-tile--delete-selected' : ''}`;
+        tile.setAttribute('tabindex', '-1');
+
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'pet-tile__img';
+
+        // If you later add images at assets/ui/pets/<petId>.png this will pick them up automatically.
+        const img = document.createElement('img');
+        img.className = 'pet-tile__img-el';
+        img.alt = pet.name || pet.petId || 'Pet';
+        img.src = `{{CDN_ASSETS_URL}}/ui/pets/${pet.petId}.png`;
+        img.onerror = () => {
+          img.style.display = 'none';
+          imgWrap.textContent = '🐾';
+        };
+        imgWrap.appendChild(img);
+
+        const mult = document.createElement('div');
+        mult.className = 'pet-tile__mult';
+        mult.textContent = String(pet.multiplier ?? 0);
+
+        tile.appendChild(imgWrap);
+        tile.appendChild(mult);
+
+        if (state.pets.deleteMode) {
+          const overlay = document.createElement('div');
+          overlay.className = 'pet-tile__delete-overlay';
+          overlay.textContent = '✖';
+          overlay.style.display = isMarkedForDelete ? 'flex' : 'none';
+          tile.appendChild(overlay);
+        }
+
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.pets.deleteMode) {
+            // Only allow marking inventory pets (inv:<idx>) and never equipped
+            const isInventory = typeof pet.instanceId === 'string' && pet.instanceId.startsWith('inv:');
+            if (!isInventory || pet.equipped) return;
+
+            if (!state.pets.deleteSelected) state.pets.deleteSelected = {};
+            if (state.pets.deleteSelected[pet.instanceId]) {
+              delete state.pets.deleteSelected[pet.instanceId];
+            } else {
+              state.pets.deleteSelected[pet.instanceId] = true;
+            }
+            // Close detail panel while in delete mode
+            state.pets.selectedPetInstanceId = null;
+            if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+            // Re-render to update overlays
+            renderPets();
+            return;
+          }
+
+          state.pets.selectedPetInstanceId = pet.instanceId;
+          renderPetDetail(pet);
+        });
+
+        petsGridEl.appendChild(tile);
+      }
+    };
+
+    // Footer buttons
+    if (petsEquipBestBtn) {
+      petsEquipBestBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'PET_EQUIP_BEST' });
+      });
+    }
+    if (petsUnequipAllBtn) {
+      petsUnequipAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'PET_UNEQUIP_ALL' });
+      });
+    }
+
+    if (petsTrashToggleBtn) {
+      petsTrashToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.deleteMode = !state.pets.deleteMode;
+        // Reset selection when leaving delete mode
+        if (!state.pets.deleteMode) {
+          state.pets.deleteSelected = {};
+        }
+        // Hide detail panel while in delete mode
+        if (state.pets.deleteMode) {
+          state.pets.selectedPetInstanceId = null;
+          if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+        }
+        renderPets();
+      });
+    }
+
+    if (petsDeleteCancelBtn) {
+      petsDeleteCancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.deleteSelected = {};
+        state.pets.deleteMode = false;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+        renderPets();
+      });
+    }
+
+    if (petsDeleteConfirmBtn) {
+      petsDeleteConfirmBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const selected = state.pets.deleteSelected || {};
+        const instanceIds = Object.keys(selected);
+        const indices = instanceIds
+          .filter((id) => id.startsWith('inv:'))
+          .map((id) => Number(id.split(':')[1]))
+          .filter((n) => Number.isFinite(n));
+        if (indices.length === 0) return;
+        hytopia.sendData({ type: 'PET_DELETE_INV', indices });
+        // Optimistically exit delete mode; server PET_STATE will refresh the grid
+        state.pets.deleteSelected = {};
+        state.pets.deleteMode = false;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+      });
+    }
+
+    // Pet detail panel controls
+    if (petDetailCloseEl) {
+      petDetailCloseEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.selectedPetInstanceId = null;
+        if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+      });
+    }
+    if (petDetailActionEl) {
+      petDetailActionEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const list = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+        const current = state.pets.selectedPetInstanceId ? (list.find(p => p.instanceId === state.pets.selectedPetInstanceId) || null) : null;
+        if (!current) return;
+        if (current.equipped) {
+          hytopia.sendData({ type: 'PET_UNEQUIP_INSTANCE', slotIndex: current.slotIndex });
+        } else {
+          hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
+        }
+      });
+    }
+
+    // Wire egg station buttons once
+    if (eggOpen1Btn) {
+      eggOpen1Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count: 1 });
+      });
+    }
+    if (eggOpen3Btn) {
+      eggOpen3Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count: 3 });
+      });
+    }
+    if (eggAutoBtn) {
+      eggAutoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.eggStation.autoEnabled) {
+          stopEggAuto();
+        } else {
+          startEggAuto();
+        }
+        renderEggStation();
+      });
+    }
+
+    // Store background click handlers and container click handlers for cleanup
+    const modalBackgroundHandlers = new Map();
+    const modalContainerHandlers = new Map();
+
     const showModal = (el) => {
       if (!el) return;
       el.classList.add('visible');
+      
+      // Create and store background click handler
+      const handleBackgroundClick = (e) => {
+        // Only close if clicking directly on the modal background (not on the container)
+        if (e.target === el) {
+          hideModal(el);
+        }
+      };
+      
+      // Remove any existing listener first
+      const existingHandler = modalBackgroundHandlers.get(el);
+      if (existingHandler) {
+        el.removeEventListener('click', existingHandler);
+      }
+      
+      // Add new handler and store it
+      el.addEventListener('click', handleBackgroundClick);
+      modalBackgroundHandlers.set(el, handleBackgroundClick);
+      
+      // Prevent clicks inside the modal container from closing
+      // But allow close button clicks to work
+      const container = el.querySelector('.pickaxe-modal__container');
+      if (container) {
+        // Remove existing container handler if any
+        const existingContainerHandler = modalContainerHandlers.get(container);
+        if (existingContainerHandler) {
+          container.removeEventListener('click', existingContainerHandler);
+        }
+        
+        const handleContainerClick = (e) => {
+          // Don't stop propagation if clicking the close button
+          const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close');
+          if (!closeButton) {
+            e.stopPropagation();
+          }
+        };
+        
+        container.addEventListener('click', handleContainerClick);
+        modalContainerHandlers.set(container, handleContainerClick);
+      }
       
       // Note: MODAL_OPENED is already sent from button click handlers
       // This ensures the modal state is set before any click processing
@@ -1024,11 +1558,34 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       if (!el) return;
       el.classList.remove('visible');
       
+      // Remove background click listener using stored reference
+      const backgroundHandler = modalBackgroundHandlers.get(el);
+      if (backgroundHandler) {
+        el.removeEventListener('click', backgroundHandler);
+        modalBackgroundHandlers.delete(el);
+      }
+      
+      // Remove container click listener
+      const container = el.querySelector('.pickaxe-modal__container');
+      if (container) {
+        const containerHandler = modalContainerHandlers.get(container);
+        if (containerHandler) {
+          container.removeEventListener('click', containerHandler);
+          modalContainerHandlers.delete(container);
+        }
+      }
+      
       // Notify server that a modal is closed (allows manual mining again)
-      if (el.id === 'pickaxe-modal') {
+      if (el.id === 'miner-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'miner' });
+      } else if (el.id === 'pickaxe-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pickaxe' });
       } else if (el.id === 'rebirth-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
+      } else if (el.id === 'pets-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
+      } else if (el.id === 'egg-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'egg' });
       }
     };
 
@@ -1232,6 +1789,187 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       renderPickaxeGrid();
       renderPickaxeDetails();
       showModal(pickaxeModal);
+    };
+
+    const renderMinerDetails = () => {
+      // Check if a miner is selected, otherwise show equipped
+      if (state.miner.selectedTier !== undefined && state.miner.selectedTier !== -1) {
+        // Always get the most up-to-date miner data from state
+        const selectedMiner = state.miner.miners.find(m => m.tier === state.miner.selectedTier);
+        if (selectedMiner) {
+          renderEquippedMiner(selectedMiner);
+          return;
+        }
+      }
+      
+      // No selection, show equipped miner or none
+      const equipped = state.miner.miners.find(m => m.availability === 'equipped');
+      if (equipped) {
+        renderEquippedMiner(equipped);
+      } else {
+        renderEquippedMiner(null);
+      }
+    };
+
+    const renderEquippedMiner = (miner) => {
+      if (!minerDetailName || !minerDetailStats || !minerDetailBadge || !minerDetailIcon) return;
+
+      if (!miner) {
+        // No miner equipped
+        minerDetailIcon.textContent = '⛑️';
+        minerDetailName.textContent = 'No Miner';
+        minerDetailStats.innerHTML = '';
+        minerDetailBadge.textContent = 'None Equipped';
+        return;
+      }
+
+      minerDetailIcon.textContent = '⛑️';
+      minerDetailName.textContent = miner.name;
+      
+      // Clear and rebuild stats with proper styling classes
+      minerDetailStats.innerHTML = '';
+      
+      // Coin Bonus
+      const coinStat = document.createElement('div');
+      coinStat.className = 'pickaxe-stat pickaxe-stat--sell';
+      coinStat.textContent = `+${miner.coinBonus}% Coins`;
+      minerDetailStats.appendChild(coinStat);
+      
+      // Ore Luck Bonus
+      const luckStat = document.createElement('div');
+      luckStat.className = 'pickaxe-stat pickaxe-stat--luck';
+      luckStat.textContent = `+${miner.oreLuckBonus}% Ore Luck`;
+      minerDetailStats.appendChild(luckStat);
+      
+      // Damage Bonus
+      const damageStat = document.createElement('div');
+      damageStat.className = 'pickaxe-stat pickaxe-stat--damage';
+      damageStat.textContent = `+${miner.damageBonus}% Damage`;
+      minerDetailStats.appendChild(damageStat);
+      
+      // Set badge text based on availability (matching pickaxe UI style)
+      if (miner.availability === 'equipped') {
+        minerDetailBadge.textContent = 'Equipped';
+      } else if (miner.availability === 'owned') {
+        minerDetailBadge.textContent = ''; // No badge for owned but not equipped
+      } else if (miner.availability === 'locked') {
+        minerDetailBadge.textContent = 'Locked';
+      } else {
+        minerDetailBadge.textContent = ''; // No badge for available
+      }
+    };
+
+    const renderMinerGrid = () => {
+      if (!minerGridEl) return;
+      minerGridEl.innerHTML = '';
+
+      const currentTier = state.miner.currentTier;
+      const gold = state.gold;
+
+      state.miner.miners.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'pickaxe-card';
+        
+        // Determine state based on availability from backend
+        const isEquipped = m.availability === 'equipped';
+        const isOwned = m.availability === 'owned';
+        const isAvailable = m.availability === 'available';
+        const isLocked = m.availability === 'locked';
+
+        // Apply appropriate classes (similar to pickaxe grid)
+        if (isEquipped) {
+          card.classList.add('equipped');
+        } else if (isOwned) {
+          card.classList.add('purchased'); // Owned but not equipped - normal appearance
+        } else if (isAvailable) {
+          card.classList.add('next-tier'); // Available to purchase
+        } else if (isLocked) {
+          card.classList.add('locked'); // Greyed out with lock
+        }
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'pickaxe-card__icon';
+        iconEl.textContent = '⛑️';
+        card.appendChild(iconEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pickaxe-card__name';
+        nameEl.textContent = m.name;
+        card.appendChild(nameEl);
+
+        // Cost display (only if not equipped and not owned)
+        if (!isEquipped && !isOwned) {
+          const costEl = document.createElement('div');
+          costEl.className = 'pickaxe-card__cost';
+          costEl.innerHTML = `<span>🪙</span> ${formatNumber(m.cost)}`;
+          card.appendChild(costEl);
+        }
+
+        // Equip button (for owned but not equipped miners)
+        if (isOwned && !isEquipped) {
+          const equipButton = document.createElement('button');
+          equipButton.className = 'pickaxe-card__buy-button';
+          equipButton.textContent = 'Equip';
+          equipButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hytopia.sendData({ type: 'EQUIP_MINER', tier: m.tier });
+          });
+          card.appendChild(equipButton);
+        }
+        // Buy button (only for available miners that are purchasable)
+        else if (isAvailable && m.purchasable && state.gold >= m.cost) {
+          const buyButton = document.createElement('button');
+          buyButton.className = 'pickaxe-card__buy-button';
+          buyButton.textContent = 'Buy';
+          buyButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hytopia.sendData({ type: 'BUY_MINER', tier: m.tier });
+          });
+          card.appendChild(buyButton);
+        }
+
+        // Equipped checkmark
+        if (isEquipped) {
+          const checkmark = document.createElement('div');
+          checkmark.className = 'pickaxe-card__checkmark';
+          checkmark.textContent = '✓';
+          card.appendChild(checkmark);
+        }
+
+        // Lock icon (if locked)
+        if (isLocked) {
+          const lock = document.createElement('div');
+          lock.className = 'pickaxe-card__lock';
+          lock.textContent = '🔒';
+          card.appendChild(lock);
+        }
+
+        // Highlight selected card
+        if (state.miner.selectedTier === m.tier) {
+          card.classList.add('selected');
+        }
+
+        card.addEventListener('click', () => {
+          state.miner.selectedTier = m.tier;
+          renderMinerGrid();
+          renderMinerDetails();
+        });
+
+        minerGridEl.appendChild(card);
+      });
+    };
+
+    const updateMinerModal = (data) => {
+      state.miner.miners = data.miners || [];
+      state.miner.currentTier = data.currentTier ?? -1;
+      state.gold = data.gold ?? state.gold;
+      // Set selected tier to equipped miner if no selection yet
+      if (state.miner.selectedTier === undefined || state.miner.selectedTier === -1) {
+        state.miner.selectedTier = state.miner.currentTier >= 0 ? state.miner.currentTier : (data.miners && data.miners.length > 0 ? data.miners[0].tier : -1);
+      }
+      renderMinerGrid();
+      renderMinerDetails();
+      showModal(minerModal);
     };
 
     const renderRebirthOptions = () => {
@@ -1798,6 +2536,88 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             }
           }
           break;
+        case 'EGG_STATION_PROXIMITY': {
+          // Server-driven proximity: show/hide egg modal
+          if (!data.inProximity) {
+            state.eggStation.inProximity = false;
+            state.eggStation.stationId = null;
+            stopEggAuto();
+            if (eggModal) hideModal(eggModal);
+            break;
+          }
+
+          state.eggStation.inProximity = true;
+          state.eggStation.stationId = data.station?.id ?? null;
+          state.eggStation.stationName = data.station?.name ?? 'Egg Station';
+          state.eggStation.eggType = data.station?.eggType ?? 'stone';
+          state.eggStation.defaultOpenCount = data.station?.defaultOpenCount ?? 1;
+          state.eggStation.costGold = data.station?.costGold ?? 0;
+
+          // Update gold + pet counts snapshot (for display)
+          if (typeof data.player?.gold === 'number') {
+            state.gold = data.player.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          }
+          if (typeof data.player?.petInventoryCount === 'number') {
+            state.pets.ownedCount = data.player.petInventoryCount;
+          }
+          if (typeof data.player?.petInventoryCap === 'number') {
+            state.pets.ownedCap = data.player.petInventoryCap;
+          }
+          if (typeof data.player?.petEquippedCount === 'number') {
+            state.pets.equippedCount = data.player.petEquippedCount;
+          }
+          if (typeof data.player?.petEquippedCap === 'number') {
+            state.pets.equippedCap = data.player.petEquippedCap;
+          }
+
+          // Open modal and block manual mining clicks
+          if (eggModal && !eggModal.classList.contains('visible')) {
+            hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'egg' });
+            showModal(eggModal);
+            // Refresh pets immediately so inventory/equipped counts are accurate
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          }
+          renderEggStation();
+          break;
+        }
+        case 'EGG_HATCH_RESULT': {
+          if (!data.success) {
+            console.log('[UI] Egg hatch failed:', data.message);
+            // Stop auto if we can't hatch (insufficient gold, inventory full, etc.)
+            stopEggAuto();
+            if (eggStationStatusEl) {
+              eggStationStatusEl.textContent = data.message || 'Failed';
+            }
+            break;
+          }
+
+          state.eggStation.lastHatch = data.results || [];
+          if (typeof data.goldSpent === 'number') {
+            // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
+            state.gold = Math.max(0, state.gold - data.goldSpent);
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          }
+          renderEggStation();
+          break;
+        }
+        case 'PET_STATE':
+          state.pets.pets = data.pets || [];
+          state.pets.ownedCount = data.ownedCount ?? state.pets.ownedCount;
+          state.pets.ownedCap = data.ownedCap ?? state.pets.ownedCap;
+          state.pets.equippedCount = data.equippedCount ?? state.pets.equippedCount;
+          state.pets.equippedCap = data.equippedCap ?? state.pets.equippedCap;
+          state.pets.multiplierSum = data.multiplierSum ?? 0;
+          state.pets.trainingMultiplier = data.trainingMultiplier ?? 1;
+          renderPets();
+          // Egg modal also displays pet inventory count, so refresh it too
+          renderEggStation();
+          break;
+        case 'PET_ACTION_RESULT':
+          if (!data.success) {
+            console.log('[UI] Pet action failed:', data.message);
+          }
+          break;
         case 'UPGRADE_PURCHASED':
           console.log('[UI] Upgrade purchased:', data);
           state.gems = data.remainingGems ?? state.gems;
@@ -1860,6 +2680,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           // Update block health bar (bottom center, above progress bar)
           if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl && blockRewardDisplayEl) {
             // Store current block info if valid
+            const oreColor = data.oreColor ?? null;
             let currentBlockInfo = null;
             if (state.mining.currentOre && blockHP > 0 && maxHP > 0) {
               currentBlockInfo = {
@@ -1868,7 +2689,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
                 maxHP: maxHP,
                 isChest: isChest,
                 sellValue: sellValue,
-                gemReward: gemReward
+                gemReward: gemReward,
+                color: oreColor // Store color for display
               };
               state.mining.lastBlockInfo = currentBlockInfo; // Update last known block
             }
@@ -1881,6 +2703,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
               // Update ALL content FIRST before showing (prevents flicker when switching ores quickly)
               // This ensures the UI never disappears - it just updates content instantly
               blockHealthBarNameEl.textContent = displayInfo.name;
+              // Apply ore color if available (for ores, not chests)
+              if (!displayInfo.isChest && displayInfo.color) {
+                blockHealthBarNameEl.style.color = displayInfo.color;
+              } else {
+                // Use white for chests or if no color available
+                blockHealthBarNameEl.style.color = '#fff';
+              }
               blockHealthBarTextEl.textContent = `${Math.floor(displayInfo.blockHP).toLocaleString()}/${Math.floor(displayInfo.maxHP).toLocaleString()} HP`;
               
               // Calculate fill percentage
@@ -1970,11 +2799,37 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             }
           }
           break;
+        case 'MINING_DEPTH_COUNTER':
+          // Update mining depth counter display
+          if (miningDepthCounterTextEl) {
+            const depth = data.depth ?? 0;
+            miningDepthCounterTextEl.textContent = `Depth: ${depth}`;
+          }
+          break;
         case 'AUTO_MINE_STATE':
           updateAutoMineButton(data.enabled ?? false);
           break;
         case 'AUTO_TRAIN_STATE':
           updateAutoTrainButton(data.enabled ?? false);
+          break;
+        case 'MINER_SHOP_DATA':
+          updateMinerModal(data);
+          break;
+        case 'MINER_PURCHASED':
+          if (data.success) {
+            state.gold = data.remainingGold ?? state.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+            // Refresh miner shop data
+            hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+          }
+          break;
+        case 'MINER_EQUIPPED':
+          if (data.success) {
+            // Refresh miner shop data and update the detail panel
+            hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+            // Also re-render details to update button state
+            renderMinerDetails();
+          }
           break;
         case 'PICKAXE_SHOP_DATA':
           console.log('[UI] Pickaxe shop data received');
@@ -2076,6 +2931,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
   <!-- Left-side action buttons -->
   <div class="left-actions">
+    <button id="miner-button" class="action-card action-card--miner">
+      <span class="action-card__icon">⛑️</span>
+    </button>
     <button id="pickaxe-button" class="action-card action-card--pickaxe">
       <span class="action-card__icon">⛏️</span>
     </button>
@@ -2083,6 +2941,34 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       <span class="action-card__icon">🔁</span>
       <span class="action-card__badge" id="rebirth-badge" hidden>!</span>
     </button>
+    <button id="pets-button" class="action-card action-card--pets">
+      <span class="action-card__icon">🐾</span>
+    </button>
+  </div>
+
+  <!-- Miner Shop Modal -->
+  <div id="miner-modal" class="modal pickaxe-modal miner-modal">
+    <div class="pickaxe-modal__container">
+      <div class="pickaxe-modal__header">
+        <div class="pickaxe-modal__title">Miners</div>
+        <button class="pickaxe-modal__close" data-close="miner-modal">×</button>
+      </div>
+      <div class="pickaxe-modal__body">
+        <!-- Left Panel: Equipped Miner Details -->
+        <div class="pickaxe-modal__left-panel">
+          <div class="pickaxe-details">
+            <div class="pickaxe-details__icon" id="miner-detail-icon">⛑️</div>
+            <div class="pickaxe-details__name" id="miner-detail-name">No Miner</div>
+            <div class="pickaxe-details__stats" id="miner-detail-stats"></div>
+            <div class="pickaxe-details__badge" id="miner-detail-badge">None Equipped</div>
+          </div>
+        </div>
+        <!-- Right Panel: Miner Grid -->
+        <div class="pickaxe-modal__right-panel">
+          <div class="pickaxe-grid" id="miner-grid"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Pickaxe Shop Modal -->
@@ -2131,6 +3017,99 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     </div>
   </div>
 
+  <!-- Egg Station Modal -->
+  <div id="egg-modal" class="modal pickaxe-modal egg-modal">
+    <div class="pickaxe-modal__container">
+      <div class="pickaxe-modal__header">
+        <div class="pickaxe-modal__title" id="egg-modal-title">Egg Station</div>
+        <button class="pickaxe-modal__close" data-close="egg-modal">×</button>
+      </div>
+      <div class="pickaxe-modal__body">
+        <div class="pickaxe-modal__left-panel">
+          <div class="pickaxe-details">
+            <div class="pickaxe-details__icon">🥚</div>
+            <div class="pickaxe-details__name" id="egg-station-name">Egg Station</div>
+            <div class="pickaxe-details__stats" id="egg-station-stats">
+              <div>Cost: <span id="egg-station-cost">0</span> gold</div>
+              <div>Your gold: <span id="egg-station-gold">0</span></div>
+              <div>Pets: <span id="egg-station-inv">0/50</span></div>
+            </div>
+            <div class="pickaxe-details__badge" id="egg-station-status">Ready</div>
+          </div>
+        </div>
+        <div class="pickaxe-modal__right-panel">
+          <div class="egg-actions">
+            <button id="egg-open-1" class="rebirth-button">Open 1</button>
+            <button id="egg-open-3" class="rebirth-button">Open 3</button>
+            <button id="egg-auto" class="rebirth-button rebirth-button--max">Auto</button>
+          </div>
+          <div class="egg-results">
+            <div class="egg-results__title">Last Hatch</div>
+            <div id="egg-results-list" class="egg-results__list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pets Modal -->
+  <div id="pets-modal" class="modal pickaxe-modal pets-modal">
+    <div class="pickaxe-modal__container">
+      <div class="pickaxe-modal__header">
+        <div class="pickaxe-modal__title">Pets</div>
+        <button class="pickaxe-modal__close" data-close="pets-modal">×</button>
+      </div>
+      <div class="pickaxe-modal__body">
+        <div class="pets-topbar">
+          <div class="pets-topbar__left">
+            <div class="pets-pill">
+              <span class="pets-pill__icon">📦</span>
+              <span id="pets-owned-count">0/50</span>
+            </div>
+            <div class="pets-pill">
+              <span class="pets-pill__icon">🐾</span>
+              <span id="pets-equipped-count">0/8</span>
+            </div>
+          </div>
+          <div class="pets-topbar__right">
+            <span class="pets-mult">x<span id="pets-multiplier-sum">1</span></span>
+          </div>
+        </div>
+
+        <div class="pets-content">
+          <div id="pets-grid" class="pets-grid"></div>
+
+          <!-- Side detail panel (opens when a pet is selected) -->
+          <div id="pet-detail-panel" class="pet-detail" hidden>
+            <button id="pet-detail-close" class="pet-detail__close">×</button>
+            <div id="pet-detail-name" class="pet-detail__name">Pet</div>
+            <div class="pet-detail__card">
+              <div id="pet-detail-image" class="pet-detail__image">🐾</div>
+              <div id="pet-detail-mult" class="pet-detail__mult">0</div>
+            </div>
+            <div id="pet-detail-rarity" class="pet-detail__rarity"></div>
+            <button id="pet-detail-action" class="pet-detail__action pet-detail__action--equip">Equip</button>
+          </div>
+        </div>
+
+        <div class="pets-footer">
+          <button id="pets-equip-best" class="pets-footer__btn pets-footer__btn--green">Equip Best</button>
+          <button id="pets-unequip-all" class="pets-footer__btn pets-footer__btn--red">Unequip All</button>
+          <button id="pets-trash-toggle" class="pets-footer__icon" title="Delete pets">🗑️</button>
+        </div>
+
+        <!-- Delete confirmation bar (appears in delete mode) -->
+        <div id="pets-delete-bar" class="pets-delete-bar" hidden>
+          <div id="pets-delete-text" class="pets-delete-bar__text">Delete 0 Pets!</div>
+          <div class="pets-delete-bar__actions">
+            <button id="pets-delete-confirm" class="pets-delete-bar__btn pets-delete-bar__btn--green">Confirm</button>
+            <button id="pets-delete-cancel" class="pets-delete-bar__btn pets-delete-bar__btn--red">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="training-prompt" class="training-prompt">
     <div id="training-prompt-key" class="training-prompt__key">E</div>
     <div class="training-prompt__copy">
@@ -2144,6 +3123,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   <!-- Mine Reset Timer (Top Center) -->
   <div id="mine-reset-timer" class="mine-reset-timer">
     <div id="mine-reset-timer-text" class="mine-reset-timer__text">Mines will reset in: 02:00</div>
+    <div id="mining-depth-counter" class="mining-depth-counter">
+      <div id="mining-depth-counter-text" class="mining-depth-counter__text">Depth: 0</div>
+    </div>
   </div>
 
   <!-- Mining Target Display (Bottom Center, Above Progress Bar) -->
@@ -2462,6 +3444,509 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     font-size: 14px;
     font-weight: 800;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Pets action button accent */
+  .action-card--pets {
+    border-color: #2d6a4f;
+    background: linear-gradient(180deg, rgba(45, 106, 79, 0.95), rgba(26, 77, 56, 0.98));
+  }
+
+  /* Egg + Pets UI helpers (use existing modal styles as the base) */
+  .egg-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .egg-results__title {
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 8px;
+  }
+
+  .egg-results__list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .egg-result-item {
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .egg-result-item__name {
+    font-weight: 800;
+  }
+
+  .egg-result-item__mult {
+    color: #ffd700;
+    font-weight: 900;
+  }
+
+  .pets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+    max-height: 420px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .pet-row {
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.92);
+    gap: 10px;
+  }
+
+  .pet-row__left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pet-row__name {
+    font-weight: 900;
+  }
+
+  .pet-row__meta {
+    opacity: 0.85;
+    font-size: 13px;
+  }
+
+  .pet-row__btn {
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    font-weight: 900;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+
+  .pet-row__btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Pets grid UI (reference-style) */
+  .pets-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 12px;
+  }
+
+  .pets-topbar__left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .pets-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    border: 3px solid rgba(0, 0, 0, 0.25);
+    background: rgba(20, 40, 70, 0.35);
+    color: #fff;
+    font-weight: 900;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .pets-pill__icon {
+    font-size: 18px;
+  }
+
+  .pets-mult {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 16px;
+    border: 3px solid rgba(0, 0, 0, 0.25);
+    background: rgba(20, 40, 70, 0.35);
+    color: #ffcc00;
+    font-weight: 900;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+    font-size: 20px;
+  }
+
+  .pets-content {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-height: 0; /* allow children to scroll */
+  }
+
+  .pets-grid {
+    display: grid;
+    /* Big tiles like the reference: auto-fit keeps it responsive without squishing */
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 4px solid rgba(0, 0, 0, 0.25);
+    background: rgba(10, 20, 40, 0.18);
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .pet-detail {
+    width: 360px;
+    flex: 0 0 360px;
+    border-radius: 18px;
+    border: 4px solid rgba(0, 0, 0, 0.25);
+    background: rgba(20, 40, 70, 0.35);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pet-detail__close {
+    align-self: flex-start;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    border: 4px solid rgba(0, 0, 0, 0.35);
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    color: #fff;
+    font-weight: 1000;
+    font-size: 28px;
+    cursor: pointer;
+  }
+
+  .pet-detail__name {
+    font-size: 30px;
+    font-weight: 1000;
+    color: #fff;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+    text-align: center;
+  }
+
+  .pet-detail__card {
+    width: 240px;
+    height: 240px;
+    border-radius: 18px;
+    border: 5px solid rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pet-detail__image {
+    width: 82%;
+    height: 82%;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 44px;
+    color: #fff;
+  }
+
+  .pet-detail__img-el {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .pet-detail__mult {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-weight: 1000;
+    font-size: 26px;
+    border: 3px solid rgba(255, 255, 255, 0.35);
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .pet-detail__rarity {
+    font-size: 28px;
+    font-weight: 1000;
+    color: #ff4dff;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .pet-detail__action {
+    width: 100%;
+    border-radius: 16px;
+    border: 5px solid rgba(0, 0, 0, 0.35);
+    padding: 16px 18px;
+    font-weight: 1100;
+    font-size: 24px;
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .pet-detail__action--equip {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+  }
+
+  .pet-detail__action--unequip {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+  }
+
+  .pet-tile {
+    aspect-ratio: 1 / 1;
+    border-radius: 18px;
+    border: 5px solid rgba(0, 0, 0, 0.65);
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  }
+
+  .pet-tile--common { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+  .pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); }
+  .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); }
+  .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+
+  .pet-tile--equipped {
+    outline: 4px solid rgba(255, 255, 255, 0.85);
+    outline-offset: -6px;
+  }
+
+  .pet-tile__img {
+    width: 84%;
+    height: 84%;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+  }
+
+  .pet-tile__img-el {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: auto;
+    display: block;
+  }
+
+  .pet-tile__mult {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-weight: 900;
+    font-size: 22px;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+    border: 3px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .pets-footer {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  .pets-footer__btn {
+    border-radius: 14px;
+    border: 4px solid rgba(0, 0, 0, 0.35);
+    padding: 12px 18px;
+    font-weight: 1000;
+    font-size: 18px;
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+    min-width: 240px;
+  }
+
+  /* Make Pets modal match the roomy "Frontiers" style panel */
+  .pets-modal .pickaxe-modal__container {
+    width: min(1180px, 94vw);
+    height: min(780px, 86vh);
+    max-height: 86vh;
+  }
+
+  .pets-modal .pickaxe-modal__header {
+    justify-content: center;
+    position: relative;
+    padding: 18px 18px;
+  }
+
+  .pets-modal .pickaxe-modal__title {
+    font-size: 44px;
+    letter-spacing: 1px;
+  }
+
+  .pets-modal .pickaxe-modal__close {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    font-size: 34px;
+  }
+
+  .pets-modal .pickaxe-modal__body {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 68px);
+    padding: 16px 18px 18px;
+    gap: 12px;
+  }
+
+  .pets-topbar {
+    margin-bottom: 0;
+  }
+
+  /* Scrollbar similar to the reference */
+  .pets-grid::-webkit-scrollbar {
+    width: 12px;
+  }
+  .pets-grid::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    border: 3px solid rgba(0, 0, 0, 0.25);
+  }
+  .pets-grid::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+  }
+
+  .pets-footer__btn--green {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+  }
+
+  .pets-footer__btn--red {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+  }
+
+  .pets-footer__icon {
+    width: 72px;
+    height: 56px;
+    border-radius: 14px;
+    border: 4px solid rgba(0, 0, 0, 0.35);
+    background: rgba(20, 40, 70, 0.35);
+    cursor: pointer;
+    font-size: 26px;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .pets-delete-bar {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    width: min(520px, 92%);
+    border-radius: 18px;
+    border: 4px solid rgba(0, 0, 0, 0.35);
+    background: rgba(20, 40, 70, 0.55);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 5;
+  }
+
+  /* Ensure HTML `hidden` attribute always wins (prevents showing until delete mode). */
+  .pets-delete-bar[hidden] {
+    display: none !important;
+  }
+
+  .pets-delete-bar__text {
+    font-size: 24px;
+    font-weight: 1100;
+    color: #fff;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+    text-align: center;
+  }
+
+  .pets-delete-bar__actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .pets-delete-bar__btn {
+    border-radius: 16px;
+    border: 5px solid rgba(0, 0, 0, 0.35);
+    padding: 14px 18px;
+    font-weight: 1100;
+    font-size: 20px;
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+    min-width: 170px;
+  }
+
+  .pets-delete-bar__btn--green {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+  }
+
+  .pets-delete-bar__btn--red {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+  }
+
+  .pets-delete-bar__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+  }
+
+  .pet-tile__delete-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+    font-weight: 1100;
+    color: rgba(255, 0, 0, 0.9);
+    text-shadow:
+      0 6px 0 rgba(0, 0, 0, 0.55),
+      -3px -3px 0 rgba(0, 0, 0, 0.55),
+      3px -3px 0 rgba(0, 0, 0, 0.55),
+      -3px 3px 0 rgba(0, 0, 0, 0.55),
+      3px 3px 0 rgba(0, 0, 0, 0.55);
+    pointer-events: none;
   }
 
   /* Modals */
@@ -2884,6 +4369,34 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     margin-top: 4px;
   }
 
+  .pickaxe-details__action-button {
+    width: 100%;
+    padding: 12px 20px;
+    margin-top: 16px;
+    border-radius: 8px;
+    border: 2px solid #4caf50;
+    background: linear-gradient(180deg, #66bb6a, #2e7d32);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .pickaxe-details__action-button:hover:not(.disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+  }
+
+  .pickaxe-details__action-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
   .pickaxe-actions {
     margin: 12px 0;
     display: flex;
@@ -3301,6 +4814,63 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     margin-top: 2px;
   }
 
+  /* Scene UI: Egg labels (name + cost, like the reference image) */
+  .scene-egg-prompt {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0); /* floating text only */
+    color: #fff;
+    opacity: 1;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    transform: scale(0.9);
+    min-width: 140px;
+  }
+
+  .scene-egg-prompt:not(.visible) {
+    opacity: 0;
+  }
+
+  .scene-egg-prompt__icon {
+    display: none; /* egg model exists in-world; label should be text-only */
+  }
+
+  .scene-egg-prompt__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .scene-egg-prompt__title {
+    font-size: 28px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  .scene-egg-prompt__cost {
+    font-size: 20px;
+    font-weight: 900;
+    color: #ffcc00;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
 
   /* Mining HUD */
   .mining-hud {
@@ -3468,6 +5038,38 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       -2px 2px 0 #000,
       2px 2px 0 #000,
       0 0 10px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+  }
+
+  /* Mining Depth Counter */
+  .mining-depth-counter {
+    margin-top: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .mine-reset-timer.visible .mining-depth-counter {
+    opacity: 1;
+  }
+
+  .mining-depth-counter__text {
+    padding: 8px 20px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-shadow: 
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 0 10px rgba(0, 0, 0, 0.8);
+    text-align: center;
     white-space: nowrap;
   }
 

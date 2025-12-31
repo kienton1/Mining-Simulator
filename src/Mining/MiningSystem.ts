@@ -15,7 +15,8 @@ import { OreType, ORE_DATABASE } from './Ore/OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE } from '../Core/GameConstants';
+import { DebrisManager } from './DebrisManager';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL } from '../Core/GameConstants';
 
 /**
  * Mining block position key (x,y,z)
@@ -47,6 +48,9 @@ interface MiningState {
   /** Set of depths that have been generated */
   generatedDepths: Set<number>;
 
+  /** Deepest depth that has been generated (most negative) */
+  deepestGeneratedDepth: number;
+
   /** World-space offset applied to this player's personal mine */
   offset: { x: number; z: number };
 
@@ -70,7 +74,10 @@ export class MiningSystem {
   private firstBlockMined: Map<Player, boolean> = new Map();
   private onFirstBlockMinedCallback?: (player: Player) => void;
   private getPickaxeCallback?: (player: Player) => PickaxeData | undefined;
+  private getMinerOreLuckBonusCallback?: (player: Player) => number; // Returns percentage (e.g., 5 = +5%)
+  private getCombinedDamageMultiplierCallback?: (player: Player) => number; // Returns combined damage multiplier
   private oreGenerator: OreGenerator;
+  private debrisManager: DebrisManager;
   
   /** Mining block type ID (stone = 8) */
   private readonly MINING_BLOCK_TYPE_ID = 8;
@@ -98,6 +105,7 @@ export class MiningSystem {
   constructor(world: World) {
     this.world = world;
     this.oreGenerator = new OreGenerator();
+    this.debrisManager = new DebrisManager(world);
   }
 
   /**
@@ -125,6 +133,17 @@ export class MiningSystem {
    */
   setGetPickaxeCallback(callback: (player: Player) => PickaxeData | undefined): void {
     this.getPickaxeCallback = callback;
+  }
+
+  setGetMinerOreLuckBonusCallback(callback: (player: Player) => number): void {
+    this.getMinerOreLuckBonusCallback = callback;
+  }
+
+  /**
+   * Sets callback to get combined damage multiplier (for chest HP initialization)
+   */
+  setGetCombinedDamageMultiplierCallback(callback: (player: Player) => number): void {
+    this.getCombinedDamageMultiplierCallback = callback;
   }
 
   /**
@@ -252,10 +271,8 @@ export class MiningSystem {
     };
 
     // Get player's current depth (floor of Y position)
-    // Depth is negative as you go down, so we convert to positive for ore generation
     const playerDepth = Math.floor(playerEntity.position.y);
     const hitDepth = resolvedBlockCoordinate.y;
-    const absoluteDepth = Math.abs(hitDepth); // Convert to positive depth for ore generation
     
     // Check if block is within the mining area bounds (X and Z)
     // Only blocks in the mining area can take damage
@@ -273,18 +290,28 @@ export class MiningSystem {
     }
     
     // Check if player is mining the level they're standing on
-    // Player should only be able to mine the block at their current depth
-    const isMiningCurrentLevel = hitDepth === state.currentDepth;
+    // Player should only be able to mine blocks within their current mine level (3 blocks tall)
+    const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
+    const isMiningCurrentLevel = this.isYCoordinateInMineLevel(hitDepth, currentMineLevel);
     
     if (!isMiningCurrentLevel) {
-      // Can't mine blocks that aren't at current depth
+      // Can't mine blocks that aren't in the current mine level
       state.currentTargetBlock = null;
       return;
     }
 
-    // Check if this depth has a chest or a normal ore block
-    const chestKey = `chest_level_${hitDepth}`;
-    const miningAreaKey = `mining_area_level_${hitDepth}`;
+    // Generate blocks ahead of player if needed (keep 20 levels ahead)
+    // Note: pickaxe is already available from handleMiningClick parameters, but we get it again to ensure we have current luck
+    const currentPickaxe = this.getPlayerPickaxe(player);
+    if (currentPickaxe) {
+      this.ensureLevelsAheadOfPlayer(player, state, currentPickaxe);
+    }
+
+    // Check if this mine level has a chest or a normal ore block
+    // Use mine level for the key so all 3 Y coordinates share the same block
+    const hitMineLevel = this.yCoordinateToMineLevel(hitDepth);
+    const chestKey = `chest_level_${hitMineLevel}`;
+    const miningAreaKey = `mining_area_level_${hitMineLevel}`;
     
     const chest = state.chestMap.get(chestKey);
     
@@ -336,35 +363,55 @@ export class MiningSystem {
           this.onChestBrokenCallback(player, gemsReward);
         }
         
+        // Spawn debris particles for chest break (use neutral brown color)
+        const levelYCoords = this.getYCoordinatesForMineLevel(hitMineLevel);
+        const middleY = levelYCoords[1]; // Middle Y coordinate of the 3-block level
+        const mineBounds = this.getMineBounds(player);
+        const areaBounds = {
+          minX: mineBounds.minX,
+          maxX: mineBounds.maxX,
+          minZ: mineBounds.minZ,
+          maxZ: mineBounds.maxZ,
+          y: middleY + 0.5, // Center of the middle block
+        };
+        // Use stone ore type for neutral brown debris color (or could use a custom chest color)
+        this.debrisManager.spawnDebris(OreType.STONE, areaBounds, 20);
+        
         // Remove chest from map
         state.chestMap.delete(chestKey);
         state.currentTargetBlock = null;
         
-        // Remove all chest blocks in the mining area at this depth from the world
+        // Remove all chest blocks in the mining area at all 3 Y coordinates of this mine level from the world
         let removedCount = 0;
-        for (const basePosition of MINING_AREA_POSITIONS) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: hitDepth,
-            z: basePosition.z + state.offset.z,
-          };
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, 0);
-            removedCount++;
-          } catch (error) {
+        for (const yCoord of levelYCoords) {
+          for (const basePosition of MINING_AREA_POSITIONS) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: yCoord,
+              z: basePosition.z + state.offset.z,
+            };
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, 0);
+              removedCount++;
+            } catch (error) {
 
+            }
           }
         }
 
-        // Player falls down to next level (chests count as depth progression)
-        const nextDepth = hitDepth - 1;
-        state.currentDepth = nextDepth;
+        // Player falls down to next mine level (drop 3 Y levels)
+        const nextMineLevel = hitMineLevel + 1;
+        const nextTopY = this.mineLevelToTopY(nextMineLevel);
+        state.currentDepth = nextTopY;
         
-        // Teleport player down one level
+        // Generate blocks ahead of player if needed (keep 20 levels ahead)
+        this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
+        
+        // Teleport player down to next mine level (position on top of the 3-block level)
         const center = this.getMineCenter(player);
         const newPosition = {
           x: center.x,
-          y: nextDepth + 1, // Position player on top of next level
+          y: nextTopY + 1, // Position player on top of next level
           z: center.z,
         };
         
@@ -383,13 +430,13 @@ export class MiningSystem {
     }
     
     // Normal ore block mining (existing logic)
-    // Get shared block for entire mining area at this depth
+    // Get shared block for entire mining area at this mine level
     // All levels are pre-generated, so this should always exist
     let block = state.blockMap.get(miningAreaKey);
     if (!block) {
       // Fallback: regenerate this level if somehow missing (shouldn't happen)
-
-      const oreType = this.generateOreType(pickaxe, absoluteDepth);
+      const absoluteDepth = hitMineLevel + 1; // Mine level + 1 for ore generation (1-based)
+      const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
       const oreHP = this.calculateOreHP(oreType, absoluteDepth);
       block = new MineBlock(oreType, oreHP);
       state.blockMap.set(miningAreaKey, block);
@@ -432,36 +479,55 @@ export class MiningSystem {
       // Add to inventory
       onOreMined(player, minedOre, minedAmount);
       
+      // Spawn debris particles across the entire 7x7 mining area
+      const levelYCoords = this.getYCoordinatesForMineLevel(hitMineLevel);
+      const middleY = levelYCoords[1]; // Middle Y coordinate of the 3-block level
+      const mineBounds = this.getMineBounds(player);
+      const areaBounds = {
+        minX: mineBounds.minX,
+        maxX: mineBounds.maxX,
+        minZ: mineBounds.minZ,
+        maxZ: mineBounds.maxZ,
+        y: middleY + 0.5, // Center of the middle block
+      };
+      this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
+      
       // Remove shared block from map
       state.blockMap.delete(miningAreaKey);
       state.currentTargetBlock = null;
       
-      // Remove all blocks in the mining area at this depth from the world
-      // All blocks break at the same time
+      // Remove all blocks in the mining area at all 3 Y coordinates of this mine level from the world
+      // All blocks break at the same time (all 3 layers)
       let removedCount = 0;
-      for (const basePosition of MINING_AREA_POSITIONS) {
-        const blockPosition = {
-          x: basePosition.x + state.offset.x,
-          y: hitDepth,
-          z: basePosition.z + state.offset.z,
-        };
-        try {
-          this.world.chunkLattice.setBlock(blockPosition, 0);
-          removedCount++;
-        } catch (error) {
+      for (const yCoord of levelYCoords) {
+        for (const basePosition of MINING_AREA_POSITIONS) {
+          const blockPosition = {
+            x: basePosition.x + state.offset.x,
+            y: yCoord,
+            z: basePosition.z + state.offset.z,
+          };
+          try {
+            this.world.chunkLattice.setBlock(blockPosition, 0);
+            removedCount++;
+          } catch (error) {
 
+          }
         }
       }
 
-      // Player falls down to next level
-      const nextDepth = hitDepth - 1;
-      state.currentDepth = nextDepth;
+      // Player falls down to next mine level (drop 3 Y levels)
+      const nextMineLevel = hitMineLevel + 1;
+      const nextTopY = this.mineLevelToTopY(nextMineLevel);
+      state.currentDepth = nextTopY;
       
-      // Teleport player down one level
+      // Generate blocks ahead of player if needed (keep 20 levels ahead)
+      this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
+      
+      // Teleport player down to next mine level (position on top of the 3-block level)
       const center = this.getMineCenter(player);
       const newPosition = {
         x: center.x,
-        y: nextDepth + 1, // Position player on top of next level
+        y: nextTopY + 1, // Position player on top of next level
         z: center.z,
       };
       
@@ -580,6 +646,20 @@ export class MiningSystem {
   }
 
   /**
+   * Gets the current mine level (0-based) for a player
+   * 
+   * @param player - Player to get mine level for
+   * @returns Current mine level (0, 1, 2, ...) or 0 if not in mine
+   */
+  getCurrentMineLevel(player: Player): number {
+    const state = this.miningStates.get(player);
+    if (!state) {
+      return 0;
+    }
+    return this.yCoordinateToMineLevel(state.currentDepth);
+  }
+
+  /**
    * Returns the world-space center of the player's mine (with offset applied)
    */
   getMineCenter(player: Player): { x: number; z: number } {
@@ -627,36 +707,42 @@ export class MiningSystem {
     const startTime = Date.now();
 
     // Clear all mining blocks (walls stay permanent)
-    // Clear from level 0 down to -999 (1000 levels)
-    for (let depth = 0; depth >= -999; depth--) {
-      for (const basePosition of MINING_AREA_POSITIONS) {
-        const blockPosition = {
-          x: basePosition.x + state.offset.x,
-          y: depth,
-          z: basePosition.z + state.offset.z,
-        };
-        try {
-          this.world.chunkLattice.setBlock(blockPosition, 0); // Set to air
-        } catch (error) {
-          // Silently fail
+    // Clear from mine level 0 down to level 333 (334 mine levels, approximately 1000 Y coordinates)
+    const maxMineLevelToClear = 333;
+    for (let mineLevel = 0; mineLevel <= maxMineLevelToClear; mineLevel++) {
+      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
+      for (const yCoord of levelYCoords) {
+        for (const basePosition of MINING_AREA_POSITIONS) {
+          const blockPosition = {
+            x: basePosition.x + state.offset.x,
+            y: yCoord,
+            z: basePosition.z + state.offset.z,
+          };
+          try {
+            this.world.chunkLattice.setBlock(blockPosition, 0); // Set to air
+          } catch (error) {
+            // Silently fail
+          }
         }
       }
     }
 
     // Reset state
     state.blockMap.clear();
+    state.chestMap.clear();
     state.generatedDepths.clear();
     state.currentDepth = MINE_DEPTH_START;
+    state.deepestGeneratedDepth = MINE_DEPTH_START;
     state.currentTargetBlock = null;
     // DON'T reset ceilingBuilt or bottomFloorDepth - walls stay permanent
 
     // Reset first block mined flag (so timer can start again on next entry)
     this.firstBlockMined.delete(player);
 
-    // Regenerate all 1000 levels with new ores (walls stay permanent)
+    // Regenerate initial 20 levels with new ores (will generate more ahead as player mines)
     const pickaxe = this.getPlayerPickaxe(player);
     if (pickaxe) {
-      this.generateAllMiningLevels(player, state, pickaxe, false); // false = don't regenerate walls
+      this.generateInitialMiningLevels(player, state, pickaxe);
     }
 
     const elapsed = Date.now() - startTime;
@@ -711,11 +797,11 @@ export class MiningSystem {
       return null;
     }
 
-    // Always check the block at currentDepth (the level the player is currently mining)
+    // Always check the block at currentDepth (the mine level the player is currently mining)
     // This shows the block the player will mine next, regardless of where they're standing
-    const checkDepth = state.currentDepth;
-    const chestKey = `chest_level_${checkDepth}`;
-    const miningAreaKey = `mining_area_level_${checkDepth}`;
+    const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
+    const chestKey = `chest_level_${currentMineLevel}`;
+    const miningAreaKey = `mining_area_level_${currentMineLevel}`;
     
     const chest = state.chestMap.get(chestKey);
     
@@ -725,7 +811,10 @@ export class MiningSystem {
       // Check if maxHP is 0 (indicates HP hasn't been initialized yet)
       if (chest.maxHP === 0) {
         const baseDamage = calculateMiningDamage(playerData.power);
-        chest.initializeHP(baseDamage);
+        // Get combined damage multiplier (includes More Damage upgrade and miner damage bonus)
+        const damageMultiplier = this.getCombinedDamageMultiplierCallback?.(player) ?? 1.0;
+        const finalDamage = baseDamage * damageMultiplier;
+        chest.initializeHP(finalDamage);
       }
       
       const chestTypeName = chest.chestType === ChestType.BASIC ? 'Basic Chest' : 'Golden Chest';
@@ -745,7 +834,7 @@ export class MiningSystem {
       // Block not in map - might have been deleted or not generated yet
       // Try to get or create it (similar to handleMiningClick logic)
       const absoluteDepth = Math.abs(checkDepth);
-      const oreType = this.generateOreType(pickaxe, absoluteDepth);
+      const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
       const oreHP = this.calculateOreHP(oreType, absoluteDepth);
       block = new MineBlock(oreType, oreHP);
       state.blockMap.set(miningAreaKey, block);
@@ -784,11 +873,12 @@ export class MiningSystem {
         state.chestMap.clear();
         state.generatedDepths.clear();
         state.currentDepth = MINE_DEPTH_START;
+        state.deepestGeneratedDepth = MINE_DEPTH_START;
         state.offset = newOffset;
         state.ceilingBuilt = false;
         state.bottomFloorDepth = null;
-        // Regenerate all levels with new offset
-        this.generateAllMiningLevels(player, state, pickaxe);
+        // Regenerate initial 20 levels with new offset (will generate more ahead as player mines)
+        this.generateInitialMiningLevels(player, state, pickaxe);
       }
       return state;
     }
@@ -801,14 +891,15 @@ export class MiningSystem {
       lastHitTime: 0,
       currentDepth: MINE_DEPTH_START,
       generatedDepths: new Set(),
+      deepestGeneratedDepth: MINE_DEPTH_START, // Start at depth 0, will generate down from here
       offset,
       ceilingBuilt: false,
       bottomFloorDepth: null,
     };
     this.miningStates.set(player, state);
 
-    // Generate ALL 1000 levels at once
-    this.generateAllMiningLevels(player, state, pickaxe);
+    // Generate initial 20 levels (will generate more ahead as player mines)
+    this.generateInitialMiningLevels(player, state, pickaxe);
     
     return state;
   }
@@ -849,6 +940,62 @@ export class MiningSystem {
   }
 
   /**
+   * Converts a Y coordinate to a mine level number
+   * Mine level 0 = Y: 0, -1, -2
+   * Mine level 1 = Y: -3, -4, -5
+   * Mine level 2 = Y: -6, -7, -8
+   * etc.
+   * 
+   * @param yCoordinate - Y coordinate (can be positive or negative)
+   * @returns Mine level number (0, 1, 2, ...)
+   */
+  private yCoordinateToMineLevel(yCoordinate: number): number {
+    // For positive Y, mine level is 0
+    if (yCoordinate >= 0) {
+      return 0;
+    }
+    // For negative Y, divide by BLOCKS_PER_MINE_LEVEL and floor
+    return Math.floor(Math.abs(yCoordinate) / BLOCKS_PER_MINE_LEVEL);
+  }
+
+  /**
+   * Converts a mine level number to the top Y coordinate of that level
+   * Mine level 0 -> Y: 0
+   * Mine level 1 -> Y: -3
+   * Mine level 2 -> Y: -6
+   * etc.
+   * 
+   * @param mineLevel - Mine level number (0, 1, 2, ...)
+   * @returns Top Y coordinate of that mine level
+   */
+  private mineLevelToTopY(mineLevel: number): number {
+    return -mineLevel * BLOCKS_PER_MINE_LEVEL;
+  }
+
+  /**
+   * Gets all Y coordinates for a given mine level
+   * 
+   * @param mineLevel - Mine level number (0, 1, 2, ...)
+   * @returns Array of Y coordinates [topY, topY-1, topY-2]
+   */
+  private getYCoordinatesForMineLevel(mineLevel: number): number[] {
+    const topY = this.mineLevelToTopY(mineLevel);
+    return [topY, topY - 1, topY - 2];
+  }
+
+  /**
+   * Checks if a Y coordinate is within a specific mine level
+   * 
+   * @param yCoordinate - Y coordinate to check
+   * @param mineLevel - Mine level to check against
+   * @returns True if Y coordinate is within the mine level's 3-block range
+   */
+  private isYCoordinateInMineLevel(yCoordinate: number, mineLevel: number): boolean {
+    const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
+    return levelYCoords.includes(yCoordinate);
+  }
+
+  /**
    * Generates an ore type based on depth and luck using the NEW LINEAR SCALING SYSTEM
    * 
    * Uses OreGenerator which:
@@ -861,8 +1008,17 @@ export class MiningSystem {
    * @param depth - Current mining depth (positive value, increases as you go deeper)
    * @returns Randomly selected ore type based on depth and luck
    */
-  private generateOreType(pickaxe: PickaxeData, depth: number): OreType {
-    const luck = pickaxe.luckBonus; // Luck is already 0.0-1.0 format
+  private generateOreType(pickaxe: PickaxeData, depth: number, player?: Player): OreType {
+    // Get pickaxe luck bonus (stored as decimal, e.g., 0.05 = +5%)
+    const pickaxeLuckDecimal = pickaxe.luckBonus;
+    
+    // Get miner ore luck bonus percentage (e.g., 5 = +5%)
+    const minerOreLuckBonus = player ? (this.getMinerOreLuckBonusCallback?.(player) ?? 0) : 0;
+    
+    // Convert both to percentages, add them together, then convert back to decimal
+    const pickaxeLuckPercent = pickaxeLuckDecimal * 100; // e.g., 0.05 -> 5%
+    const totalLuckPercent = pickaxeLuckPercent + minerOreLuckBonus; // Add percentages
+    const luck = totalLuckPercent / 100; // Convert back to decimal (0.0-1.0 format)
     
     // Convert depth to positive value (depth increases as you go deeper)
     const absoluteDepth = Math.abs(depth);
@@ -890,113 +1046,237 @@ export class MiningSystem {
   }
 
   /**
-   * Generates all 1000 mining levels at once when player enters their mine
-   * NEW SYSTEM: Pre-generates everything instead of on-the-fly generation
+   * Generates the initial 20 mine levels for a player
+   * Each mine level is 3 blocks tall (7x3x7)
+   * Called when player first logs in or mine is reset
    * 
    * @param player - Player who owns this mining state
    * @param state - Player's mining state
-   * @param pickaxe - Player's pickaxe (for ore generation)
-   * @param generateWalls - Whether to generate walls (false on reset since walls are permanent)
+   * @param pickaxe - Player's pickaxe (for ore generation with current luck)
    */
-  private generateAllMiningLevels(
+  private generateInitialMiningLevels(
     player: Player,
     state: MiningState,
-    pickaxe: PickaxeData,
-    generateWalls: boolean = true
+    pickaxe: PickaxeData
   ): void {
-
-    const startTime = Date.now();
-
-    // Build overhead ceiling once (only if generating walls)
-    if (generateWalls && !state.ceilingBuilt) {
+    // Build overhead ceiling once
+    if (!state.ceilingBuilt) {
       this.buildMineCeiling(state);
       state.ceilingBuilt = true;
     }
 
-    // Generate all 1000 levels (depth 0 to -999)
-    for (let i = 0; i < 1000; i++) {
-      const depth = MINE_DEPTH_START - i; // 0, -1, -2, ..., -999
-      const absoluteDepth = i + 1; // 1, 2, 3, ..., 1000 (for ore generation)
+    // Generate first 20 mine levels (level 0 to 19)
+    // Each mine level is 3 blocks tall
+    const levelsToGenerate = 20;
+    for (let mineLevel = 0; mineLevel < levelsToGenerate; mineLevel++) {
+      const topY = this.mineLevelToTopY(mineLevel); // Top Y coordinate of this mine level
+      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel); // All 3 Y coordinates
+      const absoluteDepth = mineLevel + 1; // 1, 2, 3, ..., 20 (for ore generation)
       
-      // Mark depth as generated
-      state.generatedDepths.add(depth);
+      // Mark all 3 Y coordinates as generated
+      for (const yCoord of levelYCoords) {
+        state.generatedDepths.add(yCoord);
+      }
       
-      // Check if a chest should spawn at this depth (probabilistic, chance-based)
+      // Check if a chest should spawn at this mine level (probabilistic, chance-based)
       const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
       
       if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
         // Spawn a chest instead of an ore block
         const chestType = chestSpawnResult.chestType;
-        const chestKey = `chest_level_${depth}`;
+        const chestKey = `chest_level_${mineLevel}`;
         
         // Create chest - HP will be initialized on first hit based on player's damage
         const chest = new ChestBlock(chestType);
         state.chestMap.set(chestKey, chest);
         
-        // Generate all blocks in the mining area at this depth as chest blocks
+        // Generate all blocks in the mining area at all 3 Y coordinates as chest blocks
         const chestBlockTypeId = chestType === ChestType.BASIC 
           ? this.BASIC_CHEST_BLOCK_TYPE_ID 
           : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
         
-        for (const basePosition of MINING_AREA_POSITIONS) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: depth,
-            z: basePosition.z + state.offset.z,
-          };
-          
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, chestBlockTypeId);
-          } catch (error) {
-            // Silently fail - chunk might not be loaded yet
+        for (const yCoord of levelYCoords) {
+          for (const basePosition of MINING_AREA_POSITIONS) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: yCoord,
+              z: basePosition.z + state.offset.z,
+            };
+            
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, chestBlockTypeId);
+            } catch (error) {
+              // Silently fail - chunk might not be loaded yet
+            }
           }
         }
       } else {
-        // Generate ore type for this level (normal block)
-        const oreType = this.generateOreType(pickaxe, absoluteDepth);
-        const miningAreaKey = `mining_area_level_${depth}`;
+        // Generate ore type for this mine level (normal block) - uses CURRENT luck at generation time
+        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+        const miningAreaKey = `mining_area_level_${mineLevel}`;
         
         // Calculate HP based on ore type and depth
         const oreHP = this.calculateOreHP(oreType, absoluteDepth);
         const block = new MineBlock(oreType, oreHP);
         state.blockMap.set(miningAreaKey, block);
         
-        // Generate all blocks in the mining area at this depth
-        for (const basePosition of MINING_AREA_POSITIONS) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: depth,
-            z: basePosition.z + state.offset.z,
-          };
-          
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, this.MINING_BLOCK_TYPE_ID);
-          } catch (error) {
-            // Silently fail - chunk might not be loaded yet
+        // Generate all blocks in the mining area at all 3 Y coordinates
+        for (const yCoord of levelYCoords) {
+          for (const basePosition of MINING_AREA_POSITIONS) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: yCoord,
+              z: basePosition.z + state.offset.z,
+            };
+            
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, this.MINING_BLOCK_TYPE_ID);
+            } catch (error) {
+              // Silently fail - chunk might not be loaded yet
+            }
           }
         }
       }
       
-      // Generate walls for this level (only on first generation)
-      if (generateWalls) {
-        this.generateMineShaftWalls(depth, state.offset);
+      // Generate walls for all 3 Y coordinates of this level
+      for (const yCoord of levelYCoords) {
+        this.generateMineShaftWalls(yCoord, state.offset);
       }
       
-      // Log progress every 100 levels
-      if ((i + 1) % 100 === 0) {
-
+      // Update deepest generated depth (bottom Y of this level)
+      const bottomY = levelYCoords[levelYCoords.length - 1];
+      if (bottomY < state.deepestGeneratedDepth) {
+        state.deepestGeneratedDepth = bottomY;
       }
     }
+    
+    // Generate initial bottom floor (10 blocks below deepest generated)
+    const bottomDepth = state.deepestGeneratedDepth - 10;
+    this.generateBottomFloor(bottomDepth, state.offset);
+    state.bottomFloorDepth = bottomDepth;
+  }
 
-    // Generate bottom floor at the very bottom (only on first generation)
-    if (generateWalls) {
-      const bottomDepth = MINE_DEPTH_START - 1000;
+  /**
+   * Ensures that there are at least 20 mine levels generated ahead of the player
+   * Called when player mines or falls deeper
+   * Each mine level is 3 blocks tall (7x3x7)
+   * 
+   * @param player - Player to generate ahead for
+   * @param state - Player's mining state
+   * @param pickaxe - Player's pickaxe (for ore generation with current luck)
+   */
+  private ensureLevelsAheadOfPlayer(
+    player: Player,
+    state: MiningState,
+    pickaxe: PickaxeData
+  ): void {
+    // Calculate target mine level (20 levels ahead of current)
+    const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
+    const targetMineLevel = currentMineLevel + 20;
+    const targetBottomY = this.mineLevelToTopY(targetMineLevel) - (BLOCKS_PER_MINE_LEVEL - 1);
+    
+    // If we've already generated to or beyond the target, no need to generate more
+    if (state.deepestGeneratedDepth <= targetBottomY) {
+      return;
+    }
+
+    // Calculate which mine levels we need to generate
+    const currentDeepestMineLevel = this.yCoordinateToMineLevel(state.deepestGeneratedDepth);
+    const startMineLevel = currentDeepestMineLevel + 1; // Next level to generate
+
+    for (let mineLevel = startMineLevel; mineLevel <= targetMineLevel; mineLevel++) {
+      const topY = this.mineLevelToTopY(mineLevel);
+      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
+      const absoluteDepth = mineLevel + 1; // For ore generation (1-based)
+      
+      // Check if this mine level was already generated (check if top Y is in generatedDepths)
+      if (state.generatedDepths.has(topY)) {
+        continue;
+      }
+      
+      // Mark all 3 Y coordinates as generated
+      for (const yCoord of levelYCoords) {
+        state.generatedDepths.add(yCoord);
+      }
+      
+      // Check if a chest should spawn at this mine level
+      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+      
+      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
+        // Spawn a chest instead of an ore block
+        const chestType = chestSpawnResult.chestType;
+        const chestKey = `chest_level_${mineLevel}`;
+        
+        // Create chest - HP will be initialized on first hit based on player's damage
+        const chest = new ChestBlock(chestType);
+        state.chestMap.set(chestKey, chest);
+        
+        // Generate all blocks in the mining area at all 3 Y coordinates as chest blocks
+        const chestBlockTypeId = chestType === ChestType.BASIC 
+          ? this.BASIC_CHEST_BLOCK_TYPE_ID 
+          : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
+        
+        for (const yCoord of levelYCoords) {
+          for (const basePosition of MINING_AREA_POSITIONS) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: yCoord,
+              z: basePosition.z + state.offset.z,
+            };
+            
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, chestBlockTypeId);
+            } catch (error) {
+              // Silently fail - chunk might not be loaded yet
+            }
+          }
+        }
+      } else {
+        // Generate ore type for this mine level (normal block) - uses CURRENT luck at generation time
+        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+        const miningAreaKey = `mining_area_level_${mineLevel}`;
+        
+        // Calculate HP based on ore type and depth
+        const oreHP = this.calculateOreHP(oreType, absoluteDepth);
+        const block = new MineBlock(oreType, oreHP);
+        state.blockMap.set(miningAreaKey, block);
+        
+        // Generate all blocks in the mining area at all 3 Y coordinates
+        for (const yCoord of levelYCoords) {
+          for (const basePosition of MINING_AREA_POSITIONS) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: yCoord,
+              z: basePosition.z + state.offset.z,
+            };
+            
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, this.MINING_BLOCK_TYPE_ID);
+            } catch (error) {
+              // Silently fail - chunk might not be loaded yet
+            }
+          }
+        }
+      }
+      
+      // Generate walls for all 3 Y coordinates of this level
+      for (const yCoord of levelYCoords) {
+        this.generateMineShaftWalls(yCoord, state.offset);
+      }
+      
+      // Update deepest generated depth (bottom Y of this level)
+      const bottomY = levelYCoords[levelYCoords.length - 1];
+      if (bottomY < state.deepestGeneratedDepth) {
+        state.deepestGeneratedDepth = bottomY;
+      }
+    }
+    
+    // Generate/update bottom floor when we reach deep enough (only once)
+    if (state.bottomFloorDepth === null || state.deepestGeneratedDepth < state.bottomFloorDepth + 10) {
+      const bottomDepth = state.deepestGeneratedDepth - 10; // 10 blocks below deepest generated
       this.generateBottomFloor(bottomDepth, state.offset);
       state.bottomFloorDepth = bottomDepth;
     }
-
-    const elapsed = Date.now() - startTime;
-
   }
 
   /**

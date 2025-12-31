@@ -11,6 +11,7 @@
 import { Player, PersistenceManager } from 'hytopia';
 import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
+import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
 
 /**
  * Validates player data structure
@@ -45,6 +46,11 @@ function validatePlayerData(data: any): data is PlayerData {
   if (data.moreCoinsLevel !== undefined && (typeof data.moreCoinsLevel !== 'number' || isNaN(data.moreCoinsLevel) || data.moreCoinsLevel < 0)) return false;
   if (data.moreDamageLevel !== undefined && (typeof data.moreDamageLevel !== 'number' || isNaN(data.moreDamageLevel) || data.moreDamageLevel < 0)) return false;
   if (!data.inventory || typeof data.inventory !== 'object') return false;
+
+  // Pet system fields are optional for backward compatibility, but if present they must be arrays of strings.
+  if (data.petInventory !== undefined && !Array.isArray(data.petInventory)) return false;
+  if (data.equippedPets !== undefined && !Array.isArray(data.equippedPets)) return false;
+  if (data.petDiscovered !== undefined && !Array.isArray(data.petDiscovered)) return false;
 
   return true;
 }
@@ -93,6 +99,12 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
       }
       return owned.length > 0 ? owned : [0];
     })(),
+    currentMinerTier: typeof savedData.currentMinerTier === 'number' && !isNaN(savedData.currentMinerTier) && savedData.currentMinerTier >= -1
+      ? savedData.currentMinerTier
+      : (defaults.currentMinerTier ?? -1),
+    ownedMiners: savedData.ownedMiners && Array.isArray(savedData.ownedMiners)
+      ? savedData.ownedMiners.filter((tier: any) => typeof tier === 'number' && !isNaN(tier) && tier >= 0).sort((a: number, b: number) => a - b)
+      : (defaults.ownedMiners ?? []),
     moreGemsLevel: typeof savedData.moreGemsLevel === 'number' && !isNaN(savedData.moreGemsLevel) && savedData.moreGemsLevel >= 0
       ? savedData.moreGemsLevel
       : (defaults.moreGemsLevel || 0),
@@ -105,9 +117,34 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     moreDamageLevel: typeof savedData.moreDamageLevel === 'number' && !isNaN(savedData.moreDamageLevel) && savedData.moreDamageLevel >= 0
       ? savedData.moreDamageLevel
       : (defaults.moreDamageLevel || 0),
+    mineResetUpgradePurchased: typeof savedData.mineResetUpgradePurchased === 'boolean'
+      ? savedData.mineResetUpgradePurchased
+      : (defaults.mineResetUpgradePurchased ?? false),
     inventory: savedData.inventory && typeof savedData.inventory === 'object'
       ? { ...defaults.inventory, ...savedData.inventory }
       : defaults.inventory,
+
+    // Pet system (sanitize + cap)
+    petInventory: (() => {
+      const raw = Array.isArray(savedData.petInventory) ? savedData.petInventory : (defaults.petInventory ?? []);
+      const sanitized = raw.filter(isPetId).slice(0, PET_INVENTORY_CAPACITY);
+      return sanitized;
+    })(),
+    equippedPets: (() => {
+      const raw = Array.isArray(savedData.equippedPets) ? savedData.equippedPets : (defaults.equippedPets ?? []);
+      const sanitized = raw.filter(isPetId).slice(0, PET_EQUIP_CAPACITY);
+      return sanitized;
+    })(),
+    petDiscovered: (() => {
+      const raw = Array.isArray(savedData.petDiscovered) ? savedData.petDiscovered : (defaults.petDiscovered ?? []);
+      // Discovered is a unique set; sanitize to valid PetIds and dedupe.
+      const unique: string[] = [];
+      for (const id of raw) {
+        if (!isPetId(id)) continue;
+        if (!unique.includes(id)) unique.push(id);
+      }
+      return unique;
+    })(),
   };
 
   // Sanitize inventory values (ensure they're numbers and non-negative)

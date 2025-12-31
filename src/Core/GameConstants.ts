@@ -35,7 +35,8 @@ export const REBIRTH_POWER_THRESHOLD = 1000; // Minimum power required to rebirt
  * Mining System Constants
  */
 export const MINE_RESET_TIME_SECONDS = 120; // 2 minutes in seconds
-export const MINE_DEPTH_START = 0; // Starting depth for mines
+export const MINE_DEPTH_START = 0; // Starting depth for mines (Y coordinate)
+export const BLOCKS_PER_MINE_LEVEL = 3; // Each mine level is 3 blocks tall (7x3x7)
 
 /**
  * Swing Rate Constants

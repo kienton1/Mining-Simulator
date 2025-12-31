@@ -37,6 +37,12 @@ export interface PlayerData {
   /** Array of owned pickaxe tiers (all pickaxes the player has purchased) */
   ownedPickaxes?: number[];
   
+  /** Current miner tier (-1 = none equipped, 0-23 = equipped miner tier) */
+  currentMinerTier?: number;
+  
+  /** Array of owned miner tiers (all miners the player has purchased) */
+  ownedMiners?: number[];
+  
   /** Whether the mine reset upgrade (5 minutes) has been purchased */
   mineResetUpgradePurchased?: boolean;
   
@@ -48,13 +54,24 @@ export interface PlayerData {
   
   /** Inventory of ores */
   inventory: InventoryData;
+
+  /**
+   * Pet System
+   *
+   * Stored as arrays of PetIds so duplicates are naturally supported (one entry per pet instance).
+   * These fields are optional for backwards compatibility with older saves.
+   */
+  petInventory?: string[];
+  equippedPets?: string[];
+  /** Unique list of pets the player has ever obtained (used for "NEW" tagging). */
+  petDiscovered?: string[];
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 1;
+export const CURRENT_DATA_VERSION = 2;
 
 /**
  * Inventory data structure
@@ -114,11 +131,17 @@ export function createDefaultPlayerData(): PlayerData {
     wins: 0,
     currentPickaxeTier: 0,
     ownedPickaxes: [0], // Start with tier 0 (Wooden) pickaxe
+    currentMinerTier: -1, // Start with no miner equipped
+    ownedMiners: [], // Start with no miners owned
+    mineResetUpgradePurchased: false, // Start without the 5-minute upgrade
     moreGemsLevel: 0,
     moreRebirthsLevel: 0,
     moreCoinsLevel: 0,
     moreDamageLevel: 0,
     inventory: {},
+    petInventory: [],
+    equippedPets: [],
+    petDiscovered: [],
   };
 }
 

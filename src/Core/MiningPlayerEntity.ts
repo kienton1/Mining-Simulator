@@ -17,6 +17,7 @@ import type { EventPayloads } from 'hytopia';
 export class MiningPlayerEntity extends DefaultPlayerEntity {
   private onLeftClickStartCallback?: () => void;
   private onLeftClickStopCallback?: () => void;
+  private canMineCallback?: () => boolean;
   private wasLeftClickPressed = false;
 
   /**
@@ -98,12 +99,44 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
   }
 
   /**
+   * Sets callback to check if player can mine (is in the mine)
+   * When this returns false, left-click input will be suppressed
+   * to prevent the mining animation from playing
+   */
+  setCanMineCallback(callback: () => boolean): void {
+    this.canMineCallback = callback;
+  }
+
+  /**
    * Handle player input each tick.
    * Detects Mouse1 (left click) for mining.
-   * Exactly like NewGame's GamePlayerEntity._onTickWithPlayerInput
+   * 
+   * IMPORTANT: This handler modifies input.ml BEFORE the SDK's
+   * DefaultPlayerEntityController processes it for animations.
+   * By setting input.ml = false, we prevent the animation from playing.
    */
   private _onTickWithPlayerInput = (payload: EventPayloads[BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT]): void => {
     const { input } = payload;
+
+    // Check if player can mine (is in the mine)
+    // If not, suppress left-click input to prevent animation
+    const canMine = this.canMineCallback ? this.canMineCallback() : true;
+    
+    if (!canMine) {
+      // Clear left-click input to prevent animation from playing
+      // This modification happens before the SDK controller processes the input
+      if (input.ml) {
+        input.ml = false;
+      }
+      // Also reset wasLeftClickPressed to prevent state issues
+      if (this.wasLeftClickPressed) {
+        this.wasLeftClickPressed = false;
+        if (this.onLeftClickStopCallback) {
+          this.onLeftClickStopCallback();
+        }
+      }
+      return;
+    }
 
     // Mouse1 (left click) input - mine blocks
     if (input.ml) {

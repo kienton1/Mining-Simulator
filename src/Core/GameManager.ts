@@ -18,9 +18,12 @@ import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START } from './GameC
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
+import { MinerShop } from '../Shop/MinerShop';
 import { GemTraderUpgradeSystem } from '../Shop/GemTraderUpgradeSystem';
 import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
+import { PetManager } from '../Pets/PetManager';
+import { HatchingSystem } from '../Pets/HatchingSystem';
 
 /**
  * Game Manager class
@@ -42,8 +45,11 @@ interface PlayerAutoState {
  * UI modal state for a player
  */
 interface PlayerModalState {
+  minerModalOpen: boolean;
   pickaxeModalOpen: boolean;
   rebirthModalOpen: boolean;
+  petsModalOpen: boolean;
+  eggModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
 }
 
@@ -52,13 +58,17 @@ export class GameManager {
   private playerDataMap: Map<Player, PlayerData> = new Map();
   private playerAutoStates: Map<Player, PlayerAutoState> = new Map();
   private playerModalStates: Map<Player, PlayerModalState> = new Map();
+  private playerInMineStates: Map<Player, boolean> = new Map(); // Tracks if player is physically in their mine
   private trainingController?: TrainingController;
   private miningController?: MiningController;
   private inventoryManager: InventoryManager;
   private sellingSystem: SellingSystem;
   private pickaxeShop: PickaxeShop;
+  private minerShop: MinerShop;
   private gemTraderUpgradeSystem: GemTraderUpgradeSystem;
   private pickaxeManager: PickaxeManager;
+  private petManager: PetManager;
+  private hatchingSystem: HatchingSystem;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
@@ -92,7 +102,12 @@ export class GameManager {
     this.inventoryManager = new InventoryManager();
     this.sellingSystem = new SellingSystem(this.inventoryManager);
     this.pickaxeShop = new PickaxeShop(pickaxeManager);
+    this.minerShop = new MinerShop();
     this.gemTraderUpgradeSystem = new GemTraderUpgradeSystem();
+
+    // Pet system
+    this.petManager = new PetManager();
+    this.hatchingSystem = new HatchingSystem(this.petManager);
     
     // Set up callbacks for inventory and shop systems
     this.inventoryManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
@@ -101,12 +116,25 @@ export class GameManager {
     this.sellingSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.sellingSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
     this.sellingSystem.setGetMoreCoinsMultiplierCallback((player) => this.gemTraderUpgradeSystem.getMoreCoinsMultiplier(player));
+    this.sellingSystem.setGetMinerCoinBonusCallback((player) => {
+      const equippedMiner = this.minerShop.getEquippedMiner(player);
+      return equippedMiner?.coinBonus ?? 0;
+    });
     
     this.pickaxeShop.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.pickaxeShop.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
     
+    this.minerShop.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.minerShop.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+    
     this.gemTraderUpgradeSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.gemTraderUpgradeSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+
+    // Pet callbacks
+    this.petManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.petManager.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+    this.hatchingSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.hatchingSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
     
     // Initialize training system
     this.trainingController = new TrainingController(world, this);
@@ -166,8 +194,11 @@ export class GameManager {
     
     // Initialize modal state
     this.playerModalStates.set(player, {
+      minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
+      petsModalOpen: false,
+      eggModalOpen: false,
       lastModalOpenTime: 0,
     });
     
@@ -439,12 +470,35 @@ export class GameManager {
   }
 
   /**
+   * Gets the miner shop instance
+   * 
+   * @returns Miner shop
+   */
+  getMinerShop(): MinerShop {
+    return this.minerShop;
+  }
+
+  /**
    * Gets the gem trader upgrade system instance
    * 
    * @returns Gem trader upgrade system
    */
   getGemTraderUpgradeSystem(): GemTraderUpgradeSystem {
     return this.gemTraderUpgradeSystem;
+  }
+
+  /**
+   * Gets the pet manager instance
+   */
+  getPetManager(): PetManager {
+    return this.petManager;
+  }
+
+  /**
+   * Gets the pet hatching system instance
+   */
+  getHatchingSystem(): HatchingSystem {
+    return this.hatchingSystem;
   }
 
   /**
@@ -763,6 +817,23 @@ export class GameManager {
 
     this.teleportPlayer(player, targetPosition);
 
+    // Mark player as in the mine (enables mining and raycasting)
+    this.setPlayerInMine(player, true);
+
+    // Update UI to show player is in mine
+    player.ui.sendData({
+      type: 'MINING_STATE_UPDATE',
+      isInMine: true,
+    });
+
+    // Start block detection immediately to show ore info
+    // Wait a moment for teleport to complete
+    setTimeout(() => {
+      if (this.miningController) {
+        this.miningController.startBlockDetection(player);
+      }
+    }, 300);
+
     // Wait a moment for teleport, then start mining
     setTimeout(() => {
       const autoState = this.playerAutoStates.get(player);
@@ -876,17 +947,26 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'pickaxe' | 'rebirth', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
+      minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
+      petsModalOpen: false,
+      eggModalOpen: false,
       lastModalOpenTime: 0,
     };
     
-    if (modalType === 'pickaxe') {
+    if (modalType === 'miner') {
+      modalState.minerModalOpen = isOpen;
+    } else if (modalType === 'pickaxe') {
       modalState.pickaxeModalOpen = isOpen;
     } else if (modalType === 'rebirth') {
       modalState.rebirthModalOpen = isOpen;
+    } else if (modalType === 'pets') {
+      modalState.petsModalOpen = isOpen;
+    } else if (modalType === 'egg') {
+      modalState.eggModalOpen = isOpen;
     }
     
     // Update timestamp when opening a modal (to prevent race conditions with clicks)
@@ -910,7 +990,13 @@ export class GameManager {
     if (!modalState) return false;
     
     // Check if modal is currently open
-    if (modalState.pickaxeModalOpen || modalState.rebirthModalOpen) {
+    if (
+      modalState.minerModalOpen ||
+      modalState.pickaxeModalOpen ||
+      modalState.rebirthModalOpen ||
+      modalState.petsModalOpen ||
+      modalState.eggModalOpen
+    ) {
       return true;
     }
     
@@ -922,6 +1008,27 @@ export class GameManager {
     }
     
     return false;
+  }
+
+  /**
+   * Checks if a player is physically in their mine
+   * Mining and raycasting should only work when player is in the mine
+   * 
+   * @param player - Player to check
+   * @returns True if player is in their mine, false if on surface or elsewhere
+   */
+  isPlayerInMine(player: Player): boolean {
+    return this.playerInMineStates.get(player) ?? false;
+  }
+
+  /**
+   * Sets whether a player is in their mine
+   * 
+   * @param player - Player to update
+   * @param inMine - Whether player is in the mine
+   */
+  private setPlayerInMine(player: Player, inMine: boolean): void {
+    this.playerInMineStates.set(player, inMine);
   }
 
   /**
@@ -1220,6 +1327,9 @@ export class GameManager {
     // Teleport to surface spawn position
     this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
 
+    // Mark player as not in the mine (disables mining and raycasting)
+    this.setPlayerInMine(player, false);
+
     // Update UI
     player.ui.sendData({
       type: 'MINING_STATE_UPDATE',
@@ -1249,6 +1359,9 @@ export class GameManager {
     const entryPosition = miningSystem.preparePlayerMine(player, pickaxe);
     this.teleportPlayer(player, entryPosition);
 
+    // Mark player as in the mine (enables mining and raycasting)
+    this.setPlayerInMine(player, true);
+
     player.ui.sendData({
       type: 'MINING_STATE_UPDATE',
       isInMine: true,
@@ -1259,6 +1372,9 @@ export class GameManager {
     if (this.mineResetTimers.has(player)) {
       this.updateMineResetTimerUI(player);
     }
+
+    // Update depth counter when entering mine
+    this.updateMiningDepthCounter(player);
 
     // Start block detection to show what block player is standing on
     // Wait a moment for teleport to complete
@@ -1418,6 +1534,9 @@ export class GameManager {
     // Teleport to surface (but don't call teleportToSurface to avoid stopping timer again)
     this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
 
+    // Mark player as not in the mine (disables mining and raycasting)
+    this.setPlayerInMine(player, false);
+
     // Reset mine to level 0
     const miningSystem = this.miningController?.getMiningSystem();
     if (miningSystem) {
@@ -1513,6 +1632,28 @@ export class GameManager {
       currentDepth: blocksMined, // Blocks mined from start (should be positive)
       goalDepth: 1000,
     });
+
+    // Also send depth counter update (mine level, 0-1000)
+    this.updateMiningDepthCounter(player);
+  }
+
+  /**
+   * Updates the mining depth counter UI for a player
+   * Shows the current mine level (0-1000)
+   * 
+   * @param player - Player to update depth counter for
+   */
+  private updateMiningDepthCounter(player: Player): void {
+    if (!this.miningController) return;
+
+    const mineLevel = this.miningController.getCurrentMineLevel(player);
+    // Clamp to 0-1000 range for display
+    const displayDepth = Math.min(1000, Math.max(0, mineLevel));
+
+    player.ui.sendData({
+      type: 'MINING_DEPTH_COUNTER',
+      depth: displayDepth,
+    });
   }
 
   /**
@@ -1543,6 +1684,7 @@ export class GameManager {
     this.miningController?.cleanupPlayer(player);
     this.playerDataMap.delete(player);
     this.playerAutoStates.delete(player);
+    this.playerInMineStates.delete(player);
     const entranceInterval = this.mineEntranceIntervals.get(player);
     if (entranceInterval) {
       clearInterval(entranceInterval);

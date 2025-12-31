@@ -39,6 +39,10 @@ import { MerchantEntity } from './src/Shop/MerchantEntity';
 import { MineResetUpgradeNPC } from './src/Shop/MineResetUpgradeNPC';
 import { GemTraderEntity } from './src/Shop/GemTraderEntity';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
+import { EggType } from './src/Pets/PetData';
+import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { EggStationManager } from './src/Pets/EggStationManager';
+import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 
 /**
  * startServer is always the entry point for our game.
@@ -125,6 +129,88 @@ startServer(world => {
   gemTraderEntity.spawn();
 
   /**
+   * Egg Stations (barrels in `assets/map.json`)
+   * Using the user-provided "closest to" coordinates (matches the 3 barrel props).
+   */
+  const eggStations = [
+    {
+      id: 'egg-station-stone',
+      name: 'Stone Egg Station',
+      eggType: EggType.STONE,
+      defaultOpenCount: 1,
+      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,9"
+      position: { x: -13, y: 2, z: 9 },
+    },
+    {
+      id: 'egg-station-gem',
+      name: 'Gem Egg Station',
+      eggType: EggType.GEM,
+      defaultOpenCount: 3,
+      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,5"
+      position: { x: -13, y: 2, z: 5 },
+    },
+    {
+      id: 'egg-station-crystal',
+      name: 'Crystal Egg Station',
+      eggType: EggType.CRYSTAL,
+      defaultOpenCount: 1,
+      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,1"
+      position: { x: -13, y: 2, z: 1 },
+    },
+  ];
+
+  // Egg UI should only pop when you're right up on the barrel (~1 block).
+  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 1.1);
+  eggStationManager.start();
+
+  // Floating name + cost labels (SceneUI), anchored like training rocks.
+  // Delay slightly so the client has time to register the `egg:prompt` template.
+  const eggStationLabelManager = new EggStationLabelManager(world, eggStations);
+  setTimeout(() => eggStationLabelManager.start(), 1000);
+
+  function sendPetState(player: any) {
+    const playerData = gameManager.getPlayerData(player);
+    if (!playerData) return;
+
+    const inv = Array.isArray(playerData.petInventory) ? playerData.petInventory : [];
+    const eq = Array.isArray(playerData.equippedPets) ? playerData.equippedPets : [];
+    const ownedCount = inv.length + eq.length;
+
+    // Expanded list: one entry per pet instance with a stable instanceId.
+    // This is required to support duplicates reliably in the UI.
+    const pets = [
+      ...eq.map((petId: string, idx: number) => ({ instanceId: `eq:${idx}`, petId, equipped: true, slotIndex: idx })),
+      ...inv.map((petId: string, idx: number) => ({ instanceId: `inv:${idx}`, petId, equipped: false, slotIndex: idx })),
+    ].map((p) => {
+      const def = getPetDefinition(p.petId);
+      return {
+        instanceId: p.instanceId,
+        petId: p.petId,
+        equipped: p.equipped,
+        slotIndex: p.slotIndex,
+        name: def?.name ?? p.petId,
+        rarity: def?.rarity ?? 'common',
+        eggType: def?.eggType ?? 'stone',
+        multiplier: def?.multiplier ?? 0,
+      };
+    });
+
+    const multiplierSum = gameManager.getPetManager().getEquippedMultiplierSum(player);
+    const trainingMultiplier = gameManager.getPetManager().getTrainingMultiplierSum(player);
+
+    player.ui.sendData({
+      type: 'PET_STATE',
+      pets,
+      ownedCount,
+      ownedCap: PET_INVENTORY_CAPACITY,
+      equippedCount: eq.length,
+      equippedCap: PET_EQUIP_CAPACITY,
+      multiplierSum,
+      trainingMultiplier,
+    });
+  }
+
+  /**
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
@@ -138,10 +224,8 @@ startServer(world => {
       const totalValue = gameManager.getSellingSystem().getSellValue(player);
       
       // Calculate sell values per ore with all multipliers for UI display
-      const pickaxe = gameManager.getPlayerPickaxe(player);
-      const pickaxeMultiplier = pickaxe?.sellValueMultiplier ?? 1.0;
-      const moreCoinsMultiplier = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
-      const sellMultiplier = pickaxeMultiplier * moreCoinsMultiplier;
+      // Use the selling system's method to get the combined multiplier (includes miner bonus)
+      const sellMultiplier = gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
       
       const oreSellValues: Record<string, number> = {};
       for (const [oreType, amount] of Object.entries(inventory)) {
@@ -273,6 +357,8 @@ startServer(world => {
     mineResetUpgradeNPC.addPlayer(player);
     // Add player to gem trader tracking
     gemTraderEntity.addPlayer(player);
+    // Add player to egg station tracking
+    eggStationManager.addPlayer(player);
     
     // Initialize player data with defaults first (synchronous)
     // This ensures entity can spawn immediately for proper camera setup
@@ -396,10 +482,8 @@ startServer(world => {
           const totalValueAfterSell = gameManager.getSellingSystem().getSellValue(player);
           
           // Calculate sell values per ore with all multipliers for UI display
-          const pickaxeAfterSell = gameManager.getPlayerPickaxe(player);
-          const pickaxeMultiplierAfterSell = pickaxeAfterSell?.sellValueMultiplier ?? 1.0;
-          const moreCoinsMultiplierAfterSell = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
-          const sellMultiplierAfterSell = pickaxeMultiplierAfterSell * moreCoinsMultiplierAfterSell;
+          // Use the selling system's method to get the combined multiplier (includes miner bonus)
+          const sellMultiplierAfterSell = gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
           
           const oreSellValuesAfterSell: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
@@ -432,10 +516,8 @@ startServer(world => {
           const totalValueAfterSellAll = gameManager.getSellingSystem().getSellValue(player);
           
           // Calculate sell values per ore with all multipliers for UI display
-          const pickaxeAfterSellAll = gameManager.getPlayerPickaxe(player);
-          const pickaxeMultiplierAfterSellAll = pickaxeAfterSellAll?.sellValueMultiplier ?? 1.0;
-          const moreCoinsMultiplierAfterSellAll = gameManager.getGemTraderUpgradeSystem().getMoreCoinsMultiplier(player);
-          const sellMultiplierAfterSellAll = pickaxeMultiplierAfterSellAll * moreCoinsMultiplierAfterSellAll;
+          // Use the selling system's method to get the combined multiplier (includes miner bonus)
+          const sellMultiplierAfterSellAll = gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
           
           const oreSellValuesAfterSellAll: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
@@ -465,6 +547,60 @@ startServer(world => {
             inProximity: false,
           });
           break;
+        case 'OPEN_MINER_SHOP':
+          gameManager.setModalState(player, 'miner', true);
+          const minerShopData = gameManager.getMinerShop().getShopData(player);
+          player.ui.sendData({
+            type: 'MINER_SHOP_DATA',
+            miners: minerShopData.miners,
+            currentTier: minerShopData.currentTier,
+            gold: minerShopData.gold,
+          });
+          break;
+        case 'BUY_MINER':
+          const buyMinerResult = gameManager.getMinerShop().buyMiner(player, data.tier);
+          const playerDataAfterMinerPurchase = gameManager.getPlayerData(player);
+          if (buyMinerResult.success) {
+            player.ui.sendData({
+              type: 'MINER_PURCHASED',
+              success: true,
+              newTier: buyMinerResult.newTier,
+              goldSpent: buyMinerResult.goldSpent,
+              remainingGold: playerDataAfterMinerPurchase?.gold || 0,
+            });
+            gameManager.sendPowerStatsToUI(player);
+          } else {
+            player.ui.sendData({
+              type: 'MINER_PURCHASED',
+              success: false,
+              message: buyMinerResult.message,
+            });
+          }
+          break;
+        case 'EQUIP_MINER':
+          const equipMinerResult = gameManager.getMinerShop().equipMiner(player, data.tier);
+          if (equipMinerResult.success) {
+            player.ui.sendData({
+              type: 'MINER_EQUIPPED',
+              success: true,
+              tier: data.tier,
+              message: equipMinerResult.message,
+            });
+            const updatedMinerShopData = gameManager.getMinerShop().getShopData(player);
+            player.ui.sendData({
+              type: 'MINER_SHOP_DATA',
+              miners: updatedMinerShopData.miners,
+              currentTier: updatedMinerShopData.currentTier,
+              gold: updatedMinerShopData.gold,
+            });
+          } else {
+            player.ui.sendData({
+              type: 'MINER_EQUIPPED',
+              success: false,
+              message: equipMinerResult.message,
+            });
+          }
+          break;
         case 'OPEN_PICKAXE_SHOP':
 
           // Modal state should already be set by MODAL_OPENED event, but set it here too as backup
@@ -479,7 +615,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
 
-          if (data.modalType === 'pickaxe' || data.modalType === 'rebirth') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg') {
             gameManager.setModalState(player, data.modalType, true);
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -495,10 +631,103 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
 
-          if (data.modalType === 'pickaxe' || data.modalType === 'rebirth') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg') {
             gameManager.setModalState(player, data.modalType, false);
           }
           break;
+        case 'REQUEST_PET_STATE':
+          sendPetState(player);
+          break;
+        case 'PET_EQUIP': {
+          const petId = String(data.petId ?? '');
+          const res = gameManager.getPetManager().equipPet(player, petId);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equip', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_UNEQUIP': {
+          const petId = String(data.petId ?? '');
+          const res = gameManager.getPetManager().unequipPet(player, petId);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequip', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_EQUIP_INSTANCE': {
+          const idx = Number(data.slotIndex ?? data.index ?? -1);
+          const res = gameManager.getPetManager().equipFromInventoryIndex(player, idx);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipInstance', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_UNEQUIP_INSTANCE': {
+          const idx = Number(data.slotIndex ?? data.index ?? -1);
+          const res = gameManager.getPetManager().unequipFromEquippedIndex(player, idx);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipInstance', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_EQUIP_BEST': {
+          const res = gameManager.getPetManager().equipBest(player);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipBest', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_UNEQUIP_ALL': {
+          const res = gameManager.getPetManager().unequipAll(player);
+          player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipAll', success: res.success, message: res.message });
+          sendPetState(player);
+          break;
+        }
+        case 'PET_DELETE_INV': {
+          const indices = Array.isArray(data.indices) ? data.indices : [];
+          const res = gameManager.getPetManager().deleteFromInventoryIndices(player, indices);
+          player.ui.sendData({
+            type: 'PET_ACTION_RESULT',
+            action: 'delete',
+            success: res.success,
+            message: res.message,
+            deletedCount: res.deletedCount ?? 0,
+          });
+          sendPetState(player);
+          break;
+        }
+        case 'EGG_HATCH': {
+          const eggTypeStr = String(data.eggType ?? 'stone').toLowerCase();
+          const eggType =
+            eggTypeStr === 'gem' ? EggType.GEM :
+            eggTypeStr === 'crystal' ? EggType.CRYSTAL :
+            EggType.STONE;
+          const count = Math.max(1, Math.min(50, Number(data.count ?? 1) || 1));
+
+          const hatchRes = gameManager.getHatchingSystem().hatch(player, eggType, count);
+          if (!hatchRes.success) {
+            player.ui.sendData({ type: 'EGG_HATCH_RESULT', success: false, message: hatchRes.message, eggType, count });
+            sendPetState(player);
+            break;
+          }
+
+          const results = (hatchRes.results ?? []).map((id) => {
+            const def = getPetDefinition(id);
+            return {
+              id,
+              name: def?.name ?? id,
+              rarity: def?.rarity ?? 'common',
+              eggType: def?.eggType ?? 'stone',
+              multiplier: def?.multiplier ?? 0,
+            };
+          });
+
+          player.ui.sendData({
+            type: 'EGG_HATCH_RESULT',
+            success: true,
+            eggType,
+            count,
+            goldSpent: hatchRes.goldSpent ?? 0,
+            results,
+          });
+          sendPetState(player);
+          break;
+        }
         case 'BUY_PICKAXE':
 
           const result = gameManager.getPickaxeShop().buyPickaxe(player, data.tier);
@@ -714,8 +943,20 @@ startServer(world => {
     // Set up mining input handling
     const miningController = gameManager.getMiningController();
     
+    // Set up callback to check if player can mine (prevents animation outside mine)
+    // This is called every tick and suppresses left-click input when player is not in the mine
+    playerEntity.setCanMineCallback(() => {
+      return gameManager.isPlayerInMine(player);
+    });
+    
     // Set up left click callbacks (like NewGame does with shoot)
     playerEntity.setOnLeftClickStart(() => {
+      // Don't allow mining if player is not in the mine
+      // This prevents mining animations and raycasting on the surface
+      if (!gameManager.isPlayerInMine(player)) {
+        return;
+      }
+      
       // Don't allow manual mining if:
       // 1. Auto-mine is enabled (it handles mining automatically)
       // 2. A blocking modal (pickaxe or rebirth) is open
@@ -732,13 +973,18 @@ startServer(world => {
         return;
       }
       
-      // Auto-mine is off and no blocking modals - allow manual mining
+      // Player is in the mine, auto-mine is off, and no blocking modals - allow manual mining
       if (miningController && !miningController.isPlayerMining(player)) {
         miningController.startMiningLoop(player);
       }
     });
     
     playerEntity.setOnLeftClickStop(() => {
+      // Don't process click release if player is not in the mine
+      if (!gameManager.isPlayerInMine(player)) {
+        return;
+      }
+      
       // Only stop manual mining if auto-mine is disabled and no blocking modals
       const autoState = gameManager.getPlayerAutoState(player);
       if (autoState?.autoMineEnabled) {
@@ -803,6 +1049,124 @@ startServer(world => {
     } else {
       world.chatManager.sendPlayerMessage(player, 'No training rock detected nearby.', 'FF5555');
     }
+  });
+
+  /**
+   * Pet system debug/testing commands
+   *
+   * Examples:
+   * - /hatch stone 1
+   * - /hatch gem 3
+   * - /petinv
+   * - /petequip all
+   * - /petequip stone_sprite
+   * - /petunequip all
+   */
+  world.chatManager.registerCommand('/hatch', (player, args) => {
+    const eggArg = (args[0] ?? 'stone').toLowerCase();
+    const count = Math.max(1, Math.min(50, Number(args[1] ?? 1) || 1));
+
+    const eggType =
+      eggArg === 'gem' ? EggType.GEM :
+      eggArg === 'crystal' ? EggType.CRYSTAL :
+      EggType.STONE;
+
+    const hatch = gameManager.getHatchingSystem().hatch(player, eggType, count);
+    if (!hatch.success) {
+      world.chatManager.sendPlayerMessage(player, `Hatch failed: ${hatch.message ?? 'unknown error'}`, 'FF5555');
+      return;
+    }
+
+    const results = hatch.results ?? [];
+    const names = results
+      .map((id) => getPetDefinition(id)?.name ?? id)
+      .join(', ');
+
+    world.chatManager.sendPlayerMessage(
+      player,
+      `Hatched ${results.length} ${eggType} egg(s) for ${hatch.goldSpent?.toLocaleString() ?? 0} gold: ${names}`,
+      '00FF00'
+    );
+  });
+
+  world.chatManager.registerCommand('/petinv', (player) => {
+    const data = gameManager.getPlayerData(player);
+    if (!data) {
+      world.chatManager.sendPlayerMessage(player, 'No player data found.', 'FF5555');
+      return;
+    }
+
+    const inv = Array.isArray(data.petInventory) ? data.petInventory : [];
+    const eq = Array.isArray(data.equippedPets) ? data.equippedPets : [];
+    const mult = gameManager.getPetManager().getTrainingMultiplierSum(player);
+
+    world.chatManager.sendPlayerMessage(player, '=== Pets ===', '00FFFF');
+    world.chatManager.sendPlayerMessage(player, `Inventory: ${inv.length}/${PET_INVENTORY_CAPACITY}`, 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, `Equipped: ${eq.length}/${PET_EQUIP_CAPACITY}`, 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, `Training multiplier sum: x${mult}`, 'FFFF00');
+  });
+
+  world.chatManager.registerCommand('/petequip', (player, args) => {
+    const petManager = gameManager.getPetManager();
+    const data = gameManager.getPlayerData(player);
+    if (!data) return;
+
+    const target = (args[0] ?? 'all').toLowerCase();
+
+    if (target === 'all') {
+      let equipped = 0;
+      while (true) {
+        const inv = Array.isArray(data.petInventory) ? data.petInventory : [];
+        if (inv.length === 0) break;
+        const petId = inv[0];
+        const res = petManager.equipPet(player, petId);
+        if (!res.success) break;
+        equipped++;
+        // refresh reference
+        const next = gameManager.getPlayerData(player);
+        if (next) Object.assign(data, next);
+      }
+      world.chatManager.sendPlayerMessage(player, `Equipped ${equipped} pet(s).`, '00FF00');
+      return;
+    }
+
+    const res = petManager.equipPet(player, target);
+    if (!res.success) {
+      world.chatManager.sendPlayerMessage(player, `Equip failed: ${res.message ?? 'unknown error'}`, 'FF5555');
+      return;
+    }
+    world.chatManager.sendPlayerMessage(player, `Equipped ${target}.`, '00FF00');
+  });
+
+  world.chatManager.registerCommand('/petunequip', (player, args) => {
+    const petManager = gameManager.getPetManager();
+    const data = gameManager.getPlayerData(player);
+    if (!data) return;
+
+    const target = (args[0] ?? 'all').toLowerCase();
+
+    if (target === 'all') {
+      let unequipped = 0;
+      while (true) {
+        const eq = Array.isArray(data.equippedPets) ? data.equippedPets : [];
+        if (eq.length === 0) break;
+        const petId = eq[0];
+        const res = petManager.unequipPet(player, petId);
+        if (!res.success) break;
+        unequipped++;
+        const next = gameManager.getPlayerData(player);
+        if (next) Object.assign(data, next);
+      }
+      world.chatManager.sendPlayerMessage(player, `Unequipped ${unequipped} pet(s).`, '00FF00');
+      return;
+    }
+
+    const res = petManager.unequipPet(player, target);
+    if (!res.success) {
+      world.chatManager.sendPlayerMessage(player, `Unequip failed: ${res.message ?? 'unknown error'}`, 'FF5555');
+      return;
+    }
+    world.chatManager.sendPlayerMessage(player, `Unequipped ${target}.`, '00FF00');
   });
 
   world.chatManager.registerCommand('/mine', player => {
@@ -895,6 +1259,8 @@ startServer(world => {
     merchantEntity.removePlayer(player);
     // Remove player from mine reset upgrade NPC tracking
     mineResetUpgradeNPC.removePlayer(player);
+    // Remove player from egg station tracking
+    eggStationManager.removePlayer(player);
     
     // Clean up mining input interval
     const miningInputInterval = (player as any).__miningInputInterval;

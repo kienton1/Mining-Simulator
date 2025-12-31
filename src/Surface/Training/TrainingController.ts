@@ -317,8 +317,13 @@ export class TrainingController {
       playerData,
       playerEntity,
       (p, powerGain) => {
-        const newTotal = this.gameManager.addPower(p, powerGain);
-        this.sendPowerGainEvent(p, powerGain, newTotal, targetRock.position);
+        // Pet system integration:
+        // Training formula: finalGain = baseGain * sumMultipliers
+        // (with "no pets equipped" treated as 1x)
+        const multiplierSum = this.gameManager.getPetManager().getTrainingMultiplierSum(p);
+        const finalGain = powerGain * multiplierSum;
+        const newTotal = this.gameManager.addPower(p, finalGain);
+        this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
       }
     );
 
