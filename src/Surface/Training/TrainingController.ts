@@ -321,7 +321,20 @@ export class TrainingController {
         // Training formula: finalGain = baseGain * sumMultipliers
         // (with "no pets equipped" treated as 1x)
         const multiplierSum = this.gameManager.getPetManager().getTrainingMultiplierSum(p);
-        const finalGain = powerGain * multiplierSum;
+        let finalGain = powerGain * multiplierSum;
+        
+        // Safety check: ensure final gain is a valid finite number
+        // Prevent Infinity, NaN, or negative values that could cause overflow
+        if (!Number.isFinite(finalGain) || finalGain < 0) {
+          finalGain = 0;
+        }
+        
+        // Cap final gain to prevent 32-bit signed int overflow (max safe value)
+        const MAX_SAFE_POWER_GAIN = 2147483647; // 2^31 - 1
+        if (finalGain > MAX_SAFE_POWER_GAIN) {
+          finalGain = MAX_SAFE_POWER_GAIN;
+        }
+        
         const newTotal = this.gameManager.addPower(p, finalGain);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
       }

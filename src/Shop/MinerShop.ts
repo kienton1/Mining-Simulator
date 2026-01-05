@@ -265,13 +265,9 @@ export class MinerShop {
       } else if (isOwned) {
         availability = 'owned';
       } else if (isNextTier) {
-        // Next tier - check if affordable
-        if (canAfford) {
-          availability = 'available';
-          purchasable = true;
-        } else {
-          availability = 'locked'; // Can't afford
-        }
+        // Next tier - always available, but purchasable based on affordability
+        availability = 'available';
+        purchasable = canAfford;
       } else {
         // Too far ahead
         availability = 'locked';

@@ -49,7 +49,7 @@ export class OreGenerator {
       // Example with 40% luck:
       //   Stone (rarity=1): 1.0 × (1 + 0.4 × 0.3) = 1.12x
       //   Diamond (rarity=100): 0.01 × (1 + 0.4 × 2.0) = 0.018x (1.8x boost)
-      //   Draconium (rarity=10000): 0.0001 × (1 + 0.4 × 4.0) = 0.00026x (2.6x boost)
+      //   Dragonstone (rarity=10000): 0.0001 × (1 + 0.4 × 4.0) = 0.00026x (2.6x boost)
       const luckBonus = luck * Math.log10(ore.rarity + 1);
       const adjustedWeight = baseWeight * (1 + luckBonus);
       

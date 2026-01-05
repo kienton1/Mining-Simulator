@@ -9,6 +9,37 @@ import { World, Entity, RigidBodyType, ColliderShape } from 'hytopia';
 import { OreType, ORE_DATABASE } from './Ore/OreData';
 
 /**
+ * Mapping from OreType to block type ID (matches MiningSystem)
+ * Block IDs 16-39 correspond to ore blocks in map.json
+ */
+const ORE_TO_BLOCK_ID: Map<OreType, number> = new Map([
+  [OreType.STONE, 16],
+  [OreType.DEEPSLATE, 17],
+  [OreType.COAL, 18],
+  [OreType.IRON, 19],
+  [OreType.TIN, 20],
+  [OreType.COBALT, 21],
+  [OreType.PYRITE, 22],
+  [OreType.GOLD, 23],
+  [OreType.OBSIDIAN, 24],
+  [OreType.RUBY, 25],
+  [OreType.DIAMOND, 26],
+  [OreType.AMBER, 27],
+  [OreType.QUARTZ, 28],
+  [OreType.TOPAZ, 29],
+  [OreType.EMERALD, 30],
+  [OreType.RELIC, 31],
+  [OreType.AMETHYST, 32],
+  [OreType.SAPPHIRE, 33],
+  [OreType.LUMINITE, 34],
+  [OreType.PRISMATIC, 35],
+  [OreType.SUNSTONE, 36],
+  [OreType.MITHRIAL, 37],
+  [OreType.ASTRALITE, 38],
+  [OreType.DRAGONSTONE, 39],
+]);
+
+/**
  * Data for a single debris piece
  */
 interface DebrisData {
@@ -143,19 +174,26 @@ export class DebrisManager {
         z: randomZ,
       };
       
-      this.spawnDebrisPiece(spawnPosition, tintColor);
+      this.spawnDebrisPiece(spawnPosition, tintColor, oreType);
     }
   }
 
   /**
-   * Gets the texture URI for the mining block type
+   * Gets the texture URI for a specific ore type
    * 
-   * @returns Texture URI for the mining block, or fallback texture
+   * @param oreType - The ore type to get texture for
+   * @returns Texture URI for the ore block, or fallback texture
    */
-  private getMiningBlockTextureUri(): string {
+  private getOreBlockTextureUri(oreType: OreType): string {
     try {
+      // Get block ID from mapping
+      const blockId = ORE_TO_BLOCK_ID.get(oreType);
+      if (blockId === undefined) {
+        return 'blocks/stone.png'; // Fallback
+      }
+
       // Get block type from world's block type registry
-      const blockType = this.world.blockTypeRegistry.getBlockType(this.MINING_BLOCK_TYPE_ID);
+      const blockType = this.world.blockTypeRegistry.getBlockType(blockId);
       if (blockType && blockType.textureUri) {
         return blockType.textureUri;
       }
@@ -171,10 +209,12 @@ export class DebrisManager {
    * 
    * @param spawnPosition - Position to spawn the debris at
    * @param tintColor - RGB color to tint the debris
+   * @param oreType - Type of ore for texture selection
    */
   private spawnDebrisPiece(
     spawnPosition: { x: number; y: number; z: number },
-    tintColor: { r: number; g: number; b: number }
+    tintColor: { r: number; g: number; b: number },
+    oreType: OreType
   ): void {
     // Add small random offset for slight variation
     const offsetX = (Math.random() - 0.5) * 0.3; // -0.15 to +0.15
@@ -198,8 +238,8 @@ export class DebrisManager {
       z: (Math.random() - 0.5) * 2.0,
     };
 
-    // Get the texture from the actual mining block type
-    const blockTextureUri = this.getMiningBlockTextureUri();
+    // Get the texture from the ore-specific block type
+    const blockTextureUri = this.getOreBlockTextureUri(oreType);
 
     // Create debris entity with FIXED rigid body type
     // FIXED type is excluded from debug rendering by default (RAPIER.QueryFilterFlags.EXCLUDE_FIXED)

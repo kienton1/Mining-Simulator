@@ -35,19 +35,19 @@ export enum OreType {
   QUARTZ = 'quartz',
   TOPAZ = 'topaz',
   EMERALD = 'emerald',
-  FOSSIL = 'fossil',
+  RELIC = 'relic',
   
   // Ultra Rare Ores (Late Game)
   AMETHYST = 'amethyst',
   SAPPHIRE = 'sapphire',
-  URANIUM = 'uranium',
-  CRYSTALITE = 'crystalite',
+  LUMINITE = 'luminite',
+  PRISMATIC = 'prismatic',
   
   // Legendary Ores (End Game)
-  SOLARITE = 'solarite',
-  MYTHRIL = 'mythril',
-  STALLITE = 'stallite',
-  DRACONIUM = 'draconium',
+  SUNSTONE = 'sunstone',
+  MITHRIAL = 'mithrial',
+  ASTRALITE = 'astralite',
+  DRAGONSTONE = 'dragonstone',
 }
 
 /**
@@ -124,7 +124,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 10000,
     name: 'Stone',
-    block: 'stone_block',  // Placeholder
+    block: 'stone-ore',
     color: '#808080',  // Gray - placeholder
   },
   [OreType.DEEPSLATE]: {
@@ -136,7 +136,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 19634,
     name: 'Deepslate',
-    block: 'deepslate_block',  // Placeholder
+    block: 'deepslate-ore',
     color: '#2F2F2F',  // Dark gray - placeholder
   },
   [OreType.COAL]: {
@@ -148,7 +148,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 22000,
     name: 'Coal',
-    block: 'coal_block',  // Placeholder
+    block: 'coal-ore',
     color: '#1A1A1A',  // Black - placeholder
   },
   [OreType.IRON]: {
@@ -160,7 +160,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 25500,
     name: 'Iron',
-    block: 'iron_block',  // Placeholder
+    block: 'iron-ore',
     color: '#C0C0C0',  // Silver - placeholder
   },
   
@@ -174,7 +174,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 27994,
     name: 'Tin',
-    block: 'tin_block',  // Placeholder
+    block: 'tin-ore',
     color: '#D3D3D3',  // Light gray - placeholder
   },
   [OreType.COBALT]: {
@@ -186,7 +186,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 45858,
     name: 'Cobalt',
-    block: 'cobalt_block',  // Placeholder
+    block: 'cobalt-ore',
     color: '#0047AB',  // Blue - placeholder
   },
   [OreType.PYRITE]: {
@@ -198,7 +198,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 56953,
     name: 'Pyrite',
-    block: 'pyrite_block',  // Placeholder
+    block: 'pyrite-ore',
     color: '#FFD700',  // Gold - placeholder
   },
   [OreType.GOLD]: {
@@ -210,7 +210,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 68720,
     name: 'Gold',
-    block: 'gold_block',  // Placeholder
+    block: 'gold-ore',
     color: '#FFD700',  // Gold - placeholder
   },
   
@@ -224,7 +224,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 93314,
     name: 'Obsidian',
-    block: 'obsidian_block',  // Placeholder
+    block: 'obsidian-ore',
     color: '#000000',  // Black - placeholder
   },
   [OreType.RUBY]: {
@@ -236,7 +236,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 139970,
     name: 'Ruby',
-    block: 'ruby_block',  // Placeholder
+    block: 'ruby-ore',
     color: '#E0115F',  // Red - placeholder
   },
   [OreType.DIAMOND]: {
@@ -248,7 +248,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 180000,
     name: 'Diamond',
-    block: 'diamond_block',  // Placeholder
+    block: 'diamond-ore',
     color: '#B9F2FF',  // Light blue/cyan - placeholder
   },
   [OreType.AMBER]: {
@@ -260,7 +260,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 230000,
     name: 'Amber',
-    block: 'amber_block',  // Placeholder
+    block: 'amber-ore',
     color: '#FFBF00',  // Amber/orange - placeholder
   },
   
@@ -274,7 +274,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 245000,
     name: 'Quartz',
-    block: 'quartz_block',  // Placeholder
+    block: 'quartz-ore',
     color: '#F5F5DC',  // Beige/white - placeholder
   },
   [OreType.TOPAZ]: {
@@ -286,7 +286,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 285000,
     name: 'Topaz',
-    block: 'topaz_block',  // Placeholder
+    block: 'topaz-ore',
     color: '#FFC87C',  // Yellow/orange - placeholder
   },
   [OreType.EMERALD]: {
@@ -298,19 +298,19 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 294520,
     name: 'Emerald',
-    block: 'emerald_block',  // Placeholder
+    block: 'emerald-ore',
     color: '#50C878',  // Green - placeholder
   },
-  [OreType.FOSSIL]: {
-    type: OreType.FOSSIL,
+  [OreType.RELIC]: {
+    type: OreType.RELIC,
     rarity: 250,  // 1 in 250
     value: 50000,
     firstDepth: 550,
     firstHealth: 159190,
     lastDepth: 1000,
     lastHealth: 385000,
-    name: 'Fossil',
-    block: 'fossil_block',  // Placeholder
+    name: 'Relic',
+    block: 'relic-ore',
     color: '#8B7355',  // Brown - placeholder
   },
   
@@ -324,7 +324,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 559890,
     name: 'Amethyst',
-    block: 'amethyst_block',  // Placeholder
+    block: 'amethyst-ore',
     color: '#9966CC',  // Purple - placeholder
   },
   [OreType.SAPPHIRE]: {
@@ -336,81 +336,81 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     lastDepth: 1000,
     lastHealth: 820000,
     name: 'Sapphire',
-    block: 'sapphire_block',  // Placeholder
+    block: 'sapphire-ore',
     color: '#0F52BA',  // Blue - placeholder
   },
-  [OreType.URANIUM]: {
-    type: OreType.URANIUM,
+  [OreType.LUMINITE]: {
+    type: OreType.LUMINITE,
     rarity: 400,  // 1 in 400
     value: 250000,
     firstDepth: 893,
     firstHealth: 987200,
     lastDepth: 1000,
     lastHealth: 1310000,
-    name: 'Uranium',
-    block: 'uranium_block',  // Placeholder
+    name: 'Luminite',
+    block: 'luminite-ore',
     color: '#00FF00',  // Green (glowing) - placeholder
   },
-  [OreType.CRYSTALITE]: {
-    type: OreType.CRYSTALITE,
+  [OreType.PRISMATIC]: {
+    type: OreType.PRISMATIC,
     rarity: 666,  // 1 in 666
     value: 350000,
     firstDepth: 638,
     firstHealth: 767500,
     lastDepth: 1000,
     lastHealth: 1550000,
-    name: 'Crystalite',
-    block: 'crystalite_block',  // Placeholder
+    name: 'Prismatic',
+    block: 'prismatic-ore',
     color: '#E0E0E0',  // Light gray/white - placeholder
   },
   
   // Legendary Ores (End Game)
-  [OreType.SOLARITE]: {
-    type: OreType.SOLARITE,
+  [OreType.SUNSTONE]: {
+    type: OreType.SUNSTONE,
     rarity: 1000,  // 1 in 1000
     value: 450000,
     firstDepth: 870,
     firstHealth: 1690000,
     lastDepth: 1000,
     lastHealth: 1900000,
-    name: 'Solarite',
-    block: 'solarite_block',  // Placeholder
+    name: 'Sunstone',
+    block: 'sunstone-ore',
     color: '#FFA500',  // Orange/yellow (sun-like) - placeholder
   },
-  [OreType.MYTHRIL]: {
-    type: OreType.MYTHRIL,
+  [OreType.MITHRIAL]: {
+    type: OreType.MITHRIAL,
     rarity: 2000,  // 1 in 2000
     value: 600000,
     firstDepth: 829,
     firstHealth: 2170000,
     lastDepth: 1000,
     lastHealth: 2400000,
-    name: 'Mythril',
-    block: 'mythril_block',  // Placeholder
+    name: 'Mithrial',
+    block: 'mithrial-ore',
     color: '#C0C0C0',  // Silver - placeholder
   },
-  [OreType.STALLITE]: {
-    type: OreType.STALLITE,
+  [OreType.ASTRALITE]: {
+    type: OreType.ASTRALITE,
     rarity: 2857,  // 1 in 2857
     value: 800000,
     firstDepth: 770,
     firstHealth: 2710000,
     lastDepth: 1000,
     lastHealth: 3100000,
-    name: 'Stallite',
-    block: 'stallite_block',  // Placeholder
+    name: 'Astralite',
+    block: 'astralite-ore',
     color: '#708090',  // Slate gray - placeholder
   },
-  [OreType.DRACONIUM]: {
-    type: OreType.DRACONIUM,
+  [OreType.DRAGONSTONE]: {
+    type: OreType.DRAGONSTONE,
     rarity: 10000,  // 1 in 10000
     value: 1500000,
     firstDepth: 875,
     firstHealth: 3300000,
     lastDepth: 1000,
     lastHealth: 4000000,
-    name: 'Draconium',
-    block: 'draconium_block',  // Placeholder
+    name: 'Dragonstone',
+    block: 'dragonstone-ore',
     color: '#8B0000',  // Dark red (dragon-like) - placeholder
   },
 };

@@ -12,6 +12,7 @@ import { Player, PersistenceManager } from 'hytopia';
 import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
 import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
+import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 
 /**
  * Validates player data structure
@@ -80,18 +81,33 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     wins: typeof savedData.wins === 'number' && !isNaN(savedData.wins) && savedData.wins >= 0 
       ? savedData.wins 
       : defaults.wins,
-    currentPickaxeTier: typeof savedData.currentPickaxeTier === 'number' && !isNaN(savedData.currentPickaxeTier) && savedData.currentPickaxeTier >= 0 
-      ? Math.min(savedData.currentPickaxeTier, 19) // Cap at max tier
-      : defaults.currentPickaxeTier,
+    currentPickaxeTier: (() => {
+      const savedTier = typeof savedData.currentPickaxeTier === 'number' && !isNaN(savedData.currentPickaxeTier) && savedData.currentPickaxeTier >= 0
+        ? savedData.currentPickaxeTier
+        : defaults.currentPickaxeTier;
+      // Validate that the tier actually exists in the database
+      const maxValidTier = PICKAXE_DATABASE.length > 0 
+        ? Math.max(...PICKAXE_DATABASE.map(p => p.tier))
+        : 0;
+      // If saved tier is valid (exists in database), use it; otherwise use default
+      const pickaxeExists = PICKAXE_DATABASE.some(p => p.tier === savedTier);
+      return pickaxeExists ? savedTier : defaults.currentPickaxeTier;
+    })(),
     ownedPickaxes: (() => {
       // Check if ownedPickaxes exists in saved data
       if (Array.isArray(savedData.ownedPickaxes) && savedData.ownedPickaxes.length > 0) {
-        return savedData.ownedPickaxes.filter((t: any) => typeof t === 'number' && !isNaN(t) && t >= 0).sort((a: number, b: number) => a - b);
+        // Filter to only include valid tiers that exist in the database
+        const validTiers = savedData.ownedPickaxes.filter((t: any) => {
+          if (typeof t !== 'number' || isNaN(t) || t < 0) return false;
+          // Check if this tier exists in the pickaxe database
+          return PICKAXE_DATABASE.some(p => p.tier === t);
+        }).sort((a: number, b: number) => a - b);
+        return validTiers.length > 0 ? validTiers : [0];
       }
       // Migration: If ownedPickaxes not set, initialize based on currentPickaxeTier
       // Assume player owns all pickaxes from tier 0 up to currentPickaxeTier
       const currentTier = typeof savedData.currentPickaxeTier === 'number' && !isNaN(savedData.currentPickaxeTier) && savedData.currentPickaxeTier >= 0
-        ? Math.min(savedData.currentPickaxeTier, 19)
+        ? savedData.currentPickaxeTier
         : defaults.currentPickaxeTier;
       const owned: number[] = [];
       for (let i = 0; i <= currentTier; i++) {

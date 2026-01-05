@@ -84,6 +84,10 @@ export class TrainingSystem {
     if (!canAccess) {
       return;
     }
+    
+    // Additional safety check: if player doesn't meet rebirth requirement,
+    // ensure power gain won't be invalid (should return 0, but prevent Infinity/NaN)
+    // Players can still train via power requirement, but power gain will be 0 if rebirths = 0
 
     const state: TrainingState = {
       isTraining: true,
@@ -97,11 +101,11 @@ export class TrainingSystem {
     this.trainingStates.set(player, state);
 
     // Calculate hit rate (swings per second)
-    // Training uses the same swing rate as mining (uses pickaxe's miningSpeed property)
-    // Base swing rate is 2.0 swings/second (1 hit per 0.5 seconds)
-    // Reference: Planning/TrainingPowerBalanceBlueprint.md
-    const hitRate = getMiningSpeed(pickaxe);
-    const hitIntervalMs = 1000 / hitRate; // Total time per hit in milliseconds
+    // Training speed is CONSTANT: 2.0 swings/second (1 hit per 0.5 seconds)
+    // Training speed does NOT scale with pickaxe speed - it's always 2.0 swings/second
+    // Reference: PowerSystemPlan.md - Training Speed is constant regardless of pickaxe
+    const TRAINING_BASE_SWING_RATE = 2.0; // Constant: 2.0 swings/second for all training
+    const hitIntervalMs = 1000 / TRAINING_BASE_SWING_RATE; // 500ms per hit (constant)
     const ANIMATION_DURATION_MS = 200; // Animation duration (shortened for accurate timing)
     const delayAfterAnimation = Math.max(0, hitIntervalMs - ANIMATION_DURATION_MS); // Remaining time after animation
 
@@ -126,10 +130,23 @@ export class TrainingSystem {
       // UPDATED: Power gain uses piecewise functions based on rock tier and rebirths
       // Pickaxes no longer affect power gain - only rock selection and rebirth count matter
       // Reference: Planning/PowerSystemPlan.md section 4
-      const powerGain = calculatePowerGainPerHit(
+      let powerGain = calculatePowerGainPerHit(
         rock.tier,
         playerData.rebirths
       );
+      
+      // Safety check: ensure power gain is a valid finite number
+      // Prevent Infinity, NaN, or negative values that could cause overflow
+      if (!Number.isFinite(powerGain) || powerGain < 0) {
+        powerGain = 0;
+      }
+      
+      // Cap power gain to prevent 32-bit signed int overflow (max safe value)
+      const MAX_SAFE_POWER_GAIN = 2147483647; // 2^31 - 1
+      if (powerGain > MAX_SAFE_POWER_GAIN) {
+        powerGain = MAX_SAFE_POWER_GAIN;
+      }
+      
       // Notify that power was gained
       onPowerGain(player, powerGain);
 
@@ -149,7 +166,7 @@ export class TrainingSystem {
         }
       });
 
-      // Schedule next hit after the calculated interval
+      // Schedule next hit after the calculated interval (constant 500ms = 2.0 swings/second)
       if (currentState.isTraining) {
         state.intervalId = setTimeout(performHit, hitIntervalMs) as any;
       }

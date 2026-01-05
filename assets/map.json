@@ -119,6 +119,206 @@
       "isCustom": true,
       "isMultiTexture": true,
       "isLiquid": false
+    },
+    {
+      "id": 16,
+      "name": "stone-ore",
+      "textureUri": "blocks/StoneOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 17,
+      "name": "deepslate-ore",
+      "textureUri": "blocks/StoneOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 18,
+      "name": "coal-ore",
+      "textureUri": "blocks/CoalOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 19,
+      "name": "iron-ore",
+      "textureUri": "blocks/IronOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 20,
+      "name": "tin-ore",
+      "textureUri": "blocks/TinOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 21,
+      "name": "cobalt-ore",
+      "textureUri": "blocks/CobaltOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 22,
+      "name": "pyrite-ore",
+      "textureUri": "blocks/PyriteOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 23,
+      "name": "gold-ore",
+      "textureUri": "blocks/GoldOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 24,
+      "name": "obsidian-ore",
+      "textureUri": "blocks/ObsidianOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 25,
+      "name": "ruby-ore",
+      "textureUri": "blocks/RubyOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 26,
+      "name": "diamond-ore",
+      "textureUri": "blocks/DiamondOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 27,
+      "name": "amber-ore",
+      "textureUri": "blocks/AmberOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 28,
+      "name": "quartz-ore",
+      "textureUri": "blocks/QuartzOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 29,
+      "name": "topaz-ore",
+      "textureUri": "blocks/TopazOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 30,
+      "name": "emerald-ore",
+      "textureUri": "blocks/EmeraldOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 31,
+      "name": "relic-ore",
+      "textureUri": "blocks/RelicOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 32,
+      "name": "amethyst-ore",
+      "textureUri": "blocks/AmethystOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 33,
+      "name": "sapphire-ore",
+      "textureUri": "blocks/SapphireOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 34,
+      "name": "luminite-ore",
+      "textureUri": "blocks/LuminiteOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 35,
+      "name": "prismatic-ore",
+      "textureUri": "blocks/PrismaticOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 36,
+      "name": "sunstone-ore",
+      "textureUri": "blocks/SunstoneOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 37,
+      "name": "mithrial-ore",
+      "textureUri": "blocks/MithriaOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 38,
+      "name": "astralite-ore",
+      "textureUri": "blocks/AstraliteOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 39,
+      "name": "dragonstone-ore",
+      "textureUri": "blocks/DragonstoneOre",
+      "isCustom": false,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 40,
+      "name": "gold-block",
+      "textureUri": "blocks/gold-block.png",
+      "isCustom": false,
+      "isMultiTexture": false,
+      "isLiquid": false
     }
   ],
   "blocks": {

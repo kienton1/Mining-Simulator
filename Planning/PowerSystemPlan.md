@@ -89,18 +89,18 @@ PowerPerHit = Rock6PowerBonus(rebirths)
 - Once unlocked, a rock remains available for training
 
 ### Training Speed
-- **Training uses same swing rate as mining**
-- Base: 2.0 swings/second (1 hit per 0.5 seconds)
-- Scales with pickaxe tier (same as mining)
-- This means training speed improves as players get better pickaxes
-- Power gain per hit is fixed based on selected rock, but faster swings = more power per second
+- **Training speed is CONSTANT: 2.0 swings/second**
+- Base: 2.0 swings/second (1 hit per 0.5 seconds = 500ms per hit)
+- Training speed does NOT scale with pickaxe tier or upgrades
+- All training uses the same constant rate regardless of pickaxe speed
+- Power gain per hit is fixed based on selected rock and rebirth count
 
 ### Power Per Second Calculation (UPDATED)
 ```
-PowerPerSecond = RockPowerBonus × SwingRate
+PowerPerSecond = RockPowerBonus × 2.0
 ```
 
-**Note**: Training speed still scales with pickaxe tier (mining speed). All rocks' (Rocks 1-6) power gain per hit scale with rebirth count.
+**Note**: Training speed is constant at 2.0 swings/second for all players, regardless of pickaxe speed. All rocks' (Rocks 1-6) power gain per hit scale with rebirth count.
 
 ---
 
@@ -559,7 +559,7 @@ PowerPerHit = Rock6PowerBonus(rebirths)
 PowerPerSecond = PowerPerHit × SwingRate
 ```
 
-**REBALANCED**: All rocks' (Rocks 1-6) power gain scale with rebirth count using piecewise functions. Training swing rate scales with pickaxe tier (mining speed), but power per hit is determined by the selected rock and rebirth count.
+**REBALANCED**: All rocks' (Rocks 1-6) power gain scale with rebirth count using piecewise functions.  power per hit is determined by the selected rock and rebirth count.
 
 #### Mining Damage Formula (UPDATED)
 ```
@@ -595,6 +595,7 @@ SwingRate = BaseSwingRate × (1 + PickaxeSpeedBonus / 100)
   - PickaxeSpeedBonus is percentage increase (0% to 4,000,000%+)
   - Example: Speed = 5.0 means +5% = 2.0 × 1.05 = 2.1 swings/sec
   - Example: Speed = 30.0 means +30% = 2.0 × 1.30 = 2.6 swings/sec
+  - **Note**: Training speed is constant at 2.0 swings/second and does NOT use pickaxe speed
   
 TimePerBlock = SwingsNeeded / SwingRate
 TimePerLevel = TimePerBlock × 1 (since each level = 1 block)
@@ -1234,8 +1235,8 @@ This power system creates a balanced progression where:
 3. **Rebirths unlock higher-tier training rocks** (alternative unlock path for rocks)
 4. **Training investment is meaningful but balanced** (power scales non-linearly with enhanced early game scaling)
 5. **Power scales smoothly from early to late game** (20 power to 200,000+ power using Power^0.553 with EarlyBoost multiplier)
-6. **Pickaxes affect training speed** (faster swings = faster power gain) but not damage directly
-7. **Pickaxes provide speed, luck, and economic value** instead of damage
+6. **Training speed is constant** (always 2.0 swings/second, does NOT scale with pickaxe speed)
+7. **Pickaxes provide speed, luck, and economic value** for mining but do NOT affect training speed or damage
 
 **Design Philosophy**: Power enhances mining significantly but doesn't completely replace the need for better pickaxes. The synergy between pickaxes (speed/luck/sell multiplier) and power (damage) creates a balanced progression system.
 

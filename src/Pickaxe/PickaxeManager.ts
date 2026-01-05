@@ -38,14 +38,40 @@ function getPickaxeColor(tier: number): [number, number, number] {
 export class PickaxeManager {
   private world: World;
   private playerPickaxeEntities: Map<Player, Entity> = new Map();
+  private pickaxeAttachedCallbacks: Map<Player, (() => void)[]> = new Map();
 
   /**
    * Creates a new PickaxeManager instance
-   * 
+   *
    * @param world - Hytopia world instance
    */
   constructor(world: World) {
     this.world = world;
+  }
+
+  /**
+   * Register a callback to be called when pickaxe is attached to a player
+   *
+   * @param player - Player to monitor
+   * @param callback - Function to call when pickaxe is attached
+   */
+  onPickaxeAttached(player: Player, callback: () => void): void {
+    if (!this.pickaxeAttachedCallbacks.has(player)) {
+      this.pickaxeAttachedCallbacks.set(player, []);
+    }
+    this.pickaxeAttachedCallbacks.get(player)!.push(callback);
+  }
+
+  /**
+   * Call all registered callbacks for a player when pickaxe is attached
+   *
+   * @param player - Player whose pickaxe was attached
+   */
+  private notifyPickaxeAttached(player: Player): void {
+    const callbacks = this.pickaxeAttachedCallbacks.get(player);
+    if (callbacks) {
+      callbacks.forEach(callback => callback());
+    }
   }
 
   /**
@@ -159,6 +185,9 @@ export class PickaxeManager {
         } catch (error) {
         }
       }
+
+      // Notify that pickaxe attachment is complete
+      this.notifyPickaxeAttached(player);
     }, 100);
 
     // Store reference for cleanup (do this immediately, attachment happens in setTimeout)

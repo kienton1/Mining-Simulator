@@ -143,7 +143,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   },
   {
     tier: 6,
-    name: 'Solarite', // Sunstone Pickaxe renamed
+    name: 'Sunstone', // Sunstone Pickaxe
     miningSpeed: 30, // +30 Speed
     luckBonus: luckPercentToDecimal(5), // +5% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(90), // +90% Coins = 1.9x

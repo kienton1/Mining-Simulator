@@ -67,6 +67,11 @@ export class MiningController {
       this.gameManager.addGems(player, finalGems);
       console.log(`[MiningController] Chest broken: awarded ${finalGems} gems (base: ${baseGems}, multiplier: ${moreGemsMultiplier}x)`);
     });
+
+    // Set callback for when player reaches win condition
+    this.miningSystem.setWinCallback((player) => {
+      this.gameManager.handlePlayerWin(player);
+    });
   }
 
   /**
@@ -118,14 +123,20 @@ export class MiningController {
       (p, oreType, amount) => {
         // Add ore to inventory
         this.gameManager.addOreToInventory(p, oreType, amount);
-        
-        // Note: Removed ore mined popup notification - info is shown in mining target display
       },
       (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
         const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
-        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward);
-        
+        // Include ore mined info when block is destroyed (like damage popups)
+        const oreMined = blockHP <= 0 && !isChest && oreData ? oreData.name : null;
+        const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
+
+        if (oreMined) {
+          console.log(`[MiningController] Block destroyed - sending ore mined: ${oreMined} (damage: ${damage}, blockHP: ${blockHP})`);
+        }
+
+        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward, oreMined, oreMinedColor);
+
         // If block was destroyed (HP reached 0), update indicator for new block after a short delay
         // This ensures the UI shows the new block at the new depth
         if (blockHP <= 0) {
@@ -202,7 +213,7 @@ export class MiningController {
   private updateBlockIndicator(player: Player, pickaxe: PickaxeData): void {
     try {
       const blockInfo = this.miningSystem.detectCurrentBlock(player, pickaxe);
-      
+
       if (!blockInfo) {
         // No valid block - hide indicator
         player.ui.sendData({
@@ -216,6 +227,32 @@ export class MiningController {
           gemReward: null,
         });
         return;
+      }
+
+      // Check if this is the unminable gold block - trigger win automatically
+      if (blockInfo.chestType === 'Unminable Gold Block') {
+        const miningState = this.miningSystem.getMiningState(player);
+        if (miningState && !miningState.winTriggered) {
+          // Trigger win condition automatically when reaching the gold block
+          miningState.winTriggered = true;
+
+          // Send immediate win notification to UI
+          player.ui.sendData({
+            type: 'WIN_CONDITION_TRIGGERED',
+            message: 'You reached the bottom! The mines are resetting...'
+          });
+
+          // Delay the actual win logic by 2 seconds to let player see the gold block
+          setTimeout(() => {
+            // Check if player is still in the mines (they might have left manually)
+            const currentState = this.miningSystem.getMiningState(player);
+            if (currentState) {
+              // Player is still in mines, trigger win
+              this.gameManager.handlePlayerWin(player);
+            }
+            // If player left mines, don't trigger win (they escaped manually)
+          }, 2000);
+        }
       }
 
       // Send update with block info (0 damage since we're just detecting, not mining)
@@ -297,21 +334,27 @@ export class MiningController {
       (p, oreType, amount) => {
         // Add ore to inventory
         this.gameManager.addOreToInventory(p, oreType, amount);
-        
-        // Note: Removed ore mined popup notification - info is shown in mining target display
       },
       (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
         const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
-        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward);
-        
+        // Include ore mined info when block is destroyed (like damage popups)
+        const oreMined = blockHP <= 0 && !isChest && oreData ? oreData.name : null;
+        const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
+
+        if (oreMined) {
+          console.log(`[MiningController] Block destroyed - sending ore mined: ${oreMined} (damage: ${damage}, blockHP: ${blockHP})`);
+        }
+
+        this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward, oreMined, oreMinedColor);
+
         // Send progress update when depth changes
         const currentMiningState = this.miningSystem.getMiningState(p);
         if (currentMiningState) {
           // Pass the actual depth (negative value) - sendProgressUpdate will calculate blocks mined
           this.gameManager.sendProgressUpdate(p, currentMiningState.currentDepth);
         }
-        
+
         // If block was destroyed (HP reached 0), update indicator for new block after a short delay
         // This ensures the UI shows the new block at the new depth
         if (blockHP <= 0) {
@@ -426,18 +469,9 @@ export class MiningController {
   }
 
   /**
-   * Sends ore mined event to UI
-   */
-  private sendOreMinedEvent(player: Player, oreName: string): void {
-    player.ui.sendData({
-      type: 'ORE_MINED',
-      oreName,
-    });
-  }
-
-  /**
    * Sends mining update event to UI (damage and current ore)
    * Now includes sell value for ores and gem rewards for chests
+   * Also includes ore mined info when block is destroyed (like damage popups)
    */
   private sendMiningUpdateEvent(
     player: Player,
@@ -447,7 +481,9 @@ export class MiningController {
     maxHP: number,
     isChest: boolean = false,
     chestType: string | null = null,
-    gemReward: number | null = null
+    gemReward: number | null = null,
+    oreMined: string | null = null,
+    oreMinedColor: string | null = null
   ): void {
     // Calculate sell value for ores (if not a chest)
     let sellValue: number | null = null;
@@ -488,6 +524,8 @@ export class MiningController {
       sellValue, // For ores: how much gold this ore will sell for (with pickaxe and More Coins multipliers)
       gemReward: finalGemReward, // For chests: how many gems this chest will give (with More Gems multiplier)
       oreColor, // For ores: color to display the ore name in
+      oreMined, // For ores: name of ore when block is destroyed (for popup, like damage)
+      oreMinedColor, // For ores: color of ore when block is destroyed (for popup)
     });
   }
 

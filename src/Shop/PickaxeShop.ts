@@ -99,8 +99,18 @@ export class PickaxeShop {
       };
     }
 
-    // ENFORCE TIER PROGRESSION: Can only buy next tier (currentTier + 1)
-    const nextTier = playerData.currentPickaxeTier + 1;
+    // ENFORCE TIER PROGRESSION: Can only buy the next tier based on OWNERSHIP (not what's equipped)
+    let ownedPickaxes = playerData.ownedPickaxes;
+    if (!ownedPickaxes || ownedPickaxes.length === 0) {
+      ownedPickaxes = [0];
+    } else if (!ownedPickaxes.includes(0)) {
+      ownedPickaxes = [0, ...ownedPickaxes];
+    }
+
+    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
+    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
+    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+    const nextTier = effectiveTier + 1;
     if (tier !== nextTier) {
       return {
         success: false,
@@ -177,28 +187,34 @@ export class PickaxeShop {
       };
     }
 
-    const currentTier = playerData.currentPickaxeTier;
+    const equippedTier = playerData.currentPickaxeTier ?? 0;
     const playerGold = playerData.gold || 0;
-    const nextTier = currentTier + 1;
-    const ownedPickaxes = playerData.ownedPickaxes || [0]; // Default to tier 0 if not set
+
+    // Owned pickaxes drive progression (not what is currently equipped)
+    let ownedPickaxes = playerData.ownedPickaxes;
+    if (!ownedPickaxes || ownedPickaxes.length === 0) {
+      ownedPickaxes = [0]; // Default to tier 0 if not set
+    } else if (!ownedPickaxes.includes(0)) {
+      ownedPickaxes = [0, ...ownedPickaxes];
+    }
+
+    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
+    const effectiveTier = Math.max(equippedTier, highestOwnedTier);
+    const nextTier = effectiveTier + 1;
 
     const pickaxes = PICKAXE_DATABASE.map(pickaxe => {
       let availability: 'equipped' | 'owned' | 'available' | 'locked' = 'locked';
       let purchasable = false;
 
-      if (pickaxe.tier === currentTier) {
+      if (pickaxe.tier === equippedTier) {
         availability = 'equipped';
       } else if (ownedPickaxes.includes(pickaxe.tier)) {
         // Player owns this pickaxe but it's not equipped
         availability = 'owned';
       } else if (pickaxe.tier === nextTier) {
-        // Next tier - check if affordable
-        if (playerGold >= pickaxe.cost) {
-          availability = 'available';
-          purchasable = true;
-        } else {
-          availability = 'locked'; // Can't afford
-        }
+        // Next tier - always available, but purchasable based on affordability
+        availability = 'available';
+        purchasable = playerGold >= pickaxe.cost;
       } else {
         // Too far ahead
         availability = 'locked';
@@ -217,7 +233,7 @@ export class PickaxeShop {
     });
 
     return {
-      currentTier,
+      currentTier: equippedTier,
       playerGold,
       pickaxes,
     };
@@ -293,7 +309,19 @@ export class PickaxeShop {
       return null;
     }
 
-    const nextTier = playerData.currentPickaxeTier + 1;
+    // Next tier is based on highest owned tier (not what is equipped)
+    let ownedPickaxes = playerData.ownedPickaxes;
+    if (!ownedPickaxes || ownedPickaxes.length === 0) {
+      ownedPickaxes = [0];
+    } else if (!ownedPickaxes.includes(0)) {
+      ownedPickaxes = [0, ...ownedPickaxes];
+    }
+
+    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
+    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
+    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+
+    const nextTier = effectiveTier + 1;
     if (nextTier >= PICKAXE_DATABASE.length) {
       return null; // Max tier reached
     }
@@ -314,9 +342,19 @@ export class PickaxeShop {
     }
 
     const available: number[] = [];
-    const currentTier = playerData.currentPickaxeTier;
+    // Available tiers are based on highest owned tier (not what is equipped)
+    let ownedPickaxes = playerData.ownedPickaxes;
+    if (!ownedPickaxes || ownedPickaxes.length === 0) {
+      ownedPickaxes = [0];
+    } else if (!ownedPickaxes.includes(0)) {
+      ownedPickaxes = [0, ...ownedPickaxes];
+    }
 
-    for (let tier = currentTier + 1; tier < PICKAXE_DATABASE.length; tier++) {
+    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
+    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
+    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+
+    for (let tier = effectiveTier + 1; tier < PICKAXE_DATABASE.length; tier++) {
       available.push(tier);
     }
 

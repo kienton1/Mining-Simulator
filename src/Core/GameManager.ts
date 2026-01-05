@@ -1053,9 +1053,84 @@ export class GameManager {
   }
 
   /**
+   * Handles player win condition (reaching depth 1000)
+   * Increments wins, teleports to surface, resets mines, and resets timer
+   *
+   * @param player - Player who reached the win condition
+   */
+  handlePlayerWin(player: Player): void {
+    const playerData = this.getPlayerData(player);
+    if (!playerData) {
+      return;
+    }
+
+    // Increment wins
+    playerData.wins += 1;
+    this.updatePlayerData(player, playerData);
+
+    // Update UI with new wins count
+    this.sendPowerStatsToUI(player);
+
+    // Stop auto modes and mining
+    const autoState = this.playerAutoStates.get(player);
+    if (autoState) {
+      if (autoState.autoMineEnabled) {
+        this.stopAutoMine(player);
+        autoState.autoMineEnabled = false;
+        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
+      }
+      if (autoState.autoTrainEnabled) {
+        this.stopAutoTrain(player);
+        autoState.autoTrainEnabled = false;
+        player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
+      }
+    }
+
+    // Stop mining if active
+    this.miningController?.stopMiningLoop(player);
+
+    // Stop block detection
+    this.miningController?.stopBlockDetection(player);
+
+    // Teleport to surface
+    this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
+
+    // Mark player as not in the mine
+    this.setPlayerInMine(player, false);
+
+    // Reset mine to level 0
+    const miningSystem = this.miningController?.getMiningSystem();
+    if (miningSystem) {
+      miningSystem.resetMineToLevel0(player);
+    }
+
+    // Stop the mine reset timer (don't restart it - player is on surface)
+    this.stopMineResetTimer(player);
+
+    // Update UI
+    player.ui.sendData({
+      type: 'MINING_STATE_UPDATE',
+      isInMine: false,
+    });
+
+    // Clear any existing timer UI since we're on surface
+    player.ui.sendData({
+      type: 'MINE_RESET_TIMER',
+      timeRemaining: null,
+      secondsRemaining: 0,
+    });
+
+    // Send win notification
+    player.ui.sendData({
+      type: 'PLAYER_WIN',
+      wins: playerData.wins,
+    });
+  }
+
+  /**
    * Toggles auto train mode for a player
    * When enabled, player teleports to highest tier training rock and trains automatically
-   * 
+   *
    * @param player - Player to toggle auto train for
    */
   toggleAutoTrain(player: Player): void {
@@ -1175,12 +1250,12 @@ export class GameManager {
           if (!playerEnt || !autoState.lastAutoTrainPosition) return;
 
           // FIRST: Check for movement - if player moves, turn off auto-train immediately
-          // Check for movement input first (WASD or space/jump)
+          // Check for movement input (WASD keys only - don't check space bar to avoid input conflicts)
           const input = player.input;
           const hasMovementInput = Boolean(
             input?.['w'] || input?.['a'] || input?.['s'] || input?.['d'] ||
-            input?.['W'] || input?.['A'] || input?.['S'] || input?.['D'] ||
-            input?.[' '] // Space bar for jumping
+            input?.['W'] || input?.['A'] || input?.['S'] || input?.['D']
+            // Removed space bar check to prevent input interference
           );
 
           // Check velocity if available
@@ -1621,15 +1696,15 @@ export class GameManager {
    * @param currentDepth - Current mining depth (Y coordinate, negative when below start)
    */
   sendProgressUpdate(player: Player, currentDepth: number): void {
-    // Calculate blocks mined: distance from starting depth (0) to current depth
-    // If currentDepth is -20, that means 20 blocks have been mined from the start
-    // MINE_DEPTH_START is 0, so if currentDepth is -20, blocksMined = 0 - (-20) = 20
-    // Ensure we always get a positive value (player should be at or below starting depth)
-    const blocksMined = Math.max(0, MINE_DEPTH_START - currentDepth);
+    // Get the current mine level (0-based) - this represents blocks mined
+    // Each mine level is 3 Y levels tall, so mine level 0 = Y: 0, -1, -2
+    // mine level 1 = Y: -3, -4, -5, etc.
+    // This ensures the progress bar shows blocks mined, not Y levels descended
+    const mineLevel = this.miningController.getCurrentMineLevel(player);
 
     player.ui.sendData({
       type: 'PROGRESS_UPDATE',
-      currentDepth: blocksMined, // Blocks mined from start (should be positive)
+      currentDepth: mineLevel, // Mine level (blocks mined) - should be 0-1000
       goalDepth: 1000,
     });
 

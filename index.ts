@@ -28,10 +28,11 @@ import {
   Audio,
   PlayerEvent,
   PlayerUIEvent,
+  CollisionGroup,
 } from 'hytopia';
 import { ORE_DATABASE, OreType } from './src/Mining/Ore/OreData';
 
-import worldMap from './assets/map.json';
+import * as worldMap from './assets/map.json';
 import { GameManager } from './src/Core/GameManager';
 import { PickaxeManager } from './src/Pickaxe/PickaxeManager';
 import { MiningPlayerEntity } from './src/Core/MiningPlayerEntity';
@@ -137,7 +138,7 @@ startServer(world => {
       id: 'egg-station-stone',
       name: 'Stone Egg Station',
       eggType: EggType.STONE,
-      defaultOpenCount: 1,
+      defaultOpenCount: 1 as const,
       // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,9"
       position: { x: -13, y: 2, z: 9 },
     },
@@ -145,7 +146,7 @@ startServer(world => {
       id: 'egg-station-gem',
       name: 'Gem Egg Station',
       eggType: EggType.GEM,
-      defaultOpenCount: 3,
+      defaultOpenCount: 3 as const,
       // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,5"
       position: { x: -13, y: 2, z: 5 },
     },
@@ -153,7 +154,7 @@ startServer(world => {
       id: 'egg-station-crystal',
       name: 'Crystal Egg Station',
       eggType: EggType.CRYSTAL,
-      defaultOpenCount: 1,
+      defaultOpenCount: 1 as const,
       // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,1"
       position: { x: -13, y: 2, z: 1 },
     },
@@ -369,6 +370,20 @@ startServer(world => {
     const playerEntity = new MiningPlayerEntity(player);
     playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
 
+    // Disable player-to-player collisions
+    // Players belong to PLAYER group but don't collide with other players
+    // They still collide with blocks, entities, and everything else
+    playerEntity.setCollisionGroupsForSolidColliders({
+      belongsTo: [CollisionGroup.PLAYER],
+      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER],
+    });
+    
+    // Also update sensor colliders (if any) to prevent sensor collisions between players
+    playerEntity.setCollisionGroupsForSensorColliders({
+      belongsTo: [CollisionGroup.PLAYER],
+      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER],
+    });
+
     // Set and lock camera zoom (zoom out a bit and prevent player from changing it)
     // Wait a moment for camera to initialize
     setTimeout(() => {
@@ -410,14 +425,38 @@ startServer(world => {
       // Only update if loaded data is different from defaults
       const currentData = gameManager.getPlayerData(player);
       if (currentData && loadedData) {
-        // Update with loaded data
+        // Store the saved pickaxe and miner tiers before updating
+        // Use the loaded data values directly (they've already been validated by PersistenceManager)
+        const savedPickaxeTier = loadedData.currentPickaxeTier ?? defaultPlayerData.currentPickaxeTier;
+        const savedMinerTier = loadedData.currentMinerTier ?? defaultPlayerData.currentMinerTier;
+        
+        // Update with loaded data (this updates the in-memory playerDataMap)
         gameManager.updatePlayerData(player, loadedData);
         
-        // Update pickaxe if tier changed
-        if (loadedData.currentPickaxeTier !== defaultPlayerData.currentPickaxeTier) {
-          pickaxeManager.attachPickaxeToPlayer(player, loadedData.currentPickaxeTier);
-          // Re-initialize mine with new pickaxe (in case mine generation depends on pickaxe)
-          gameManager.initializePlayerMine(player);
+        // Always restore pickaxe from saved data (ensures persistence works correctly)
+        // Use a small delay to ensure entity is fully spawned before attaching pickaxe
+        setTimeout(() => {
+          pickaxeManager.attachPickaxeToPlayer(player, savedPickaxeTier);
+        }, 50);
+        
+        // Re-initialize mine with saved pickaxe (in case mine generation depends on pickaxe)
+        // Only re-initialize if pickaxe tier actually changed from default
+        if (savedPickaxeTier !== defaultPlayerData.currentPickaxeTier) {
+          // Small delay to ensure pickaxe is attached first
+          setTimeout(() => {
+            gameManager.initializePlayerMine(player);
+          }, 100);
+        }
+        
+        // Miner tier is restored automatically through the loaded PlayerData
+        // The equipped miner tier is now persisted in currentMinerTier
+        // No visual representation needed, but bonuses will apply correctly
+        // Verify miner tier was restored correctly
+        const finalData = gameManager.getPlayerData(player);
+        if (finalData && finalData.currentMinerTier !== savedMinerTier) {
+          // If miner tier wasn't restored, fix it
+          finalData.currentMinerTier = savedMinerTier;
+          gameManager.updatePlayerData(player, finalData);
         }
         
         // IMPORTANT: Update UI with loaded data after a brief delay
@@ -425,7 +464,7 @@ startServer(world => {
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
 
-        }, 100);
+        }, 150);
       } else if (currentData) {
         // Even if no saved data, ensure UI is updated with current data
         setTimeout(() => {
@@ -433,7 +472,7 @@ startServer(world => {
         }, 100);
       }
     }).catch(error => {
-
+      console.error(`Failed to load player data for ${player.id}:`, error);
       // Still update UI with defaults if load fails
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
@@ -445,7 +484,7 @@ startServer(world => {
     
     // Set up UI loaded handler - this will send initial stats
     // Note: If saved data loads after UI loads, it will update the UI automatically
-    player.ui.on(PlayerUIEvent.LOADED, () => {
+    player.ui.on(PlayerUIEvent.LOAD, () => {
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
     });
@@ -602,8 +641,6 @@ startServer(world => {
           }
           break;
         case 'OPEN_PICKAXE_SHOP':
-
-          // Modal state should already be set by MODAL_OPENED event, but set it here too as backup
           gameManager.setModalState(player, 'pickaxe', true);
           const shopData = gameManager.getPickaxeShop().getShopData(player);
           player.ui.sendData({

@@ -101,19 +101,19 @@ export interface InventoryData {
   [OreType.QUARTZ]?: number;
   [OreType.TOPAZ]?: number;
   [OreType.EMERALD]?: number;
-  [OreType.FOSSIL]?: number;
+  [OreType.RELIC]?: number;
   
   // Ultra Rare Ores (Late Game)
   [OreType.AMETHYST]?: number;
   [OreType.SAPPHIRE]?: number;
-  [OreType.URANIUM]?: number;
-  [OreType.CRYSTALITE]?: number;
+  [OreType.LUMINITE]?: number;
+  [OreType.PRISMATIC]?: number;
   
   // Legendary Ores (End Game)
-  [OreType.SOLARITE]?: number;
-  [OreType.MYTHRIL]?: number;
-  [OreType.STALLITE]?: number;
-  [OreType.DRACONIUM]?: number;
+  [OreType.SUNSTONE]?: number;
+  [OreType.MITHRIAL]?: number;
+  [OreType.ASTRALITE]?: number;
+  [OreType.DRAGONSTONE]?: number;
 }
 
 /**

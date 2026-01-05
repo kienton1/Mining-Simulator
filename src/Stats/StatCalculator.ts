@@ -9,7 +9,7 @@
  * Reference: Planning/PowerSystemPlan.md - Power System with Piecewise Functions
  */
 
-import { PickaxeData } from '../Pickaxe/PickaxeData';
+import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import { TrainingRockTier } from '../Surface/Training/TrainingRockData';
 // Note: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are deprecated
 // New system uses power-based damage formula and piecewise functions for power gain
@@ -23,6 +23,11 @@ import { TrainingRockTier } from '../Surface/Training/TrainingRockData';
  */
 function calculateRock1PowerGain(rebirths: number): number {
   const x = rebirths;
+  
+  // Special case: x = 0 returns 1 (base power gain)
+  if (x === 0) {
+    return 1;
+  }
   
   if (x >= 1 && x <= 36) {
     return Math.floor((x + 4) / 5);
@@ -51,14 +56,21 @@ function calculateRock1PowerGain(rebirths: number): number {
 function calculateRock2PowerGain(rebirths: number): number {
   const x = rebirths;
   
+  // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
+  if (x === 0) {
+    return 1;
+  }
+  
   if (x >= 1 && x < 57) {
-    return Math.floor(x / 5);
+    // For low rebirth counts, ensure minimum of 1 power gain
+    // Formula: floor(x / 5) but with minimum of 1 to ensure progression
+    return Math.max(1, Math.floor((x + 6) / 5));
   } else if (x >= 57 && x < 2510) {
     return Math.floor(0.15 * x + 2.5);
   } else if (x >= 2510) {
     return Math.floor(0.15 * x + 2);
   } else {
-    return 0; // x < 1
+    return 1; // x < 1 (shouldn't reach here, but return 1 as minimum)
   }
 }
 
@@ -72,6 +84,11 @@ function calculateRock2PowerGain(rebirths: number): number {
 function calculateRock3PowerGain(rebirths: number): number {
   const x = rebirths;
   
+  // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
+  if (x === 0) {
+    return 1;
+  }
+  
   if (x >= 1 && x <= 47) {
     return Math.floor(0.8 * x + 7);
   } else if (x > 47 && x < 2510) {
@@ -79,7 +96,7 @@ function calculateRock3PowerGain(rebirths: number): number {
   } else if (x >= 2510) {
     return Math.floor(0.75 * x);
   } else {
-    return 0; // x < 1
+    return 0; // x < 1 (shouldn't reach here due to x=0 check above)
   }
 }
 
@@ -102,6 +119,11 @@ function roundHalf(value: number): number {
  */
 function calculateRock4PowerGain(rebirths: number): number {
   const x = rebirths;
+  
+  // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
+  if (x === 0) {
+    return 1;
+  }
   
   if (x <= 457) {
     return roundHalf((9 * x + 91) / 4);

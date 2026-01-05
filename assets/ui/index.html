@@ -704,15 +704,15 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       'quartz': { name: 'Quartz', value: 5000, color: 'quartz' },
       'topaz': { name: 'Topaz', value: 10000, color: 'topaz' },
       'emerald': { name: 'Emerald', value: 20000, color: 'emerald' },
-      'fossil': { name: 'Fossil', value: 50000, color: 'fossil' },
+      'relic': { name: 'Relic', value: 50000, color: 'relic' },
       'amethyst': { name: 'Amethyst', value: 75000, color: 'amethyst' },
       'sapphire': { name: 'Sapphire', value: 150000, color: 'sapphire' },
-      'uranium': { name: 'Uranium', value: 250000, color: 'uranium' },
-      'crystalite': { name: 'Crystalite', value: 350000, color: 'crystalite' },
-      'solarite': { name: 'Solarite', value: 450000, color: 'solarite' },
-      'mythril': { name: 'Mythril', value: 600000, color: 'mythril' },
-      'stallite': { name: 'Stallite', value: 800000, color: 'stallite' },
-      'draconium': { name: 'Draconium', value: 1500000, color: 'draconium' },
+      'luminite': { name: 'Luminite', value: 250000, color: 'luminite' },
+      'prismatic': { name: 'Prismatic', value: 350000, color: 'prismatic' },
+      'sunstone': { name: 'Sunstone', value: 450000, color: 'sunstone' },
+      'mithrial': { name: 'Mithrial', value: 600000, color: 'mithrial' },
+      'astralite': { name: 'Astralite', value: 800000, color: 'astralite' },
+      'dragonstone': { name: 'Dragonstone', value: 1500000, color: 'dragonstone' },
     };
 
     // Format number for display (2 decimals for money/power, but hide .00)
@@ -866,7 +866,6 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const minerDetailBadge = document.getElementById('miner-detail-badge');
     const minerDetailIcon = document.getElementById('miner-detail-icon');
     const pickaxeGridEl = document.getElementById('pickaxe-grid');
-    const pickaxeActionButton = document.getElementById('pickaxe-action-button');
     const pickaxeDetailName = document.getElementById('pickaxe-detail-name');
     const pickaxeDetailStats = document.getElementById('pickaxe-detail-stats');
     const pickaxeDetailCost = document.getElementById('pickaxe-detail-cost');
@@ -994,7 +993,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       },
       pickaxe: {
         currentTier: 0,
-        selectedTier: 0,
+        selectedTier: undefined,
         pickaxes: [],
       },
       rebirth: {
@@ -1590,17 +1589,26 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     };
 
     const renderPickaxeDetails = () => {
-      // Show equipped pickaxe in left panel (per planning document)
-      const equipped = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
-      if (!equipped) {
-        // Fallback to current tier
-        const current = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.currentTier);
-        if (current) {
-          renderEquippedPickaxe(current);
-        }
-        return;
+      // Show selected pickaxe, or equipped if none selected
+      let pickaxeToShow = null;
+      
+      if (state.pickaxe.selectedTier !== undefined) {
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.selectedTier);
       }
-      renderEquippedPickaxe(equipped);
+      
+      if (!pickaxeToShow) {
+        // Fallback to equipped pickaxe
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
+      }
+      
+      if (!pickaxeToShow) {
+        // Fallback to current tier
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.currentTier);
+      }
+      
+      if (pickaxeToShow) {
+        renderEquippedPickaxe(pickaxeToShow);
+      }
     };
 
     const renderEquippedPickaxe = (pickaxe) => {
@@ -1638,41 +1646,52 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         pickaxeDetailStats.appendChild(sellStat);
       }
 
-      // Cost display (should show "Equipped" for equipped pickaxe)
-      if (pickaxeDetailCost) {
-        pickaxeDetailCost.textContent = pickaxe.availability === 'equipped' ? 'Equipped' : `Cost: ${formatNumber(pickaxe.cost)}`;
-      }
-
-      // Action button (hide for equipped, show buy for available)
-      if (pickaxeActionButton) {
+      // Action button logic
+      // IMPORTANT: Do NOT cache the action button element globally.
+      // We replace it when updating listeners (clone/remove), so we must re-query it each render.
+      const pickaxeActionButtonEl = document.getElementById('pickaxe-action-button');
+      if (pickaxeActionButtonEl) {
         // Remove existing click listeners by cloning
-        const newButton = pickaxeActionButton.cloneNode(true);
-        pickaxeActionButton.parentNode.replaceChild(newButton, pickaxeActionButton);
+        const newButton = pickaxeActionButtonEl.cloneNode(true);
+        pickaxeActionButtonEl.parentNode.replaceChild(newButton, pickaxeActionButtonEl);
         const actionButton = document.getElementById('pickaxe-action-button');
         
         if (pickaxe.availability === 'equipped') {
+          // Currently equipped - show "Equipped" text (not a button)
           actionButton.textContent = 'Equipped';
           actionButton.classList.add('disabled');
+          actionButton.disabled = true;
         } else if (pickaxe.availability === 'owned') {
-          // Player owns this pickaxe but it's not equipped - show Equip button
+          // Player owns this pickaxe but it's not equipped - show green Equip button
           actionButton.textContent = 'Equip';
           actionButton.classList.remove('disabled');
+          actionButton.disabled = false;
           actionButton.dataset.tier = String(pickaxe.tier);
           actionButton.addEventListener('click', () => {
             console.log(`[UI] Equip pickaxe tier ${pickaxe.tier} from action button`);
             hytopia.sendData({ type: 'EQUIP_PICKAXE', tier: pickaxe.tier });
           });
-        } else if (pickaxe.availability === 'available' && pickaxe.purchasable) {
-          actionButton.textContent = `Buy (${formatNumber(pickaxe.cost)})`;
-          actionButton.classList.toggle('disabled', state.gold < pickaxe.cost);
+        } else if (pickaxe.availability === 'available') {
+          // Next tier available - show buy button with cost, grey out if can't afford
+          actionButton.textContent = `🪙 ${formatNumber(pickaxe.cost)}`;
+          actionButton.disabled = false;
+          if (!pickaxe.purchasable) {
+            actionButton.classList.add('disabled');
+          } else {
+            actionButton.classList.remove('disabled');
+          }
           actionButton.dataset.tier = String(pickaxe.tier);
           actionButton.addEventListener('click', () => {
-            console.log(`[UI] Buy pickaxe tier ${pickaxe.tier} from action button`);
-            hytopia.sendData({ type: 'BUY_PICKAXE', tier: pickaxe.tier });
+            if (pickaxe.purchasable) {
+              console.log(`[UI] Buy pickaxe tier ${pickaxe.tier} from action button`);
+              hytopia.sendData({ type: 'BUY_PICKAXE', tier: pickaxe.tier });
+            }
           });
         } else {
+          // Locked - show locked state
           actionButton.textContent = 'Locked';
           actionButton.classList.add('disabled');
+          actionButton.disabled = true;
         }
       }
     };
@@ -1722,30 +1741,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           card.appendChild(costEl);
         }
 
-        // Equip button (for owned but not equipped pickaxes)
-        if (isOwned && !isEquipped) {
-          const equipButton = document.createElement('button');
-          equipButton.className = 'pickaxe-card__buy-button';
-          equipButton.textContent = 'Equip';
-          equipButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log(`[UI] Equip pickaxe tier ${p.tier} clicked`);
-            hytopia.sendData({ type: 'EQUIP_PICKAXE', tier: p.tier });
-          });
-          card.appendChild(equipButton);
-        }
-        // Buy button (only for available pickaxes)
-        else if (isAvailable && p.purchasable && state.gold >= p.cost) {
-          const buyButton = document.createElement('button');
-          buyButton.className = 'pickaxe-card__buy-button';
-          buyButton.textContent = 'Buy';
-          buyButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log(`[UI] Buy pickaxe tier ${p.tier} clicked`);
-            hytopia.sendData({ type: 'BUY_PICKAXE', tier: p.tier });
-          });
-          card.appendChild(buyButton);
-        }
+        // No buy/equip buttons on cards - all interactions happen in sidebar
 
         // Equipped checkmark
         if (isEquipped) {
@@ -1763,6 +1759,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           card.appendChild(lock);
         }
 
+        // Highlight selected card
+        if (state.pickaxe.selectedTier === p.tier) {
+          card.classList.add('selected');
+        }
+
         // Click to select (for details view) - for all pickaxes
         card.addEventListener('click', () => {
           state.pickaxe.selectedTier = p.tier;
@@ -1778,48 +1779,52 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       state.pickaxe.pickaxes = data.pickaxes || [];
       state.pickaxe.currentTier = data.currentTier ?? 0;
       state.gold = data.gold ?? state.gold;
-      if (!state.pickaxe.selectedTier) {
-        state.pickaxe.selectedTier = state.pickaxe.currentTier;
+
+      // If no selection, select the equipped pickaxe
+      if (state.pickaxe.selectedTier === undefined || state.pickaxe.selectedTier === -1) {
+        const equipped = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
+        state.pickaxe.selectedTier = equipped ? equipped.tier : (state.pickaxe.currentTier >= 0 ? state.pickaxe.currentTier : (data.pickaxes && data.pickaxes.length > 0 ? data.pickaxes[0].tier : 0));
       }
-      // mark owned/equipped flags
-      state.pickaxe.pickaxes = state.pickaxe.pickaxes.map(p => ({
-        ...p,
-        isEquipped: p.tier === state.pickaxe.currentTier,
-      }));
+
       renderPickaxeGrid();
       renderPickaxeDetails();
       showModal(pickaxeModal);
     };
 
     const renderMinerDetails = () => {
-      // Check if a miner is selected, otherwise show equipped
+      // Show selected miner, or equipped if none selected
+      let minerToShow = null;
+      
       if (state.miner.selectedTier !== undefined && state.miner.selectedTier !== -1) {
-        // Always get the most up-to-date miner data from state
-        const selectedMiner = state.miner.miners.find(m => m.tier === state.miner.selectedTier);
-        if (selectedMiner) {
-          renderEquippedMiner(selectedMiner);
-          return;
-        }
+        minerToShow = state.miner.miners.find(m => m.tier === state.miner.selectedTier);
       }
       
-      // No selection, show equipped miner or none
-      const equipped = state.miner.miners.find(m => m.availability === 'equipped');
-      if (equipped) {
-        renderEquippedMiner(equipped);
+      if (!minerToShow) {
+        // Fallback to equipped miner
+        minerToShow = state.miner.miners.find(m => m.availability === 'equipped');
+      }
+      
+      if (minerToShow) {
+        renderEquippedMiner(minerToShow);
       } else {
         renderEquippedMiner(null);
       }
     };
 
     const renderEquippedMiner = (miner) => {
-      if (!minerDetailName || !minerDetailStats || !minerDetailBadge || !minerDetailIcon) return;
+      const minerActionButton = document.getElementById('miner-action-button');
+      if (!minerDetailName || !minerDetailStats || !minerActionButton || !minerDetailIcon) return;
 
       if (!miner) {
         // No miner equipped
         minerDetailIcon.textContent = '⛑️';
         minerDetailName.textContent = 'No Miner';
         minerDetailStats.innerHTML = '';
-        minerDetailBadge.textContent = 'None Equipped';
+        if (minerActionButton) {
+          minerActionButton.textContent = 'No Miner';
+          minerActionButton.classList.add('disabled');
+          minerActionButton.disabled = true;
+        }
         return;
       }
 
@@ -1847,15 +1852,50 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       damageStat.textContent = `+${miner.damageBonus}% Damage`;
       minerDetailStats.appendChild(damageStat);
       
-      // Set badge text based on availability (matching pickaxe UI style)
-      if (miner.availability === 'equipped') {
-        minerDetailBadge.textContent = 'Equipped';
-      } else if (miner.availability === 'owned') {
-        minerDetailBadge.textContent = ''; // No badge for owned but not equipped
-      } else if (miner.availability === 'locked') {
-        minerDetailBadge.textContent = 'Locked';
-      } else {
-        minerDetailBadge.textContent = ''; // No badge for available
+      // Action button logic
+      if (minerActionButton) {
+        // Remove existing click listeners by cloning
+        const newButton = minerActionButton.cloneNode(true);
+        minerActionButton.parentNode.replaceChild(newButton, minerActionButton);
+        const actionButton = document.getElementById('miner-action-button');
+        
+        if (miner.availability === 'equipped') {
+          // Currently equipped - show "Equipped" text (not a button)
+          actionButton.textContent = 'Equipped';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        } else if (miner.availability === 'owned') {
+          // Player owns this miner but it's not equipped - show green Equip button
+          actionButton.textContent = 'Equip';
+          actionButton.classList.remove('disabled');
+          actionButton.disabled = false;
+          actionButton.dataset.tier = String(miner.tier);
+          actionButton.addEventListener('click', () => {
+            console.log(`[UI] Equip miner tier ${miner.tier} from action button`);
+            hytopia.sendData({ type: 'EQUIP_MINER', tier: miner.tier });
+          });
+        } else if (miner.availability === 'available') {
+          // Next tier available - show buy button with cost, grey out if can't afford
+          actionButton.textContent = `🪙 ${formatNumber(miner.cost)}`;
+          actionButton.disabled = false;
+          if (!miner.purchasable) {
+            actionButton.classList.add('disabled');
+          } else {
+            actionButton.classList.remove('disabled');
+          }
+          actionButton.dataset.tier = String(miner.tier);
+          actionButton.addEventListener('click', () => {
+            if (miner.purchasable) {
+              console.log(`[UI] Buy miner tier ${miner.tier} from action button`);
+              hytopia.sendData({ type: 'BUY_MINER', tier: miner.tier });
+            }
+          });
+        } else {
+          // Locked - show locked state
+          actionButton.textContent = 'Locked';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        }
       }
     };
 
@@ -1905,28 +1945,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           card.appendChild(costEl);
         }
 
-        // Equip button (for owned but not equipped miners)
-        if (isOwned && !isEquipped) {
-          const equipButton = document.createElement('button');
-          equipButton.className = 'pickaxe-card__buy-button';
-          equipButton.textContent = 'Equip';
-          equipButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            hytopia.sendData({ type: 'EQUIP_MINER', tier: m.tier });
-          });
-          card.appendChild(equipButton);
-        }
-        // Buy button (only for available miners that are purchasable)
-        else if (isAvailable && m.purchasable && state.gold >= m.cost) {
-          const buyButton = document.createElement('button');
-          buyButton.className = 'pickaxe-card__buy-button';
-          buyButton.textContent = 'Buy';
-          buyButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            hytopia.sendData({ type: 'BUY_MINER', tier: m.tier });
-          });
-          card.appendChild(buyButton);
-        }
+        // No buy/equip buttons on cards - all interactions happen in sidebar
 
         // Equipped checkmark
         if (isEquipped) {
@@ -1963,10 +1982,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       state.miner.miners = data.miners || [];
       state.miner.currentTier = data.currentTier ?? -1;
       state.gold = data.gold ?? state.gold;
-      // Set selected tier to equipped miner if no selection yet
+      
+      // If no selection, select the equipped miner
       if (state.miner.selectedTier === undefined || state.miner.selectedTier === -1) {
-        state.miner.selectedTier = state.miner.currentTier >= 0 ? state.miner.currentTier : (data.miners && data.miners.length > 0 ? data.miners[0].tier : -1);
+        const equipped = state.miner.miners.find(m => m.availability === 'equipped');
+        state.miner.selectedTier = equipped ? equipped.tier : (state.miner.currentTier >= 0 ? state.miner.currentTier : (data.miners && data.miners.length > 0 ? data.miners[0].tier : -1));
       }
+      
       renderMinerGrid();
       renderMinerDetails();
       showModal(minerModal);
@@ -2034,8 +2056,18 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       if (rebirthBadge) rebirthBadge.hidden = !(data.canRebirth);
     };
 
-    const spawnMinedOrePopup = (oreName) => {
-      console.log('[UI] spawnMinedOrePopup called with oreName:', oreName);
+    const spawnMinedOrePopup = (oreName, oreColor) => {
+      const timestamp = Date.now();
+      console.log(`[UI] spawnMinedOrePopup called with oreName: ${oreName}, oreColor: ${oreColor}, timestamp: ${timestamp}`);
+
+      // Check for existing popups to see if they're being reused
+      const existingPopups = minedOreLayerEl.querySelectorAll('.mined-ore-popup');
+      if (existingPopups.length > 0) {
+        console.log(`[UI] WARNING: ${existingPopups.length} existing ore popups found when spawning new one!`);
+        existingPopups.forEach((popup, index) => {
+          console.log(`[UI] Existing popup ${index}: classes: ${popup.className}, text: ${popup.textContent}`);
+        });
+      }
       if (!minedOreLayerEl) {
         console.error('[UI] minedOreLayerEl not found! Cannot spawn popup.');
         return;
@@ -2044,34 +2076,36 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       const popup = document.createElement('div');
       popup.className = 'mined-ore-popup';
       
+      // Create text with + prefix
       const oreText = document.createElement('span');
       oreText.className = 'mined-ore-popup__text';
-      oreText.textContent = oreName;
+      oreText.textContent = `+${oreName}`;
+      // Apply ore color if provided, otherwise use default white
+      oreText.style.color = oreColor || '#ffffff';
       popup.appendChild(oreText);
       
-      const plusIcon = document.createElement('span');
-      plusIcon.className = 'mined-ore-popup__icon';
-      plusIcon.textContent = '+';
-      popup.appendChild(plusIcon);
-      
-      // Position at bottom middle right
-      popup.style.right = '40px';
-      popup.style.bottom = '120px';
+      // Position above the block health bar name (centered, above the ore name)
+      // Block health bar is at bottom: 120px, name is at the top of it
+      // Position popup above the name text
+      popup.style.left = '50%';
+      popup.style.bottom = '220px'; // Above the ore name
+      popup.style.transform = 'translateX(-50%)';
       
       minedOreLayerEl.appendChild(popup);
       
       // Force a reflow before adding active class
       popup.offsetHeight;
       
-      // Add active class to trigger animation
+      // Add active class to trigger float up animation
       requestAnimationFrame(() => {
         popup.classList.add('active');
       });
-      
+
+      // Fade out and remove
       setTimeout(() => {
-        popup.classList.remove('active');
+        popup.classList.add('fade-out');
         setTimeout(() => popup.remove(), 300); // Wait for fade out animation
-      }, 1000); // Disappear after 1 second
+      }, 900); // Total visible time ~1 second
     };
 
     const spawnPowerGain = (amount, rockPosition) => {
@@ -2657,12 +2691,6 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             }
           }
           break;
-        case 'ORE_MINED':
-          console.log('[UI] Ore mined:', data.oreName);
-          if (data.oreName) {
-            spawnMinedOrePopup(data.oreName);
-          }
-          break;
         case 'MINING_UPDATE':
           state.mining.damage = data.damage ?? 0;
           state.mining.currentOre = data.currentOreName ?? null;
@@ -2676,7 +2704,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           if (state.mining.damage > 0) {
             spawnDamagePopup(state.mining.damage);
           }
-          
+
+          // Spawn ore mined popup when block is destroyed (like damage popups)
+          if (data.oreMined && data.oreMinedColor) {
+            console.log(`[UI] MINING_UPDATE received ore mined: ${data.oreMined}, spawning popup (damage: ${data.damage}, blockHP: ${data.blockHP})`);
+            spawnMinedOrePopup(data.oreMined, data.oreMinedColor);
+          }
+
           // Update block health bar (bottom center, above progress bar)
           if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl && blockRewardDisplayEl) {
             // Store current block info if valid
@@ -2854,7 +2888,10 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           if (data.success) {
             // Update pickaxe state
             state.pickaxe.currentTier = data.newTier ?? state.pickaxe.currentTier;
-            // Refresh shop data (server already sent updated data)
+            // Refresh shop data to update availability status
+            hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+            // Also re-render details to update button state
+            renderPickaxeDetails();
           } else {
             console.warn('[UI] Pickaxe equip failed:', data.message);
             // Could show error message to user here
@@ -2960,7 +2997,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             <div class="pickaxe-details__icon" id="miner-detail-icon">⛑️</div>
             <div class="pickaxe-details__name" id="miner-detail-name">No Miner</div>
             <div class="pickaxe-details__stats" id="miner-detail-stats"></div>
-            <div class="pickaxe-details__badge" id="miner-detail-badge">None Equipped</div>
+            <button class="pickaxe-details__action-button" id="miner-action-button">No Miner</button>
           </div>
         </div>
         <!-- Right Panel: Miner Grid -->
@@ -2985,7 +3022,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             <div class="pickaxe-details__icon" id="pickaxe-detail-icon">⛏️</div>
             <div class="pickaxe-details__name" id="pickaxe-detail-name">Pickaxe</div>
             <div class="pickaxe-details__stats" id="pickaxe-detail-stats"></div>
-            <div class="pickaxe-details__badge">Equipped</div>
+            <button class="pickaxe-details__action-button" id="pickaxe-action-button">Equipped</button>
           </div>
         </div>
         <!-- Right Panel: Pickaxe Grid -->
@@ -4925,42 +4962,67 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     overflow: hidden;
   }
 
-  /* Bottom Middle Right: Mined Ore Popup */
+  /* Mined Ore Floating Popup - Positioned above block health bar */
   .mined-ore-popup {
     position: fixed;
-    right: 40px;
-    bottom: 120px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 18px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    justify-content: center;
+    padding: 8px 16px;
     color: #fff;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 2px;
+    text-shadow: 
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 0 10px rgba(0, 0, 0, 0.8);
     opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.4s ease, transform 0.4s ease;
     pointer-events: none;
+    z-index: 1001;
   }
 
+  /* Float up animation */
   .mined-ore-popup.active {
-    opacity: 1;
-    transform: translateY(0);
+    animation: orePopupFloatUp 0.4s ease-out forwards;
+  }
+
+  /* Fade out animation */
+  .mined-ore-popup.fade-out {
+    animation: orePopupFadeOut 0.3s ease-out forwards;
+  }
+
+  @keyframes orePopupFloatUp {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(30px) scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px) scale(1.1);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-20px) scale(1);
+    }
+  }
+
+  @keyframes orePopupFadeOut {
+    0% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-20px);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-40px);
+    }
   }
 
   .mined-ore-popup__text {
-    color: #fff;
-  }
-
-  .mined-ore-popup__icon {
-    color: #4caf50;
-    font-size: 24px;
+    /* Color is set dynamically based on ore type */
     font-weight: 800;
   }
 
@@ -5448,7 +5510,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   .merchant-ui__ore-name.sapphire { color: #0f52ba; }
   .merchant-ui__ore-name.topaz { color: #ffc87c; }
   .merchant-ui__ore-name.diamond { color: #b9f2ff; }
-  .merchant-ui__ore-name.mythril { color: #9b59b6; }
+  .merchant-ui__ore-name.mithrial { color: #9b59b6; }
   .merchant-ui__ore-name.adamantite { color: #4a90e2; }
   .merchant-ui__ore-name.cosmic { color: #ff00ff; }
 
