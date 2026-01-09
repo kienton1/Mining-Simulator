@@ -115,8 +115,8 @@ export class SellingSystem {
     // Calculate total value before clearing (with combined multiplier)
     let totalGold = this.inventoryManager.calculateTotalValue(player, sellMultiplier);
     
-    // Round to nearest 5 with no decimals
-    totalGold = Math.round(totalGold / 5) * 5;
+    // Round to nearest integer (no decimals)
+    totalGold = Math.round(totalGold);
 
     if (totalGold === 0) {
       return 0;
@@ -196,8 +196,8 @@ export class SellingSystem {
       }
     }
 
-    // Round to nearest 5 with no decimals
-    totalGold = Math.round(totalGold / 5) * 5;
+    // Round to nearest integer (no decimals)
+    totalGold = Math.round(totalGold);
 
     if (totalGold === 0) {
       return 0;
@@ -259,8 +259,8 @@ export class SellingSystem {
     const baseValue = sellAmount * oreData.value;
     let goldEarned = baseValue * sellMultiplier;
     
-    // Round to nearest 5 with no decimals
-    goldEarned = Math.round(goldEarned / 5) * 5;
+    // Round to nearest integer (no decimals)
+    goldEarned = Math.round(goldEarned);
 
     // Remove ore from inventory
     this.inventoryManager.removeOre(player, oreType, sellAmount);
@@ -361,8 +361,8 @@ export class SellingSystem {
     );
 
     let totalValue = this.inventoryManager.calculateTotalValue(player, sellMultiplier);
-    // Round to nearest 5 with no decimals
-    return Math.round(totalValue / 5) * 5;
+    // Round to nearest integer (no decimals)
+    return Math.round(totalValue);
   }
 
   /**
@@ -409,8 +409,8 @@ export class SellingSystem {
       }
     }
 
-    // Round to nearest 5 with no decimals
-    return Math.round(total / 5) * 5;
+    // Round to nearest integer (no decimals)
+    return Math.round(total);
   }
 }
 

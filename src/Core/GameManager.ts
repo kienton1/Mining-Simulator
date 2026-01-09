@@ -24,6 +24,7 @@ import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
+import { WorldRegistry } from '../WorldRegistry';
 
 /**
  * Game Manager class
@@ -50,6 +51,7 @@ interface PlayerModalState {
   rebirthModalOpen: boolean;
   petsModalOpen: boolean;
   eggModalOpen: boolean;
+  mapsModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
 }
 
@@ -947,13 +949,14 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg' | 'maps', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
       eggModalOpen: false,
+      mapsModalOpen: false,
       lastModalOpenTime: 0,
     };
     
@@ -967,6 +970,8 @@ export class GameManager {
       modalState.petsModalOpen = isOpen;
     } else if (modalType === 'egg') {
       modalState.eggModalOpen = isOpen;
+    } else if (modalType === 'maps') {
+      modalState.mapsModalOpen = isOpen;
     }
     
     // Update timestamp when opening a modal (to prevent race conditions with clicks)
@@ -1700,7 +1705,7 @@ export class GameManager {
     // Each mine level is 3 Y levels tall, so mine level 0 = Y: 0, -1, -2
     // mine level 1 = Y: -3, -4, -5, etc.
     // This ensures the progress bar shows blocks mined, not Y levels descended
-    const mineLevel = this.miningController.getCurrentMineLevel(player);
+    const mineLevel = this.miningController?.getCurrentMineLevel(player) ?? 0;
 
     player.ui.sendData({
       type: 'PROGRESS_UPDATE',
@@ -1879,6 +1884,126 @@ export class GameManager {
     }, 250);
 
     this.mineEntranceIntervals.set(player, interval);
+  }
+
+  /**
+   * Unlocks a world for a player
+   * 
+   * @param player - Player to unlock world for
+   * @param worldId - World ID to unlock
+   * @returns True if unlocked successfully, false otherwise
+   */
+  unlockWorld(player: Player, worldId: string): { success: boolean; message?: string } {
+    const playerData = this.getPlayerData(player);
+    if (!playerData) {
+      return { success: false, message: 'Player data not found' };
+    }
+
+    // Check if world exists
+    const worldConfig = WorldRegistry.getWorldConfig(worldId);
+    if (!worldConfig) {
+      return { success: false, message: 'World not found' };
+    }
+
+    // Check if already unlocked
+    const unlockedWorlds = playerData.unlockedWorlds || ['island1'];
+    if (unlockedWorlds.includes(worldId)) {
+      return { success: false, message: 'World already unlocked' };
+    }
+
+    // Check unlock requirement
+    if (worldConfig.unlockRequirement.type === 'wins') {
+      if (playerData.wins < worldConfig.unlockRequirement.amount) {
+        return { 
+          success: false, 
+          message: `Need ${worldConfig.unlockRequirement.amount} wins to unlock this world` 
+        };
+      }
+    }
+
+    // Unlock the world
+    if (!unlockedWorlds.includes(worldId)) {
+      unlockedWorlds.push(worldId);
+      playerData.unlockedWorlds = unlockedWorlds;
+      this.updatePlayerData(player, playerData);
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Teleports a player to a world
+   * 
+   * @param player - Player to teleport
+   * @param worldId - World ID to teleport to
+   * @returns True if teleported successfully, false otherwise
+   */
+  teleportToWorld(player: Player, worldId: string): { success: boolean; message?: string } {
+    const playerData = this.getPlayerData(player);
+    if (!playerData) {
+      return { success: false, message: 'Player data not found' };
+    }
+
+    // Check if world exists
+    const worldConfig = WorldRegistry.getWorldConfig(worldId);
+    if (!worldConfig) {
+      return { success: false, message: 'World not found' };
+    }
+
+    // Check if world is unlocked
+    const unlockedWorlds = playerData.unlockedWorlds || ['island1'];
+    if (!unlockedWorlds.includes(worldId)) {
+      return { success: false, message: 'World not unlocked' };
+    }
+
+    // Stop auto modes before teleporting
+    this.stopAutoMine(player);
+    this.stopAutoTrain(player);
+
+    // Teleport player to spawn point
+    const spawnPoint = worldConfig.spawnPoint;
+    this.teleportPlayer(player, spawnPoint);
+
+    // Update current world
+    playerData.currentWorld = worldId;
+    this.updatePlayerData(player, playerData);
+
+    return { success: true };
+  }
+
+  /**
+   * Gets world selection data for UI
+   * 
+   * @param player - Player to get world data for
+   * @returns World selection data
+   */
+  getWorldSelectionData(player: Player): {
+    worlds: Array<{
+      id: string;
+      name: string;
+      displayOrder: number;
+      isUnlocked: boolean;
+      isCurrent: boolean;
+      unlockRequirement?: { type: string; amount: number };
+      trophyMultiplier: number;
+    }>;
+  } {
+    const playerData = this.getPlayerData(player);
+    const unlockedWorlds = playerData?.unlockedWorlds || ['island1'];
+    const currentWorld = playerData?.currentWorld || 'island1';
+
+    const allWorlds = WorldRegistry.getAllWorlds();
+    const worlds = allWorlds.map(world => ({
+      id: world.id,
+      name: world.name,
+      displayOrder: world.displayOrder,
+      isUnlocked: unlockedWorlds.includes(world.id),
+      isCurrent: currentWorld === world.id,
+      unlockRequirement: world.unlockRequirement,
+      trophyMultiplier: world.trophyMultiplier,
+    }));
+
+    return { worlds };
   }
 }
 

@@ -395,8 +395,8 @@ export class MiningSystem {
       // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
       const baseDamage = calculateMiningDamage(playerData.power);
       
-      // Apply More Damage upgrade multiplier
-      const damage = baseDamage * damageMultiplier;
+      // Apply More Damage upgrade multiplier and round to integer
+      const damage = Math.round(baseDamage * damageMultiplier);
       
       // Deal damage to chest
       const chestDestroyed = chest.takeDamage(damage);
@@ -520,8 +520,8 @@ export class MiningSystem {
     // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
     const baseDamage = calculateMiningDamage(playerData.power);
     
-    // Apply More Damage upgrade multiplier
-    const damage = baseDamage * damageMultiplier;
+    // Apply More Damage upgrade multiplier and round to integer
+    const damage = Math.round(baseDamage * damageMultiplier);
     
     // Deal damage to shared block
     const blockDestroyed = block.takeDamage(damage);
@@ -549,10 +549,8 @@ export class MiningSystem {
       const minedOre = block.oreType;
       const minedAmount = 1;
 
-      // Add to inventory (only for manual mining to prevent duplicate UI popups)
-      if (!isAutoMining) {
-        onOreMined(player, minedOre, minedAmount);
-      }
+      // Add to inventory (for both manual and auto mining)
+      onOreMined(player, minedOre, minedAmount);
       
       // Spawn debris particles across the entire 7x7 mining area
       const levelYCoords = this.getYCoordinatesForMineLevel(hitMineLevel);
@@ -903,7 +901,7 @@ export class MiningSystem {
         const baseDamage = calculateMiningDamage(playerData.power);
         // Get combined damage multiplier (includes More Damage upgrade and miner damage bonus)
         const damageMultiplier = this.getCombinedDamageMultiplierCallback?.(player) ?? 1.0;
-        const finalDamage = baseDamage * damageMultiplier;
+        const finalDamage = Math.round(baseDamage * damageMultiplier);
         chest.initializeHP(finalDamage);
       }
       

@@ -44,6 +44,9 @@ import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
+import { WorldRegistry } from './src/WorldRegistry';
+import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
+import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
 
 /**
  * startServer is always the entry point for our game.
@@ -78,6 +81,13 @@ startServer(world => {
    * This manages pickaxe entities attached to players
    */
   const pickaxeManager = new PickaxeManager(world);
+
+  /**
+   * Initialize World Registry
+   * Register all worlds (island1 is default, island2 is beach world)
+   */
+  WorldRegistry.registerWorld(ISLAND1_CONFIG);
+  WorldRegistry.registerWorld(ISLAND2_CONFIG);
 
   /**
    * Initialize Game Manager
@@ -235,8 +245,8 @@ startServer(world => {
           if (oreData) {
             // Calculate sell value per unit with multipliers
             let sellValue = oreData.value * sellMultiplier;
-            // Round to nearest 5
-            sellValue = Math.round(sellValue / 5) * 5;
+            // Round to nearest integer (no decimals)
+            sellValue = Math.round(sellValue);
             oreSellValues[oreType] = sellValue;
           }
         }
@@ -530,7 +540,8 @@ startServer(world => {
               const oreData = ORE_DATABASE[oreType as OreType];
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSell;
-                sellValue = Math.round(sellValue / 5) * 5;
+                // Round to nearest integer (no decimals)
+                sellValue = Math.round(sellValue);
                 oreSellValuesAfterSell[oreType] = sellValue;
               }
             }
@@ -564,7 +575,8 @@ startServer(world => {
               const oreData = ORE_DATABASE[oreType as OreType];
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSellAll;
-                sellValue = Math.round(sellValue / 5) * 5;
+                // Round to nearest integer (no decimals)
+                sellValue = Math.round(sellValue);
                 oreSellValuesAfterSellAll[oreType] = sellValue;
               }
             }
@@ -652,7 +664,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -963,6 +975,44 @@ startServer(world => {
           player.ui.sendData({
             type: 'MINE_RESET_UPGRADE_PROXIMITY',
             inProximity: false,
+          });
+          break;
+        case 'OPEN_WORLDS_PANEL':
+          gameManager.setModalState(player, 'maps', true);
+          const worldSelectionData = gameManager.getWorldSelectionData(player);
+          player.ui.sendData({
+            type: 'WORLDS_PANEL_DATA',
+            worlds: worldSelectionData.worlds,
+          });
+          break;
+        case 'UNLOCK_WORLD':
+          const unlockResult = gameManager.unlockWorld(player, data.worldId);
+          player.ui.sendData({
+            type: 'WORLD_UNLOCKED',
+            success: unlockResult.success,
+            message: unlockResult.message,
+            worldId: data.worldId,
+          });
+          // Refresh worlds panel data after unlock attempt
+          const worldSelectionDataAfterUnlock = gameManager.getWorldSelectionData(player);
+          player.ui.sendData({
+            type: 'WORLDS_PANEL_DATA',
+            worlds: worldSelectionDataAfterUnlock.worlds,
+          });
+          break;
+        case 'TELEPORT_TO_WORLD':
+          const teleportResult = gameManager.teleportToWorld(player, data.worldId);
+          player.ui.sendData({
+            type: 'WORLD_TELEPORTED',
+            success: teleportResult.success,
+            message: teleportResult.message,
+            worldId: data.worldId,
+          });
+          // Refresh worlds panel data after teleport attempt
+          const worldSelectionDataAfterTeleport = gameManager.getWorldSelectionData(player);
+          player.ui.sendData({
+            type: 'WORLDS_PANEL_DATA',
+            worlds: worldSelectionDataAfterTeleport.worlds,
           });
           break;
         default:

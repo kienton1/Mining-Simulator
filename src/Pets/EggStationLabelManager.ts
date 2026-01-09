@@ -7,7 +7,7 @@
  * - periodically re-apply positions to keep them anchored
  */
 
-import { Entity, RigidBodyType, SceneUI, World } from 'hytopia';
+import { SceneUI, World } from 'hytopia';
 import type { EggStationDefinition } from './EggStationManager';
 import { EGG_DEFINITIONS } from './PetDatabase';
 import { EggType } from './PetData';
@@ -16,7 +16,6 @@ export class EggStationLabelManager {
   private world: World;
   private stations: EggStationDefinition[];
   private sceneUIs: Map<string, SceneUI> = new Map();
-  private anchors: Map<string, Entity> = new Map();
   private interval?: NodeJS.Timeout;
 
   constructor(world: World, stations: EggStationDefinition[]) {
@@ -51,15 +50,6 @@ export class EggStationLabelManager {
       }
     }
     this.sceneUIs.clear();
-
-    for (const anchor of this.anchors.values()) {
-      try {
-        anchor.despawn();
-      } catch {
-        // ignore
-      }
-    }
-    this.anchors.clear();
   }
 
   private ensureLabel(station: EggStationDefinition): SceneUI {
@@ -76,35 +66,18 @@ export class EggStationLabelManager {
       ? `${(costGold / 1000).toFixed(costGold % 1000 === 0 ? 0 : 1)}K Gold`
       : `${costGold} Gold`;
 
-    // Create (or reuse) a tiny invisible anchor entity at the station position.
-    // Using attachedToEntity is the most reliable way to avoid position falling back to origin.
-    let anchor = this.anchors.get(station.id);
-    if (!anchor) {
-      anchor = new Entity({
-        name: `egg-ui-anchor:${station.id}`,
-        tag: 'egg-ui-anchor',
-        isEnvironmental: true,
-        opacity: 0,
-        modelUri: 'models/environment/City/barrel-wood-2.gltf',
-        modelScale: 0.01,
-        rigidBodyOptions: {
-          type: RigidBodyType.STATIC,
-          enabledRotations: { x: false, y: false, z: false },
-        },
-      });
-      anchor.spawn(this.world, station.position);
-      this.anchors.set(station.id, anchor);
-    } else if (!anchor.isSpawned) {
-      anchor.spawn(this.world, station.position);
-    } else {
-      anchor.setPosition(station.position);
-    }
+    // Use direct positioning like the working training system
+    // Position the UI above the egg station
+    const uiPos = {
+      x: station.position.x,
+      y: station.position.y + 2.8, // Float above the egg station
+      z: station.position.z,
+    };
 
     const ui = new SceneUI({
       templateId: 'egg:prompt',
       viewDistance: 96,
-      attachedToEntity: anchor,
-      offset: { x: 0, y: 2.8, z: 0 },
+      position: uiPos,
       state: {
         visible: true,
         title,
@@ -114,10 +87,6 @@ export class EggStationLabelManager {
     });
 
     ui.load(this.world);
-    // Extra safety: explicitly re-apply attachment + offset after load.
-    ui.setAttachedToEntity(anchor);
-    ui.setOffset({ x: 0, y: 2.8, z: 0 });
-
     this.sceneUIs.set(station.id, ui);
     return ui;
   }
@@ -125,12 +94,14 @@ export class EggStationLabelManager {
   private updateLabelPosition(station: EggStationDefinition): void {
     const ui = this.sceneUIs.get(station.id);
     if (!ui) return;
-    const anchor = this.anchors.get(station.id);
-    if (anchor?.isSpawned) {
-      anchor.setPosition(station.position);
-      ui.setAttachedToEntity(anchor);
-      ui.setOffset({ x: 0, y: 2.8, z: 0 });
-    }
+
+    // Update position directly like the working training system
+    const uiPos = {
+      x: station.position.x,
+      y: station.position.y + 2.8, // Float above the egg station
+      z: station.position.z,
+    };
+    ui.setPosition(uiPos);
   }
 }
 

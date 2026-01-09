@@ -65,13 +65,23 @@ export interface PlayerData {
   equippedPets?: string[];
   /** Unique list of pets the player has ever obtained (used for "NEW" tagging). */
   petDiscovered?: string[];
+
+  /**
+   * World System
+   * 
+   * Multi-world support for different maps/locations.
+   */
+  /** Currently active world ID (default: 'island1' for original map) */
+  currentWorld?: string;
+  /** Array of unlocked world IDs (default: ['island1'] for original map) */
+  unlockedWorlds?: string[];
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 2;
+export const CURRENT_DATA_VERSION = 3;
 
 /**
  * Inventory data structure
@@ -142,6 +152,8 @@ export function createDefaultPlayerData(): PlayerData {
     petInventory: [],
     equippedPets: [],
     petDiscovered: [],
+    currentWorld: 'island1', // Default to original map
+    unlockedWorlds: ['island1'], // Original map is always unlocked
   };
 }
 

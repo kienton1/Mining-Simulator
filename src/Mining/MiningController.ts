@@ -506,8 +506,8 @@ export class MiningController {
         // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)
         const sellMultiplier = this.gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
         let calculatedValue = oreData.value * sellMultiplier;
-        // Round to nearest 5 with no decimals (matching selling system)
-        calculatedValue = Math.round(calculatedValue / 5) * 5;
+        // Round to nearest integer (no decimals)
+        calculatedValue = Math.round(calculatedValue);
         sellValue = calculatedValue;
         // Get ore color for text display
         oreColor = oreData.color;

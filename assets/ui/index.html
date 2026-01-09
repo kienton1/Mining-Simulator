@@ -855,12 +855,15 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const pickaxeButton = document.getElementById('pickaxe-button');
     const rebirthButton = document.getElementById('rebirth-button');
     const petsButton = document.getElementById('pets-button');
+    const mapsButton = document.getElementById('maps-button');
     const minerModal = document.getElementById('miner-modal');
     const pickaxeModal = document.getElementById('pickaxe-modal');
     const rebirthModal = document.getElementById('rebirth-modal');
     const petsModal = document.getElementById('pets-modal');
+    const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
     const minerGridEl = document.getElementById('miner-grid');
+    const mapsListEl = document.getElementById('maps-list');
     const minerDetailName = document.getElementById('miner-detail-name');
     const minerDetailStats = document.getElementById('miner-detail-stats');
     const minerDetailBadge = document.getElementById('miner-detail-badge');
@@ -959,10 +962,23 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       });
     }
 
+    // Setup maps button click handler (HUD below pets)
+    if (mapsButton) {
+      mapsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'maps' });
+        hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+        showModal(mapsModal);
+        mapsButton.blur();
+        window.focus();
+      });
+    }
+
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
-      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close');
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close');
       
       if (closeButton) {
         const modalId = closeButton.getAttribute('data-close');
@@ -1469,6 +1485,76 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         } else {
           hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
         }
+      });
+    }
+
+    // Render maps list
+    function renderMapsList(worlds) {
+      if (!mapsListEl) return;
+      mapsListEl.innerHTML = '';
+
+      worlds.forEach((world) => {
+        const worldCard = document.createElement('div');
+        worldCard.className = `maps-card ${world.isCurrent ? 'maps-card--current' : ''} ${!world.isUnlocked ? 'maps-card--locked' : ''}`;
+
+        const worldName = document.createElement('div');
+        worldName.className = 'maps-card__name';
+        worldName.textContent = world.name;
+        worldCard.appendChild(worldName);
+
+        const worldInfo = document.createElement('div');
+        worldInfo.className = 'maps-card__info';
+        
+        if (world.trophyMultiplier > 1) {
+          const trophyMultiplier = document.createElement('div');
+          trophyMultiplier.className = 'maps-card__multiplier';
+          trophyMultiplier.innerHTML = `🏆 x${world.trophyMultiplier}`;
+          worldInfo.appendChild(trophyMultiplier);
+        }
+
+        if (world.isCurrent) {
+          const currentBadge = document.createElement('div');
+          currentBadge.className = 'maps-card__current';
+          currentBadge.textContent = 'Current';
+          worldInfo.appendChild(currentBadge);
+        }
+
+        worldCard.appendChild(worldInfo);
+
+        const worldActions = document.createElement('div');
+        worldActions.className = 'maps-card__actions';
+
+        if (!world.isUnlocked) {
+          const unlockBtn = document.createElement('button');
+          unlockBtn.className = 'maps-card__btn maps-card__btn--unlock';
+          if (world.unlockRequirement) {
+            unlockBtn.textContent = `Unlock (${world.unlockRequirement.amount} wins)`;
+          } else {
+            unlockBtn.textContent = 'Unlock';
+          }
+          unlockBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hytopia.sendData({ type: 'UNLOCK_WORLD', worldId: world.id });
+          });
+          worldActions.appendChild(unlockBtn);
+        } else {
+          const teleportBtn = document.createElement('button');
+          teleportBtn.className = 'maps-card__btn maps-card__btn--teleport';
+          teleportBtn.textContent = world.isCurrent ? 'Current' : 'Teleport';
+          teleportBtn.disabled = world.isCurrent;
+          if (!world.isCurrent) {
+            teleportBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              hytopia.sendData({ type: 'TELEPORT_TO_WORLD', worldId: world.id });
+            });
+          }
+          worldActions.appendChild(teleportBtn);
+        }
+
+        worldCard.appendChild(worldActions);
+        mapsListEl.appendChild(worldCard);
       });
     }
 
@@ -2914,6 +3000,35 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             console.warn('[UI] Rebirth failed:', data.message);
           }
           break;
+        case 'WORLDS_PANEL_DATA':
+          console.log('[UI] Worlds panel data received:', data);
+          renderMapsList(data.worlds || []);
+          break;
+        case 'WORLD_UNLOCKED':
+          console.log('[UI] World unlocked:', data);
+          if (data.success) {
+            // Refresh worlds panel data
+            hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+            if (data.message) {
+              // Could show success message here
+            }
+          } else {
+            console.warn('[UI] World unlock failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'WORLD_TELEPORTED':
+          console.log('[UI] World teleported:', data);
+          if (data.success) {
+            // Close modal on successful teleport
+            if (mapsModal) hideModal(mapsModal);
+            // Refresh worlds panel data
+            hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+          } else {
+            console.warn('[UI] World teleport failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
         default:
           console.log('[UI] Unknown event type:', data.type);
           break;
@@ -2980,6 +3095,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     </button>
     <button id="pets-button" class="action-card action-card--pets">
       <span class="action-card__icon">🐾</span>
+    </button>
+    <button id="maps-button" class="action-card action-card--maps">
+      <span class="action-card__icon">🗺️</span>
     </button>
   </div>
 
@@ -3143,6 +3261,19 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             <button id="pets-delete-cancel" class="pets-delete-bar__btn pets-delete-bar__btn--red">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Maps Selection Modal -->
+  <div id="maps-modal" class="modal maps-modal">
+    <div class="maps-modal__container">
+      <div class="maps-modal__header">
+        <div class="maps-modal__title">Worlds</div>
+        <button class="maps-modal__close" data-close="maps-modal">×</button>
+      </div>
+      <div class="maps-modal__body">
+        <div id="maps-list" class="maps-list"></div>
       </div>
     </div>
   </div>
@@ -4032,6 +4163,142 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     font-weight: 800;
     cursor: pointer;
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .maps-modal .pickaxe-modal__container {
+    width: min(800px, 94vw);
+    height: min(600px, 86vh);
+    max-height: 86vh;
+  }
+
+  .maps-modal .pickaxe-modal__header {
+    justify-content: center;
+    position: relative;
+    padding: 18px 18px;
+  }
+
+  .maps-modal .pickaxe-modal__title {
+    font-size: 44px;
+    letter-spacing: 1px;
+  }
+
+  .maps-modal .pickaxe-modal__close {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+  }
+
+  .maps-modal .pickaxe-modal__body {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .maps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .maps-card {
+    background: rgba(31, 41, 55, 0.9);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .maps-card:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .maps-card--current {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+  }
+
+  .maps-card--locked {
+    opacity: 0.6;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .maps-card__name {
+    font-size: 28px;
+    font-weight: 1000;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .maps-card__info {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .maps-card__multiplier {
+    font-size: 18px;
+    font-weight: 800;
+    color: #ffd700;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .maps-card__current {
+    font-size: 16px;
+    font-weight: 700;
+    color: #4caf50;
+    background: rgba(76, 175, 80, 0.2);
+    padding: 4px 12px;
+    border-radius: 8px;
+  }
+
+  .maps-card__actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .maps-card__btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: 3px solid rgba(0, 0, 0, 0.35);
+    font-weight: 1000;
+    font-size: 18px;
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  .maps-card__btn--teleport {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+  }
+
+  .maps-card__btn--teleport:hover:not(:disabled) {
+    background: linear-gradient(180deg, #16a34a, #166534);
+    transform: scale(1.05);
+  }
+
+  .maps-card__btn--teleport:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .maps-card__btn--unlock {
+    background: linear-gradient(180deg, #fbbf24, #d97706);
+  }
+
+  .maps-card__btn--unlock:hover {
+    background: linear-gradient(180deg, #f59e0b, #b45309);
+    transform: scale(1.05);
+  }
+
+  .action-card--maps {
+    background: linear-gradient(180deg, #1e40af, #1e3a8a);
   }
 
   .rebirth-modal__container {

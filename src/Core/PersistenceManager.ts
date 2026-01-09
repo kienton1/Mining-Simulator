@@ -53,6 +53,10 @@ function validatePlayerData(data: any): data is PlayerData {
   if (data.equippedPets !== undefined && !Array.isArray(data.equippedPets)) return false;
   if (data.petDiscovered !== undefined && !Array.isArray(data.petDiscovered)) return false;
 
+  // World system fields are optional for backward compatibility
+  if (data.currentWorld !== undefined && typeof data.currentWorld !== 'string') return false;
+  if (data.unlockedWorlds !== undefined && !Array.isArray(data.unlockedWorlds)) return false;
+
   return true;
 }
 
@@ -158,6 +162,22 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
       for (const id of raw) {
         if (!isPetId(id)) continue;
         if (!unique.includes(id)) unique.push(id);
+      }
+      return unique;
+    })(),
+    // World system (with defaults)
+    currentWorld: typeof savedData.currentWorld === 'string' && savedData.currentWorld.length > 0
+      ? savedData.currentWorld
+      : (defaults.currentWorld ?? 'island1'),
+    unlockedWorlds: (() => {
+      const raw = Array.isArray(savedData.unlockedWorlds) ? savedData.unlockedWorlds : (defaults.unlockedWorlds ?? ['island1']);
+      // Ensure 'island1' is always unlocked and dedupe
+      const unique: string[] = [];
+      if (!raw.includes('island1')) unique.push('island1');
+      for (const worldId of raw) {
+        if (typeof worldId === 'string' && worldId.length > 0 && !unique.includes(worldId)) {
+          unique.push(worldId);
+        }
       }
       return unique;
     })(),
