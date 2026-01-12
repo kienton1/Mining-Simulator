@@ -10,6 +10,11 @@
 import { World, Block } from 'hytopia';
 import type { TrainingRockData, TrainingRockTier } from './TrainingRockData';
 import { getTrainingRockByTier } from './TrainingRockData';
+import { 
+  ISLAND2_TRAINING_ROCK_TIER,
+  getIsland2TrainingRockByTier,
+  type Island2TrainingRockData,
+} from '../../worldData/TrainingRocks';
 
 /**
  * Training rock location in the world
@@ -18,8 +23,8 @@ export interface TrainingRockLocation {
   /** Block position of the training rock */
   position: { x: number; y: number; z: number };
   
-  /** Training rock data */
-  rockData: TrainingRockData;
+  /** Training rock data (Island 1 or Island 2) */
+  rockData: TrainingRockData | Island2TrainingRockData;
   
   /** Block entity (if applicable) */
   block?: Block;
@@ -31,6 +36,9 @@ export interface TrainingRockLocation {
     minZ: number;
     maxZ: number;
   };
+  
+  /** World ID this rock belongs to ('island1' or 'island2') */
+  worldId?: string;
 }
 
 /**
@@ -55,16 +63,30 @@ export class TrainingRockManager {
    * Registers a training rock at a specific location
    * 
    * @param position - World position of the training rock
-   * @param tier - Tier of training rock
+   * @param tier - Tier of training rock (Island 1 or Island 2)
    * @param block - Optional block entity (if the rock is a block)
+   * @param bounds - Optional bounds for interaction area
+   * @param worldId - Optional world ID ('island1' or 'island2'), defaults to 'island1'
    */
   registerTrainingRock(
     position: { x: number; y: number; z: number },
-    tier: TrainingRockTier,
+    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER,
     block?: Block,
-    bounds?: TrainingRockLocation['bounds']
+    bounds?: TrainingRockLocation['bounds'],
+    worldId: string = 'island1'
   ): void {
-    const rockData = getTrainingRockByTier(tier);
+    // Try Island 2 first if world is Island 2
+    let rockData: TrainingRockData | Island2TrainingRockData | undefined;
+    
+    if (worldId === 'island2') {
+      rockData = getIsland2TrainingRockByTier(tier as ISLAND2_TRAINING_ROCK_TIER);
+    }
+    
+    // Fallback to Island 1 if Island 2 rock not found
+    if (!rockData) {
+      rockData = getTrainingRockByTier(tier as TrainingRockTier);
+    }
+    
     if (!rockData) {
       return;
     }
@@ -74,9 +96,12 @@ export class TrainingRockManager {
       rockData,
       block,
       bounds,
+      worldId,
     };
 
-    this.trainingRocks.set(rockData.id, location);
+    // Use unique ID that includes world ID to prevent conflicts
+    const uniqueId = `${worldId}:${rockData.id}`;
+    this.trainingRocks.set(uniqueId, location);
   }
 
   /**
@@ -169,23 +194,28 @@ export class TrainingRockManager {
   registerTrainingRocksFromMap(
     rockPositions: Array<{
       position: { x: number; y: number; z: number };
-      tier: TrainingRockTier;
+      tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER;
       bounds?: TrainingRockLocation['bounds'];
+      worldId?: string;
     }>
   ): void {
-    // Track which tiers we've already registered to prevent duplicates
-    const registeredTiers = new Set<TrainingRockTier>();
+    // Track which tiers we've already registered to prevent duplicates (per world)
+    const registeredKeys = new Set<string>();
     
-    for (const { position, tier, bounds } of rockPositions) {
-      // Skip if we've already registered this tier
-      if (registeredTiers.has(tier)) {
+    for (const { position, tier, bounds, worldId = 'island1' } of rockPositions) {
+      // Create unique key for this tier + world combination
+      const key = `${worldId}:${tier}`;
+      
+      // Skip if we've already registered this tier for this world
+      if (registeredKeys.has(key)) {
         continue;
       }
       
-      this.registerTrainingRock(position, tier, undefined, bounds);
+      registeredKeys.add(key);
+      
+      this.registerTrainingRock(position, tier, undefined, bounds, worldId);
       if (bounds) {
       }
-      registeredTiers.add(tier);
     }
   }
 }

@@ -16,7 +16,7 @@ import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
 /**
  * Mining block position key (x,y,z)
@@ -70,8 +70,8 @@ interface MiningState {
  */
 export class MiningSystem {
   private miningStates: Map<Player, MiningState> = new Map();
-  private mineOffsets: Map<Player, { x: number; z: number }> = new Map();
-  private nextInstanceIndex = 0;
+  private mineOffsets: Map<string, { x: number; z: number }> = new Map(); // Key: `${player.id}:${worldId}`
+  private nextInstanceIndexPerWorld: Map<string, number> = new Map(); // Track instance indices per world
   private world: World;
   private getPlayerDataCallback?: (player: Player) => PlayerData | undefined;
   private firstBlockMined: Map<Player, boolean> = new Map();
@@ -87,33 +87,60 @@ export class MiningSystem {
   
   /**
    * Mapping from OreType to block type ID
-   * Block IDs 16-39 correspond to ore blocks in map.json
+   * Island 1 ores: Block IDs 16-39 from map.json
+   * Island 2 ores: Block IDs 45-68 from map.json
    */
-  private readonly ORE_TO_BLOCK_ID: Map<OreType, number> = new Map([
-    [OreType.STONE, 16],
-    [OreType.DEEPSLATE, 17],
-    [OreType.COAL, 18],
-    [OreType.IRON, 19],
-    [OreType.TIN, 20],
-    [OreType.COBALT, 21],
-    [OreType.PYRITE, 22],
-    [OreType.GOLD, 23],
-    [OreType.OBSIDIAN, 24],
-    [OreType.RUBY, 25],
-    [OreType.DIAMOND, 26],
-    [OreType.AMBER, 27],
-    [OreType.QUARTZ, 28],
-    [OreType.TOPAZ, 29],
-    [OreType.EMERALD, 30],
-    [OreType.RELIC, 31],
-    [OreType.AMETHYST, 32],
-    [OreType.SAPPHIRE, 33],
-    [OreType.LUMINITE, 34],
-    [OreType.PRISMATIC, 35],
-    [OreType.SUNSTONE, 36],
-    [OreType.MITHRIAL, 37],
-    [OreType.ASTRALITE, 38],
-    [OreType.DRAGONSTONE, 39],
+  private readonly ORE_TO_BLOCK_ID: Map<string, number> = new Map([
+    // Island 1 ores (OreType)
+    ['stone', 16],
+    ['deepslate', 17],
+    ['coal', 18],
+    ['iron', 19],
+    ['tin', 20],
+    ['cobalt', 21],
+    ['pyrite', 22],
+    ['gold', 23],
+    ['obsidian', 24],
+    ['ruby', 25],
+    ['diamond', 26],
+    ['amber', 27],
+    ['quartz', 28],
+    ['topaz', 29],
+    ['emerald', 30],
+    ['relic', 31],
+    ['amethyst', 32],
+    ['sapphire', 33],
+    ['luminite', 34],
+    ['prismatic', 35],
+    ['sunstone', 36],
+    ['mithrial', 37],
+    ['astralite', 38],
+    ['dragonstone', 39],
+    // Island 2 ores (ISLAND2_ORE_TYPE) - Block IDs 45-68 from map.json
+    ['dunestone', 45],     // Dunestone
+    ['barnacite', 46],     // Barnacite
+    ['prismarine', 47],    // Prismarine
+    ['basaltite', 48],     // Basaltite
+    ['wreckite', 49],      // Wreckite
+    ['tradewindite', 50],  // Tradewindite
+    ['driftite', 51],      // Driftite
+    ['anchorite', 52],     // Anchorite
+    ['seaglassium', 53],   // Seaglassium
+    ['shellchromite', 54], // Shellchromite
+    ['turtlite', 55],      // Turtlite
+    ['opalstone', 56],     // Opalstone
+    ['azurite', 57],       // Azurite
+    ['mangrovite', 58],    // Mangrovite
+    ['reefium', 59],       // Reefium
+    ['kelpite', 60],       // Kelpite
+    ['sunstonite', 61],    // Sunstonite
+    ['riptidite', 62],     // Riptidite
+    ['trenchite', 63],     // Trenchite
+    ['stormium', 64],      // Stormium
+    ['lavastone', 65],     // Lavastone
+    ['biolumite', 66],     // Biolumite
+    ['oceanium', 67],      // Oceanium
+    ['palmitite', 68],     // Palmitite
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
@@ -216,8 +243,8 @@ export class MiningSystem {
   handleMiningClick(
     player: Player,
     pickaxe: PickaxeData,
-    onOreMined: (player: Player, oreType: OreType, amount: number) => void,
-    onDamageDealt: (player: Player, damage: number, currentOre: OreType | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
+    onOreMined: (player: Player, oreType: string, amount: number) => void,
+    onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
     isBlockingModalOpen?: () => boolean,
     isAutoMining: boolean = false
@@ -326,7 +353,8 @@ export class MiningSystem {
     
     // Check if block is within the mining area bounds (X and Z)
     // Only blocks in the mining area can take damage
-    const offsetBounds = this.getOffsetBounds(state.offset);
+    const worldId = this.getPlayerWorldId(player);
+    const offsetBounds = this.getOffsetBounds(state.offset, worldId);
     const isInMiningArea = 
       resolvedBlockCoordinate.x >= offsetBounds.minX &&
       resolvedBlockCoordinate.x <= offsetBounds.maxX &&
@@ -456,8 +484,10 @@ export class MiningSystem {
         
         // Remove all chest blocks in the mining area at all 3 Y coordinates of this mine level from the world
         let removedCount = 0;
+        const worldId = this.getPlayerWorldId(player);
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
         for (const yCoord of levelYCoords) {
-          for (const basePosition of MINING_AREA_POSITIONS) {
+          for (const basePosition of miningPositions) {
             const blockPosition = {
               x: basePosition.x + state.offset.x,
               y: yCoord,
@@ -508,9 +538,10 @@ export class MiningSystem {
     let block = state.blockMap.get(miningAreaKey);
     if (!block) {
       // Fallback: regenerate this level if somehow missing (shouldn't happen)
+      const worldId = this.getPlayerWorldId(player);
       const absoluteDepth = hitMineLevel + 1; // Mine level + 1 for ore generation (1-based)
       const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
-      const oreHP = this.calculateOreHP(oreType, absoluteDepth);
+      const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
       block = new MineBlock(oreType, oreHP);
       state.blockMap.set(miningAreaKey, block);
     }
@@ -572,8 +603,9 @@ export class MiningSystem {
       // Remove all blocks in the mining area at all 3 Y coordinates of this mine level from the world
       // All blocks break at the same time (all 3 layers)
       let removedCount = 0;
+      const miningPositions = this.getMiningAreaPositionsForPlayer(player);
       for (const yCoord of levelYCoords) {
-        for (const basePosition of MINING_AREA_POSITIONS) {
+        for (const basePosition of miningPositions) {
           const blockPosition = {
             x: basePosition.x + state.offset.x,
             y: yCoord,
@@ -633,8 +665,8 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData,
     playerData: PlayerData,
-    onOreMined: (player: Player, oreType: OreType, amount: number) => void,
-    onDamageDealt: (player: Player, damage: number, currentOre: OreType | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
+    onOreMined: (player: Player, oreType: string, amount: number) => void,
+    onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
     isBlockingModalOpen?: () => boolean
   ): void {
@@ -736,9 +768,11 @@ export class MiningSystem {
    * Returns the world-space center of the player's mine (with offset applied)
    */
   getMineCenter(player: Player): { x: number; z: number } {
-    const offset = this.getOrCreateOffset(player);
-    const centerX = (MINING_AREA_BOUNDS.minX + MINING_AREA_BOUNDS.maxX) / 2 + offset.x;
-    const centerZ = (MINING_AREA_BOUNDS.minZ + MINING_AREA_BOUNDS.maxZ) / 2 + offset.z;
+    const worldId = this.getPlayerWorldId(player);
+    const offset = this.getOrCreateOffset(player, worldId);
+    const bounds = this.getMiningAreaBounds(worldId);
+    const centerX = (bounds.minX + bounds.maxX) / 2 + offset.x;
+    const centerZ = (bounds.minZ + bounds.maxZ) / 2 + offset.z;
     return { x: centerX, z: centerZ };
   }
 
@@ -746,7 +780,9 @@ export class MiningSystem {
    * Returns the world-space bounds for the player's mine (with offset applied)
    */
   getMineBounds(player: Player) {
-    return this.getOffsetBounds(this.getOrCreateOffset(player));
+    const worldId = this.getPlayerWorldId(player);
+    const offset = this.getOrCreateOffset(player, worldId);
+    return this.getOffsetBounds(offset, worldId);
   }
 
   /**
@@ -781,11 +817,12 @@ export class MiningSystem {
 
     // Clear all mining blocks (walls stay permanent)
     // Clear from mine level 0 down to level 333 (334 mine levels, approximately 1000 Y coordinates)
+    const miningPositions = this.getMiningAreaPositionsForPlayer(player);
     const maxMineLevelToClear = 333;
     for (let mineLevel = 0; mineLevel <= maxMineLevelToClear; mineLevel++) {
       const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
       for (const yCoord of levelYCoords) {
-        for (const basePosition of MINING_AREA_POSITIONS) {
+        for (const basePosition of miningPositions) {
           const blockPosition = {
             x: basePosition.x + state.offset.x,
             y: yCoord,
@@ -835,13 +872,25 @@ export class MiningSystem {
 
   /**
    * Cleans up mining state when player leaves
+   * Removes all mine offsets for the player across all worlds
    * 
    * @param player - Player who left
    */
   cleanupPlayer(player: Player): void {
     this.stopMiningLoop(player);
     this.miningStates.delete(player);
-    this.mineOffsets.delete(player);
+    
+    // Remove all offsets for this player (all worlds)
+    const keysToDelete: string[] = [];
+    for (const key of this.mineOffsets.keys()) {
+      if (key.startsWith(`${player.id}:`)) {
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      this.mineOffsets.delete(key);
+    }
+    
     this.firstBlockMined.delete(player);
   }
 
@@ -921,9 +970,10 @@ export class MiningSystem {
     if (!block) {
       // Block not in map - might have been deleted or not generated yet
       // Try to get or create it (similar to handleMiningClick logic)
+      const worldId = this.getPlayerWorldId(player);
       const absoluteDepth = currentMineLevel + 1; // Mine level + 1 for ore generation (1-based)
       const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
-      const oreHP = this.calculateOreHP(oreType, absoluteDepth);
+      const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
       block = new MineBlock(oreType, oreHP);
       state.blockMap.set(miningAreaKey, block);
     }
@@ -953,35 +1003,52 @@ export class MiningSystem {
    * @param oreType - The ore type to get block ID for
    * @returns Block type ID, or MINING_BLOCK_TYPE_ID as fallback
    */
-  private getBlockIdForOreType(oreType: OreType): number {
+  /**
+   * Gets the block ID for an ore type
+   * World-aware: Supports both Island 1 and Island 2 ores
+   * 
+   * @param oreType - Ore type as string (ore type name)
+   * @param worldId - World ID ('island1' or 'island2'), defaults to 'island1'
+   * @returns Block type ID for the ore
+   */
+  private getBlockIdForOreType(oreType: string, worldId: string = 'island1'): number {
     return this.ORE_TO_BLOCK_ID.get(oreType) ?? this.MINING_BLOCK_TYPE_ID;
   }
 
   /**
    * Ensures a mining state exists for the player (and initializes with an offset)
    * NEW SYSTEM: Generates all 1000 levels at once instead of progressive generation
+   * World-aware: Creates separate mine instances for each world
    */
   private getOrCreateState(player: Player, pickaxe: PickaxeData): MiningState {
+    const worldId = this.getPlayerWorldId(player);
+    const correctOffset = this.getOrCreateOffset(player, worldId);
+    
     let state = this.miningStates.get(player);
     if (state) {
-      // If legacy state had no offset, reset it to a personal offset and regenerate
-      if (state.offset.x === 0 && state.offset.z === 0) {
-        const newOffset = this.getOrCreateOffset(player);
+      // Check if the state's offset matches the current world's offset
+      // If not, regenerate the state for the current world
+      const currentOffsetKey = `${player.id}:${worldId}`;
+      const stateOffsetKey = this.findOffsetKeyForOffset(player, state.offset);
+      
+      if (stateOffsetKey !== currentOffsetKey || (state.offset.x === 0 && state.offset.z === 0)) {
+        // State is for a different world or legacy state, regenerate for current world
         state.blockMap.clear();
         state.chestMap.clear();
         state.generatedDepths.clear();
         state.currentDepth = MINE_DEPTH_START;
         state.deepestGeneratedDepth = MINE_DEPTH_START;
-        state.offset = newOffset;
+        state.offset = correctOffset;
         state.ceilingBuilt = false;
         state.bottomFloorDepth = null;
+        state.winTriggered = false;
         // Regenerate initial 20 levels with new offset (will generate more ahead as player mines)
         this.generateInitialMiningLevels(player, state, pickaxe);
       }
       return state;
     }
 
-    const offset = this.getOrCreateOffset(player);
+    const offset = correctOffset;
     state = {
       blockMap: new Map(),
       chestMap: new Map(),
@@ -1004,37 +1071,99 @@ export class MiningSystem {
   }
 
   /**
-   * Returns (and caches) a unique offset for the player's mine instance
+   * Helper to find the offset key for a given offset (for validation)
    */
-  private getOrCreateOffset(player: Player): { x: number; z: number } {
-    const existing = this.mineOffsets.get(player);
+  private findOffsetKeyForOffset(player: Player, offset: { x: number; z: number }): string | null {
+    for (const [key, storedOffset] of this.mineOffsets.entries()) {
+      if (storedOffset.x === offset.x && storedOffset.z === offset.z && key.startsWith(`${player.id}:`)) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns (and caches) a unique offset for the player's mine instance
+   * Separate offset spaces per world to ensure Island 1 and Island 2 have separate mines
+   */
+  private getOrCreateOffset(player: Player, worldId: string): { x: number; z: number } {
+    const key = `${player.id}:${worldId}`;
+    const existing = this.mineOffsets.get(key);
     if (existing) {
       return existing;
     }
 
+    // Get or create instance index for this world
+    let instanceIndex = this.nextInstanceIndexPerWorld.get(worldId) ?? 0;
+    instanceIndex++;
+    this.nextInstanceIndexPerWorld.set(worldId, instanceIndex);
+
     // Simple grid allocation using spacing to avoid overlap
     // Start from index 1 so nobody uses the origin/shared area
-    const index = ++this.nextInstanceIndex;
+    // Island 2 uses a different grid region (offset by a large amount) to avoid overlap with Island 1
+    const baseOffsetX = worldId === 'island2' ? 10000 : 0; // Island 2 mines start at X=10000
+    const index = instanceIndex;
     const spacing = MINE_INSTANCE_SPACING;
     const gridWidth = 16; // gives plenty of room before wrapping
     const row = Math.floor(index / gridWidth);
     const col = index % gridWidth;
-    const offset = { x: col * spacing, z: row * spacing };
+    const offset = { x: baseOffsetX + col * spacing, z: row * spacing };
 
-    this.mineOffsets.set(player, offset);
+    this.mineOffsets.set(key, offset);
     return offset;
+  }
+
+  /**
+   * Get mining area bounds based on world ID
+   */
+  private getMiningAreaBounds(worldId: string) {
+    if (worldId === 'island2') {
+      return ISLAND2_MINING_AREA_BOUNDS;
+    }
+    return MINING_AREA_BOUNDS;
+  }
+
+  /**
+   * Get player's current world ID
+   */
+  private getPlayerWorldId(player: Player): string {
+    const playerData = this.getPlayerDataCallback?.(player);
+    return playerData?.currentWorld || 'island1';
+  }
+
+  /**
+   * Generate mining area positions dynamically based on bounds
+   */
+  private getMiningAreaPositions(bounds: { minX: number; maxX: number; minZ: number; maxZ: number; y: number }): Array<{ x: number; y: number; z: number }> {
+    const positions: Array<{ x: number; y: number; z: number }> = [];
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        positions.push({ x, y: bounds.y, z });
+      }
+    }
+    return positions;
+  }
+
+  /**
+   * Get mining area positions for the player's current world
+   */
+  private getMiningAreaPositionsForPlayer(player: Player): Array<{ x: number; y: number; z: number }> {
+    const worldId = this.getPlayerWorldId(player);
+    const bounds = this.getMiningAreaBounds(worldId);
+    return this.getMiningAreaPositions(bounds);
   }
 
   /**
    * Translate base mining bounds by an offset
    */
-  private getOffsetBounds(offset: { x: number; z: number }) {
+  private getOffsetBounds(offset: { x: number; z: number }, worldId: string) {
+    const bounds = this.getMiningAreaBounds(worldId);
     return {
-      minX: MINING_AREA_BOUNDS.minX + offset.x,
-      maxX: MINING_AREA_BOUNDS.maxX + offset.x,
-      minZ: MINING_AREA_BOUNDS.minZ + offset.z,
-      maxZ: MINING_AREA_BOUNDS.maxZ + offset.z,
-      y: MINING_AREA_BOUNDS.y,
+      minX: bounds.minX + offset.x,
+      maxX: bounds.maxX + offset.x,
+      minZ: bounds.minZ + offset.z,
+      maxZ: bounds.maxZ + offset.z,
+      y: bounds.y,
     };
   }
 
@@ -1096,6 +1225,7 @@ export class MiningSystem {
 
   /**
    * Generates an ore type based on depth and luck using the NEW LINEAR SCALING SYSTEM
+   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
    * 
    * Uses OreGenerator which:
    * - Filters ores by firstDepth (ores only spawn at their unlock depth or deeper)
@@ -1105,9 +1235,13 @@ export class MiningSystem {
    * 
    * @param pickaxe - Player's pickaxe (contains luck bonus)
    * @param depth - Current mining depth (positive value, increases as you go deeper)
-   * @returns Randomly selected ore type based on depth and luck
+   * @param player - Player (used to get worldId)
+   * @returns Randomly selected ore type as string based on depth and luck
    */
-  private generateOreType(pickaxe: PickaxeData, depth: number, player?: Player): OreType {
+  private generateOreType(pickaxe: PickaxeData, depth: number, player?: Player): string {
+    // Get player's world ID
+    const worldId = player ? this.getPlayerWorldId(player) : 'island1';
+    
     // Get pickaxe luck bonus (stored as decimal, e.g., 0.05 = +5%)
     const pickaxeLuckDecimal = pickaxe.luckBonus;
     
@@ -1122,26 +1256,28 @@ export class MiningSystem {
     // Convert depth to positive value (depth increases as you go deeper)
     const absoluteDepth = Math.abs(depth);
     
-    // Use OreGenerator with depth and luck
-    return this.oreGenerator.generateOre(absoluteDepth, luck);
+    // Use OreGenerator with depth, luck, and worldId
+    return this.oreGenerator.generateOre(absoluteDepth, luck, worldId);
   }
 
   /**
    * Calculates the HP for an ore at a given depth using NEW LINEAR SCALING SYSTEM
+   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
    * 
    * Uses linear interpolation from firstHealth to lastHealth based on depth
    * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
    * 
-   * @param oreType - Type of ore
+   * @param oreType - Type of ore as string
    * @param depth - Current mining depth (should be positive)
+   * @param worldId - World ID ('island1' or 'island2')
    * @returns Calculated HP with linear depth scaling
    */
-  private calculateOreHP(oreType: OreType, depth: number): number {
+  private calculateOreHP(oreType: string, depth: number, worldId: string): number {
     // Ensure depth is positive
     const absoluteDepth = Math.abs(depth);
     
     // Use OreGenerator's getOreHealth method which uses linear interpolation
-    return this.oreGenerator.getOreHealth(oreType, absoluteDepth);
+    return this.oreGenerator.getOreHealth(oreType, absoluteDepth, worldId);
   }
 
   /**
@@ -1158,9 +1294,12 @@ export class MiningSystem {
     state: MiningState,
     pickaxe: PickaxeData
   ): void {
+    // Get world ID once for this method
+    const worldId = this.getPlayerWorldId(player);
+    
     // Build overhead ceiling once
     if (!state.ceilingBuilt) {
-      this.buildMineCeiling(state);
+      this.buildMineCeiling(state, worldId);
       state.ceilingBuilt = true;
     }
 
@@ -1183,13 +1322,16 @@ export class MiningSystem {
         const miningAreaKey = `unminable_gold_level_${mineLevel}`;
 
         // Create an unminable gold block (infinite HP, no damage taken)
-        const goldBlock = new MineBlock(OreType.GOLD, Number.MAX_SAFE_INTEGER); // Infinite HP
+        // Use appropriate gold ore type based on world
+        const goldOreType = worldId === 'island2' ? 'sunstonite' : OreType.GOLD;
+        const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER); // Infinite HP
         state.blockMap.set(miningAreaKey, goldBlock);
 
         // Generate the 7x7x1 gold block (only middle Y coordinate of the 3-block level)
         const middleY = levelYCoords[1]; // Middle Y coordinate of the 3-block level
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
 
-        for (const basePosition of MINING_AREA_POSITIONS) {
+        for (const basePosition of miningPositions) {
           const blockPosition = {
             x: basePosition.x + state.offset.x,
             y: middleY,
@@ -1205,7 +1347,7 @@ export class MiningSystem {
 
         // Generate walls for all 3 Y coordinates of this level (normal walls)
         for (const yCoord of levelYCoords) {
-          this.generateMineShaftWalls(yCoord, state.offset);
+          this.generateMineShaftWalls(yCoord, state.offset, worldId);
         }
 
         // Update deepest generated depth (bottom Y of this level)
@@ -1233,9 +1375,10 @@ export class MiningSystem {
         const chestBlockTypeId = chestType === ChestType.BASIC
           ? this.BASIC_CHEST_BLOCK_TYPE_ID
           : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
 
         for (const yCoord of levelYCoords) {
-          for (const basePosition of MINING_AREA_POSITIONS) {
+          for (const basePosition of miningPositions) {
             const blockPosition = {
               x: basePosition.x + state.offset.x,
               y: yCoord,
@@ -1255,16 +1398,17 @@ export class MiningSystem {
         const miningAreaKey = `mining_area_level_${mineLevel}`;
 
         // Calculate HP based on ore type and depth
-        const oreHP = this.calculateOreHP(oreType, absoluteDepth);
+        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
         const block = new MineBlock(oreType, oreHP);
         state.blockMap.set(miningAreaKey, block);
 
         // Get the block ID for this ore type
-        const oreBlockId = this.getBlockIdForOreType(oreType);
+        const oreBlockId = this.getBlockIdForOreType(oreType, worldId);
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
 
         // Generate all blocks in the mining area at all 3 Y coordinates
         for (const yCoord of levelYCoords) {
-          for (const basePosition of MINING_AREA_POSITIONS) {
+          for (const basePosition of miningPositions) {
             const blockPosition = {
               x: basePosition.x + state.offset.x,
               y: yCoord,
@@ -1282,7 +1426,7 @@ export class MiningSystem {
 
       // Generate walls for all 3 Y coordinates of this level
       for (const yCoord of levelYCoords) {
-        this.generateMineShaftWalls(yCoord, state.offset);
+        this.generateMineShaftWalls(yCoord, state.offset, worldId);
       }
 
       // Update deepest generated depth (bottom Y of this level)
@@ -1294,7 +1438,7 @@ export class MiningSystem {
 
     // Generate bottom floor at the deepest level (10 blocks below deepest generated)
     const bottomDepth = state.deepestGeneratedDepth - 10;
-    this.generateBottomFloor(bottomDepth, state.offset);
+    this.generateBottomFloor(bottomDepth, state.offset, worldId);
     state.bottomFloorDepth = bottomDepth;
   }
 
@@ -1312,6 +1456,9 @@ export class MiningSystem {
     state: MiningState,
     pickaxe: PickaxeData
   ): void {
+    // Get world ID once for this method
+    const worldId = this.getPlayerWorldId(player);
+    
     // Calculate target mine level (20 levels ahead of current)
     const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
     const targetMineLevel = currentMineLevel + 20;
@@ -1357,9 +1504,10 @@ export class MiningSystem {
         const chestBlockTypeId = chestType === ChestType.BASIC 
           ? this.BASIC_CHEST_BLOCK_TYPE_ID 
           : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
         
         for (const yCoord of levelYCoords) {
-          for (const basePosition of MINING_AREA_POSITIONS) {
+          for (const basePosition of miningPositions) {
             const blockPosition = {
               x: basePosition.x + state.offset.x,
               y: yCoord,
@@ -1379,16 +1527,17 @@ export class MiningSystem {
         const miningAreaKey = `mining_area_level_${mineLevel}`;
         
         // Calculate HP based on ore type and depth
-        const oreHP = this.calculateOreHP(oreType, absoluteDepth);
+        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
         const block = new MineBlock(oreType, oreHP);
         state.blockMap.set(miningAreaKey, block);
         
         // Get the block ID for this ore type
-        const oreBlockId = this.getBlockIdForOreType(oreType);
+        const oreBlockId = this.getBlockIdForOreType(oreType, worldId);
+        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
         
         // Generate all blocks in the mining area at all 3 Y coordinates
         for (const yCoord of levelYCoords) {
-          for (const basePosition of MINING_AREA_POSITIONS) {
+          for (const basePosition of miningPositions) {
             const blockPosition = {
               x: basePosition.x + state.offset.x,
               y: yCoord,
@@ -1404,6 +1553,11 @@ export class MiningSystem {
         }
       }
 
+      // Generate walls for all 3 Y coordinates of this level (so Island 2 uses sand, Island 1 uses dirt)
+      for (const yCoord of levelYCoords) {
+        this.generateMineShaftWalls(yCoord, state.offset, worldId);
+      }
+
       // Update deepest generated depth (bottom Y of this level)
       const bottomY = levelYCoords[levelYCoords.length - 1];
       if (bottomY < state.deepestGeneratedDepth) {
@@ -1414,7 +1568,7 @@ export class MiningSystem {
     // Generate/update bottom floor when we reach deep enough (only once)
     if (state.bottomFloorDepth === null || state.deepestGeneratedDepth < state.bottomFloorDepth + 10) {
       const bottomDepth = state.deepestGeneratedDepth - 10; // 10 blocks below deepest generated
-      this.generateBottomFloor(bottomDepth, state.offset);
+      this.generateBottomFloor(bottomDepth, state.offset, worldId);
       state.bottomFloorDepth = bottomDepth;
     }
   }
@@ -1422,50 +1576,55 @@ export class MiningSystem {
   /**
    * Generates dirt walls around the mining area to create a mine shaft
    * Creates two solid boxes: inner box at layer 1, outer box at layer 10, with empty space (2-9) between them
+   * World-aware: Uses correct bounds and wall material based on world
    * 
    * @param depth - Y coordinate (depth) to generate walls at
+   * @param offset - World-space offset for this mine instance
+   * @param worldId - World ID ('island1' or 'island2')
    */
-  private generateMineShaftWalls(depth: number, offset: { x: number; z: number }): void {
+  private generateMineShaftWalls(depth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
+    const bounds = this.getMiningAreaBounds(worldId);
+    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
     
     // Generate inner box (layer 1) - solid walls around the mining area
-    const innerMinX = MINING_AREA_BOUNDS.minX - 1 + offset.x;
-    const innerMaxX = MINING_AREA_BOUNDS.maxX + 1 + offset.x;
-    const innerMinZ = MINING_AREA_BOUNDS.minZ - 1 + offset.z;
-    const innerMaxZ = MINING_AREA_BOUNDS.maxZ + 1 + offset.z;
+    const innerMinX = bounds.minX - 1 + offset.x;
+    const innerMaxX = bounds.maxX + 1 + offset.x;
+    const innerMinZ = bounds.minZ - 1 + offset.z;
+    const innerMaxZ = bounds.maxZ + 1 + offset.z;
     
     // Inner box: all four sides (left, right, front, back) as solid walls
     for (let x = innerMinX; x <= innerMaxX; x++) {
       // Front wall of inner box
-      this.generateWallBlock(x, depth, innerMinZ);
+      this.generateWallBlock(x, depth, innerMinZ, wallBlockId);
       // Back wall of inner box
-      this.generateWallBlock(x, depth, innerMaxZ);
+      this.generateWallBlock(x, depth, innerMaxZ, wallBlockId);
     }
     for (let z = innerMinZ; z <= innerMaxZ; z++) {
       // Left wall of inner box
-      this.generateWallBlock(innerMinX, depth, z);
+      this.generateWallBlock(innerMinX, depth, z, wallBlockId);
       // Right wall of inner box
-      this.generateWallBlock(innerMaxX, depth, z);
+      this.generateWallBlock(innerMaxX, depth, z, wallBlockId);
     }
     
     // Generate outer box (layer 10) - solid walls 10 blocks out
-    const outerMinX = MINING_AREA_BOUNDS.minX - wallThickness + offset.x;
-    const outerMaxX = MINING_AREA_BOUNDS.maxX + wallThickness + offset.x;
-    const outerMinZ = MINING_AREA_BOUNDS.minZ - wallThickness + offset.z;
-    const outerMaxZ = MINING_AREA_BOUNDS.maxZ + wallThickness + offset.z;
+    const outerMinX = bounds.minX - wallThickness + offset.x;
+    const outerMaxX = bounds.maxX + wallThickness + offset.x;
+    const outerMinZ = bounds.minZ - wallThickness + offset.z;
+    const outerMaxZ = bounds.maxZ + wallThickness + offset.z;
     
     // Outer box: all four sides (left, right, front, back) as solid walls
     for (let x = outerMinX; x <= outerMaxX; x++) {
       // Front wall of outer box
-      this.generateWallBlock(x, depth, outerMinZ);
+      this.generateWallBlock(x, depth, outerMinZ, wallBlockId);
       // Back wall of outer box
-      this.generateWallBlock(x, depth, outerMaxZ);
+      this.generateWallBlock(x, depth, outerMaxZ, wallBlockId);
     }
     for (let z = outerMinZ; z <= outerMaxZ; z++) {
       // Left wall of outer box
-      this.generateWallBlock(outerMinX, depth, z);
+      this.generateWallBlock(outerMinX, depth, z, wallBlockId);
       // Right wall of outer box
-      this.generateWallBlock(outerMaxX, depth, z);
+      this.generateWallBlock(outerMaxX, depth, z, wallBlockId);
     }
   }
 
@@ -1473,9 +1632,12 @@ export class MiningSystem {
    * Builds a 10-layer hollow dirt shell above the mine to hide the offset area, leaving headroom
    * Only layers 1 and 10 are dirt, layers 2-9 are air (matching wall pattern)
    * Also generates vertical walls connecting ceiling to floor with the same pattern
+   * World-aware: Uses correct bounds and wall material based on world
    */
-  private buildMineCeiling(state: MiningState): void {
+  private buildMineCeiling(state: MiningState, worldId: string): void {
     const offset = state.offset;
+    const bounds = this.getMiningAreaBounds(worldId);
+    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
     const ceilingLayers = 10;
     const startY = MINE_DEPTH_START + 1; // lowered by one to sit closer to the floor
     const floorY = MINE_DEPTH_START; // Floor level
@@ -1483,23 +1645,23 @@ export class MiningSystem {
     const ceilingTopY = startY + ceilingLayers - 1;
     
     // Calculate ceiling bounds (matching wall thickness)
-    const minX = MINING_AREA_BOUNDS.minX + offset.x - wallThickness;
-    const maxX = MINING_AREA_BOUNDS.maxX + offset.x + wallThickness;
-    const minZ = MINING_AREA_BOUNDS.minZ + offset.z - wallThickness;
-    const maxZ = MINING_AREA_BOUNDS.maxZ + offset.z + wallThickness;
+    const minX = bounds.minX + offset.x - wallThickness;
+    const maxX = bounds.maxX + offset.x + wallThickness;
+    const minZ = bounds.minZ + offset.z - wallThickness;
+    const maxZ = bounds.maxZ + offset.z + wallThickness;
 
     // Generate ceiling as two solid boxes: inner box (layer 1) and outer box (layer 10)
     // Inner box bounds (layer 1)
-    const innerCeilingMinX = MINING_AREA_BOUNDS.minX + offset.x - 1;
-    const innerCeilingMaxX = MINING_AREA_BOUNDS.maxX + offset.x + 1;
-    const innerCeilingMinZ = MINING_AREA_BOUNDS.minZ + offset.z - 1;
-    const innerCeilingMaxZ = MINING_AREA_BOUNDS.maxZ + offset.z + 1;
+    const innerCeilingMinX = bounds.minX + offset.x - 1;
+    const innerCeilingMaxX = bounds.maxX + offset.x + 1;
+    const innerCeilingMinZ = bounds.minZ + offset.z - 1;
+    const innerCeilingMaxZ = bounds.maxZ + offset.z + 1;
     
     // Outer box bounds (layer 10)
-    const outerCeilingMinX = MINING_AREA_BOUNDS.minX + offset.x - wallThickness;
-    const outerCeilingMaxX = MINING_AREA_BOUNDS.maxX + offset.x + wallThickness;
-    const outerCeilingMinZ = MINING_AREA_BOUNDS.minZ + offset.z - wallThickness;
-    const outerCeilingMaxZ = MINING_AREA_BOUNDS.maxZ + offset.z + wallThickness;
+    const outerCeilingMinX = bounds.minX + offset.x - wallThickness;
+    const outerCeilingMaxX = bounds.maxX + offset.x + wallThickness;
+    const outerCeilingMinZ = bounds.minZ + offset.z - wallThickness;
+    const outerCeilingMaxZ = bounds.maxZ + offset.z + wallThickness;
     
     // Generate inner box ceiling (layer 1) - solid perimeter
     const innerCeilingY = startY; // Layer 1 (index 0)
@@ -1508,7 +1670,7 @@ export class MiningSystem {
         const isPerimeter = x === innerCeilingMinX || x === innerCeilingMaxX || z === innerCeilingMinZ || z === innerCeilingMaxZ;
         if (!isPerimeter) continue; // Only perimeter for inner box
         try {
-          this.world.chunkLattice.setBlock({ x, y: innerCeilingY, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y: innerCeilingY, z }, wallBlockId);
         } catch (error) {
 
         }
@@ -1522,7 +1684,7 @@ export class MiningSystem {
         const isPerimeter = x === outerCeilingMinX || x === outerCeilingMaxX || z === outerCeilingMinZ || z === outerCeilingMaxZ;
         if (!isPerimeter) continue; // Only perimeter for outer box
         try {
-          this.world.chunkLattice.setBlock({ x, y: outerCeilingY, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y: outerCeilingY, z }, wallBlockId);
         } catch (error) {
 
         }
@@ -1543,25 +1705,25 @@ export class MiningSystem {
       // Left wall
       for (let z = innerWallMinZ; z <= innerWallMaxZ; z++) {
         try {
-          this.world.chunkLattice.setBlock({ x: innerWallMinX, y, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x: innerWallMinX, y, z }, wallBlockId);
         } catch (error) {}
       }
       // Right wall
       for (let z = innerWallMinZ; z <= innerWallMaxZ; z++) {
         try {
-          this.world.chunkLattice.setBlock({ x: innerWallMaxX, y, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x: innerWallMaxX, y, z }, wallBlockId);
         } catch (error) {}
       }
       // Front wall
       for (let x = innerWallMinX; x <= innerWallMaxX; x++) {
         try {
-          this.world.chunkLattice.setBlock({ x, y, z: innerWallMinZ }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y, z: innerWallMinZ }, wallBlockId);
         } catch (error) {}
       }
       // Back wall
       for (let x = innerWallMinX; x <= innerWallMaxX; x++) {
         try {
-          this.world.chunkLattice.setBlock({ x, y, z: innerWallMaxZ }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y, z: innerWallMaxZ }, wallBlockId);
         } catch (error) {}
       }
     }
@@ -1578,25 +1740,25 @@ export class MiningSystem {
       // Left wall
       for (let z = outerWallMinZ; z <= outerWallMaxZ; z++) {
         try {
-          this.world.chunkLattice.setBlock({ x: outerWallMinX, y, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x: outerWallMinX, y, z }, wallBlockId);
         } catch (error) {}
       }
       // Right wall
       for (let z = outerWallMinZ; z <= outerWallMaxZ; z++) {
         try {
-          this.world.chunkLattice.setBlock({ x: outerWallMaxX, y, z }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x: outerWallMaxX, y, z }, wallBlockId);
         } catch (error) {}
       }
       // Front wall
       for (let x = outerWallMinX; x <= outerWallMaxX; x++) {
         try {
-          this.world.chunkLattice.setBlock({ x, y, z: outerWallMinZ }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y, z: outerWallMinZ }, wallBlockId);
         } catch (error) {}
       }
       // Back wall
       for (let x = outerWallMinX; x <= outerWallMaxX; x++) {
         try {
-          this.world.chunkLattice.setBlock({ x, y, z: outerWallMaxZ }, this.DIRT_BLOCK_TYPE_ID);
+          this.world.chunkLattice.setBlock({ x, y, z: outerWallMaxZ }, wallBlockId);
         } catch (error) {}
       }
     }
@@ -1604,30 +1766,34 @@ export class MiningSystem {
 
   /**
    * Generates the bottom floor at the bottommost level
-   * Fills wall depths 2-9 with dirt to create a solid floor between inner and outer walls
+   * Fills wall depths 2-9 with dirt/sand to create a solid floor between inner and outer walls
    * Excludes the mining area itself so players can still mine
+   * World-aware: Uses correct bounds and wall material based on world
    * 
    * @param floorDepth - Y coordinate (depth) of the floor
    * @param offset - Player's mine offset
+   * @param worldId - World ID ('island1' or 'island2')
    */
-  private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }): void {
+  private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
+    const bounds = this.getMiningAreaBounds(worldId);
+    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
     
     // Mining area bounds (with offset) - this area should NOT be filled
-    const miningMinX = MINING_AREA_BOUNDS.minX + offset.x;
-    const miningMaxX = MINING_AREA_BOUNDS.maxX + offset.x;
-    const miningMinZ = MINING_AREA_BOUNDS.minZ + offset.z;
-    const miningMaxZ = MINING_AREA_BOUNDS.maxZ + offset.z;
+    const miningMinX = bounds.minX + offset.x;
+    const miningMaxX = bounds.maxX + offset.x;
+    const miningMinZ = bounds.minZ + offset.z;
+    const miningMaxZ = bounds.maxZ + offset.z;
     
-    // Fill layers 2-9 with dirt (wall depths 2-9)
+    // Fill layers 2-9 with dirt/sand (wall depths 2-9)
     for (let wallOffset = 2; wallOffset <= 9; wallOffset++) {
       // Calculate bounds for this wall depth
-      const floorMinX = MINING_AREA_BOUNDS.minX - wallOffset + offset.x;
-      const floorMaxX = MINING_AREA_BOUNDS.maxX + wallOffset + offset.x;
-      const floorMinZ = MINING_AREA_BOUNDS.minZ - wallOffset + offset.z;
-      const floorMaxZ = MINING_AREA_BOUNDS.maxZ + wallOffset + offset.z;
+      const floorMinX = bounds.minX - wallOffset + offset.x;
+      const floorMaxX = bounds.maxX + wallOffset + offset.x;
+      const floorMinZ = bounds.minZ - wallOffset + offset.z;
+      const floorMaxZ = bounds.maxZ + wallOffset + offset.z;
       
-      // Fill the area at this wall depth with dirt, but exclude the mining area
+      // Fill the area at this wall depth with dirt/sand, but exclude the mining area
       for (let x = floorMinX; x <= floorMaxX; x++) {
         for (let z = floorMinZ; z <= floorMaxZ; z++) {
           // Skip if this position is within the mining area
@@ -1636,7 +1802,7 @@ export class MiningSystem {
           }
           
           try {
-            this.world.chunkLattice.setBlock({ x, y: floorDepth, z }, this.DIRT_BLOCK_TYPE_ID);
+            this.world.chunkLattice.setBlock({ x, y: floorDepth, z }, wallBlockId);
           } catch (error) {
             // Silently fail
           }
@@ -1648,39 +1814,42 @@ export class MiningSystem {
 
   /**
    * Deletes the bottom floor at a specific depth
-   * Removes dirt blocks from wall depths 2-9 (excluding mining area and wall positions)
+   * Removes dirt/sand blocks from wall depths 2-9 (excluding mining area and wall positions)
+   * World-aware: Uses correct bounds based on world
    * 
    * @param floorDepth - Y coordinate (depth) of the floor to delete
    * @param offset - Player's mine offset
+   * @param worldId - World ID ('island1' or 'island2')
    */
-  private deleteBottomFloor(floorDepth: number, offset: { x: number; z: number }): void {
+  private deleteBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
+    const bounds = this.getMiningAreaBounds(worldId);
     
     // Mining area bounds (with offset) - this area should NOT be deleted (it's not part of the floor)
-    const miningMinX = MINING_AREA_BOUNDS.minX + offset.x;
-    const miningMaxX = MINING_AREA_BOUNDS.maxX + offset.x;
-    const miningMinZ = MINING_AREA_BOUNDS.minZ + offset.z;
-    const miningMaxZ = MINING_AREA_BOUNDS.maxZ + offset.z;
+    const miningMinX = bounds.minX + offset.x;
+    const miningMaxX = bounds.maxX + offset.x;
+    const miningMinZ = bounds.minZ + offset.z;
+    const miningMaxZ = bounds.maxZ + offset.z;
     
     // Inner wall bounds (layer 1) - these should NOT be deleted (they're walls, not floor)
-    const innerWallMinX = MINING_AREA_BOUNDS.minX - 1 + offset.x;
-    const innerWallMaxX = MINING_AREA_BOUNDS.maxX + 1 + offset.x;
-    const innerWallMinZ = MINING_AREA_BOUNDS.minZ - 1 + offset.z;
-    const innerWallMaxZ = MINING_AREA_BOUNDS.maxZ + 1 + offset.z;
+    const innerWallMinX = bounds.minX - 1 + offset.x;
+    const innerWallMaxX = bounds.maxX + 1 + offset.x;
+    const innerWallMinZ = bounds.minZ - 1 + offset.z;
+    const innerWallMaxZ = bounds.maxZ + 1 + offset.z;
     
     // Outer wall bounds (layer 10) - these should NOT be deleted (they're walls, not floor)
-    const outerWallMinX = MINING_AREA_BOUNDS.minX - wallThickness + offset.x;
-    const outerWallMaxX = MINING_AREA_BOUNDS.maxX + wallThickness + offset.x;
-    const outerWallMinZ = MINING_AREA_BOUNDS.minZ - wallThickness + offset.z;
-    const outerWallMaxZ = MINING_AREA_BOUNDS.maxZ + wallThickness + offset.z;
+    const outerWallMinX = bounds.minX - wallThickness + offset.x;
+    const outerWallMaxX = bounds.maxX + wallThickness + offset.x;
+    const outerWallMinZ = bounds.minZ - wallThickness + offset.z;
+    const outerWallMaxZ = bounds.maxZ + wallThickness + offset.z;
     
     // Delete layers 2-9 (wall depths 2-9)
     for (let wallOffset = 2; wallOffset <= 9; wallOffset++) {
       // Calculate bounds for this wall depth
-      const floorMinX = MINING_AREA_BOUNDS.minX - wallOffset + offset.x;
-      const floorMaxX = MINING_AREA_BOUNDS.maxX + wallOffset + offset.x;
-      const floorMinZ = MINING_AREA_BOUNDS.minZ - wallOffset + offset.z;
-      const floorMaxZ = MINING_AREA_BOUNDS.maxZ + wallOffset + offset.z;
+      const floorMinX = bounds.minX - wallOffset + offset.x;
+      const floorMaxX = bounds.maxX + wallOffset + offset.x;
+      const floorMinZ = bounds.minZ - wallOffset + offset.z;
+      const floorMaxZ = bounds.maxZ + wallOffset + offset.z;
       
       // Delete blocks at this wall depth (set to air), but skip the mining area and wall positions
       for (let x = floorMinX; x <= floorMaxX; x++) {
@@ -1716,14 +1885,16 @@ export class MiningSystem {
   }
 
   /**
-   * Generates a single wall block (dirt) at the specified position
+   * Generates a single wall block at the specified position
    * Only generates if the position is air/empty
+   * World-aware: Uses sand for Island 2, dirt for Island 1
    * 
    * @param x - X coordinate
    * @param y - Y coordinate (depth)
    * @param z - Z coordinate
+   * @param blockId - Block ID to use (dirt for Island 1, sand for Island 2)
    */
-  private generateWallBlock(x: number, y: number, z: number): void {
+  private generateWallBlock(x: number, y: number, z: number, blockId: number): void {
     const wallPosition = { x, y, z };
     
     try {
@@ -1732,8 +1903,8 @@ export class MiningSystem {
       
       // Only create wall block if it doesn't exist (air = 0 or undefined)
       if (!existingBlockId || existingBlockId === 0) {
-        // Set block to dirt (ID 9) for walls
-        this.world.chunkLattice.setBlock(wallPosition, this.DIRT_BLOCK_TYPE_ID);
+        // Set block to the specified block ID (dirt for Island 1, sand for Island 2)
+        this.world.chunkLattice.setBlock(wallPosition, blockId);
       }
     } catch (error) {
       // Silently fail for wall generation - not critical

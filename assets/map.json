@@ -399,6 +399,150 @@
       "isCustom": true,
       "isMultiTexture": true,
       "isLiquid": false
+    },
+    {
+      "id": 51,
+      "name": "Driftite",
+      "textureUri": "blocks/Driftite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 52,
+      "name": "Anchorite",
+      "textureUri": "blocks/Anchorite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 53,
+      "name": "Seaglassium",
+      "textureUri": "blocks/Seaglassium",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 54,
+      "name": "Shellchromite",
+      "textureUri": "blocks/Shellchromite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 55,
+      "name": "Turtlite",
+      "textureUri": "blocks/Turtlite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 56,
+      "name": "Opalstone",
+      "textureUri": "blocks/Opalstone",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 57,
+      "name": "Azurite",
+      "textureUri": "blocks/Azurite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 58,
+      "name": "Mangrovite",
+      "textureUri": "blocks/Mangrovite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 59,
+      "name": "Reefium",
+      "textureUri": "blocks/Reefium",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 60,
+      "name": "Kelpite",
+      "textureUri": "blocks/Kelpite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 61,
+      "name": "Sunstonite",
+      "textureUri": "blocks/Sunstonite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 62,
+      "name": "Riptidite",
+      "textureUri": "blocks/Riptidite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 63,
+      "name": "Trenchite",
+      "textureUri": "blocks/Trenchite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 64,
+      "name": "Stormium",
+      "textureUri": "blocks/Stormium",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 65,
+      "name": "Lavastone",
+      "textureUri": "blocks/Lavastone",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 66,
+      "name": "Biolumite",
+      "textureUri": "blocks/Biolumite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 67,
+      "name": "Oceanium",
+      "textureUri": "blocks/Oceanium",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 68,
+      "name": "Palmitite",
+      "textureUri": "blocks/Palmitite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
     }
   ],
   "blocks": {

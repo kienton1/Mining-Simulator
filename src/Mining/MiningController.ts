@@ -10,8 +10,8 @@
 import { World, Player, Entity } from 'hytopia';
 import { MiningSystem } from './MiningSystem';
 import { GameManager } from '../Core/GameManager';
-import { OreType } from './Ore/OreData';
-import { ORE_DATABASE } from './Ore/OreData';
+import { OreType, ORE_DATABASE } from './Ore/OreData';
+import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from '../worldData/Ores';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 
 /**
@@ -23,6 +23,27 @@ export class MiningController {
   private miningSystem: MiningSystem;
   private gameManager: GameManager;
   private blockDetectionIntervals: Map<Player, NodeJS.Timeout> = new Map();
+
+  /**
+   * Helper function to get ore data from either Island 1 or Island 2 database
+   * World-aware: Checks both databases
+   * 
+   * @param oreType - Ore type as string (ore type name)
+   * @returns Ore data from the appropriate database, or null if not found
+   */
+  private getOreData(oreType: string | null): { name: string; value: number; color: string } | null {
+    if (!oreType) return null;
+    
+    // Try Island 1 database first
+    if (oreType in ORE_DATABASE) {
+      return ORE_DATABASE[oreType as OreType];
+    }
+    // Try Island 2 database if not found
+    if (oreType in ISLAND2_ORE_DATABASE) {
+      return ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+    }
+    return null;
+  }
 
   constructor(world: World, gameManager: GameManager) {
     this.world = world;
@@ -268,7 +289,7 @@ export class MiningController {
           blockInfo.gemReward
         );
       } else {
-        const oreData = blockInfo.oreType ? ORE_DATABASE[blockInfo.oreType] : null;
+        const oreData = this.getOreData(blockInfo.oreType);
         this.sendMiningUpdateEvent(
           player,
           0, // No damage, just detection
@@ -337,7 +358,7 @@ export class MiningController {
       },
       (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
-        const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
+        const oreData = this.getOreData(currentOre);
         // Include ore mined info when block is destroyed (like damage popups)
         const oreMined = blockHP <= 0 && !isChest && oreData ? oreData.name : null;
         const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
@@ -496,21 +517,27 @@ export class MiningController {
     }
     
     // Get ore color for display (only for ores, not chests)
+    // World-aware: Check both Island 1 and Island 2 databases
     let oreColor: string | null = null;
     if (!isChest && currentOreName) {
-      // Find ore type from name
-      const oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      // Find ore type from name in both databases
+      let oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      if (!oreEntry) {
+        oreEntry = Object.entries(ISLAND2_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      }
       if (oreEntry) {
-        const oreType = oreEntry[0] as OreType;
-        const oreData = ORE_DATABASE[oreType];
-        // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)
-        const sellMultiplier = this.gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
-        let calculatedValue = oreData.value * sellMultiplier;
-        // Round to nearest integer (no decimals)
-        calculatedValue = Math.round(calculatedValue);
-        sellValue = calculatedValue;
-        // Get ore color for text display
-        oreColor = oreData.color;
+        const oreType = oreEntry[0];
+        const oreData = this.getOreData(oreType);
+        if (oreData) {
+          // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)
+          const sellMultiplier = this.gameManager.getSellingSystem().getCombinedCoinMultiplier(player);
+          let calculatedValue = oreData.value * sellMultiplier;
+          // Round to nearest integer (no decimals)
+          calculatedValue = Math.round(calculatedValue);
+          sellValue = calculatedValue;
+          // Get ore color for text display
+          oreColor = oreData.color;
+        }
       }
     }
 

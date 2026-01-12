@@ -3,6 +3,223 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 -->
 
 <script>
+  // Format number for popups - max 3 digits (including decimals) followed by letter suffix
+  function formatPopupNumber(value) {
+    if (value < 0) return '-' + formatPopupNumber(-value);
+    if (value === 0) return '0';
+    
+    // Helper to format with exactly max 3 digits total (including decimals, excluding decimal point)
+    const formatWithMax3Digits = (num, suffix) => {
+      // Count digits in integer part
+      const intPart = Math.floor(num);
+      const intDigits = intPart.toString().length;
+      
+      // If integer part is 3+ digits, show as integer (e.g., 100-999)
+      if (intDigits >= 3) {
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // If integer part is 2 digits (10-99), can add 1 decimal place to make 3 digits total
+      if (intDigits === 2) {
+        const with1Dec = num.toFixed(1);
+        const digitsCount = with1Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // If adding decimal exceeds 3 digits, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // If integer part is 1 digit (1-9), can add up to 2 decimal places to make 3 digits total
+      if (intDigits === 1) {
+        const with2Dec = num.toFixed(2);
+        const digitsCount = with2Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with2Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Try 1 decimal place
+        const with1Dec = num.toFixed(1);
+        const digitsCount1 = with1Dec.replace('.', '').length;
+        if (digitsCount1 <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Fallback to integer
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // For numbers < 1 (intDigits === 0), show up to 3 significant digits
+      // This is rare for power gains, but handle it
+      const with3Dec = num.toFixed(3);
+      const digitsCount = with3Dec.replace('.', '').replace(/^0+/, '').length;
+      if (digitsCount <= 3) {
+        return with3Dec.replace(/\.?0+$/, '').replace(/^0\./, '0.') + suffix;
+      }
+      return num.toFixed(2).replace(/\.?0+$/, '') + suffix;
+    };
+    
+    // Handle very large numbers (same structure as formatNumber)
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'De');
+      return formatWithMax3Digits(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
+      return formatWithMax3Digits(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
+      return formatWithMax3Digits(num, 'c');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'c');
+      return formatWithMax3Digits(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sp');
+      return formatWithMax3Digits(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sx');
+      return formatWithMax3Digits(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Qn');
+      return formatWithMax3Digits(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Q');
+      return formatWithMax3Digits(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'T');
+      return formatWithMax3Digits(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'B');
+      return formatWithMax3Digits(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'M');
+      return formatWithMax3Digits(num, 'K');
+    }
+    // Less than 1000 - show as integer (max 3 digits naturally)
+    return Math.round(value).toString();
+  }
+
+  // Global number formatting function - limits to 1-2 decimal places max with letter abbreviations
+  function formatNumber(value) {
+    if (value < 0) return '-' + formatNumber(-value);
+    if (value === 0) return '0';
+    
+    // Helper to format with 1-2 decimal places and remove trailing zeros
+    const formatWithSuffix = (num, suffix) => {
+      // Try 1 decimal place first
+      const with1Dec = num.toFixed(1);
+      if (with1Dec.endsWith('.0')) {
+        // If it ends in .0, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Try 2 decimal places if needed
+      const with2Dec = num.toFixed(2);
+      if (with2Dec.endsWith('.00')) {
+        // If it ends in .00, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Remove trailing zeros (e.g., 1.50 -> 1.5, 2.30 -> 2.3)
+      return with2Dec.replace(/\.?0+$/, '') + suffix;
+    };
+    
+    // Handle very large numbers
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
+      return formatWithSuffix(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'c');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'c');
+      return formatWithSuffix(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
+      return formatWithSuffix(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
+      return formatWithSuffix(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
+      return formatWithSuffix(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+      return formatWithSuffix(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
+      return formatWithSuffix(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
+      return formatWithSuffix(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
+      return formatWithSuffix(num, 'K');
+    }
+    // Less than 1000 - show as integer
+    return Math.round(value).toString();
+  }
+
   // Register SceneUI templates as soon as hytopia is available
   // This ensures templates are available when server creates SceneUIs
   (function registerSceneUITemplates() {
@@ -429,20 +646,6 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
     if (!upgradeUI || !upgradeButton || !upgradeStatus || !buttonText) return;
 
-    const formatNumber = (value) => {
-      if (value >= 1_000_000) {
-        const num = value / 1_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M';
-      }
-      if (value >= 1_000) {
-        const num = value / 1_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K';
-      }
-      return value.toLocaleString();
-    };
-
     if (hasUpgrade) {
       buttonText.textContent = 'Bought!';
       upgradeButton.disabled = true;
@@ -500,31 +703,6 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
     // Clear existing items
     gemTraderUIContent.innerHTML = '';
-
-    // Format number for display
-    const formatNumber = (value) => {
-      if (value >= 1_000_000_000_000) {
-        const num = value / 1_000_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'T';
-      }
-      if (value >= 1_000_000_000) {
-        const num = value / 1_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'B';
-      }
-      if (value >= 1_000_000) {
-        const num = value / 1_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M';
-      }
-      if (value >= 1_000) {
-        const num = value / 1_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K';
-      }
-      return value.toLocaleString();
-    };
 
     // Upgrade definitions
     const upgradeDefs = [
@@ -687,72 +865,67 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     // Clear existing items
     merchantUIContent.innerHTML = '';
 
-    // Get ore data for values (matching NEW ORE_DATABASE from OreData.ts - 24 ores)
+    // Get ore data for values (matching ORE_DATABASE from OreData.ts and ISLAND2_ORE_DATABASE from Ores.ts)
+    // Colors are hex values from the ore data files
     const oreData = {
-      'stone': { name: 'Stone', value: 2, color: 'stone' },
-      'deepslate': { name: 'Deepslate', value: 5, color: 'stone' },
-      'coal': { name: 'Coal', value: 6, color: 'coal' },
-      'iron': { name: 'Iron', value: 10, color: 'iron' },
-      'tin': { name: 'Tin', value: 15, color: 'iron' },
-      'cobalt': { name: 'Cobalt', value: 50, color: 'cobalt' },
-      'pyrite': { name: 'Pyrite', value: 100, color: 'gold' },
-      'gold': { name: 'Gold', value: 250, color: 'gold' },
-      'obsidian': { name: 'Obsidian', value: 500, color: 'obsidian' },
-      'ruby': { name: 'Ruby', value: 1000, color: 'ruby' },
-      'diamond': { name: 'Diamond', value: 2000, color: 'diamond' },
-      'amber': { name: 'Amber', value: 3500, color: 'amber' },
-      'quartz': { name: 'Quartz', value: 5000, color: 'quartz' },
-      'topaz': { name: 'Topaz', value: 10000, color: 'topaz' },
-      'emerald': { name: 'Emerald', value: 20000, color: 'emerald' },
-      'relic': { name: 'Relic', value: 50000, color: 'relic' },
-      'amethyst': { name: 'Amethyst', value: 75000, color: 'amethyst' },
-      'sapphire': { name: 'Sapphire', value: 150000, color: 'sapphire' },
-      'luminite': { name: 'Luminite', value: 250000, color: 'luminite' },
-      'prismatic': { name: 'Prismatic', value: 350000, color: 'prismatic' },
-      'sunstone': { name: 'Sunstone', value: 450000, color: 'sunstone' },
-      'mithrial': { name: 'Mithrial', value: 600000, color: 'mithrial' },
-      'astralite': { name: 'Astralite', value: 800000, color: 'astralite' },
-      'dragonstone': { name: 'Dragonstone', value: 1500000, color: 'dragonstone' },
-    };
-
-    // Format number for display (2 decimals for money/power, but hide .00)
-    const formatNumber = (value) => {
-      if (value >= 1_000_000_000_000_000_000) {
-        const num = value / 1_000_000_000_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'S'; // Sextillion
-      }
-      if (value >= 1_000_000_000_000_000) {
-        const num = value / 1_000_000_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'Q'; // Quadrillion
-      }
-      if (value >= 1_000_000_000_000) {
-        const num = value / 1_000_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'T'; // Trillion
-      }
-      if (value >= 1_000_000_000) {
-        const num = value / 1_000_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'B'; // Billion
-      }
-      if (value >= 1_000_000) {
-        const num = value / 1_000_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'M'; // Million
-      }
-      if (value >= 1_000) {
-        const num = value / 1_000;
-        const formatted = num.toFixed(2);
-        return (formatted.endsWith('.00') ? Math.round(num).toString() : formatted) + 'K'; // Thousand
-      }
-      const formatted = value.toFixed(2);
-      return formatted.endsWith('.00') ? Math.round(value).toString() : formatted;
+      // Island 1 ores
+      'stone': { name: 'Stone', value: 2, color: '#808080' },
+      'deepslate': { name: 'Deepslate', value: 5, color: '#2F2F2F' },
+      'coal': { name: 'Coal', value: 6, color: '#1A1A1A' },
+      'iron': { name: 'Iron', value: 10, color: '#C0C0C0' },
+      'tin': { name: 'Tin', value: 15, color: '#D3D3D3' },
+      'cobalt': { name: 'Cobalt', value: 50, color: '#0047AB' },
+      'pyrite': { name: 'Pyrite', value: 100, color: '#FFD700' },
+      'gold': { name: 'Gold', value: 250, color: '#FFD700' },
+      'obsidian': { name: 'Obsidian', value: 500, color: '#000000' },
+      'ruby': { name: 'Ruby', value: 1000, color: '#E0115F' },
+      'diamond': { name: 'Diamond', value: 2000, color: '#B9F2FF' },
+      'amber': { name: 'Amber', value: 3500, color: '#FFBF00' },
+      'quartz': { name: 'Quartz', value: 5000, color: '#F5F5DC' },
+      'topaz': { name: 'Topaz', value: 10000, color: '#FFC87C' },
+      'emerald': { name: 'Emerald', value: 20000, color: '#50C878' },
+      'relic': { name: 'Relic', value: 50000, color: '#8B7355' },
+      'amethyst': { name: 'Amethyst', value: 75000, color: '#9966CC' },
+      'sapphire': { name: 'Sapphire', value: 150000, color: '#0F52BA' },
+      'luminite': { name: 'Luminite', value: 250000, color: '#00FF00' },
+      'prismatic': { name: 'Prismatic', value: 350000, color: '#E0E0E0' },
+      'sunstone': { name: 'Sunstone', value: 450000, color: '#FFA500' },
+      'mithrial': { name: 'Mithrial', value: 600000, color: '#C0C0C0' },
+      'astralite': { name: 'Astralite', value: 800000, color: '#708090' },
+      'dragonstone': { name: 'Dragonstone', value: 1500000, color: '#8B0000' },
+      // Island 2 ores
+      'dunestone': { name: 'Dunestone', value: 1000, color: '#8B7D6B' },
+      'driftite': { name: 'Driftite', value: 15000, color: '#A8A8A8' },
+      'anchorite': { name: 'Anchorite', value: 30000, color: '#4A4A4A' },
+      'barnacite': { name: 'Barnacite', value: 35000, color: '#6B4423' },
+      'seaglassium': { name: 'Seaglassium', value: 100000, color: '#87CEEB' },
+      'shellchromite': { name: 'Shellchromite', value: 250000, color: '#F5DEB3' },
+      'turtlite': { name: 'Turtlite', value: 650000, color: '#228B22' },
+      'prismarine': { name: 'Prismarine', value: 2500000, color: '#00CED1' },
+      'opalstone': { name: 'Opalstone', value: 4000000, color: '#E6E6FA' },
+      'azurite': { name: 'Azurite', value: 7500000, color: '#007FFF' },
+      'mangrovite': { name: 'Mangrovite', value: 19000000, color: '#8B4513' },
+      'basaltite': { name: 'Basaltite', value: 15000000, color: '#2F2F2F' },
+      'reefium': { name: 'Reefium', value: 25000000, color: '#FF6347' },
+      'kelpite': { name: 'Kelpite', value: 27500000, color: '#2E8B57' },
+      'sunstonite': { name: 'Sunstonite', value: 40000000, color: '#FFD700' },
+      'riptidite': { name: 'Riptidite', value: 75000000, color: '#4682B4' },
+      'trenchite': { name: 'Trenchite', value: 100000000, color: '#191970' },
+      'stormium': { name: 'Stormium', value: 150000000, color: '#708090' },
+      'lavastone': { name: 'Lavastone', value: 200000000, color: '#FF4500' },
+      'wreckite': { name: 'Wreckite', value: 250000000, color: '#8B4513' },
+      'biolumite': { name: 'Biolumite', value: 300000000, color: '#00FF00' },
+      'oceanium': { name: 'Oceanium', value: 400000000, color: '#0000CD' },
+      'palmitite': { name: 'Palmitite', value: 400000000, color: '#FFE4B5' },
+      'tradewindite': { name: 'Tradewindite', value: 1750000000, color: '#87CEFA' },
     };
 
     // Create ore items
     const oreTypes = Object.keys(inventory).filter(oreType => inventory[oreType] > 0);
+    
+    // Debug: Log inventory and oreData keys
+    console.log('[MerchantUI] Inventory keys:', oreTypes);
+    console.log('[MerchantUI] OreData keys count:', Object.keys(oreData).length);
     
     if (oreTypes.length === 0) {
       const emptyMessage = document.createElement('div');
@@ -775,7 +948,13 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       const amount = inventory[oreType];
       const data = oreData[oreType];
       
-      if (!data || amount <= 0) continue;
+      // Debug: Log missing ores
+      if (!data) {
+        console.warn(`[MerchantUI] No data found for ore type: ${oreType}`);
+        continue;
+      }
+      
+      if (amount <= 0) continue;
 
       const item = document.createElement('div');
       item.className = 'merchant-ui__ore-item';
@@ -785,7 +964,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       oreInfo.className = 'merchant-ui__ore-info';
 
       const oreName = document.createElement('div');
-      oreName.className = `merchant-ui__ore-name ${data.color}`;
+      oreName.className = 'merchant-ui__ore-name';
+      oreName.style.color = data.color; // Use actual hex color from ore data
       oreName.textContent = `${data.name} (x${amount})`;
       oreInfo.appendChild(oreName);
 
@@ -1054,125 +1234,6 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         lastHatch: [],
         autoEnabled: false,
       },
-    };
-
-    const formatNumber = value => {
-      // Format: Max 3 digits before decimal, max 2 after, then letter suffix
-      // Abbreviations: T, Qd, Qn, Sx, Sp, c, Oc, No, De, UDe
-      
-      // Helper to format and remove trailing zeros
-      const formatValue = (num, suffix) => {
-        const formatted = num.toFixed(2);
-        const cleaned = formatted.endsWith('.00') ? Math.round(num).toString() : formatted.replace(/\.?0+$/, '');
-        return cleaned + suffix;
-      };
-      
-      if (value >= 1e36) {
-        // Undecillion (1e36)
-        const num = value / 1e36;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'UDe');
-        }
-        return formatValue(num, 'UDe');
-      }
-      if (value >= 1e33) {
-        // Decillion (1e33)
-        const num = value / 1e33;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'UDe');
-        }
-        return formatValue(num, 'De');
-      }
-      if (value >= 1e30) {
-        // Nonillion (1e30)
-        const num = value / 1e30;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'De');
-        }
-        return formatValue(num, 'No');
-      }
-      if (value >= 1e27) {
-        // Octillion (1e27)
-        const num = value / 1e27;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'No');
-        }
-        return formatValue(num, 'Oc');
-      }
-      if (value >= 1e26) {
-        // Custom 'c' tier (1e26, between Sp and Oc)
-        const num = value / 1e26;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'Oc');
-        }
-        return formatValue(num, 'c');
-      }
-      if (value >= 1e24) {
-        // Septillion (1e24)
-        const num = value / 1e24;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'c');
-        }
-        return formatValue(num, 'Sp');
-      }
-      if (value >= 1e21) {
-        // Sextillion (1e21)
-        const num = value / 1e21;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'Sp');
-        }
-        return formatValue(num, 'Sx');
-      }
-      if (value >= 1e18) {
-        // Quintillion (1e18)
-        const num = value / 1e18;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'Sx');
-        }
-        return formatValue(num, 'Qn');
-      }
-      if (value >= 1e15) {
-        // Quadrillion (1e15)
-        const num = value / 1e15;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'Qn');
-        }
-        return formatValue(num, 'Qd');
-      }
-      if (value >= 1e12) {
-        // Trillion (1e12)
-        const num = value / 1e12;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'Qd');
-        }
-        return formatValue(num, 'T');
-      }
-      if (value >= 1_000_000_000) {
-        // Billion
-        const num = value / 1_000_000_000;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'T');
-        }
-        return formatValue(num, 'B');
-      }
-      if (value >= 1_000_000) {
-        // Million
-        const num = value / 1_000_000;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'B');
-        }
-        return formatValue(num, 'M');
-      }
-      if (value >= 1_000) {
-        // Thousand
-        const num = value / 1_000;
-        if (num >= 1000) {
-          return formatValue(num / 1000, 'M');
-        }
-        return formatValue(num, 'K');
-      }
-      // Less than 1000 - show as integer
-      return Math.round(value).toString();
     };
 
     // Egg station local auto-open loop (client-side)
@@ -2213,7 +2274,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       
       const text = document.createElement('span');
       text.className = 'power-gain__text';
-      text.textContent = `+${Math.round(amount)}`;
+      text.textContent = `+${formatPopupNumber(amount)}`;
       popup.appendChild(text);
       
       // Position popup near the rock if position is provided
@@ -2285,25 +2346,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       const popup = document.createElement('div');
       popup.className = 'damage-popup';
       
-      // Format damage number (e.g., 1140000000 -> "1.14B")
-      const formatDamage = (value) => {
-        if (value >= 1000000000) {
-          const bValue = value / 1000000000;
-          return bValue.toFixed(2).replace(/\.?0+$/, '') + 'B';
-        } else if (value >= 1000000) {
-          const mValue = value / 1000000;
-          return mValue.toFixed(2).replace(/\.?0+$/, '') + 'M';
-        } else if (value >= 1000) {
-          const kValue = value / 1000;
-          return kValue.toFixed(2).replace(/\.?0+$/, '') + 'K';
-        } else {
-          return Math.round(value).toString();
-        }
-      };
-      
       const damageText = document.createElement('span');
       damageText.className = 'damage-popup__text';
-      damageText.textContent = `${formatDamage(damage)} Dmg`;
+      damageText.textContent = `${formatNumber(damage)} Dmg`;
       popup.appendChild(damageText);
       
       // Position to the right of the HP bar (which is centered at bottom: 120px)
@@ -2830,7 +2875,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
                 // Use white for chests or if no color available
                 blockHealthBarNameEl.style.color = '#fff';
               }
-              blockHealthBarTextEl.textContent = `${Math.floor(displayInfo.blockHP).toLocaleString()}/${Math.floor(displayInfo.maxHP).toLocaleString()} HP`;
+              blockHealthBarTextEl.textContent = `${formatNumber(Math.floor(displayInfo.blockHP))}/${formatNumber(Math.floor(displayInfo.maxHP))} HP`;
               
               // Calculate fill percentage
               const fillPercent = Math.max(0, Math.min(100, (displayInfo.blockHP / displayInfo.maxHP) * 100));

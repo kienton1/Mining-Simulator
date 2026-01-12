@@ -86,44 +86,11 @@ export const CURRENT_DATA_VERSION = 3;
 /**
  * Inventory data structure
  * Maps ore type to quantity
- * Supports all 24 ore types from OreData
+ * Supports all ore types from both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE)
+ * Uses index signature to allow any string key for world-aware support
  */
 export interface InventoryData {
-  // Common Ores (Available Early)
-  [OreType.STONE]?: number;
-  [OreType.DEEPSLATE]?: number;
-  [OreType.COAL]?: number;
-  [OreType.IRON]?: number;
-  
-  // Uncommon Ores (Early-Mid Game)
-  [OreType.TIN]?: number;
-  [OreType.COBALT]?: number;
-  [OreType.PYRITE]?: number;
-  [OreType.GOLD]?: number;
-  
-  // Rare Ores (Mid Game)
-  [OreType.OBSIDIAN]?: number;
-  [OreType.RUBY]?: number;
-  [OreType.DIAMOND]?: number;
-  [OreType.AMBER]?: number;
-  
-  // Very Rare Ores (Mid-Late Game)
-  [OreType.QUARTZ]?: number;
-  [OreType.TOPAZ]?: number;
-  [OreType.EMERALD]?: number;
-  [OreType.RELIC]?: number;
-  
-  // Ultra Rare Ores (Late Game)
-  [OreType.AMETHYST]?: number;
-  [OreType.SAPPHIRE]?: number;
-  [OreType.LUMINITE]?: number;
-  [OreType.PRISMATIC]?: number;
-  
-  // Legendary Ores (End Game)
-  [OreType.SUNSTONE]?: number;
-  [OreType.MITHRIAL]?: number;
-  [OreType.ASTRALITE]?: number;
-  [OreType.DRAGONSTONE]?: number;
+  [oreType: string]: number | undefined;
 }
 
 /**

@@ -121,7 +121,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 30000000,
     name: 'Dunestone',
-    block: 'Dunestone/',
+    block: 'Dunestone',
     color: '#8B7D6B',  // Dune/sand beige
   },
   [ISLAND2_ORE_TYPE.DRIFTITE]: {
@@ -133,7 +133,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 70000000,
     name: 'Driftite',
-    block: 'Driftite/',
+    block: 'Driftite',
     color: '#A8A8A8',  // Driftwood gray
   },
   [ISLAND2_ORE_TYPE.ANCHORITE]: {
@@ -145,7 +145,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 90000000,
     name: 'Anchorite',
-    block: 'Anchorite/',
+    block: 'Anchorite',
     color: '#4A4A4A',  // Anchor metal dark gray
   },
   [ISLAND2_ORE_TYPE.BARNACITE]: {
@@ -157,7 +157,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 100000000,
     name: 'Barnacite',
-    block: 'Barnacite/',
+    block: 'Barnacite',
     color: '#6B4423',  // Barnacle brown
   },
   [ISLAND2_ORE_TYPE.SEAGLASSIUM]: {
@@ -169,7 +169,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 125000000,
     name: 'Seaglassium',
-    block: 'Seaglassium/',
+    block: 'Seaglassium',
     color: '#87CEEB',  // Sky blue - sea glass
   },
   [ISLAND2_ORE_TYPE.SHELLCHROMITE]: {
@@ -181,7 +181,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 200000000,
     name: 'Shellchromite',
-    block: 'Shellchromite/',
+    block: 'Shellchromite',
     color: '#F5DEB3',  // Shell cream/pearl
   },
 
@@ -195,7 +195,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 290000000,
     name: 'Turtlite',
-    block: 'Turtlite/',
+    block: 'Turtlite',
     color: '#228B22',  // Turtle green
   },
   [ISLAND2_ORE_TYPE.PRISMARINE]: {
@@ -207,7 +207,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 400000000,
     name: 'Prismarine',
-    block: 'Prismarine/',
+    block: 'Prismarine',
     color: '#00CED1',  // Prismarine cyan
   },
   [ISLAND2_ORE_TYPE.OPALSTONE]: {
@@ -219,7 +219,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 603000000,
     name: 'Opalstone',
-    block: 'Opalstone/',
+    block: 'Opalstone',
     color: '#E6E6FA',  // Opal lavender
   },
   [ISLAND2_ORE_TYPE.AZURITE]: {
@@ -231,7 +231,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 800000000,
     name: 'Azurite',
-    block: 'Azurite/',
+    block: 'Azurite',
     color: '#007FFF',  // Azure blue
   },
   [ISLAND2_ORE_TYPE.MANGROVITE]: {
@@ -243,7 +243,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 1000000000,
     name: 'Mangrovite',
-    block: 'Mangrovite/',
+    block: 'Mangrovite',
     color: '#8B4513',  // Mangrove brown
   },
   [ISLAND2_ORE_TYPE.BASALTITE]: {
@@ -255,7 +255,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 1200000000,
     name: 'Basaltite',
-    block: 'Basaltite/',
+    block: 'Basaltite',
     color: '#2F2F2F',  // Basalt dark gray
   },
 
@@ -269,7 +269,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 1300000000,
     name: 'Reefium',
-    block: 'Reefium/',
+    block: 'Reefium',
     color: '#FF6347',  // Coral reef red-orange
   },
   [ISLAND2_ORE_TYPE.KELPITE]: {
@@ -281,7 +281,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 1400000000,
     name: 'Kelpite',
-    block: 'Kelpite/',
+    block: 'Kelpite',
     color: '#2E8B57',  // Kelp green
   },
   [ISLAND2_ORE_TYPE.SUNSTONITE]: {
@@ -293,7 +293,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 1500000000,
     name: 'Sunstonite',
-    block: 'Sunstonite/',
+    block: 'Sunstonite',
     color: '#FFD700',  // Sunstone gold
   },
   [ISLAND2_ORE_TYPE.RIPTIDITE]: {
@@ -305,7 +305,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 2000000000,
     name: 'Riptidite',
-    block: 'Riptidite/',
+    block: 'Riptidite',
     color: '#4682B4',  // Riptide steel blue
   },
 
@@ -319,7 +319,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 2500000000,
     name: 'Trenchite',
-    block: 'Trenchite/',
+    block: 'Trenchite',
     color: '#191970',  // Trench midnight blue
   },
   [ISLAND2_ORE_TYPE.STORMIUM]: {
@@ -331,7 +331,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 2000000000,
     name: 'Stormium',
-    block: 'Stormium/',
+    block: 'Stormium',
     color: '#708090',  // Storm gray
   },
   [ISLAND2_ORE_TYPE.LAVASTONE]: {
@@ -343,7 +343,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 2800000000,
     name: 'Lavastone',
-    block: 'Lavastone/',
+    block: 'Lavastone',
     color: '#FF4500',  // Lava orange-red
   },
   [ISLAND2_ORE_TYPE.WRECKITE]: {
@@ -355,7 +355,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 3500000000,
     name: 'Wreckite',
-    block: 'Wreckite/',
+    block: 'Wreckite',
     color: '#8B4513',  // Shipwreck brown
   },
 
@@ -369,7 +369,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 3400000000,
     name: 'Biolumite',
-    block: 'Biolumite/',
+    block: 'Biolumite',
     color: '#00FF00',  // Bioluminescent green
   },
   [ISLAND2_ORE_TYPE.OCEANIUM]: {
@@ -381,7 +381,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 3500000000,
     name: 'Oceanium',
-    block: 'Oceanium/',
+    block: 'Oceanium',
     color: '#0000CD',  // Deep ocean blue
   },
   [ISLAND2_ORE_TYPE.PALMITITE]: {
@@ -393,7 +393,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 3700000000,
     name: 'Palmitite',
-    block: 'Palmitite/',
+    block: 'Palmitite',
     color: '#FFE4B5',  // Palm cream
   },
   [ISLAND2_ORE_TYPE.TRADEWINDITE]: {
@@ -405,7 +405,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     lastDepth: 1000,
     lastHealth: 7000000000,
     name: 'Tradewindite',
-    block: 'Tradewindite/',
+    block: 'Tradewindite',
     color: '#87CEFA',  // Trade wind light blue
   },
 };

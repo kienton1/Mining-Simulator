@@ -3,19 +3,18 @@
  * 
  * Represents a single block in the mine that can be mined.
  * Tracks HP and ore type.
+ * World-aware: Supports both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE) ores.
  * 
  * Reference: Planning/gameOverview.txt section 6.1
  */
-
-import { OreType } from './Ore/OreData';
 
 /**
  * Mine Block class
  * Represents a block that can be mined
  */
 export class MineBlock {
-  /** Type of ore in this block */
-  oreType: OreType;
+  /** Type of ore in this block (as string to support both Island 1 and Island 2 ores) */
+  oreType: string;
   
   /** Maximum HP of the block */
   maxHP: number;
@@ -26,10 +25,10 @@ export class MineBlock {
   /**
    * Creates a new mine block
    * 
-   * @param oreType - Type of ore in this block
+   * @param oreType - Type of ore in this block (as string)
    * @param maxHP - Maximum HP of the block
    */
-  constructor(oreType: OreType, maxHP: number = 100) {
+  constructor(oreType: string, maxHP: number = 100) {
     this.oreType = oreType;
     this.maxHP = maxHP;
     this.currentHP = maxHP;

@@ -193,6 +193,46 @@ export const SHARED_MINE_SHAFT = {
 } as const;
 
 /**
+ * Island 2 (Beach World) Mining Area Coordinates
+ * Defines the bounds of the mining area where players can mine stone blocks in the beach world
+ * 
+ * Coordinates format: { x, y, z }
+ * Volume defined by: (-285,0,23), (-291,1,17), (-285,1,17), (-291,1,23)
+ */
+export const ISLAND2_MINING_AREA_BOUNDS = {
+  /** Minimum X coordinate */
+  minX: -291,
+  /** Maximum X coordinate */
+  maxX: -285,
+  /** Y coordinate (surface level) */
+  y: 0,
+  /** Minimum Z coordinate */
+  minZ: 17,
+  /** Maximum Z coordinate */
+  maxZ: 23,
+} as const;
+
+/**
+ * Island 2 (Beach World) Shared Mine Shaft (public drop-in hole)
+ * Players jump down this 10-block-deep shaft; a trigger at the bottom
+ * teleports them into their personal mine instance.
+ */
+export const ISLAND2_SHARED_MINE_SHAFT = {
+  bounds: {
+    minX: ISLAND2_MINING_AREA_BOUNDS.minX,
+    maxX: ISLAND2_MINING_AREA_BOUNDS.maxX,
+    minZ: ISLAND2_MINING_AREA_BOUNDS.minZ,
+    maxZ: ISLAND2_MINING_AREA_BOUNDS.maxZ,
+  },
+  topY: 0,
+  bottomY: -10,
+  /** Blocks of fall before teleporting to personal mine */
+  teleportAfterDropBlocks: 5,
+  /** Y threshold where we teleport (derived from topY - teleportAfterDropBlocks) */
+  teleportThresholdY: -5.5,
+} as const;
+
+/**
  * Spacing (in blocks) between per-player mine instances when using spatial offsets.
  * Keep large enough to avoid accidental overlap between players.
  */

@@ -1,4 +1,4 @@
-import { WorldConfig } from '../types/WorldConfig';
+import type { WorldConfig } from './WorldConfig';
 
 /**
  * Island 2 World Configuration

@@ -8,6 +8,7 @@
 
 import { Player } from 'hytopia';
 import { OreType, ORE_DATABASE } from '../Mining/Ore/OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from '../worldData/Ores';
 import type { InventoryData, PlayerData } from '../Core/PlayerData';
 
 /**
@@ -42,13 +43,14 @@ export class InventoryManager {
 
   /**
    * Adds ore to player's inventory
+   * World-aware: Supports both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE) ores
    * 
    * @param player - Player to add ore to
-   * @param oreType - Type of ore to add
+   * @param oreType - Type of ore to add (as string to support both worlds)
    * @param amount - Amount to add (default: 1)
    * @returns True if successful, false otherwise
    */
-  addOre(player: Player, oreType: OreType, amount: number = 1): boolean {
+  addOre(player: Player, oreType: string, amount: number = 1): boolean {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
       return false;
@@ -74,13 +76,14 @@ export class InventoryManager {
 
   /**
    * Removes ore from player's inventory
+   * World-aware: Supports both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE) ores
    * 
    * @param player - Player to remove ore from
-   * @param oreType - Type of ore to remove
+   * @param oreType - Type of ore to remove (as string to support both worlds)
    * @param amount - Amount to remove (default: all)
    * @returns True if successful, false if insufficient ore
    */
-  removeOre(player: Player, oreType: OreType, amount?: number): boolean {
+  removeOre(player: Player, oreType: string, amount?: number): boolean {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData || !playerData.inventory) {
       return false;
@@ -118,12 +121,13 @@ export class InventoryManager {
 
   /**
    * Gets the quantity of a specific ore type in player's inventory
+   * World-aware: Supports both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE) ores
    * 
    * @param player - Player to check
-   * @param oreType - Type of ore to check
+   * @param oreType - Type of ore to check (as string to support both worlds)
    * @returns Quantity of ore, or 0 if not found
    */
-  getOreCount(player: Player, oreType: OreType): number {
+  getOreCount(player: Player, oreType: string): number {
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData || !playerData.inventory) {
       return 0;
@@ -164,8 +168,16 @@ export class InventoryManager {
 
     let total = 0;
     for (const [oreType, amount] of Object.entries(playerData.inventory)) {
-      const oreData = ORE_DATABASE[oreType as OreType];
-      if (oreData && amount) {
+      if (!amount) continue;
+      
+      // Try Island 1 database first
+      let oreData = ORE_DATABASE[oreType as OreType];
+      // Try Island 2 database if not found
+      if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+        oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+      }
+      
+      if (oreData) {
         total += amount * oreData.value * sellValueMultiplier;
       }
     }

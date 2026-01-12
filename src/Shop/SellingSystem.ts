@@ -7,7 +7,8 @@
  */
 
 import { Player } from 'hytopia';
-import { OreType, ORE_DATABASE } from '../Mining/Ore/OreData';
+import { OreType, ORE_DATABASE, type OreData } from '../Mining/Ore/OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from '../worldData/Ores';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
@@ -124,13 +125,21 @@ export class SellingSystem {
 
     // Get all ore types in inventory
     const inventory = this.inventoryManager.getInventory(player);
-    const oreTypes = Object.keys(inventory) as OreType[];
+    const oreTypes = Object.keys(inventory);
 
     // Calculate base value (without multiplier) for logging
     let baseValue = 0;
     for (const oreType of oreTypes) {
       const amount = inventory[oreType] || 0;
-      const oreData = ORE_DATABASE[oreType as OreType];
+      if (!amount) continue;
+      
+      // Try Island 1 database first
+      let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+      // Try Island 2 database if not found
+      if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+        oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+      }
+      
       if (oreData && amount > 0) {
         baseValue += amount * oreData.value;
       }

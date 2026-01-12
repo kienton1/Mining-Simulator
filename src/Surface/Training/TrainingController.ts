@@ -8,6 +8,103 @@
  */
 
 import { World, Player, SceneUI, Entity } from 'hytopia';
+
+/**
+ * Formats a number with letter abbreviations (K, M, B, T, etc.) matching the UI formatNumber function
+ * Limits to 1-2 decimal places and removes trailing zeros
+ */
+function formatNumber(value: number): string {
+  if (value < 0) return '-' + formatNumber(-value);
+  if (value === 0) return '0';
+  
+  // Helper to format with 1-2 decimal places and remove trailing zeros
+  const formatWithSuffix = (num: number, suffix: string): string => {
+    // Try 1 decimal place first
+    const with1Dec = num.toFixed(1);
+    if (with1Dec.endsWith('.0')) {
+      // If it ends in .0, show as integer
+      return Math.round(num).toString() + suffix;
+    }
+    // Try 2 decimal places if needed
+    const with2Dec = num.toFixed(2);
+    if (with2Dec.endsWith('.00')) {
+      // If it ends in .00, show as integer
+      return Math.round(num).toString() + suffix;
+    }
+    // Remove trailing zeros (e.g., 1.50 -> 1.5, 2.30 -> 2.3)
+    return with2Dec.replace(/\.?0+$/, '') + suffix;
+  };
+  
+  // Handle very large numbers
+  if (value >= 1e36) {
+    const num = value / 1e36;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+    return formatWithSuffix(num, 'UDe');
+  }
+  if (value >= 1e33) {
+    const num = value / 1e33;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+    return formatWithSuffix(num, 'De');
+  }
+  if (value >= 1e30) {
+    const num = value / 1e30;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
+    return formatWithSuffix(num, 'No');
+  }
+  if (value >= 1e27) {
+    const num = value / 1e27;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
+    return formatWithSuffix(num, 'Oc');
+  }
+  if (value >= 1e26) {
+    const num = value / 1e26;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+    return formatWithSuffix(num, 'c');
+  }
+  if (value >= 1e24) {
+    const num = value / 1e24;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'c');
+    return formatWithSuffix(num, 'Sp');
+  }
+  if (value >= 1e21) {
+    const num = value / 1e21;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
+    return formatWithSuffix(num, 'Sx');
+  }
+  if (value >= 1e18) {
+    const num = value / 1e18;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
+    return formatWithSuffix(num, 'Qn');
+  }
+  if (value >= 1e15) {
+    const num = value / 1e15;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
+    return formatWithSuffix(num, 'Q');
+  }
+  if (value >= 1e12) {
+    const num = value / 1e12;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+    return formatWithSuffix(num, 'T');
+  }
+  if (value >= 1e9) {
+    const num = value / 1e9;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
+    return formatWithSuffix(num, 'B');
+  }
+  if (value >= 1e6) {
+    const num = value / 1e6;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
+    return formatWithSuffix(num, 'M');
+  }
+  if (value >= 1e3) {
+    const num = value / 1e3;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
+    return formatWithSuffix(num, 'K');
+  }
+  // Less than 1000 - show as integer
+  return Math.round(value).toString();
+}
+import path from 'node:path';
 import { TrainingSystem } from './TrainingSystem';
 import { TrainingRockManager } from './TrainingRockManager';
 import type { TrainingRockLocation } from './TrainingRockManager';
@@ -17,6 +114,13 @@ import { detectTrainingRockPlacements } from './TrainingRockLocator';
 import { GameManager } from '../../Core/GameManager';
 import type { PlayerData } from '../../Core/PlayerData';
 import { calculatePowerGainPerHit } from '../../Stats/StatCalculator';
+import { 
+  ISLAND2_TRAINING_ROCK_DATABASE,
+  ISLAND2_BLOCK_TYPE_TO_TIER,
+  getIsland2TrainingRockByTier,
+  ISLAND2_TRAINING_ROCK_TIER,
+  type Island2TrainingRockData,
+} from '../../worldData/TrainingRocks';
 
 const FALLBACK_TRAINING_ROCKS: Array<{
   position: { x: number; y: number; z: number };
@@ -55,6 +159,48 @@ const FALLBACK_TRAINING_ROCKS: Array<{
   },
 ];
 
+/**
+ * Fallback positions for Island 2 training rocks
+ * Used when auto-detection from BeachMap.json fails
+ * Exact positions from map.json with bounds calculated from nearby dirt patches
+ */
+const FALLBACK_ISLAND2_TRAINING_ROCKS: Array<{
+  position: { x: number; y: number; z: number };
+  bounds?: TrainingRockLocation['bounds'];
+  tier: ISLAND2_TRAINING_ROCK_TIER;
+}> = [
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.DUNESTONE,
+    position: { x: -298.52, y: 1.75, z: -8.35 },
+    bounds: { minX: -300, maxX: -297, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.BARNACITE,
+    position: { x: -294.44, y: 1.75, z: -8.37 },
+    bounds: { minX: -296, maxX: -293, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.PRISMARINE,
+    position: { x: -290.57, y: 1.75, z: -8.25 },
+    bounds: { minX: -292, maxX: -289, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.BASALTITE,
+    position: { x: -283.44, y: 1.75, z: -8.44 },
+    bounds: { minX: -285, maxX: -282, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.WRECKITE,
+    position: { x: -279.52, y: 1.75, z: -8.37 },
+    bounds: { minX: -281, maxX: -278, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+  {
+    tier: ISLAND2_TRAINING_ROCK_TIER.TRADEWINDITE,
+    position: { x: -275.47, y: 1.75, z: -8.29 },
+    bounds: { minX: -277, maxX: -274, minZ: -11, maxZ: -6 }, // Bounds from nearby dirt patches in map.json
+  },
+];
+
 const INTERACT_INPUTS: string[] = ['e', 'ml'];
 
 interface PlayerTrainingState {
@@ -80,8 +226,9 @@ export class TrainingController {
   private gameManager: GameManager;
   private trainingRockSpawns: Array<{
     position: { x: number; y: number; z: number };
-    tier: TrainingRockTier;
+    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER;
     bounds?: TrainingRockLocation['bounds'];
+    worldId?: string;
   }>;
   private playerStates: Map<Player, PlayerTrainingState> = new Map();
   private rockSceneUIs: Map<string, SceneUI> = new Map(); // Map of rock ID -> SceneUI
@@ -100,13 +247,25 @@ export class TrainingController {
     this.trainingSystem.setWorld(world); // Pass world to training system for pickaxe access
     this.rockManager = new TrainingRockManager(world);
 
-    const dynamicSpawns = detectTrainingRockPlacements();
-    this.trainingRockSpawns = dynamicSpawns.length ? dynamicSpawns : FALLBACK_TRAINING_ROCKS;
+    // Detect Island 1 training rocks from map.json
+    const island1Spawns = detectTrainingRockPlacements(undefined, 'island1');
+    const island1Placements = island1Spawns.length ? island1Spawns : FALLBACK_TRAINING_ROCKS.map(rock => ({
+      ...rock,
+      worldId: 'island1' as const,
+    }));
 
-    if (dynamicSpawns.length === 0) {
-    } else {
-    }
+    // Use exact positions for Island 2 training rocks from map.json
+    // These are the precise coordinates of the ore blocks in map.json
+    // Auto-detection may be used in the future, but for now we use exact positions
+    const island2Placements = FALLBACK_ISLAND2_TRAINING_ROCKS.map(rock => ({
+      ...rock,
+      worldId: 'island2' as const,
+    }));
 
+    // Combine all placements
+    this.trainingRockSpawns = [...island1Placements, ...island2Placements];
+
+    // Register all training rocks (both Island 1 and Island 2)
     this.rockManager.registerTrainingRocksFromMap(this.trainingRockSpawns);
     
     // Create SceneUIs for all training rocks immediately (always visible)
@@ -123,19 +282,24 @@ export class TrainingController {
   private initializeAllRockSceneUIs(): void {
     const allRocks = this.rockManager.getAllTrainingRocks();
     for (const rock of allRocks) {
-      const sceneUI = this.ensureRockSceneUI(rock.rockData.id, rock);
+      // Use unique ID that includes world ID to prevent conflicts between worlds
+      const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
+      const sceneUI = this.ensureRockSceneUI(uniqueId, rock);
       
-      // Format power requirement (use K for thousands)
-      let powerReqText = rock.rockData.requiredPower.toLocaleString();
-      if (rock.rockData.requiredPower >= 1000) {
-        const kValue = (rock.rockData.requiredPower / 1000).toFixed(rock.rockData.requiredPower % 1000 === 0 ? 0 : 1);
-        powerReqText = `${kValue}K`;
-      }
+      // Format power requirement with proper letter abbreviations (K, M, B, T, etc.)
+      // Handle both Island 1 and Island 2 rock data
+      const requiredPower = 'requiredPower' in rock.rockData ? rock.rockData.requiredPower : 0;
+      const powerReqText = formatNumber(requiredPower);
       
       // Set initial state with base power gain (no player-specific calculation)
-      const powerGainText = `+${rock.rockData.powerGainMultiplier} Power`;
+      // Handle both Island 1 (powerGainMultiplier) and Island 2 (uiPowerBonus) rocks
+      const powerBonus = 'uiPowerBonus' in rock.rockData 
+        ? rock.rockData.uiPowerBonus 
+        : ('powerGainMultiplier' in rock.rockData ? rock.rockData.powerGainMultiplier : 1);
+      const powerGainText = `+${formatNumber(powerBonus)} Power`;
       const requirementText = `${powerReqText} Required`;
-      const rebirthText = `${rock.rockData.requiredRebirths} Rebirths`;
+      const requiredRebirths = 'requiredRebirths' in rock.rockData ? rock.rockData.requiredRebirths : 0;
+      const rebirthText = `${formatNumber(requiredRebirths)} Rebirths`;
       
       sceneUI.setState({
         visible: true,
@@ -149,7 +313,9 @@ export class TrainingController {
     // Set up periodic position updates to keep SceneUIs anchored to their rocks
     setInterval(() => {
       for (const rock of allRocks) {
-        this.updateRockSceneUIPosition(rock.rockData.id, rock);
+        // Use unique ID that includes world ID
+        const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
+        this.updateRockSceneUIPosition(uniqueId, rock);
       }
     }, 1000); // Update position every second to ensure it stays anchored
   }
@@ -261,8 +427,10 @@ export class TrainingController {
       return false;
     }
 
-    const nearbyRock = this.rockManager.findNearbyTrainingRock(playerEntity.position);
-    if (!nearbyRock || nearbyRock.rockData.id !== targetRock.rockData.id) {
+    // Check if player is near the target rock (filter by world)
+    const nearbyRock = this.getNearbyTrainingRock(player);
+    if (!nearbyRock || nearbyRock.position.x !== targetRock.position.x || 
+        nearbyRock.position.z !== targetRock.position.z) {
       return false;
     }
 
@@ -282,18 +450,30 @@ export class TrainingController {
     // Store original position before teleporting (for restoration on exit)
     const originalPosition = { ...playerEntity.position };
     
+    // Get world ID to determine teleport position offset
+    const worldId = playerData.currentWorld || 'island1';
+    
     // Move player next to the rock so swings visibly hit it
-    // Teleport to same X as the ore block, but with fixed Y and Z positions
-    const standPosition = {
-      x: targetRock.position.x, // Same X as the ore block
-      y: 1.75, // Fixed Y position
-      z: -9.27, // Fixed Z position (forward of the ore blocks)
-    };
+    // For Island 1: use fixed position
+    // For Island 2: use rock position with relative offset (based on Dunestone: x + 0.02, y same, z + 0.1)
+    const standPosition = worldId === 'island2' 
+      ? {
+          x: Math.round((targetRock.position.x + 0.02) * 10) / 10, // Rock X + 0.02, rounded to 1 decimal
+          y: targetRock.position.y, // Same Y as rock (1.75)
+          z: targetRock.position.z + 0.1, // Rock Z + 0.1 (moved forward to prevent clipping)
+        }
+      : {
+          x: targetRock.position.x, // Same X as the ore block
+          y: 1.75, // Fixed Y position (Island 1)
+          z: -9.27, // Fixed Z position (forward of the ore blocks, Island 1)
+        };
     playerEntity.setPosition(standPosition);
 
     // Hide prompt while training (both regular and SceneUI)
     this.hideInteractPrompt(player);
-    this.hideRockSceneUI(targetRock.rockData.id);
+    // Use unique ID that includes world ID
+    const uniqueId = targetRock.worldId ? `${targetRock.worldId}:${targetRock.rockData.id}` : targetRock.rockData.id;
+    this.hideRockSceneUI(uniqueId);
 
     // Store the training rock location and positions
     const state = this.playerStates.get(player);
@@ -309,10 +489,52 @@ export class TrainingController {
     // Start velocity monitoring to detect movement (including jumping)
     this.startVelocityMonitoring(player, targetRock);
 
+    // Determine hit rate based on world ID (already declared above)
+    let hitRate = 2.0; // Default: Island 1 hit rate (2.0 hits/second)
+    
+    // Island 2 has different hit rates: 3/sec for rocks 1-5, 4/sec for rock 6
+    if (worldId === 'island2') {
+      // Island 2 has different hit rates: 3/sec for rocks 1-5, 4/sec for rock 6
+      // Check the rock data to determine hit rate
+      const rockData = targetRock.rockData as any; // Cast to access hitRate if it's Island 2 data
+      
+      // Island 2 training rock data has a hitRate property
+      if (rockData.hitRate !== undefined) {
+        hitRate = rockData.hitRate;
+      } else {
+        // Fallback: check rock ID to determine if it's Island 2 rock 6
+        const rockId = targetRock.rockData.id;
+        if (rockId === 'tradewindite-rock') {
+          hitRate = 4.0; // Rock 6: 4 hits/second
+        } else {
+          hitRate = 3.0; // Rocks 1-5: 3 hits/second
+        }
+      }
+    }
+
+    // Create a unified rock data structure for TrainingSystem
+    // TrainingSystem expects TrainingRockData, but we might have Island2TrainingRockData
+    // Create an adapter that converts Island2TrainingRockData to TrainingRockData format
+    let rockDataForSystem: TrainingRockData;
+    if (worldId === 'island2' && 'uiPowerBonus' in targetRock.rockData) {
+      // This is an Island 2 rock - create adapter
+      const island2Rock = targetRock.rockData as Island2TrainingRockData;
+      rockDataForSystem = {
+        id: island2Rock.id,
+        tier: island2Rock.tier as any, // Cast to TrainingRockTier for compatibility
+        name: island2Rock.name,
+        requiredRebirths: island2Rock.requiredRebirths,
+        requiredPower: island2Rock.requiredPower,
+        powerGainMultiplier: island2Rock.uiPowerBonus, // Use uiPowerBonus as powerGainMultiplier
+      };
+    } else {
+      rockDataForSystem = targetRock.rockData as TrainingRockData;
+    }
+    
     // Start training loop
     this.trainingSystem.startTraining(
       player,
-      targetRock.rockData,
+      rockDataForSystem,
       pickaxe,
       playerData,
       playerEntity,
@@ -337,7 +559,9 @@ export class TrainingController {
         
         const newTotal = this.gameManager.addPower(p, finalGain);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
-      }
+      },
+      worldId,
+      hitRate
     );
 
     player.ui.sendData({
@@ -448,7 +672,32 @@ export class TrainingController {
   getNearbyTrainingRock(player: Player): TrainingRockLocation | null {
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) return null;
-    return this.rockManager.findNearbyTrainingRock(playerEntity.position);
+    
+    const playerData = this.gameManager.getPlayerData(player);
+    const currentWorld = playerData?.currentWorld || 'island1';
+    
+    // Find nearby rock and filter by current world
+    const nearbyRock = this.rockManager.findNearbyTrainingRock(playerEntity.position);
+    if (nearbyRock && nearbyRock.worldId === currentWorld) {
+      return nearbyRock;
+    }
+    
+    // If the found rock is for a different world, search for rocks in current world
+    const allRocks = this.rockManager.getAllTrainingRocks();
+    for (const rock of allRocks) {
+      if (rock.worldId !== currentWorld) continue;
+      
+      // Check if player is within bounds
+      if (rock.bounds) {
+        const withinX = playerEntity.position.x >= rock.bounds.minX && playerEntity.position.x <= rock.bounds.maxX;
+        const withinZ = playerEntity.position.z >= rock.bounds.minZ && playerEntity.position.z <= rock.bounds.maxZ;
+        if (withinX && withinZ) {
+          return rock;
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -465,18 +714,14 @@ export class TrainingController {
     // Get all training rocks
     const allRocks = this.rockManager.getAllTrainingRocks();
     
-    // Filter to accessible rocks and sort by tier (highest first)
-    // Tier order: EMERALD_DEEPSLATE > DIAMOND_DEEPSLATE > GOLD_DEEPSLATE > IRON_DEEPSLATE > COBBLESTONE > DIRT
-    const tierOrder = {
-      [TrainingRockTier.EMERALD_DEEPSLATE]: 5,
-      [TrainingRockTier.DIAMOND_DEEPSLATE]: 4,
-      [TrainingRockTier.GOLD_DEEPSLATE]: 3,
-      [TrainingRockTier.IRON_DEEPSLATE]: 2,
-      [TrainingRockTier.COBBLESTONE]: 1,
-      [TrainingRockTier.DIRT]: 0,
-    };
-
+    // Get current world to filter rocks
+    const currentWorld = playerData.currentWorld || 'island1';
+    
+    // Filter rocks by world and accessibility
     const accessibleRocks = allRocks.filter(rock => {
+      // Only consider rocks from current world
+      if (rock.worldId !== currentWorld) return false;
+      
       const access = this.getAccessState(playerData, rock.rockData);
       return access.canTrain;
     });
@@ -484,9 +729,39 @@ export class TrainingController {
     if (accessibleRocks.length === 0) return null;
 
     // Sort by tier (highest first)
+    // Island 1 tier order: EMERALD_DEEPSLATE > DIAMOND_DEEPSLATE > GOLD_DEEPSLATE > IRON_DEEPSLATE > COBBLESTONE > DIRT
+    // Island 2 tier order: TRADEWINDITE > WRECKITE > BASALTITE > PRISMARINE > BARNACITE > DUNESTONE
+    const tierOrderIsland1: Record<TrainingRockTier, number> = {
+      [TrainingRockTier.EMERALD_DEEPSLATE]: 5,
+      [TrainingRockTier.DIAMOND_DEEPSLATE]: 4,
+      [TrainingRockTier.GOLD_DEEPSLATE]: 3,
+      [TrainingRockTier.IRON_DEEPSLATE]: 2,
+      [TrainingRockTier.COBBLESTONE]: 1,
+      [TrainingRockTier.DIRT]: 0,
+    };
+    
+    const tierOrderIsland2: Record<ISLAND2_TRAINING_ROCK_TIER, number> = {
+      [ISLAND2_TRAINING_ROCK_TIER.TRADEWINDITE]: 5,
+      [ISLAND2_TRAINING_ROCK_TIER.WRECKITE]: 4,
+      [ISLAND2_TRAINING_ROCK_TIER.BASALTITE]: 3,
+      [ISLAND2_TRAINING_ROCK_TIER.PRISMARINE]: 2,
+      [ISLAND2_TRAINING_ROCK_TIER.BARNACITE]: 1,
+      [ISLAND2_TRAINING_ROCK_TIER.DUNESTONE]: 0,
+    };
+
     accessibleRocks.sort((a, b) => {
-      const tierA = tierOrder[a.rockData.tier] ?? -1;
-      const tierB = tierOrder[b.rockData.tier] ?? -1;
+      // Use appropriate tier order based on world
+      let tierA = -1;
+      let tierB = -1;
+      
+      if (currentWorld === 'island1') {
+        tierA = tierOrderIsland1[a.rockData.tier as TrainingRockTier] ?? -1;
+        tierB = tierOrderIsland1[b.rockData.tier as TrainingRockTier] ?? -1;
+      } else if (currentWorld === 'island2') {
+        tierA = tierOrderIsland2[a.rockData.tier as ISLAND2_TRAINING_ROCK_TIER] ?? -1;
+        tierB = tierOrderIsland2[b.rockData.tier as ISLAND2_TRAINING_ROCK_TIER] ?? -1;
+      }
+      
       return tierB - tierA; // Descending order
     });
 
@@ -600,17 +875,21 @@ export class TrainingController {
     access: { canTrain: boolean; meetsPower: boolean; meetsRebirth: boolean }
   ): void {
     // Show the bottom UI prompt with "Hold E to interact"
-    player.ui.sendData({
-      type: 'TRAINING_PROMPT',
-      visible: true,
-      rockName: rockLocation.rockData.name,
-      requirements: {
-        power: rockLocation.rockData.requiredPower,
-        rebirths: rockLocation.rockData.requiredRebirths,
-      },
-      canTrain: access.canTrain,
-      actionKey: 'E',
-    });
+      // Handle both Island 1 and Island 2 rock data
+      const requiredPower = 'requiredPower' in rockLocation.rockData ? rockLocation.rockData.requiredPower : 0;
+      const requiredRebirths = 'requiredRebirths' in rockLocation.rockData ? rockLocation.rockData.requiredRebirths : 0;
+      
+      player.ui.sendData({
+        type: 'TRAINING_PROMPT',
+        visible: true,
+        rockName: rockLocation.rockData.name,
+        requirements: {
+          power: requiredPower,
+          rebirths: requiredRebirths,
+        },
+        canTrain: access.canTrain,
+        actionKey: 'E',
+      });
   }
 
   private hideInteractPrompt(player: Player): void {
@@ -661,9 +940,13 @@ export class TrainingController {
     return entities[0];
   }
 
-  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData) {
-    const meetsPower = (playerData?.power ?? 0) >= rock.requiredPower;
-    const meetsRebirth = (playerData?.rebirths ?? 0) >= rock.requiredRebirths;
+  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData | Island2TrainingRockData) {
+    // Handle both Island 1 (TrainingRockData) and Island 2 (Island2TrainingRockData) rocks
+    const requiredPower = 'requiredPower' in rock ? rock.requiredPower : 0;
+    const requiredRebirths = 'requiredRebirths' in rock ? rock.requiredRebirths : 0;
+    
+    const meetsPower = (playerData?.power ?? 0) >= requiredPower;
+    const meetsRebirth = (playerData?.rebirths ?? 0) >= requiredRebirths;
     return {
       canTrain: meetsPower || meetsRebirth,
       meetsPower,

@@ -30,7 +30,8 @@ import {
   PlayerUIEvent,
   CollisionGroup,
 } from 'hytopia';
-import { ORE_DATABASE, OreType } from './src/Mining/Ore/OreData';
+import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/worldData/Ores';
 
 import * as worldMap from './assets/map.json';
 import { GameManager } from './src/Core/GameManager';
@@ -103,8 +104,10 @@ startServer(world => {
    * See Planning/mapStructure.md for details
    */
   world.loadMap(worldMap);
-  // Carve shared mine shaft (10-block drop) for all players
+  // Carve shared mine shaft (10-block drop) for all players - Island 1 (Original)
   gameManager.buildSharedMineShaft();
+  // Carve shared mine shaft for Island 2 (Beach World) with beach ores
+  gameManager.buildSharedMineShaftForIsland2();
 
   /**
    * Spawn Merchant Entity
@@ -240,8 +243,13 @@ startServer(world => {
       
       const oreSellValues: Record<string, number> = {};
       for (const [oreType, amount] of Object.entries(inventory)) {
-        if (amount > 0) {
-          const oreData = ORE_DATABASE[oreType as OreType];
+        if (amount && amount > 0) {
+          // Try Island 1 database first
+          let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+          // Try Island 2 database if not found
+          if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+            oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+          }
           if (oreData) {
             // Calculate sell value per unit with multipliers
             let sellValue = oreData.value * sellMultiplier;
@@ -536,8 +544,13 @@ startServer(world => {
           
           const oreSellValuesAfterSell: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
-            if (amount > 0) {
-              const oreData = ORE_DATABASE[oreType as OreType];
+            if (amount && amount > 0) {
+              // Try Island 1 database first
+              let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+              // Try Island 2 database if not found
+              if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+                oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+              }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSell;
                 // Round to nearest integer (no decimals)
@@ -571,8 +584,13 @@ startServer(world => {
           
           const oreSellValuesAfterSellAll: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
-            if (amount > 0) {
-              const oreData = ORE_DATABASE[oreType as OreType];
+            if (amount && amount > 0) {
+              // Try Island 1 database first
+              let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+              // Try Island 2 database if not found
+              if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+                oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+              }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSellAll;
                 // Round to nearest integer (no decimals)
@@ -1281,7 +1299,7 @@ startServer(world => {
     }
 
     const inventoryCount = Object.keys(playerData.inventory).length;
-    const totalOres = Object.values(playerData.inventory).reduce((sum, val) => sum + (val || 0), 0);
+    const totalOres = Object.values(playerData.inventory).reduce((sum, val) => (sum || 0) + (val || 0), 0);
 
     world.chatManager.sendPlayerMessage(player, '=== Your Saved Data ===', '00FFFF');
     world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Gold: ${playerData.gold.toLocaleString()}`, 'FFFFFF');

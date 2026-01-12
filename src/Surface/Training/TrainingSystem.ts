@@ -64,6 +64,8 @@ export class TrainingSystem {
    * @param playerData - Player's current data (for rebirths)
    * @param playerEntity - Player entity for animation playback
    * @param onPowerGain - Callback when power is gained (to update player data)
+   * @param worldId - Optional world ID ('island1' or 'island2'), defaults to 'island1'
+   * @param hitRate - Optional hit rate (hits per second), defaults to 2.0 for Island 1
    */
   startTraining(
     player: Player,
@@ -71,7 +73,9 @@ export class TrainingSystem {
     pickaxe: PickaxeData,
     playerData: PlayerData,
     playerEntity: Entity,
-    onPowerGain: (player: Player, amount: number) => void
+    onPowerGain: (player: Player, amount: number) => void,
+    worldId: string = 'island1',
+    hitRate: number = 2.0
   ): void {
     // Stop any existing training first
     this.stopTraining(player);
@@ -101,11 +105,12 @@ export class TrainingSystem {
     this.trainingStates.set(player, state);
 
     // Calculate hit rate (swings per second)
-    // Training speed is CONSTANT: 2.0 swings/second (1 hit per 0.5 seconds)
-    // Training speed does NOT scale with pickaxe speed - it's always 2.0 swings/second
+    // Island 1: 2.0 swings/second (1 hit per 0.5 seconds)
+    // Island 2: 3.0 swings/second for rocks 1-5, 4.0 swings/second for rock 6
+    // Training speed does NOT scale with pickaxe speed - it's based on world/rock
     // Reference: PowerSystemPlan.md - Training Speed is constant regardless of pickaxe
-    const TRAINING_BASE_SWING_RATE = 2.0; // Constant: 2.0 swings/second for all training
-    const hitIntervalMs = 1000 / TRAINING_BASE_SWING_RATE; // 500ms per hit (constant)
+    const TRAINING_BASE_SWING_RATE = hitRate; // Use provided hit rate (world/rock-specific)
+    const hitIntervalMs = 1000 / TRAINING_BASE_SWING_RATE; // ms per hit
     const ANIMATION_DURATION_MS = 200; // Animation duration (shortened for accurate timing)
     const delayAfterAnimation = Math.max(0, hitIntervalMs - ANIMATION_DURATION_MS); // Remaining time after animation
 
@@ -129,10 +134,12 @@ export class TrainingSystem {
       // Grant power immediately (don't wait for animation)
       // UPDATED: Power gain uses piecewise functions based on rock tier and rebirths
       // Pickaxes no longer affect power gain - only rock selection and rebirth count matter
+      // Island 2 uses different formulas than Island 1
       // Reference: Planning/PowerSystemPlan.md section 4
       let powerGain = calculatePowerGainPerHit(
         rock.tier,
-        playerData.rebirths
+        playerData.rebirths,
+        worldId
       );
       
       // Safety check: ensure power gain is a valid finite number

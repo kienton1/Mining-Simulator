@@ -11,6 +11,11 @@
 
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import { TrainingRockTier } from '../Surface/Training/TrainingRockData';
+import { 
+  ISLAND2_TRAINING_ROCK_TIER,
+  calculateIsland2TrainingPowerGain,
+  type Island2TrainingRockData,
+} from '../worldData/TrainingRocks';
 // Note: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are deprecated
 // New system uses power-based damage formula and piecewise functions for power gain
 
@@ -244,30 +249,46 @@ function calculateRock6PowerGain(rebirths: number): number {
  * 
  * Reference: Planning/PowerSystemPlan.md section 4 - Training Rock Balance
  * 
- * @param rockTier - Training rock tier
+ * @param rockTier - Training rock tier (Island 1 or Island 2)
  * @param rebirths - Number of rebirths the player has
+ * @param worldId - Optional world ID ('island1' or 'island2'), defaults to 'island1'
  * @returns Power gained per hit
  */
 export function calculatePowerGainPerHit(
-  rockTier: TrainingRockTier,
-  rebirths: number
+  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER,
+  rebirths: number,
+  worldId: string = 'island1'
 ): number {
-  switch (rockTier) {
-    case TrainingRockTier.DIRT:
-      return calculateRock1PowerGain(rebirths);
-    case TrainingRockTier.COBBLESTONE:
-      return calculateRock2PowerGain(rebirths);
-    case TrainingRockTier.IRON_DEEPSLATE:
-      return calculateRock3PowerGain(rebirths);
-    case TrainingRockTier.GOLD_DEEPSLATE:
-      return calculateRock4PowerGain(rebirths);
-    case TrainingRockTier.DIAMOND_DEEPSLATE:
-      return calculateRock5PowerGain(rebirths);
-    case TrainingRockTier.EMERALD_DEEPSLATE:
-      return calculateRock6PowerGain(rebirths);
-    default:
-      return calculateRock1PowerGain(rebirths);
+  // Island 2 uses different formulas
+  if (worldId === 'island2') {
+    // Check if this is an Island 2 tier
+    if (Object.values(ISLAND2_TRAINING_ROCK_TIER).includes(rockTier as ISLAND2_TRAINING_ROCK_TIER)) {
+      return calculateIsland2TrainingPowerGain(rockTier as ISLAND2_TRAINING_ROCK_TIER, rebirths);
+    }
   }
+  
+  // Island 1 uses piecewise functions
+  if (Object.values(TrainingRockTier).includes(rockTier as TrainingRockTier)) {
+    switch (rockTier as TrainingRockTier) {
+      case TrainingRockTier.DIRT:
+        return calculateRock1PowerGain(rebirths);
+      case TrainingRockTier.COBBLESTONE:
+        return calculateRock2PowerGain(rebirths);
+      case TrainingRockTier.IRON_DEEPSLATE:
+        return calculateRock3PowerGain(rebirths);
+      case TrainingRockTier.GOLD_DEEPSLATE:
+        return calculateRock4PowerGain(rebirths);
+      case TrainingRockTier.DIAMOND_DEEPSLATE:
+        return calculateRock5PowerGain(rebirths);
+      case TrainingRockTier.EMERALD_DEEPSLATE:
+        return calculateRock6PowerGain(rebirths);
+      default:
+        return calculateRock1PowerGain(rebirths);
+    }
+  }
+  
+  // Fallback to Island 1 Rock 1 if tier not recognized
+  return calculateRock1PowerGain(rebirths);
 }
 
 /**

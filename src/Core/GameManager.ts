@@ -14,7 +14,7 @@ import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
 import { OreType } from '../Mining/Ore/OreData';
-import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START } from './GameConstants';
+import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT } from './GameConstants';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
@@ -201,6 +201,7 @@ export class GameManager {
       rebirthModalOpen: false,
       petsModalOpen: false,
       eggModalOpen: false,
+      mapsModalOpen: false,
       lastModalOpenTime: 0,
     });
     
@@ -435,13 +436,14 @@ export class GameManager {
   /**
    * Adds ore to player's inventory
    * Uses InventoryManager for consistency
+   * World-aware: Supports both Island 1 (OreType) and Island 2 (ISLAND2_ORE_TYPE) ores
    * 
    * @param player - Player to add ore to
-   * @param oreType - Type of ore to add
+   * @param oreType - Type of ore to add (as string)
    * @param amount - Amount of ore to add
    */
-  addOreToInventory(player: Player, oreType: OreType, amount: number): void {
-    this.inventoryManager.addOre(player, oreType, amount);
+  addOreToInventory(player: Player, oreType: string, amount: number): void {
+    this.inventoryManager.addOre(player, oreType as any, amount);
   }
 
   /**
@@ -1404,8 +1406,14 @@ export class GameManager {
     // The timer should continue running and be visible even on surface
     // It will only stop when it expires or when the mine is reset
 
-    // Teleport to surface spawn position
-    this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
+    // Get player's current world and teleport to that world's surface spawn position
+    const playerData = this.playerDataMap.get(player);
+    const currentWorldId = playerData?.currentWorld || 'island1';
+    const worldConfig = WorldRegistry.getWorldConfig(currentWorldId);
+    
+    // Use the world's spawn point, or fallback to island1 spawn if config not found
+    const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
+    this.teleportPlayer(player, spawnPoint);
 
     // Mark player as not in the mine (disables mining and raycasting)
     this.setPlayerInMine(player, false);
@@ -1851,7 +1859,66 @@ export class GameManager {
   }
 
   /**
+   * Builds the shared mine shaft for Island 2 (Beach World)
+   * Same structure as the original island but using beach world coordinates and beach ores
+   */
+  buildSharedMineShaftForIsland2(): void {
+    // Carve a 10-block-deep hole covering the mining area and add sand walls + void block
+    const bounds = ISLAND2_MINING_AREA_BOUNDS;
+    const topY = ISLAND2_SHARED_MINE_SHAFT.topY;
+    const bottomY = ISLAND2_SHARED_MINE_SHAFT.bottomY + 1; // carve down to bottomY inclusive
+    const wallMinX = bounds.minX - 1;
+    const wallMaxX = bounds.maxX + 1;
+    const wallMinZ = bounds.minZ - 1;
+    const wallMaxZ = bounds.maxZ + 1;
+    const sandId = 43; // Sand block for beach world
+    const voidId = 2; // coal-block (black)
+
+    // Carve interior to air
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        for (let y = topY; y >= bottomY; y--) {
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, 0);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Build sand walls around the hole for all carved depths
+    for (let y = topY; y >= bottomY; y--) {
+      for (let x = wallMinX; x <= wallMaxX; x++) {
+        for (let z = wallMinZ; z <= wallMaxZ; z++) {
+          const isWall = x === wallMinX || x === wallMaxX || z === wallMinZ || z === wallMaxZ;
+          if (!isWall) continue;
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, sandId);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Place void floor across the whole mining area one level below carve depth
+    const voidY = bottomY - 1;
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        try {
+          this.world.chunkLattice.setBlock({ x, y: voidY, z }, voidId);
+        } catch (err) {
+
+        }
+      }
+    }
+
+  }
+
+  /**
    * Starts per-player watcher that teleports them to their personal mine when they reach the shaft bottom
+   * Checks both Island 1 and Island 2 mineshafts based on player's current world
    */
   startMineEntranceWatch(player: Player): void {
     // Clear existing
@@ -1864,22 +1931,42 @@ export class GameManager {
       const playerEnt = this.getPlayerEntity(player);
       if (!playerEnt) return;
       const pos = playerEnt.position;
-      const shaft = SHARED_MINE_SHAFT;
       const now = Date.now();
 
-      const inBounds =
-        pos.x >= shaft.bounds.minX && pos.x <= shaft.bounds.maxX &&
-        pos.z >= shaft.bounds.minZ && pos.z <= shaft.bounds.maxZ;
-
-      if (!inBounds) return;
-
-      if (pos.y <= shaft.teleportThresholdY) {
+      // Get player's current world to determine which mineshaft to check
+      const playerData = this.getPlayerData(player);
+      const currentWorld = playerData?.currentWorld || 'island1';
+      
+      // Check Island 1 mineshaft
+      const shaft1 = SHARED_MINE_SHAFT;
+      const inBounds1 =
+        pos.x >= shaft1.bounds.minX && pos.x <= shaft1.bounds.maxX &&
+        pos.z >= shaft1.bounds.minZ && pos.z <= shaft1.bounds.maxZ;
+      
+      if (inBounds1 && pos.y <= shaft1.teleportThresholdY) {
         const last = this.mineEntranceCooldowns.get(player) ?? 0;
         if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
           return;
         }
         this.mineEntranceCooldowns.set(player, now);
         this.enterPersonalMine(player);
+        return;
+      }
+
+      // Check Island 2 mineshaft
+      const shaft2 = ISLAND2_SHARED_MINE_SHAFT;
+      const inBounds2 =
+        pos.x >= shaft2.bounds.minX && pos.x <= shaft2.bounds.maxX &&
+        pos.z >= shaft2.bounds.minZ && pos.z <= shaft2.bounds.maxZ;
+      
+      if (inBounds2 && pos.y <= shaft2.teleportThresholdY) {
+        const last = this.mineEntranceCooldowns.get(player) ?? 0;
+        if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
+          return;
+        }
+        this.mineEntranceCooldowns.set(player, now);
+        this.enterPersonalMine(player);
+        return;
       }
     }, 250);
 

@@ -70,7 +70,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.DUNESTONE,
     name: 'Dunestone Training Area',
     requiredRebirths: 2500,
-    requiredPower: 250000000000, // 250B
+    requiredPower: 250000000, // 250M
     uiPowerBonus: 300,
     formulaConstant: 10.157182969523832,
     hitRate: 3, // 3 hits per second
@@ -81,7 +81,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.BARNACITE,
     name: 'Barnacite Training Area',
     requiredRebirths: 25000,
-    requiredPower: 5000000000000, // 5T
+    requiredPower: 5000000000, // 5B
     uiPowerBonus: 500,
     formulaConstant: 16.928638282539723,
     hitRate: 3, // 3 hits per second
@@ -92,7 +92,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.PRISMARINE,
     name: 'Prismarine Training Area',
     requiredRebirths: 150000,
-    requiredPower: 100000000000000, // 100T
+    requiredPower: 100000000000, // 100B
     uiPowerBonus: 1500,
     formulaConstant: 50.78591484761917,
     hitRate: 3, // 3 hits per second
@@ -103,7 +103,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.BASALTITE,
     name: 'Basaltite Training Area',
     requiredRebirths: 750000,
-    requiredPower: 1000000000000000, // 1Q
+    requiredPower: 1000000000000, // 1T
     uiPowerBonus: 4000,
     formulaConstant: 135.42910626031778,
     hitRate: 3, // 3 hits per second
@@ -114,7 +114,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.WRECKITE,
     name: 'Wreckite Training Area',
     requiredRebirths: 10000000,
-    requiredPower: 100000000000000000, // 100Q
+    requiredPower: 100000000000000, // 100T
     uiPowerBonus: 12000,
     formulaConstant: 406.28731878095334,
     hitRate: 3, // 3 hits per second
@@ -125,7 +125,7 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
     tier: ISLAND2_TRAINING_ROCK_TIER.TRADEWINDITE,
     name: 'Tradewindite Training Area',
     requiredRebirths: 45000000,
-    requiredPower: 1000000000000000000, // 1S
+    requiredPower: 1000000000000000, // 1Q
     uiPowerBonus: 25000,
     formulaConstant: 848.6326371037162,
     hitRate: 4, // 4 hits per second
