@@ -7,7 +7,7 @@
  * Reference: Planning/gameOverview.txt section 2
  */
 
-import { OreType } from '../Mining/Ore/OreData';
+import { OreType } from '../Mining/Ore/World1OreData';
 
 /**
  * Player's persistent statistics
@@ -43,8 +43,8 @@ export interface PlayerData {
   /** Array of owned miner tiers (all miners the player has purchased) */
   ownedMiners?: number[];
   
-  /** Whether the mine reset upgrade (5 minutes) has been purchased */
-  mineResetUpgradePurchased?: boolean;
+  /** Whether the mine reset upgrade (5 minutes) has been purchased per world */
+  mineResetUpgradePurchased?: Record<string, boolean>; // Key: worldId, Value: whether purchased
   
   /** Gem Trader upgrade levels */
   moreGemsLevel?: number;
@@ -81,7 +81,7 @@ export interface PlayerData {
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 3;
+export const CURRENT_DATA_VERSION = 4;
 
 /**
  * Inventory data structure
@@ -110,7 +110,7 @@ export function createDefaultPlayerData(): PlayerData {
     ownedPickaxes: [0], // Start with tier 0 (Wooden) pickaxe
     currentMinerTier: -1, // Start with no miner equipped
     ownedMiners: [], // Start with no miners owned
-    mineResetUpgradePurchased: false, // Start without the 5-minute upgrade
+    mineResetUpgradePurchased: {}, // Start without the 5-minute upgrade for any world
     moreGemsLevel: 0,
     moreRebirthsLevel: 0,
     moreCoinsLevel: 0,

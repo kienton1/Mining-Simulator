@@ -1,14 +1,16 @@
 /**
- * Island 2 Ore Data
+ * World 2 Ore Data
  *
- * Defines all 24 ocean-themed ores for Island 2 (Beach World).
+ * Defines all 24 ocean-themed ores for World 2 (Beach World).
  * Each ore has a depth range and health scales linearly within that range.
  *
  * Reference: Planning/BeachMapPlans/NewWorldIslandPlan.md section 2
  */
 
+import { calculateOreHealth } from './World1OreData';
+
 /**
- * Enumeration of all ore types in Island 2 (ocean theme)
+ * Enumeration of all ore types in World 2 (ocean theme)
  * 24 ores total with progressive depth unlocking
  */
 export enum ISLAND2_ORE_TYPE {
@@ -48,7 +50,7 @@ export enum ISLAND2_ORE_TYPE {
 }
 
 /**
- * Ore data structure for Island 2
+ * Ore data structure for World 2
  */
 export interface Island2OreData {
   /** Type of ore */
@@ -83,30 +85,17 @@ export interface Island2OreData {
 }
 
 /**
- * Calculate ore health at a given depth using linear interpolation
- * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
+ * Calculate ore health for World 2 ores
+ * Uses the shared calculateOreHealth function from World1OreData
+ * This maintains backward compatibility while using the shared implementation
  */
 export function calculateIsland2OreHealth(oreData: Island2OreData, currentDepth: number): number {
-  // If before first depth, use first health
-  if (currentDepth <= oreData.firstDepth) {
-    return oreData.firstHealth;
-  }
-
-  // If at or past last depth, use last health
-  if (currentDepth >= oreData.lastDepth) {
-    return oreData.lastHealth;
-  }
-
-  // Linear interpolation
-  const depthRange = oreData.lastDepth - oreData.firstDepth;
-  const healthRange = oreData.lastHealth - oreData.firstHealth;
-  const depthProgress = currentDepth - oreData.firstDepth;
-
-  return Math.round(oreData.firstHealth + (depthProgress / depthRange) * healthRange);
+  // Use the shared calculateOreHealth function (World 1's backend)
+  return calculateOreHealth(oreData, currentDepth);
 }
 
 /**
- * Database of all Island 2 ore types with their properties
+ * Database of all World 2 ore types with their properties
  * 24 ocean-themed ores with linear health scaling from firstDepth to lastDepth (1000)
  * Reference: Planning/BeachMapPlans/NewWorldIslandPlan.md section 2
  */
@@ -411,7 +400,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
 };
 
 /**
- * Array of all Island 2 ore types for iteration
+ * Array of all World 2 ore types for iteration
  */
 export const ISLAND2_ORE_TYPES = Object.values(ISLAND2_ORE_TYPE);
 
@@ -435,3 +424,4 @@ export function getIsland2OreValue(oreType: ISLAND2_ORE_TYPE): number {
 export function getIsland2OreRarity(oreType: ISLAND2_ORE_TYPE): number {
   return ISLAND2_ORE_DATABASE[oreType].rarity;
 }
+

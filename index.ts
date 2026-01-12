@@ -30,8 +30,8 @@ import {
   PlayerUIEvent,
   CollisionGroup,
 } from 'hytopia';
-import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/OreData';
-import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/worldData/Ores';
+import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
 
 import * as worldMap from './assets/map.json';
 import { GameManager } from './src/Core/GameManager';
@@ -285,8 +285,10 @@ startServer(world => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
-      const hasUpgrade = playerData?.mineResetUpgradePurchased ?? false;
-      const cost = 2_000_000;
+      const currentWorld = playerData?.currentWorld || 'island1';
+      const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
+      // Cost varies by world: island1 = 2M, island2 = 750B
+      const cost = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
       const gold = playerData?.gold || 0;
       
       player.ui.sendData({
@@ -447,6 +449,10 @@ startServer(world => {
         // Use the loaded data values directly (they've already been validated by PersistenceManager)
         const savedPickaxeTier = loadedData.currentPickaxeTier ?? defaultPlayerData.currentPickaxeTier;
         const savedMinerTier = loadedData.currentMinerTier ?? defaultPlayerData.currentMinerTier;
+        
+        // IMPORTANT: Reset currentWorld to 'island1' since players always spawn in the default world (island1)
+        // The saved currentWorld might be from a previous session, but the player is actually in island1
+        loadedData.currentWorld = 'island1';
         
         // Update with loaded data (this updates the in-memory playerDataMap)
         gameManager.updatePlayerData(player, loadedData);
@@ -965,7 +971,8 @@ startServer(world => {
 
           const purchaseResult = gameManager.purchaseMineResetUpgrade(player);
           const updatedPlayerData = gameManager.getPlayerData(player);
-          const hasUpgrade = updatedPlayerData?.mineResetUpgradePurchased ?? false;
+          const currentWorld = updatedPlayerData?.currentWorld || 'island1';
+          const hasUpgrade = updatedPlayerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
           
           if (purchaseResult.success) {
             // Update UI with purchase result

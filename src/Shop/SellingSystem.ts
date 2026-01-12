@@ -7,8 +7,8 @@
  */
 
 import { Player } from 'hytopia';
-import { OreType, ORE_DATABASE, type OreData } from '../Mining/Ore/OreData';
-import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from '../worldData/Ores';
+import { OreType, ORE_DATABASE, type OreData } from '../Mining/Ore/World1OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from '../Mining/Ore/World2OreData';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';

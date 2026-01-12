@@ -10,8 +10,8 @@
 import { World, Player, Entity } from 'hytopia';
 import { MiningSystem } from './MiningSystem';
 import { GameManager } from '../Core/GameManager';
-import { OreType, ORE_DATABASE } from './Ore/OreData';
-import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from '../worldData/Ores';
+import { OreType, ORE_DATABASE } from './Ore/World1OreData';
+import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 
 /**

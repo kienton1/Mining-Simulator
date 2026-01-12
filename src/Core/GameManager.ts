@@ -13,7 +13,7 @@ import { createDefaultPlayerData } from './PlayerData';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
-import { OreType } from '../Mining/Ore/OreData';
+import { OreType } from '../Mining/Ore/World1OreData';
 import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT } from './GameConstants';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
@@ -773,11 +773,15 @@ export class GameManager {
 
     if (autoState.autoMineEnabled) {
       // Disable auto train when enabling auto mine
+      // Always stop auto train first to clear any intervals/state before starting auto mine
+      // This prevents race conditions where the interval might still fire after teleporting
       if (autoState.autoTrainEnabled) {
-        this.stopAutoTrain(player);
         autoState.autoTrainEnabled = false;
         player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
       }
+      // Stop auto train to clear intervals and stop training (even if flag was already false)
+      // This ensures no lingering intervals can interfere with auto mine
+      this.stopAutoTrain(player);
       this.startAutoMine(player);
     } else {
       this.stopAutoMine(player);
@@ -1248,8 +1252,11 @@ export class GameManager {
 
           // If training was stopped (e.g., by velocity monitoring detecting movement), turn off auto-train
           if (!this.trainingController?.isPlayerTraining(player)) {
-
-            this.toggleAutoTrain(player);
+            // Only turn off auto train if it's actually enabled (don't toggle - just disable)
+            // This prevents the interval from accidentally enabling auto train when it's disabled
+            autoState.autoTrainEnabled = false;
+            this.stopAutoTrain(player);
+            player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
             return;
           }
 
@@ -1484,9 +1491,10 @@ export class GameManager {
       return;
     }
 
-    // Check if player has the upgrade
+    // Check if player has the upgrade for the current world
     const playerData = this.getPlayerData(player);
-    const hasUpgrade = playerData?.mineResetUpgradePurchased ?? false;
+    const currentWorld = playerData?.currentWorld || 'island1';
+    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
     const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
 
     const startTime = Date.now();
@@ -1517,9 +1525,10 @@ export class GameManager {
     const startTime = this.mineResetStartTimes.get(player);
     if (!startTime) return;
 
-    // Get the correct duration based on upgrade
+    // Get the correct duration based on upgrade for current world
     const playerData = this.getPlayerData(player);
-    const hasUpgrade = playerData?.mineResetUpgradePurchased ?? false;
+    const currentWorld = playerData?.currentWorld || 'island1';
+    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
     const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
 
     const elapsed = Date.now() - startTime;
@@ -1556,16 +1565,26 @@ export class GameManager {
       };
     }
 
-    // Check if already purchased
-    if (playerData.mineResetUpgradePurchased) {
+    // Get current world
+    const currentWorld = playerData.currentWorld || 'island1';
+    
+    // Initialize the upgrade map if it doesn't exist
+    if (!playerData.mineResetUpgradePurchased) {
+      playerData.mineResetUpgradePurchased = {};
+    }
+
+    // Check if already purchased for this world
+    if (playerData.mineResetUpgradePurchased[currentWorld]) {
       return {
         success: false,
-        message: 'Upgrade already purchased',
+        message: 'Upgrade already purchased for this world',
       };
     }
 
-    // Check if player has enough gold
-    const UPGRADE_COST = 2_000_000;
+    // Get upgrade cost based on world (use WorldManager if available, otherwise default)
+    // For now, use hardcoded values - island1: 2M, island2: 750B
+    const UPGRADE_COST = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
+    
     if (playerData.gold < UPGRADE_COST) {
       return {
         success: false,
@@ -1573,9 +1592,9 @@ export class GameManager {
       };
     }
 
-    // Deduct gold and mark upgrade as purchased
+    // Deduct gold and mark upgrade as purchased for this world
     playerData.gold -= UPGRADE_COST;
-    playerData.mineResetUpgradePurchased = true;
+    playerData.mineResetUpgradePurchased[currentWorld] = true;
     this.updatePlayerData(player, playerData);
 
     // Update gold UI
@@ -1592,7 +1611,7 @@ export class GameManager {
 
   /**
    * Called when the mine reset timer expires
-   * Teleports player to lobby and resets their mine
+   * Resets the mine and teleports player to surface if they're in the mine
    * 
    * @param player - Player whose timer expired
    */
@@ -1600,6 +1619,9 @@ export class GameManager {
 
     // Stop timer updates
     this.stopMineResetTimer(player);
+
+    // Check if player is in the mine
+    const isInMine = this.isPlayerInMine(player);
 
     // Stop auto modes and mining
     const autoState = this.playerAutoStates.get(player);
@@ -1619,13 +1641,23 @@ export class GameManager {
     // Stop mining if active
     this.miningController?.stopMiningLoop(player);
 
-    // Teleport to surface (but don't call teleportToSurface to avoid stopping timer again)
-    this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
+    // Only teleport if player is in the mine (they need to be moved out)
+    // If they're not in the mine, we don't need to teleport them
+    if (isInMine) {
+      // Get player's current world to teleport to the correct surface
+      const playerData = this.getPlayerData(player);
+      const currentWorldId = playerData?.currentWorld || 'island1';
+      const worldConfig = WorldRegistry.getWorldConfig(currentWorldId);
+      const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
+      
+      // Teleport to surface of the current world
+      this.teleportPlayer(player, spawnPoint);
 
-    // Mark player as not in the mine (disables mining and raycasting)
-    this.setPlayerInMine(player, false);
+      // Mark player as not in the mine (disables mining and raycasting)
+      this.setPlayerInMine(player, false);
+    }
 
-    // Reset mine to level 0
+    // Reset mine to level 0 (regardless of whether player is in mine or not)
     const miningSystem = this.miningController?.getMiningSystem();
     if (miningSystem) {
       miningSystem.resetMineToLevel0(player);
@@ -1638,11 +1670,13 @@ export class GameManager {
       secondsRemaining: 0,
     });
 
-    // Update mining state UI
-    player.ui.sendData({
-      type: 'MINING_STATE_UPDATE',
-      isInMine: false,
-    });
+    // Update mining state UI (only if player was in mine)
+    if (isInMine) {
+      player.ui.sendData({
+        type: 'MINING_STATE_UPDATE',
+        isInMine: false,
+      });
+    }
   }
 
   /**
@@ -2047,6 +2081,21 @@ export class GameManager {
     this.stopAutoMine(player);
     this.stopAutoTrain(player);
 
+    // Stop mine reset timer (will restart when player mines first block in new world)
+    this.stopMineResetTimer(player);
+
+    // Hide timer and depth HUD when changing worlds (timer hasn't started yet)
+    player.ui.sendData({
+      type: 'MINE_RESET_TIMER',
+      timeRemaining: null, // This will hide the timer UI
+    });
+    
+    // Reset depth counter display (will show again when player enters mines)
+    player.ui.sendData({
+      type: 'MINING_DEPTH_COUNTER',
+      depth: 0,
+    });
+
     // Teleport player to spawn point
     const spawnPoint = worldConfig.spawnPoint;
     this.teleportPlayer(player, spawnPoint);
@@ -2054,6 +2103,11 @@ export class GameManager {
     // Update current world
     playerData.currentWorld = worldId;
     this.updatePlayerData(player, playerData);
+
+    // Generate mine for the new world immediately (before player enters mines)
+    // This ensures the mine is ready when the player goes to their mines
+    // This will also reset the firstBlockMined flag so timer starts on first block
+    this.initializePlayerMine(player);
 
     return { success: true };
   }

@@ -137,9 +137,19 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     moreDamageLevel: typeof savedData.moreDamageLevel === 'number' && !isNaN(savedData.moreDamageLevel) && savedData.moreDamageLevel >= 0
       ? savedData.moreDamageLevel
       : (defaults.moreDamageLevel || 0),
-    mineResetUpgradePurchased: typeof savedData.mineResetUpgradePurchased === 'boolean'
-      ? savedData.mineResetUpgradePurchased
-      : (defaults.mineResetUpgradePurchased ?? false),
+    // Migrate old boolean format to per-world format
+    mineResetUpgradePurchased: (() => {
+      if (typeof savedData.mineResetUpgradePurchased === 'boolean') {
+        // Old format: migrate to per-world (assume it was for island1)
+        return savedData.mineResetUpgradePurchased ? { island1: true } : {};
+      } else if (savedData.mineResetUpgradePurchased && typeof savedData.mineResetUpgradePurchased === 'object') {
+        // New format: per-world object
+        return savedData.mineResetUpgradePurchased;
+      } else {
+        // Default: no upgrades
+        return {};
+      }
+    })(),
     inventory: savedData.inventory && typeof savedData.inventory === 'object'
       ? { ...defaults.inventory, ...savedData.inventory }
       : defaults.inventory,

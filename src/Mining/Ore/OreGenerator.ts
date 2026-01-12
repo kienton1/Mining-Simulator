@@ -10,8 +10,8 @@
  * Reference: Planning/ProgressionBalanceBlueprint.md section 2
  */
 
-import { OreType, ORE_DATABASE, calculateOreHealth } from './OreData';
-import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE, calculateIsland2OreHealth } from '../../worldData/Ores';
+import { OreType, ORE_DATABASE, calculateOreHealth } from './World1OreData';
+import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './World2OreData';
 
 /**
  * Ore Generator class
@@ -146,15 +146,16 @@ export class OreGenerator {
    * @returns Health value for the ore at this depth
    */
   getOreHealth(oreType: string, currentDepth: number, worldId: string = 'island1'): number {
+    // Use the shared calculateOreHealth function for both worlds (World 1's backend)
     if (worldId === 'island2') {
       // Check if it's an Island 2 ore type
       if (oreType in ISLAND2_ORE_DATABASE) {
         const oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
-        return calculateIsland2OreHealth(oreData, currentDepth);
+        return calculateOreHealth(oreData, currentDepth);
       }
       // Fallback to dunestone if invalid
       const defaultOre = ISLAND2_ORE_DATABASE[ISLAND2_ORE_TYPE.DUNESTONE];
-      return calculateIsland2OreHealth(defaultOre, currentDepth);
+      return calculateOreHealth(defaultOre, currentDepth);
     } else {
       // Check if it's an Island 1 ore type
       if (oreType in ORE_DATABASE) {

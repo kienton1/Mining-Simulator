@@ -53,7 +53,7 @@ export const BASE_SWING_RATE = 1 / 0.5; // 2.0 swings per second (1 hit per 0.5 
  * Health scales linearly from firstDepth to lastDepth (1000) using interpolation
  * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
  * 
- * See src/Mining/Ore/OreData.ts for the new system
+ * See src/Mining/Ore/World1OreData.ts for the new system
  * Reference: Planning/ProgressionBalanceBlueprint.md section 2
  */
 // export const DEPTH_HP_SCALING = 0.1; // DEPRECATED - No longer used

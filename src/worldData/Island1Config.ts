@@ -85,7 +85,7 @@ export const ISLAND1_CONFIG: WorldConfig = {
 
   // Data File References (original data files)
   dataFiles: {
-    ores: './src/Mining/Ore/OreData.ts',
+    ores: './src/Mining/Ore/World1OreData.ts',
     trainingRocks: './src/Surface/Training/TrainingRockData.ts',
     pets: './src/Pets/PetDatabase.ts',
   },

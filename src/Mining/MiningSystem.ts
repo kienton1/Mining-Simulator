@@ -11,7 +11,7 @@ import { World, Player, Entity, RigidBodyType } from 'hytopia';
 import { calculateMiningDamage } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
-import { OreType, ORE_DATABASE } from './Ore/OreData';
+import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
@@ -191,6 +191,16 @@ export class MiningSystem {
    */
   setFirstBlockMinedCallback(callback: (player: Player) => void): void {
     this.onFirstBlockMinedCallback = callback;
+  }
+
+  /**
+   * Resets the first block mined flag for a player
+   * This should be called when resetting the mine depth (e.g., when teleporting to a new world)
+   * 
+   * @param player - Player to reset flag for
+   */
+  resetFirstBlockMined(player: Player): void {
+    this.firstBlockMined.delete(player);
   }
 
   /**
@@ -1042,6 +1052,8 @@ export class MiningSystem {
         state.ceilingBuilt = false;
         state.bottomFloorDepth = null;
         state.winTriggered = false;
+        // Reset first block mined flag so timer starts when player mines first block in new world
+        this.resetFirstBlockMined(player);
         // Regenerate initial 20 levels with new offset (will generate more ahead as player mines)
         this.generateInitialMiningLevels(player, state, pickaxe);
       }

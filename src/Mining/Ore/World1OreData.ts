@@ -1,5 +1,5 @@
 /**
- * Ore Data
+ * World 1 Ore Data
  * 
  * Defines ore types and their properties using the NEW LINEAR SCALING SYSTEM.
  * Each ore has a depth range and health scales linearly within that range.
@@ -86,10 +86,31 @@ export interface OreData {
 }
 
 /**
+ * Shared interface for ore health calculation
+ * Used by both World 1 and World 2 ore data
+ */
+export interface OreHealthData {
+  /** First depth where this ore can spawn */
+  firstDepth: number;
+  /** Health at first depth */
+  firstHealth: number;
+  /** Last depth (always 1000) */
+  lastDepth: number;
+  /** Health at last depth (depth 1000) */
+  lastHealth: number;
+}
+
+/**
  * Calculate ore health at a given depth using linear interpolation
  * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
+ * 
+ * Shared function for both World 1 and World 2 ores
+ * 
+ * @param oreData - Ore data with health properties (OreData or Island2OreData)
+ * @param currentDepth - Current depth in the mine
+ * @returns Calculated health at the given depth
  */
-export function calculateOreHealth(oreData: OreData, currentDepth: number): number {
+export function calculateOreHealth(oreData: OreHealthData, currentDepth: number): number {
   // If before first depth, use first health
   if (currentDepth <= oreData.firstDepth) {
     return oreData.firstHealth;

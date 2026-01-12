@@ -6,7 +6,7 @@
  */
 
 import { World, Entity, RigidBodyType, ColliderShape } from 'hytopia';
-import { OreType, ORE_DATABASE } from './Ore/OreData';
+import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 
 /**
  * Mapping from OreType to block type ID (matches MiningSystem)
