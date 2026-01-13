@@ -10,6 +10,7 @@
 import { World, Player, PlayerUIEvent, Entity } from 'hytopia';
 import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData } from './PlayerData';
+import { toBigInt, bigIntToString } from './BigIntUtils';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
@@ -348,17 +349,20 @@ export class GameManager {
    * Adds power to player
    * 
    * @param player - Player to add power to
-   * @param amount - Amount of power to add
+   * @param amount - Amount of power to add (number, string, or BigInt)
+   * @returns New total power as string (for BigInt support)
    */
-  addPower(player: Player, amount: number): number {
+  addPower(player: Player, amount: number | string | bigint): string {
     const data = this.getPlayerData(player);
     if (!data) {
-
-      return 0;
+      return '0';
     }
 
-    const oldPower = data.power;
-    data.power += amount;
+    const currentPower = toBigInt(data.power);
+    const powerToAdd = toBigInt(amount);
+    const newPower = currentPower + powerToAdd;
+    
+    data.power = bigIntToString(newPower);
     this.updatePlayerData(player, data);
 
     this.sendPowerStatsToUI(player);
@@ -605,7 +609,8 @@ export class GameManager {
     let maxRebirths = 0;
     let totalCost = 0;
     const currentRebirths = playerData.rebirths;
-    const currentPower = playerData.power;
+    // Convert power string (BigInt) to number for comparison
+    const currentPower = Number(playerData.power);
 
     while (true) {
       const nextCost = this.calculateRebirthCost(currentRebirths + maxRebirths);
@@ -650,7 +655,8 @@ export class GameManager {
       };
     }
 
-    const currentPower = playerData.power;
+    // Convert power string (BigInt) to number for comparison and UI display
+    const currentPower = Number(playerData.power);
     const currentRebirths = playerData.rebirths;
 
     // Get available rebirth packages based on More Rebirths upgrade level
@@ -700,18 +706,22 @@ export class GameManager {
     const currentRebirths = playerData.rebirths;
     const totalCost = this.calculateRebirthCostMultiple(currentRebirths, count);
 
-    if (playerData.power < totalCost) {
+    // Convert power string (BigInt) to number for comparison
+    const playerPower = Number(playerData.power);
+    if (playerPower < totalCost) {
       return {
         success: false,
-        message: `Insufficient power. Need ${totalCost.toLocaleString()}, have ${playerData.power.toLocaleString()}`,
+        message: `Insufficient power. Need ${totalCost.toLocaleString()}, have ${playerPower.toLocaleString()}`,
       };
     }
 
-    // Deduct cost
-    playerData.power -= totalCost;
-
-    // Reset power to base (1) after rebirth
-    playerData.power = 1;
+    // Deduct cost using BigInt arithmetic
+    const currentPowerBigInt = toBigInt(playerData.power);
+    const costBigInt = BigInt(totalCost);
+    const newPowerBigInt = currentPowerBigInt - costBigInt;
+    
+    // Reset power to base (1) after rebirth (as string for BigInt)
+    playerData.power = '1';
 
     // Increase rebirths
     playerData.rebirths += count;
@@ -724,7 +734,7 @@ export class GameManager {
       rebirthsPerformed: count,
       newRebirths: playerData.rebirths,
       powerSpent: totalCost,
-      newPower: playerData.power,
+      newPower: 1, // Return as number for UI compatibility
     };
   }
 

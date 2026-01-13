@@ -16,8 +16,8 @@ export interface PlayerData {
   /** Data version for migration support (increment when structure changes) */
   dataVersion?: number;
   
-  /** Current power level (increases mining damage) */
-  power: number;
+  /** Current power level (increases mining damage) - stored as string for BigInt support in JSON */
+  power: string;
   
   /** Number of times player has rebirthed */
   rebirths: number;
@@ -101,7 +101,7 @@ export interface InventoryData {
 export function createDefaultPlayerData(): PlayerData {
   return {
     dataVersion: CURRENT_DATA_VERSION,
-    power: 1, // Base power when players join
+    power: '1', // Base power when players join (stored as string for BigInt)
     rebirths: 0,
     gold: 0,
     gems: 0,

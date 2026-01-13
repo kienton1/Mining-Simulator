@@ -8,6 +8,7 @@
  */
 
 import { World, Player, SceneUI, Entity } from 'hytopia';
+import { toBigInt } from '../../Core/BigIntUtils';
 
 /**
  * Formats a number with letter abbreviations (K, M, B, T, etc.) matching the UI formatNumber function
@@ -551,8 +552,8 @@ export class TrainingController {
           finalGain = 0;
         }
         
-        // Cap final gain to prevent 32-bit signed int overflow (max safe value)
-        const MAX_SAFE_POWER_GAIN = 2147483647; // 2^31 - 1
+        // Cap final gain to prevent overflow (using MAX_VALUE - very large but may lose precision for huge integers)
+        const MAX_SAFE_POWER_GAIN = Number.MAX_VALUE; // ~1.7976931348623157e+308 (largest JavaScript number)
         if (finalGain > MAX_SAFE_POWER_GAIN) {
           finalGain = MAX_SAFE_POWER_GAIN;
         }
@@ -925,7 +926,7 @@ export class TrainingController {
     return;
   }
 
-  private sendPowerGainEvent(player: Player, amount: number, totalPower: number, rockPosition?: { x: number; y: number; z: number }): void {
+  private sendPowerGainEvent(player: Player, amount: number, totalPower: string, rockPosition?: { x: number; y: number; z: number }): void {
     player.ui.sendData({
       type: 'POWER_GAIN',
       amount,
@@ -945,7 +946,9 @@ export class TrainingController {
     const requiredPower = 'requiredPower' in rock ? rock.requiredPower : 0;
     const requiredRebirths = 'requiredRebirths' in rock ? rock.requiredRebirths : 0;
     
-    const meetsPower = (playerData?.power ?? 0) >= requiredPower;
+    // Convert power string (BigInt) to number for comparison with requiredPower
+    const playerPower = playerData?.power ? Number(playerData.power) : 0;
+    const meetsPower = playerPower >= requiredPower;
     const meetsRebirth = (playerData?.rebirths ?? 0) >= requiredRebirths;
     return {
       canTrain: meetsPower || meetsRebirth,

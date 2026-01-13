@@ -13,9 +13,15 @@ export enum PetRarity {
 }
 
 export enum EggType {
+  // World 1 (Island 1) Eggs
   STONE = 'stone',
   GEM = 'gem',
   CRYSTAL = 'crystal',
+  
+  // World 2 (Island 2 / Beach World) Eggs
+  ABYSSAL = 'abyssal',
+  BOARDWALK = 'boardwalk',
+  SHIPWRECK = 'shipwreck',
 }
 
 /**

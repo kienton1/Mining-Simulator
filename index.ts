@@ -144,9 +144,11 @@ startServer(world => {
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
-   * Using the user-provided "closest to" coordinates (matches the 3 barrel props).
+   * World 1 (Island 1) stations at positions -13, 2, Z
+   * World 2 (Island 2 / Beach World) stations at positions -300, 1.75, Z
    */
   const eggStations = [
+    // World 1 (Island 1) Egg Stations
     {
       id: 'egg-station-stone',
       name: 'Stone Egg Station',
@@ -170,6 +172,32 @@ startServer(world => {
       defaultOpenCount: 1 as const,
       // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,1"
       position: { x: -13, y: 2, z: 1 },
+    },
+    
+    // World 2 (Island 2 / Beach World) Egg Stations
+    {
+      id: 'egg-station-abyssal',
+      name: 'Abyssal Egg Station',
+      eggType: EggType.ABYSSAL,
+      defaultOpenCount: 1 as const,
+      // User-provided position for World 2 Abyssal Egg
+      position: { x: -299.97, y: 1.75, z: 9.95 },
+    },
+    {
+      id: 'egg-station-boardwalk',
+      name: 'Boardwalk Egg Station',
+      eggType: EggType.BOARDWALK,
+      defaultOpenCount: 3 as const,
+      // User-provided position for World 2 Boardwalk Egg
+      position: { x: -300.03, y: 1.75, z: 6.12 },
+    },
+    {
+      id: 'egg-station-shipwreck',
+      name: 'Shipwreck Egg Station',
+      eggType: EggType.SHIPWRECK,
+      defaultOpenCount: 1 as const,
+      // User-provided position for World 2 Shipwreck Egg
+      position: { x: -299.97, y: 1.75, z: 1.95 },
     },
   ];
 
@@ -769,6 +797,9 @@ startServer(world => {
           const eggType =
             eggTypeStr === 'gem' ? EggType.GEM :
             eggTypeStr === 'crystal' ? EggType.CRYSTAL :
+            eggTypeStr === 'abyssal' ? EggType.ABYSSAL :
+            eggTypeStr === 'boardwalk' ? EggType.BOARDWALK :
+            eggTypeStr === 'shipwreck' ? EggType.SHIPWRECK :
             EggType.STONE;
           const count = Math.max(1, Math.min(50, Number(data.count ?? 1) || 1));
 
@@ -1181,6 +1212,9 @@ startServer(world => {
     const eggType =
       eggArg === 'gem' ? EggType.GEM :
       eggArg === 'crystal' ? EggType.CRYSTAL :
+      eggArg === 'abyssal' ? EggType.ABYSSAL :
+      eggArg === 'boardwalk' ? EggType.BOARDWALK :
+      eggArg === 'shipwreck' ? EggType.SHIPWRECK :
       EggType.STONE;
 
     const hatch = gameManager.getHatchingSystem().hatch(player, eggType, count);

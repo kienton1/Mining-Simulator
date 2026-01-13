@@ -59,12 +59,39 @@ export class EggStationLabelManager {
     const title =
       station.eggType === EggType.STONE ? 'Stone Egg' :
       station.eggType === EggType.GEM ? 'Gem Egg' :
-      'Crystal Egg';
+      station.eggType === EggType.CRYSTAL ? 'Crystal Egg' :
+      station.eggType === EggType.ABYSSAL ? 'Abyssal Egg' :
+      station.eggType === EggType.BOARDWALK ? 'Boardwalk Egg' :
+      'Shipwreck Egg';
 
     const costGold = EGG_DEFINITIONS[station.eggType]?.costGold ?? 0;
-    const costText = costGold >= 1000
-      ? `${(costGold / 1000).toFixed(costGold % 1000 === 0 ? 0 : 1)}K Gold`
-      : `${costGold} Gold`;
+    
+    // Format cost with proper suffixes (K, M, B) with max 2 decimal places
+    let costText: string;
+    if (costGold >= 1e9) {
+      // Billions
+      const billions = costGold / 1e9;
+      const formatted = billions % 1 === 0 
+        ? billions.toFixed(0)
+        : billions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
+      costText = `${formatted}B Gold`;
+    } else if (costGold >= 1e6) {
+      // Millions
+      const millions = costGold / 1e6;
+      const formatted = millions % 1 === 0
+        ? millions.toFixed(0)
+        : millions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
+      costText = `${formatted}M Gold`;
+    } else if (costGold >= 1000) {
+      // Thousands
+      const thousands = costGold / 1000;
+      const formatted = thousands % 1 === 0
+        ? thousands.toFixed(0)
+        : thousands.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
+      costText = `${formatted}K Gold`;
+    } else {
+      costText = `${costGold} Gold`;
+    }
 
     // Use direct positioning like the working training system
     // Position the UI above the egg station

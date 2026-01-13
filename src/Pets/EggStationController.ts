@@ -196,6 +196,12 @@ export class EggStationController {
         return 'Gem Egg';
       case EggType.CRYSTAL:
         return 'Crystal Egg';
+      case EggType.ABYSSAL:
+        return 'Abyssal Egg';
+      case EggType.BOARDWALK:
+        return 'Boardwalk Egg';
+      case EggType.SHIPWRECK:
+        return 'Shipwreck Egg';
     }
   }
 }

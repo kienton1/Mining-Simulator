@@ -64,22 +64,22 @@ export const ISLAND2_CONFIG: WorldConfig = {
     },
   },
 
-  // Egg Station Positions (same relative positions, offset by map offset)
+  // Egg Station Positions (user-provided positions for World 2)
   eggStations: {
     abyssal: {
-      x: 737, // -13 + 750
-      y: 2,
-      z: 751, // 1 + 750
+      x: -299.97,
+      y: 1.75,
+      z: 9.95,
     },
     boardwalk: {
-      x: 737, // -13 + 750
-      y: 2,
-      z: 755, // 5 + 750
+      x: -300.03,
+      y: 1.75,
+      z: 6.12,
     },
     shipwreck: {
-      x: 737, // -13 + 750
-      y: 2,
-      z: 759, // 9 + 750
+      x: -299.97,
+      y: 1.75,
+      z: 1.95,
     },
   },
 

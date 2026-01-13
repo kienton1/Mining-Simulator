@@ -13,6 +13,7 @@ import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
 import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
 import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
+import { stringToBigInt, bigIntToString } from './BigIntUtils';
 
 /**
  * Validates player data structure
@@ -35,7 +36,8 @@ function validatePlayerData(data: any): data is PlayerData {
   }
 
   // Validate types
-  if (typeof data.power !== 'number' || isNaN(data.power) || data.power < 0) return false;
+  // Power is stored as string for BigInt support
+  if (typeof data.power !== 'string' || !/^\d+$/.test(data.power)) return false;
   if (typeof data.rebirths !== 'number' || isNaN(data.rebirths) || data.rebirths < 0) return false;
   if (typeof data.gold !== 'number' || isNaN(data.gold) || data.gold < 0) return false;
   if (data.gems !== undefined && (typeof data.gems !== 'number' || isNaN(data.gems) || data.gems < 0)) return false;
@@ -70,9 +72,17 @@ function validatePlayerData(data: any): data is PlayerData {
 function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
   const merged: PlayerData = {
     dataVersion: typeof savedData.dataVersion === 'number' ? savedData.dataVersion : CURRENT_DATA_VERSION,
-    power: typeof savedData.power === 'number' && !isNaN(savedData.power) && savedData.power >= 0 
-      ? savedData.power 
-      : defaults.power,
+    power: (() => {
+      // Support both old format (number) and new format (string)
+      if (typeof savedData.power === 'string' && /^\d+$/.test(savedData.power)) {
+        return savedData.power;
+      }
+      if (typeof savedData.power === 'number' && !isNaN(savedData.power) && savedData.power >= 0) {
+        // Migrate old number format to string
+        return String(Math.floor(savedData.power));
+      }
+      return defaults.power;
+    })(),
     rebirths: typeof savedData.rebirths === 'number' && !isNaN(savedData.rebirths) && savedData.rebirths >= 0 
       ? savedData.rebirths 
       : defaults.rebirths,
@@ -225,7 +235,8 @@ export class PlayerDataPersistence {
   static async loadPlayerData(player: Player): Promise<PlayerData | null> {
     try {
       // Use Hytopia's recommended PersistenceManager.instance singleton
-      const savedData = await PersistenceManager.instance.getPlayerData(player);
+      // Note: getPlayerData is marked @internal but exists at runtime
+      const savedData = await (PersistenceManager.instance as any).getPlayerData(player);
       
       if (!savedData || Object.keys(savedData).length === 0) {
         // No saved data exists - return null to use defaults
@@ -234,12 +245,19 @@ export class PlayerDataPersistence {
 
       // Validate saved data
       if (!validatePlayerData(savedData)) {
+        console.warn('[PersistenceManager] loadPlayerData: Saved data failed validation, using defaults');
         return null;
       }
 
       // Merge with defaults to ensure all fields exist
       const defaults = createDefaultPlayerData();
-      const mergedData = mergeWithDefaults(savedData, defaults);
+      let mergedData: PlayerData;
+      try {
+        mergedData = mergeWithDefaults(savedData, defaults);
+      } catch (error) {
+        console.error('[PersistenceManager] loadPlayerData: Error merging saved data with defaults:', error);
+        return null; // Return null to use fresh defaults on error
+      }
       
       // Ensure data version is set (for future migrations)
       mergedData.dataVersion = mergedData.dataVersion || CURRENT_DATA_VERSION;
@@ -265,7 +283,8 @@ export class PlayerDataPersistence {
       }
 
       // Use Hytopia's recommended PersistenceManager.instance singleton
-      await PersistenceManager.instance.setPlayerData(player, data);
+      // Note: setPlayerData is marked @internal but exists at runtime
+      await (PersistenceManager.instance as any).setPlayerData(player, data);
       
       // Enhanced logging for testing
       return true;

@@ -81,7 +81,9 @@ export class TrainingSystem {
     this.stopTraining(player);
 
     // Check if player can access this rock (OR condition: power OR rebirths)
-    const meetsPower = playerData.power >= rock.requiredPower;
+    // Convert power string (BigInt) to number for comparison with requiredPower
+    const playerPower = Number(playerData.power);
+    const meetsPower = playerPower >= rock.requiredPower;
     const meetsRebirth = playerData.rebirths >= rock.requiredRebirths;
     const canAccess = meetsPower || meetsRebirth;
     
@@ -148,8 +150,8 @@ export class TrainingSystem {
         powerGain = 0;
       }
       
-      // Cap power gain to prevent 32-bit signed int overflow (max safe value)
-      const MAX_SAFE_POWER_GAIN = 2147483647; // 2^31 - 1
+      // Cap power gain to prevent overflow (using MAX_VALUE - very large but may lose precision for huge integers)
+      const MAX_SAFE_POWER_GAIN = Number.MAX_VALUE; // ~1.7976931348623157e+308 (largest JavaScript number)
       if (powerGain > MAX_SAFE_POWER_GAIN) {
         powerGain = MAX_SAFE_POWER_GAIN;
       }

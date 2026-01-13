@@ -208,11 +208,11 @@ Legendary (4): Sunstone, Mithrial, Astralite, Dragonstone
 
 | Pet Name | Drop Rate | Multiplier | Rarity Estimate |
 |----------|-----------|------------|-----------------|
-| Baby Sandray | 63.270% | 5,500 | Common |
-| Baby Tidepup | 30.000% | 8,000 | Common |
-| Baby Reefwing | 6.000% | 30,000 | Rare |
-| Baby Krakling | 0.700% | 65,000 | Epic |
-| Baby Ghostgull | 0.040% | 150,000 | Legendary |
+| Baby Sandray | 63.270% | 55 | Common |
+| Baby Tidepup | 30.000% | 80 | Common |
+| Baby Reefwing | 6.000% | 300 | Rare |
+| Baby Krakling | 0.700% | 650 | Epic |
+| Baby Ghostgull | 0.040% | 1,500 | Legendary |
 
 **Total Drop Rate**: 100.010% (slight rounding, acceptable)
 
@@ -237,12 +237,12 @@ Legendary (4): Sunstone, Mithrial, Astralite, Dragonstone
 
 | Pet Name | Drop Rate | Multiplier | Rarity Estimate |
 |----------|-----------|------------|-----------------|
-| Baby Coralclad | 64.269% | 10,000 | Common |
-| Baby Gigglecrab | 30.000% | 17,500 | Common |
-| Baby Skifflet | 5.000% | 50,000 | Rare |
-| Baby Emberfin | 0.700% | 150,000 | Epic |
-| Baby Neonkelp | 0.030% | 280,000 | Epic |
-| Baby Pearlmaw | 0.001% | 650,000 | Legendary |
+| Baby Coralclad | 64.269% | 100 | Common |
+| Baby Gigglecrab | 30.000% | 175 | Common |
+| Baby Skifflet | 5.000% | 500 | Rare |
+| Baby Emberfin | 0.700% | 1,500 | Epic |
+| Baby Neonkelp | 0.030% | 2,800 | Epic |
+| Baby Pearlmaw | 0.001% | 6,500 | Legendary |
 
 **Total Drop Rate**: 100.000%
 
@@ -309,7 +309,7 @@ Legendary (4): Sunstone, Mithrial, Astralite, Dragonstone
 - **Cost Scaling**: Island 2 pet eggs are MUCH more expensive (100K, 250M, 1B vs 10, 100, 2500)
   - This aligns with the higher ore values on Island 2
   - Players will need to earn more gold to afford pets
-- **Multiplier Scaling**: Island 2 pets have much higher multipliers (250-650K vs 2-250)
+- **Multiplier Scaling**: Island 2 pets have higher multipliers (55-6,500 vs 2-250)
   - This compensates for the higher training rock values (if training rocks scale similarly)
 - **Drop Rate Format**: Provided as percentages (need to convert to weights for loot table)
   - Current system uses relative weights (0.3, 0.4, etc.)
