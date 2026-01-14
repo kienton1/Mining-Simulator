@@ -62,13 +62,23 @@ export class EggStationLabelManager {
       station.eggType === EggType.CRYSTAL ? 'Crystal Egg' :
       station.eggType === EggType.ABYSSAL ? 'Abyssal Egg' :
       station.eggType === EggType.BOARDWALK ? 'Boardwalk Egg' :
-      'Shipwreck Egg';
+      station.eggType === EggType.SHIPWRECK ? 'Shipwreck Egg' :
+      station.eggType === EggType.SAND ? 'Sand Egg' :
+      station.eggType === EggType.SNOW ? 'Snow Egg' :
+      'Lava Egg';
 
     const costGold = EGG_DEFINITIONS[station.eggType]?.costGold ?? 0;
     
-    // Format cost with proper suffixes (K, M, B) with max 2 decimal places
+    // Format cost with proper suffixes (K, M, B, T) with max 2 decimal places
     let costText: string;
-    if (costGold >= 1e9) {
+    if (costGold >= 1e12) {
+      // Trillions
+      const trillions = costGold / 1e12;
+      const formatted = trillions % 1 === 0
+        ? trillions.toFixed(0)
+        : trillions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
+      costText = `${formatted}T Gold`;
+    } else if (costGold >= 1e9) {
       // Billions
       const billions = costGold / 1e9;
       const formatted = billions % 1 === 0 

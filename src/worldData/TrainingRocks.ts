@@ -28,6 +28,25 @@ export enum ISLAND2_TRAINING_ROCK_TIER {
 }
 
 /**
+ * Training rock tier enumeration for Island 3 (Volcanic World)
+ * 6 tiers based on volcanic ore block types:
+ * - SULFURON: Rock 7 (+60,000 Power UI)
+ * - FUMARO: Rock 8 (+200,000 Power UI)
+ * - CHARBITE: Rock 9 (+450,000 Power UI)
+ * - MINTASH: Rock 10 (+2,500,000 Power UI)
+ * - MAGMAORB: Rock 11 (+7,500,000 Power UI)
+ * - INFERNON: Rock 12 (+15,000,000 Power UI)
+ */
+export enum ISLAND3_TRAINING_ROCK_TIER {
+  SULFURON = 'sulfuron',
+  FUMARO = 'fumaro',
+  CHARBITE = 'charbite',
+  MINTASH = 'mintash',
+  MAGMAORB = 'magmaorb',
+  INFERNON = 'infernon',
+}
+
+/**
  * Training rock data structure for Island 2
  */
 export interface Island2TrainingRockData {
@@ -38,6 +57,38 @@ export interface Island2TrainingRockData {
   tier: ISLAND2_TRAINING_ROCK_TIER;
 
   /** Display name (ocean-themed) */
+  name: string;
+
+  /** Number of rebirths required to access this rock */
+  requiredRebirths: number;
+
+  /** Amount of power required to access this rock (alternative to rebirths) */
+  requiredPower: number;
+
+  /** UI power bonus display value */
+  uiPowerBonus: number;
+
+  /** Formula constant for power gain calculation */
+  formulaConstant: number;
+
+  /** Hit rate (hits per second) */
+  hitRate: number;
+
+  /** Block type used to identify this training rock */
+  blockType: string;
+}
+
+/**
+ * Training rock data structure for Island 3
+ */
+export interface Island3TrainingRockData {
+  /** Unique identifier for this training rock */
+  id: string;
+
+  /** Tier of training rock */
+  tier: ISLAND3_TRAINING_ROCK_TIER;
+
+  /** Display name (volcanic-themed) */
   name: string;
 
   /** Number of rebirths required to access this rock */
@@ -134,6 +185,80 @@ export const ISLAND2_TRAINING_ROCK_DATABASE: Record<ISLAND2_TRAINING_ROCK_TIER, 
 };
 
 /**
+ * Database of all Island 3 training rocks
+ * 6 tiers with exponential power gain functions based on rebirths
+ * Reference: Volcanic training formulas (rocks 7-12)
+ */
+export const ISLAND3_TRAINING_ROCK_DATABASE: Record<ISLAND3_TRAINING_ROCK_TIER, Island3TrainingRockData> = {
+  [ISLAND3_TRAINING_ROCK_TIER.SULFURON]: {
+    id: 'sulfuron-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.SULFURON,
+    name: 'Sulfuron Training Area',
+    requiredRebirths: 100_000_000, // 100M
+    requiredPower: 10_000_000_000_000_000, // 10 Qd
+    uiPowerBonus: 60_000,
+    formulaConstant: 1563.1250846645694,
+    hitRate: 4,
+    blockType: 'Sulfuron',
+  },
+  [ISLAND3_TRAINING_ROCK_TIER.FUMARO]: {
+    id: 'fumaro-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.FUMARO,
+    name: 'Fumaro Training Area',
+    requiredRebirths: 250_000_000, // 250M
+    requiredPower: 50_000_000_000_000_000, // 50 Qd
+    uiPowerBonus: 200_000,
+    formulaConstant: 5210.416948881898,
+    hitRate: 4,
+    blockType: 'Fumaro',
+  },
+  [ISLAND3_TRAINING_ROCK_TIER.CHARBITE]: {
+    id: 'charbite-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.CHARBITE,
+    name: 'Charbite Training Area',
+    requiredRebirths: 1_000_000_000, // 1B
+    requiredPower: 750_000_000_000_000_000, // 750 Qd
+    uiPowerBonus: 450_000,
+    formulaConstant: 11557.301919885911,
+    hitRate: 4,
+    blockType: 'Charbite',
+  },
+  [ISLAND3_TRAINING_ROCK_TIER.MINTASH]: {
+    id: 'mintash-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.MINTASH,
+    name: 'Mintash Training Area',
+    requiredRebirths: 2_500_000_000, // 2.5B
+    requiredPower: 25_000_000_000_000_000_000, // 25 Qn
+    uiPowerBonus: 2_500_000,
+    formulaConstant: 65491.37754602016,
+    hitRate: 4,
+    blockType: 'Mintash',
+  },
+  [ISLAND3_TRAINING_ROCK_TIER.MAGMAORB]: {
+    id: 'magmaorb-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.MAGMAORB,
+    name: 'Magmaorb Training Area',
+    requiredRebirths: 20_000_000_000, // 20B
+    requiredPower: 1_000_000_000_000_000_000_000, // 1 Sx
+    uiPowerBonus: 7_500_000,
+    formulaConstant: 195511.02414473664,
+    hitRate: 4,
+    blockType: 'Magmaorb',
+  },
+  [ISLAND3_TRAINING_ROCK_TIER.INFERNON]: {
+    id: 'infernon-rock',
+    tier: ISLAND3_TRAINING_ROCK_TIER.INFERNON,
+    name: 'Infernon Training Area',
+    requiredRebirths: 100_000_000_000, // 100B
+    requiredPower: 50_000_000_000_000_000_000_000, // 50 Sx
+    uiPowerBonus: 15_000_000,
+    formulaConstant: 391022.0482894733,
+    hitRate: 5,
+    blockType: 'Infernon',
+  },
+};
+
+/**
  * Calculate power gain per hit for Island 2 training rocks
  * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
  * Where x = player rebirth count, y = power gained per training hit
@@ -147,6 +272,37 @@ export function calculateIsland2TrainingPowerGain(rockTier: ISLAND2_TRAINING_ROC
   const exponent = 0.9993304728909983; // Same exponent as Island 1
 
   return Math.floor(rockData.formulaConstant * Math.pow(rebirthCount, exponent));
+}
+
+/**
+ * Calculate power gain per hit for Island 3 training rocks
+ * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
+ * Where x = player rebirth count, y = power gained per training hit
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per hit
+ */
+export function calculateIsland3TrainingPowerGain(rockTier: ISLAND3_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const rockData = ISLAND3_TRAINING_ROCK_DATABASE[rockTier];
+  const exponent = 0.9993304728909983;
+
+  return Math.floor(rockData.formulaConstant * Math.pow(rebirthCount, exponent));
+}
+
+/**
+ * Calculate power gain per second for Island 3 training rocks
+ * Formula: Power/sec = (power per hit) * (hits per second)
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per second
+ */
+export function calculateIsland3TrainingPowerPerSecond(rockTier: ISLAND3_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const powerPerHit = calculateIsland3TrainingPowerGain(rockTier, rebirthCount);
+  const rockData = ISLAND3_TRAINING_ROCK_DATABASE[rockTier];
+
+  return powerPerHit * rockData.hitRate;
 }
 
 /**
@@ -175,6 +331,16 @@ export function getIsland2TrainingRockByTier(tier: ISLAND2_TRAINING_ROCK_TIER): 
 }
 
 /**
+ * Gets Island 3 training rock data by tier
+ *
+ * @param tier - Training rock tier
+ * @returns Training rock data or undefined if tier doesn't exist
+ */
+export function getIsland3TrainingRockByTier(tier: ISLAND3_TRAINING_ROCK_TIER): Island3TrainingRockData | undefined {
+  return ISLAND3_TRAINING_ROCK_DATABASE[tier];
+}
+
+/**
  * Gets all Island 2 training rocks that a player can access based on their rebirth count OR power
  *
  * @param rebirths - Player's current rebirth count
@@ -183,6 +349,19 @@ export function getIsland2TrainingRockByTier(tier: ISLAND2_TRAINING_ROCK_TIER): 
  */
 export function getAccessibleIsland2TrainingRocks(rebirths: number, power: number): Island2TrainingRockData[] {
   return Object.values(ISLAND2_TRAINING_ROCK_DATABASE).filter(
+    rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
+  );
+}
+
+/**
+ * Gets all Island 3 training rocks that a player can access based on their rebirth count OR power
+ *
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns Array of accessible training rock data
+ */
+export function getAccessibleIsland3TrainingRocks(rebirths: number, power: number): Island3TrainingRockData[] {
+  return Object.values(ISLAND3_TRAINING_ROCK_DATABASE).filter(
     rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
   );
 }
@@ -203,6 +382,21 @@ export function canAccessIsland2TrainingRock(tier: ISLAND2_TRAINING_ROCK_TIER, r
 }
 
 /**
+ * Checks if a player can access an Island 3 training rock
+ * Player can unlock via EITHER power requirement OR rebirth requirement
+ *
+ * @param tier - Training rock tier to check
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns True if player can access this rock
+ */
+export function canAccessIsland3TrainingRock(tier: ISLAND3_TRAINING_ROCK_TIER, rebirths: number, power: number): boolean {
+  const rock = getIsland3TrainingRockByTier(tier);
+  if (!rock) return false;
+  return rock.requiredRebirths <= rebirths || rock.requiredPower <= power;
+}
+
+/**
  * Get block type to tier mapping for Island 2 training rocks
  * Used for auto-detection of training rocks in the world
  */
@@ -216,6 +410,19 @@ export const ISLAND2_BLOCK_TYPE_TO_TIER: Record<string, ISLAND2_TRAINING_ROCK_TI
 };
 
 /**
+ * Get block type to tier mapping for Island 3 training rocks
+ * Used for auto-detection of training rocks in the world
+ */
+export const ISLAND3_BLOCK_TYPE_TO_TIER: Record<string, ISLAND3_TRAINING_ROCK_TIER> = {
+  'Sulfuron': ISLAND3_TRAINING_ROCK_TIER.SULFURON,
+  'Fumaro': ISLAND3_TRAINING_ROCK_TIER.FUMARO,
+  'Charbite': ISLAND3_TRAINING_ROCK_TIER.CHARBITE,
+  'Mintash': ISLAND3_TRAINING_ROCK_TIER.MINTASH,
+  'Magmaorb': ISLAND3_TRAINING_ROCK_TIER.MAGMAORB,
+  'Infernon': ISLAND3_TRAINING_ROCK_TIER.INFERNON,
+};
+
+/**
  * Get training rock tier from block type
  *
  * @param blockType - Block type string
@@ -223,4 +430,14 @@ export const ISLAND2_BLOCK_TYPE_TO_TIER: Record<string, ISLAND2_TRAINING_ROCK_TI
  */
 export function getIsland2TierFromBlockType(blockType: string): ISLAND2_TRAINING_ROCK_TIER | undefined {
   return ISLAND2_BLOCK_TYPE_TO_TIER[blockType];
+}
+
+/**
+ * Get training rock tier from block type (Island 3)
+ *
+ * @param blockType - Block type string
+ * @returns Training rock tier or undefined if not found
+ */
+export function getIsland3TierFromBlockType(blockType: string): ISLAND3_TRAINING_ROCK_TIER | undefined {
+  return ISLAND3_BLOCK_TYPE_TO_TIER[blockType];
 }

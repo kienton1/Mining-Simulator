@@ -81,11 +81,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     if (value >= 1e26) {
       const num = value / 1e26;
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
-      return formatWithMax3Digits(num, 'c');
+      return formatWithMax3Digits(num, 'Oc');
     }
     if (value >= 1e24) {
       const num = value / 1e24;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'c');
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
       return formatWithMax3Digits(num, 'Sp');
     }
     if (value >= 1e21) {
@@ -174,11 +174,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     if (value >= 1e26) {
       const num = value / 1e26;
       if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
-      return formatWithSuffix(num, 'c');
+      return formatWithSuffix(num, 'Oc');
     }
     if (value >= 1e24) {
       const num = value / 1e24;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'c');
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
       return formatWithSuffix(num, 'Sp');
     }
     if (value >= 1e21) {
@@ -1208,6 +1208,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       },
       mining: {
         isMining: false,
+        isInMine: false,
         currentOre: null,
         damage: 0,
         lastBlockInfo: null, // Store last known block info to prevent UI disappearing during fast mining
@@ -2853,6 +2854,9 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           }
           break;
         case 'MINING_UPDATE':
+          if (!state.mining.isInMine) {
+            break;
+          }
           state.mining.damage = data.damage ?? 0;
           state.mining.currentOre = data.currentOreName ?? null;
           const blockHP = data.blockHP ?? 0;
@@ -2956,6 +2960,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           updateProgressBar(data.currentDepth ?? 0, data.goalDepth ?? 1000);
           break;
         case 'MINING_STATE_UPDATE':
+          state.mining.isInMine = data.isInMine ?? false;
           // Show/hide mining controls
           const miningControlsEl = document.getElementById('mining-controls');
           if (miningControlsEl) {

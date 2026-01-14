@@ -213,6 +213,23 @@ export const ISLAND2_MINING_AREA_BOUNDS = {
 } as const;
 
 /**
+ * Island 3 (Volcanic World) Mining Area Coordinates
+ * Mining opening corners: (-591,0,25), (-591,0,19), (-585,0,19), (-585,0,25)
+ */
+export const ISLAND3_MINING_AREA_BOUNDS = {
+  /** Minimum X coordinate */
+  minX: -591,
+  /** Maximum X coordinate */
+  maxX: -585,
+  /** Y coordinate (surface level) */
+  y: 0,
+  /** Minimum Z coordinate */
+  minZ: 19,
+  /** Maximum Z coordinate */
+  maxZ: 25,
+} as const;
+
+/**
  * Island 2 (Beach World) Shared Mine Shaft (public drop-in hole)
  * Players jump down this 10-block-deep shaft; a trigger at the bottom
  * teleports them into their personal mine instance.
@@ -233,8 +250,25 @@ export const ISLAND2_SHARED_MINE_SHAFT = {
 } as const;
 
 /**
+ * Island 3 (Volcanic World) Shared Mine Shaft (public drop-in hole)
+ */
+export const ISLAND3_SHARED_MINE_SHAFT = {
+  bounds: {
+    minX: ISLAND3_MINING_AREA_BOUNDS.minX,
+    maxX: ISLAND3_MINING_AREA_BOUNDS.maxX,
+    minZ: ISLAND3_MINING_AREA_BOUNDS.minZ,
+    maxZ: ISLAND3_MINING_AREA_BOUNDS.maxZ,
+  },
+  topY: 0,
+  bottomY: -10,
+  /** Blocks of fall before teleporting to personal mine */
+  teleportAfterDropBlocks: 5,
+  /** Y threshold where we teleport (derived from topY - teleportAfterDropBlocks) */
+  teleportThresholdY: -5.5,
+} as const;
+
+/**
  * Spacing (in blocks) between per-player mine instances when using spatial offsets.
  * Keep large enough to avoid accidental overlap between players.
  */
 export const MINE_INSTANCE_SPACING = 256;
-

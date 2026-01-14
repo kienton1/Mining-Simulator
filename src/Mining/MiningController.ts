@@ -12,6 +12,7 @@ import { MiningSystem } from './MiningSystem';
 import { GameManager } from '../Core/GameManager';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
+import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 
 /**
@@ -41,6 +42,10 @@ export class MiningController {
     // Try Island 2 database if not found
     if (oreType in ISLAND2_ORE_DATABASE) {
       return ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+    }
+    // Try Island 3 database if not found
+    if (oreType in ISLAND3_ORE_DATABASE) {
+      return ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
     }
     return null;
   }
@@ -147,7 +152,7 @@ export class MiningController {
       },
       (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display
-        const oreData = currentOre ? ORE_DATABASE[currentOre] : null;
+        const oreData = this.getOreData(currentOre);
         // Include ore mined info when block is destroyed (like damage popups)
         const oreMined = blockHP <= 0 && !isChest && oreData ? oreData.name : null;
         const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
@@ -233,6 +238,21 @@ export class MiningController {
    */
   private updateBlockIndicator(player: Player, pickaxe: PickaxeData): void {
     try {
+      // Only show ore info when player is physically in the mine
+      if (!this.gameManager.isPlayerInMine(player)) {
+        player.ui.sendData({
+          type: 'MINING_UPDATE',
+          damage: 0,
+          currentOreName: null,
+          blockHP: 0,
+          maxHP: 0,
+          isChest: false,
+          sellValue: null,
+          gemReward: null,
+        });
+        return;
+      }
+
       const blockInfo = this.miningSystem.detectCurrentBlock(player, pickaxe);
 
       if (!blockInfo) {
@@ -524,6 +544,9 @@ export class MiningController {
       let oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
       if (!oreEntry) {
         oreEntry = Object.entries(ISLAND2_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      }
+      if (!oreEntry) {
+        oreEntry = Object.entries(ISLAND3_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
       }
       if (oreEntry) {
         const oreType = oreEntry[0];

@@ -32,6 +32,7 @@ import {
 } from 'hytopia';
 import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
+import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from './src/Mining/Ore/World3OreData';
 
 import * as worldMap from './assets/map.json';
 import { GameManager } from './src/Core/GameManager';
@@ -48,6 +49,7 @@ import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 import { WorldRegistry } from './src/WorldRegistry';
 import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
+import { ISLAND3_CONFIG } from './src/worldData/Island3Config';
 
 /**
  * startServer is always the entry point for our game.
@@ -89,6 +91,7 @@ startServer(world => {
    */
   WorldRegistry.registerWorld(ISLAND1_CONFIG);
   WorldRegistry.registerWorld(ISLAND2_CONFIG);
+  WorldRegistry.registerWorld(ISLAND3_CONFIG);
 
   /**
    * Initialize Game Manager
@@ -108,6 +111,8 @@ startServer(world => {
   gameManager.buildSharedMineShaft();
   // Carve shared mine shaft for Island 2 (Beach World) with beach ores
   gameManager.buildSharedMineShaftForIsland2();
+  // Carve shared mine shaft for Island 3 (Volcanic World)
+  gameManager.buildSharedMineShaftForIsland3();
 
   /**
    * Spawn Merchant Entity
@@ -199,6 +204,29 @@ startServer(world => {
       // User-provided position for World 2 Shipwreck Egg
       position: { x: -299.97, y: 1.75, z: 1.95 },
     },
+
+    // World 3 (Island 3 / Volcanic World) Egg Stations
+    {
+      id: 'egg-station-sand',
+      name: 'Sand Egg Station',
+      eggType: EggType.SAND,
+      defaultOpenCount: 1 as const,
+      position: { x: -600, y: 2, z: 12 },
+    },
+    {
+      id: 'egg-station-snow',
+      name: 'Snow Egg Station',
+      eggType: EggType.SNOW,
+      defaultOpenCount: 1 as const,
+      position: { x: -600, y: 2, z: 8 },
+    },
+    {
+      id: 'egg-station-lava',
+      name: 'Lava Egg Station',
+      eggType: EggType.LAVA,
+      defaultOpenCount: 1 as const,
+      position: { x: -600, y: 2, z: 4 },
+    },
   ];
 
   // Egg UI should only pop when you're right up on the barrel (~1 block).
@@ -273,10 +301,14 @@ startServer(world => {
       for (const [oreType, amount] of Object.entries(inventory)) {
         if (amount && amount > 0) {
           // Try Island 1 database first
-          let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+          let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
           // Try Island 2 database if not found
           if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
             oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+          }
+          // Try Island 3 database if not found
+          if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
+            oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
           }
           if (oreData) {
             // Calculate sell value per unit with multipliers
@@ -800,6 +832,9 @@ startServer(world => {
             eggTypeStr === 'abyssal' ? EggType.ABYSSAL :
             eggTypeStr === 'boardwalk' ? EggType.BOARDWALK :
             eggTypeStr === 'shipwreck' ? EggType.SHIPWRECK :
+            eggTypeStr === 'sand' ? EggType.SAND :
+            eggTypeStr === 'snow' ? EggType.SNOW :
+            eggTypeStr === 'lava' ? EggType.LAVA :
             EggType.STONE;
           const count = Math.max(1, Math.min(50, Number(data.count ?? 1) || 1));
 
@@ -1215,6 +1250,9 @@ startServer(world => {
       eggArg === 'abyssal' ? EggType.ABYSSAL :
       eggArg === 'boardwalk' ? EggType.BOARDWALK :
       eggArg === 'shipwreck' ? EggType.SHIPWRECK :
+      eggArg === 'sand' ? EggType.SAND :
+      eggArg === 'snow' ? EggType.SNOW :
+      eggArg === 'lava' ? EggType.LAVA :
       EggType.STONE;
 
     const hatch = gameManager.getHatchingSystem().hatch(player, eggType, count);
@@ -1451,5 +1489,3 @@ startServer(world => {
     volume: 0.1,
   }).play(world);
 });
-
-

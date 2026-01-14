@@ -15,7 +15,7 @@ import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
 import { OreType } from '../Mining/Ore/World1OreData';
-import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT } from './GameConstants';
+import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT, ISLAND3_MINING_AREA_BOUNDS, ISLAND3_SHARED_MINE_SHAFT } from './GameConstants';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
@@ -1085,8 +1085,14 @@ export class GameManager {
       return;
     }
 
-    // Increment wins
-    playerData.wins += 1;
+    // Increment wins based on current world (island1=1, island2=100, island3=1000)
+    let winMultiplier = 1;
+    if (playerData.currentWorld === 'island2') {
+      winMultiplier = 100;
+    } else if (playerData.currentWorld === 'island3') {
+      winMultiplier = 1000;
+    }
+    playerData.wins += winMultiplier;
     this.updatePlayerData(player, playerData);
 
     // Update UI with new wins count
@@ -1113,8 +1119,11 @@ export class GameManager {
     // Stop block detection
     this.miningController?.stopBlockDetection(player);
 
-    // Teleport to surface
-    this.teleportPlayer(player, { x: 0, y: 10, z: 0 });
+    // Teleport to the surface of the world the player was mining in
+    const worldId = playerData.currentWorld || 'island1';
+    const worldConfig = WorldRegistry.getWorldConfig(worldId);
+    const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
+    this.teleportPlayer(player, spawnPoint);
 
     // Mark player as not in the mine
     this.setPlayerInMine(player, false);
@@ -1650,6 +1659,8 @@ export class GameManager {
 
     // Stop mining if active
     this.miningController?.stopMiningLoop(player);
+    // Stop block detection so mining UI clears when timer boots player out
+    this.miningController?.stopBlockDetection(player);
 
     // Only teleport if player is in the mine (they need to be moved out)
     // If they're not in the mine, we don't need to teleport them
@@ -1961,8 +1972,63 @@ export class GameManager {
   }
 
   /**
+   * Builds the shared mine shaft for Island 3 (Volcanic World)
+   */
+  buildSharedMineShaftForIsland3(): void {
+    const bounds = ISLAND3_MINING_AREA_BOUNDS;
+    const topY = ISLAND3_SHARED_MINE_SHAFT.topY;
+    const bottomY = ISLAND3_SHARED_MINE_SHAFT.bottomY + 1; // carve down to bottomY inclusive
+    const wallMinX = bounds.minX - 1;
+    const wallMaxX = bounds.maxX + 1;
+    const wallMinZ = bounds.minZ - 1;
+    const wallMaxZ = bounds.maxZ + 1;
+    const deepslateCobbleId = 2; // cobbled-deepslate
+    const voidId = 2; // coal-block (black)
+
+    // Carve interior to air
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        for (let y = topY; y >= bottomY; y--) {
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, 0);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Build deepslate cobble walls around the hole for all carved depths
+    for (let y = topY; y >= bottomY; y--) {
+      for (let x = wallMinX; x <= wallMaxX; x++) {
+        for (let z = wallMinZ; z <= wallMaxZ; z++) {
+          const isWall = x === wallMinX || x === wallMaxX || z === wallMinZ || z === wallMaxZ;
+          if (!isWall) continue;
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, deepslateCobbleId);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Place void floor across the whole mining area one level below carve depth
+    const voidY = bottomY - 1;
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        try {
+          this.world.chunkLattice.setBlock({ x, y: voidY, z }, voidId);
+        } catch (err) {
+
+        }
+      }
+    }
+  }
+
+  /**
    * Starts per-player watcher that teleports them to their personal mine when they reach the shaft bottom
-   * Checks both Island 1 and Island 2 mineshafts based on player's current world
+   * Checks Island 1, Island 2, and Island 3 mineshafts
    */
   startMineEntranceWatch(player: Player): void {
     // Clear existing
@@ -2004,6 +2070,22 @@ export class GameManager {
         pos.z >= shaft2.bounds.minZ && pos.z <= shaft2.bounds.maxZ;
       
       if (inBounds2 && pos.y <= shaft2.teleportThresholdY) {
+        const last = this.mineEntranceCooldowns.get(player) ?? 0;
+        if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
+          return;
+        }
+        this.mineEntranceCooldowns.set(player, now);
+        this.enterPersonalMine(player);
+        return;
+      }
+
+      // Check Island 3 mineshaft
+      const shaft3 = ISLAND3_SHARED_MINE_SHAFT;
+      const inBounds3 =
+        pos.x >= shaft3.bounds.minX && pos.x <= shaft3.bounds.maxX &&
+        pos.z >= shaft3.bounds.minZ && pos.z <= shaft3.bounds.maxZ;
+
+      if (inBounds3 && pos.y <= shaft3.teleportThresholdY) {
         const last = this.mineEntranceCooldowns.get(player) ?? 0;
         if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
           return;
@@ -2091,6 +2173,19 @@ export class GameManager {
     this.stopAutoMine(player);
     this.stopAutoTrain(player);
 
+    // Stop mining and block detection when leaving current mines
+    this.miningController?.stopMiningLoop(player);
+    this.miningController?.stopBlockDetection(player);
+
+    // Mark player as not in the mine while on the surface
+    this.setPlayerInMine(player, false);
+
+    // Update UI to reflect leaving the mine
+    player.ui.sendData({
+      type: 'MINING_STATE_UPDATE',
+      isInMine: false,
+    });
+
     // Stop mine reset timer (will restart when player mines first block in new world)
     this.stopMineResetTimer(player);
 
@@ -2106,18 +2201,16 @@ export class GameManager {
       depth: 0,
     });
 
-    // Teleport player to spawn point
-    const spawnPoint = worldConfig.spawnPoint;
-    this.teleportPlayer(player, spawnPoint);
-
-    // Update current world
+    // Update current world first so mine generation uses the correct world
     playerData.currentWorld = worldId;
     this.updatePlayerData(player, playerData);
 
-    // Generate mine for the new world immediately (before player enters mines)
-    // This ensures the mine is ready when the player goes to their mines
-    // This will also reset the firstBlockMined flag so timer starts on first block
+    // Generate mine for the new world before teleporting
     this.initializePlayerMine(player);
+
+    // Teleport player to spawn point
+    const spawnPoint = worldConfig.spawnPoint;
+    this.teleportPlayer(player, spawnPoint);
 
     return { success: true };
   }
@@ -2157,4 +2250,3 @@ export class GameManager {
     return { worlds };
   }
 }
-

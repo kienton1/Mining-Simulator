@@ -7,12 +7,17 @@
 
 import { World, Entity, RigidBodyType, ColliderShape } from 'hytopia';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
+import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
 
 /**
- * Mapping from OreType to block type ID (matches MiningSystem)
- * Block IDs 16-39 correspond to ore blocks in map.json
+ * Mapping from ore type to block type ID (matches MiningSystem)
+ * Block IDs 16-39: Island 1
+ * Block IDs 45-68: Island 2
+ * Block IDs 73-96: Island 3
  */
-const ORE_TO_BLOCK_ID: Map<OreType, number> = new Map([
+const ORE_TO_BLOCK_ID: Map<string, number> = new Map([
+  // Island 1 ores
   [OreType.STONE, 16],
   [OreType.DEEPSLATE, 17],
   [OreType.COAL, 18],
@@ -37,6 +42,56 @@ const ORE_TO_BLOCK_ID: Map<OreType, number> = new Map([
   [OreType.MITHRIAL, 37],
   [OreType.ASTRALITE, 38],
   [OreType.DRAGONSTONE, 39],
+  // Island 2 ores
+  [ISLAND2_ORE_TYPE.DUNESTONE, 45],
+  [ISLAND2_ORE_TYPE.BARNACITE, 46],
+  [ISLAND2_ORE_TYPE.PRISMARINE, 47],
+  [ISLAND2_ORE_TYPE.BASALTITE, 48],
+  [ISLAND2_ORE_TYPE.WRECKITE, 49],
+  [ISLAND2_ORE_TYPE.TRADEWINDITE, 50],
+  [ISLAND2_ORE_TYPE.DRIFTITE, 51],
+  [ISLAND2_ORE_TYPE.ANCHORITE, 52],
+  [ISLAND2_ORE_TYPE.SEAGLASSIUM, 53],
+  [ISLAND2_ORE_TYPE.SHELLCHROMITE, 54],
+  [ISLAND2_ORE_TYPE.TURTLITE, 55],
+  [ISLAND2_ORE_TYPE.OPALSTONE, 56],
+  [ISLAND2_ORE_TYPE.AZURITE, 57],
+  [ISLAND2_ORE_TYPE.MANGROVITE, 58],
+  [ISLAND2_ORE_TYPE.REEFIUM, 59],
+  [ISLAND2_ORE_TYPE.KELPITE, 60],
+  [ISLAND2_ORE_TYPE.SUNSTONITE, 61],
+  [ISLAND2_ORE_TYPE.RIPTIDITE, 62],
+  [ISLAND2_ORE_TYPE.TRENCHITE, 63],
+  [ISLAND2_ORE_TYPE.STORMIUM, 64],
+  [ISLAND2_ORE_TYPE.LAVASTONE, 65],
+  [ISLAND2_ORE_TYPE.BIOLUMITE, 66],
+  [ISLAND2_ORE_TYPE.OCEANIUM, 67],
+  [ISLAND2_ORE_TYPE.PALMITITE, 68],
+  // Island 3 ores
+  [ISLAND3_ORE_TYPE.SULFURON, 73],
+  [ISLAND3_ORE_TYPE.FUMARO, 74],
+  [ISLAND3_ORE_TYPE.CHARBITE, 75],
+  [ISLAND3_ORE_TYPE.MINTASH, 76],
+  [ISLAND3_ORE_TYPE.MAGMAORB, 77],
+  [ISLAND3_ORE_TYPE.INFERNON, 78],
+  [ISLAND3_ORE_TYPE.ASHROCK, 79],
+  [ISLAND3_ORE_TYPE.CINDREL, 80],
+  [ISLAND3_ORE_TYPE.PYRESTONE, 81],
+  [ISLAND3_ORE_TYPE.EMBERITE, 82],
+  [ISLAND3_ORE_TYPE.SCORIX, 83],
+  [ISLAND3_ORE_TYPE.HEATSTONE, 84],
+  [ISLAND3_ORE_TYPE.CALDERA, 85],
+  [ISLAND3_ORE_TYPE.VITRIN, 86],
+  [ISLAND3_ORE_TYPE.BRIMMET, 87],
+  [ISLAND3_ORE_TYPE.NIGHTASH, 88],
+  [ISLAND3_ORE_TYPE.SPIREC, 89],
+  [ISLAND3_ORE_TYPE.VENTARA, 90],
+  [ISLAND3_ORE_TYPE.LAPILLO, 91],
+  [ISLAND3_ORE_TYPE.TUFFEN, 92],
+  [ISLAND3_ORE_TYPE.SEARIN, 93],
+  [ISLAND3_ORE_TYPE.CINDEROP, 94],
+  [ISLAND3_ORE_TYPE.COREFLARE, 95],
+  [ISLAND3_ORE_TYPE.DARKGLOW, 96],
 ]);
 
 /**
@@ -137,12 +192,15 @@ export class DebrisManager {
    * @param count - Number of debris pieces to spawn (default: 20)
    */
   spawnDebris(
-    oreType: OreType,
+    oreType: string,
     areaBounds: { minX: number; maxX: number; minZ: number; maxZ: number; y: number },
     count: number = 20
   ): void {
     // Get ore color from database
-    const oreData = ORE_DATABASE[oreType];
+    const oreData =
+      (oreType in ORE_DATABASE && ORE_DATABASE[oreType as OreType]) ||
+      (oreType in ISLAND2_ORE_DATABASE && ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE]) ||
+      (oreType in ISLAND3_ORE_DATABASE && ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE]);
     if (!oreData) {
       return; // Invalid ore type
     }
@@ -184,7 +242,7 @@ export class DebrisManager {
    * @param oreType - The ore type to get texture for
    * @returns Texture URI for the ore block, or fallback texture
    */
-  private getOreBlockTextureUri(oreType: OreType): string {
+  private getOreBlockTextureUri(oreType: string): string {
     try {
       // Get block ID from mapping
       const blockId = ORE_TO_BLOCK_ID.get(oreType);
@@ -214,7 +272,7 @@ export class DebrisManager {
   private spawnDebrisPiece(
     spawnPosition: { x: number; y: number; z: number },
     tintColor: { r: number; g: number; b: number },
-    oreType: OreType
+    oreType: string
   ): void {
     // Add small random offset for slight variation
     const offsetX = (Math.random() - 0.5) * 0.3; // -0.15 to +0.15
@@ -402,4 +460,3 @@ export class DebrisManager {
     this.cleanupAllDebris();
   }
 }
-

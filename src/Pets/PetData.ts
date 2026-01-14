@@ -22,6 +22,11 @@ export enum EggType {
   ABYSSAL = 'abyssal',
   BOARDWALK = 'boardwalk',
   SHIPWRECK = 'shipwreck',
+
+  // World 3 (Island 3 / Volcanic World) Eggs
+  SAND = 'sand',
+  SNOW = 'snow',
+  LAVA = 'lava',
 }
 
 /**

@@ -16,7 +16,7 @@ import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
 /**
  * Mining block position key (x,y,z)
@@ -89,6 +89,7 @@ export class MiningSystem {
    * Mapping from OreType to block type ID
    * Island 1 ores: Block IDs 16-39 from map.json
    * Island 2 ores: Block IDs 45-68 from map.json
+   * Island 3 ores: Block IDs 73-96 from map.json
    */
   private readonly ORE_TO_BLOCK_ID: Map<string, number> = new Map([
     // Island 1 ores (OreType)
@@ -141,10 +142,36 @@ export class MiningSystem {
     ['biolumite', 66],     // Biolumite
     ['oceanium', 67],      // Oceanium
     ['palmitite', 68],     // Palmitite
+    // Island 3 ores (Volcanic) - Block IDs 73-96 from map.json
+    ['sulfuron', 73],      // Sulfuron
+    ['fumaro', 74],        // Fumaro
+    ['charbite', 75],      // Charbite
+    ['mintash', 76],       // Mintash
+    ['magmaorb', 77],      // Magmaorb
+    ['infernon', 78],      // Infernon
+    ['ashrock', 79],       // Ashrock
+    ['cindrel', 80],       // Cindrel
+    ['pyrestone', 81],     // Pyrestone
+    ['emberite', 82],      // Emberite
+    ['scorix', 83],        // Scorix
+    ['heatstone', 84],     // Heatstone
+    ['caldera', 85],       // Caldera
+    ['vitrin', 86],        // Vitrin
+    ['brimmet', 87],       // Brimmet
+    ['nightash', 88],      // Nightash
+    ['spirec', 89],        // Spirec
+    ['ventara', 90],       // Ventara
+    ['lapillo', 91],       // Lapillo
+    ['tuffen', 92],        // Tuffen
+    ['searin', 93],        // Searin
+    ['cinderop', 94],      // Cinderop
+    ['coreflare', 95],     // Coreflare
+    ['darkglow', 96],      // Darkglow
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
   private readonly DIRT_BLOCK_TYPE_ID = 9;
+  private readonly DEEPSLATE_COBBLE_BLOCK_TYPE_ID = 2;
   
   /** Basic chest block type ID */
   private readonly BASIC_CHEST_BLOCK_TYPE_ID = 10;
@@ -1112,8 +1139,8 @@ export class MiningSystem {
 
     // Simple grid allocation using spacing to avoid overlap
     // Start from index 1 so nobody uses the origin/shared area
-    // Island 2 uses a different grid region (offset by a large amount) to avoid overlap with Island 1
-    const baseOffsetX = worldId === 'island2' ? 10000 : 0; // Island 2 mines start at X=10000
+    // Island 2 and Island 3 use different grid regions to avoid overlap with Island 1
+    const baseOffsetX = worldId === 'island2' ? 10000 : worldId === 'island3' ? 20000 : 0;
     const index = instanceIndex;
     const spacing = MINE_INSTANCE_SPACING;
     const gridWidth = 16; // gives plenty of room before wrapping
@@ -1131,6 +1158,9 @@ export class MiningSystem {
   private getMiningAreaBounds(worldId: string) {
     if (worldId === 'island2') {
       return ISLAND2_MINING_AREA_BOUNDS;
+    }
+    if (worldId === 'island3') {
+      return ISLAND3_MINING_AREA_BOUNDS;
     }
     return MINING_AREA_BOUNDS;
   }
@@ -1597,7 +1627,11 @@ export class MiningSystem {
   private generateMineShaftWalls(depth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
     const bounds = this.getMiningAreaBounds(worldId);
-    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
+    const wallBlockId = worldId === 'island2'
+      ? 43
+      : worldId === 'island3'
+        ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
+        : this.DIRT_BLOCK_TYPE_ID;
     
     // Generate inner box (layer 1) - solid walls around the mining area
     const innerMinX = bounds.minX - 1 + offset.x;
@@ -1649,7 +1683,11 @@ export class MiningSystem {
   private buildMineCeiling(state: MiningState, worldId: string): void {
     const offset = state.offset;
     const bounds = this.getMiningAreaBounds(worldId);
-    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
+    const wallBlockId = worldId === 'island2'
+      ? 43
+      : worldId === 'island3'
+        ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
+        : this.DIRT_BLOCK_TYPE_ID;
     const ceilingLayers = 10;
     const startY = MINE_DEPTH_START + 1; // lowered by one to sit closer to the floor
     const floorY = MINE_DEPTH_START; // Floor level
@@ -1789,7 +1827,11 @@ export class MiningSystem {
   private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
     const bounds = this.getMiningAreaBounds(worldId);
-    const wallBlockId = worldId === 'island2' ? 43 : this.DIRT_BLOCK_TYPE_ID; // Sand for Island 2, dirt for Island 1
+    const wallBlockId = worldId === 'island2'
+      ? 43
+      : worldId === 'island3'
+        ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
+        : this.DIRT_BLOCK_TYPE_ID;
     
     // Mining area bounds (with offset) - this area should NOT be filled
     const miningMinX = bounds.minX + offset.x;
