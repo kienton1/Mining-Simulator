@@ -77,6 +77,11 @@ export class TrainingSystem {
     worldId: string = 'island1',
     hitRate: number = 2.0
   ): void {
+    // Start mining animation on player entity (Hyground style)
+    if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
+      (playerEntity as any).startMiningAnimation();
+    }
+    
     // Stop any existing training first
     this.stopTraining(player);
 
@@ -281,6 +286,11 @@ export class TrainingSystem {
   stopTraining(player: Player): void {
     const state = this.trainingStates.get(player);
     if (!state) return;
+    
+    // Stop mining animation and return to holding pose (Hyground style)
+    if (state.playerEntity && typeof (state.playerEntity as any).stopMiningAnimation === 'function') {
+      (state.playerEntity as any).stopMiningAnimation();
+    }
 
     state.isTraining = false;
     state.animationPlaying = false;

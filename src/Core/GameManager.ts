@@ -62,6 +62,7 @@ export class GameManager {
   private playerAutoStates: Map<Player, PlayerAutoState> = new Map();
   private playerModalStates: Map<Player, PlayerModalState> = new Map();
   private playerInMineStates: Map<Player, boolean> = new Map(); // Tracks if player is physically in their mine
+  private playerLoadingStates: Map<Player, boolean> = new Map();
   private trainingController?: TrainingController;
   private miningController?: MiningController;
   private inventoryManager: InventoryManager;
@@ -745,6 +746,28 @@ export class GameManager {
    */
   onPlayerUILoaded(player: Player): void {
     this.sendPowerStatsToUI(player);
+  }
+
+  /**
+   * Toggles loading state for a player.
+   * Disables input and interactions while loading.
+   */
+  setPlayerLoading(player: Player, isLoading: boolean): void {
+    this.playerLoadingStates.set(player, isLoading);
+    player.ui.sendData({
+      type: 'LOADING_SCREEN',
+      visible: isLoading,
+    });
+
+    player.setInteractEnabled(!isLoading);
+    if (isLoading) {
+      player.resetInputs();
+    }
+
+    const playerEntity = this.getPlayerEntity(player);
+    if (playerEntity && typeof (playerEntity as any).setInputSuppressed === 'function') {
+      (playerEntity as any).setInputSuppressed(isLoading);
+    }
   }
 
   /**
@@ -2173,6 +2196,9 @@ export class GameManager {
     this.stopAutoMine(player);
     this.stopAutoTrain(player);
 
+    // Show loading screen and suppress input during world switch
+    this.setPlayerLoading(player, true);
+
     // Stop mining and block detection when leaving current mines
     this.miningController?.stopMiningLoop(player);
     this.miningController?.stopBlockDetection(player);
@@ -2211,6 +2237,11 @@ export class GameManager {
     // Teleport player to spawn point
     const spawnPoint = worldConfig.spawnPoint;
     this.teleportPlayer(player, spawnPoint);
+
+    // Allow time for mine generation/rendering before removing the loading screen
+    setTimeout(() => {
+      this.setPlayerLoading(player, false);
+    }, 1500);
 
     return { success: true };
   }

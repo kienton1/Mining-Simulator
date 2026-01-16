@@ -1050,6 +1050,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     const minerDetailIcon = document.getElementById('miner-detail-icon');
     const pickaxeGridEl = document.getElementById('pickaxe-grid');
     const pickaxeDetailName = document.getElementById('pickaxe-detail-name');
+    const pickaxeDetailIcon = document.getElementById('pickaxe-detail-icon');
     const pickaxeDetailStats = document.getElementById('pickaxe-detail-stats');
     const pickaxeDetailCost = document.getElementById('pickaxe-detail-cost');
 
@@ -1639,6 +1640,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             teleportBtn.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
+              setLoadingScreenVisible(true);
               hytopia.sendData({ type: 'TELEPORT_TO_WORLD', worldId: world.id });
             });
           }
@@ -1797,6 +1799,22 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         pickaxeDetailName.textContent = `${pickaxe.name} Pickaxe`;
       }
 
+      if (pickaxeDetailIcon) {
+        pickaxeDetailIcon.innerHTML = '';
+        if (pickaxe.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${pickaxe.imageUri}`;
+          img.alt = `${pickaxe.name} pickaxe`;
+          img.className = 'pickaxe-details__icon-img';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'contain';
+          pickaxeDetailIcon.appendChild(img);
+        } else {
+          pickaxeDetailIcon.textContent = '⛏️';
+        }
+      }
+
       // Update stats display (per planning document format)
       // REBALANCED: Pickaxes now only affect Speed, Luck, and Sell Value Multiplier
       if (pickaxeDetailStats) {
@@ -1903,7 +1921,18 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
         const iconEl = document.createElement('div');
         iconEl.className = 'pickaxe-card__icon';
-        iconEl.textContent = '⛏️';
+        if (p.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${p.imageUri}`;
+          img.alt = `${p.name} pickaxe`;
+          img.className = 'pickaxe-card__icon-img';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'contain';
+          iconEl.appendChild(img);
+        } else {
+          iconEl.textContent = '⛏️';
+        }
         card.appendChild(iconEl);
 
         const nameEl = document.createElement('div');
@@ -2611,9 +2640,27 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       }
     }
 
+    function setLoadingScreenVisible(visible) {
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.toggle('visible', Boolean(visible));
+      }
+      if (document.body) {
+        document.body.classList.toggle('loading', Boolean(visible));
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Default to visible until the server tells us to hide it.
+      setLoadingScreenVisible(true);
+    });
+
     hytopia.onData(data => {
       console.log('[UI] Received data:', data.type, data);
       switch (data.type) {
+        case 'LOADING_SCREEN':
+          setLoadingScreenVisible(Boolean(data.visible));
+          break;
         case 'POWER_STATS':
           state.power = data.power ?? 0;
           state.gold = data.gold ?? state.gold;
@@ -3106,6 +3153,7 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
             hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
           } else {
             console.warn('[UI] World teleport failed:', data.message);
+            setLoadingScreenVisible(false);
             // Could show error message to user here
           }
           break;
@@ -3116,6 +3164,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     });
   }
 </script>
+
+<div id="loading-screen" class="loading-screen visible" aria-hidden="true"></div>
 
 <div class="ui-root">
   <div class="mobile-controls">
@@ -3500,6 +3550,22 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   body {
     margin: 0;
     padding: 0;
+  }
+
+  body.loading .ui-root {
+    pointer-events: none;
+  }
+
+  .loading-screen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 10000;
+    display: none;
+  }
+
+  .loading-screen.visible {
+    display: block;
   }
 
   .ui-root {
@@ -4864,6 +4930,20 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   .pickaxe-card__icon {
     font-size: 48px;
     margin: 4px 0;
+  }
+
+  .pickaxe-card__icon-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .pickaxe-details__icon-img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    image-rendering: pixelated;
   }
 
   .pickaxe-card__cost {

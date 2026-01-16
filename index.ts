@@ -450,6 +450,21 @@ startServer(world => {
     const playerEntity = new MiningPlayerEntity(player);
     playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
 
+    // Start in loading state until UI and backend data are ready
+    gameManager.setPlayerLoading(player, true);
+    const loadingGate = { uiLoaded: false, dataLoaded: false };
+    const loadingFallbackTimeout = setTimeout(() => {
+      // Failsafe: never keep players stuck in loading.
+      gameManager.setPlayerLoading(player, false);
+    }, 5000);
+    const tryFinishLoading = () => {
+      if (!loadingGate.uiLoaded || !loadingGate.dataLoaded) return;
+      clearTimeout(loadingFallbackTimeout);
+      setTimeout(() => {
+        gameManager.setPlayerLoading(player, false);
+      }, 300);
+    };
+
     // Disable player-to-player collisions
     // Players belong to PLAYER group but don't collide with other players
     // They still collide with blocks, entities, and everything else
@@ -501,6 +516,11 @@ startServer(world => {
     
     // Load saved data in background and update if different
     // This doesn't block entity spawning, so camera works correctly
+    const dataLoadTimeout = setTimeout(() => {
+      loadingGate.dataLoaded = true;
+      tryFinishLoading();
+    }, 2000);
+
     gameManager.initializePlayerAsync(player).then(loadedData => {
       // Only update if loaded data is different from defaults
       const currentData = gameManager.getPlayerData(player);
@@ -555,12 +575,18 @@ startServer(world => {
           gameManager.sendPowerStatsToUI(player);
         }, 100);
       }
+      clearTimeout(dataLoadTimeout);
+      loadingGate.dataLoaded = true;
+      tryFinishLoading();
     }).catch(error => {
       console.error(`Failed to load player data for ${player.id}:`, error);
       // Still update UI with defaults if load fails
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
       }, 100);
+      clearTimeout(dataLoadTimeout);
+      loadingGate.dataLoaded = true;
+      tryFinishLoading();
     });
 
     // Load our game UI for this player
@@ -571,6 +597,8 @@ startServer(world => {
     player.ui.on(PlayerUIEvent.LOAD, () => {
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
+      loadingGate.uiLoaded = true;
+      tryFinishLoading();
     });
     
     // Set up per-player UI event handler (as per Hytopia SDK guide)

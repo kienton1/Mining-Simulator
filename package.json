@@ -8,7 +8,8 @@
     "build": "hytopia build",
     "package": "hytopia package",
     "upgrade-assets-library": "hytopia upgrade-assets-library",
-    "upgrade-project": "hytopia upgrade-project"
+    "upgrade-project": "hytopia upgrade-project",
+    "generate-pickaxe-thumbnails": "node scripts/render-pickaxe-thumbnails.js"
   },
   "keywords": [],
   "author": "",
@@ -27,5 +28,9 @@
   "bugs": {
     "url": "https://github.com/kienton1/Mining-Simulator/issues"
   },
-  "homepage": "https://github.com/kienton1/Mining-Simulator#readme"
+  "homepage": "https://github.com/kienton1/Mining-Simulator#readme",
+  "devDependencies": {
+    "puppeteer": "^24.35.0",
+    "three": "^0.182.0"
+  }
 }

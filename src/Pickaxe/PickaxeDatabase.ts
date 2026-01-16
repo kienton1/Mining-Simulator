@@ -11,7 +11,7 @@
  * - Cost → Purchase cost in coins
  */
 
-import { PickaxeData } from './PickaxeData';
+import type { PickaxeData } from './PickaxeData';
 
 /**
  * Helper to convert coin percentage to sell value multiplier
@@ -217,7 +217,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   },
   {
     tier: 15,
-    name: 'Jester\'s Mallet', // Clown Hammer renamed
+    name: 'Jester\u2019s Mallet', // Clown Hammer renamed (using curly apostrophe to match texture filename)
     miningSpeed: 200, // +200 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(450), // +450% Coins = 5.5x

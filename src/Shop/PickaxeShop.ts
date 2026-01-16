@@ -174,6 +174,7 @@ export class PickaxeShop {
       luckBonus: number;
       sellValueMultiplier: number;
       cost: number;
+      imageUri?: string;
       availability: 'equipped' | 'owned' | 'available' | 'locked';
       purchasable: boolean;
     }>;
@@ -227,6 +228,7 @@ export class PickaxeShop {
         luckBonus: pickaxe.luckBonus,
         sellValueMultiplier: pickaxe.sellValueMultiplier,
         cost: pickaxe.cost,
+        imageUri: `ui/pickaxes/tier-${pickaxe.tier}.png`,
         availability,
         purchasable,
       };
@@ -409,4 +411,3 @@ export class PickaxeShop {
     return currentGold >= pickaxe.cost;
   }
 }
-

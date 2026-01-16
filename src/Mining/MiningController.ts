@@ -158,7 +158,6 @@ export class MiningController {
         const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
 
         if (oreMined) {
-          console.log(`[MiningController] Block destroyed - sending ore mined: ${oreMined} (damage: ${damage}, blockHP: ${blockHP})`);
         }
 
         this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward, oreMined, oreMinedColor);
@@ -333,6 +332,12 @@ export class MiningController {
    * @param player - Player who is mining
    */
   startMiningLoop(player: Player): void {
+    // Start mining animation on player entity (Hyground style)
+    const playerEntity = this.gameManager.getPlayerEntity(player);
+    if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
+      (playerEntity as any).startMiningAnimation();
+    }
+    
     // First check if player is in the mine - if not, do nothing
     const initialMiningState = this.miningSystem.getMiningState(player);
     if (!initialMiningState) {
@@ -384,7 +389,6 @@ export class MiningController {
         const oreMinedColor = blockHP <= 0 && !isChest && oreData ? oreData.color : null;
 
         if (oreMined) {
-          console.log(`[MiningController] Block destroyed - sending ore mined: ${oreMined} (damage: ${damage}, blockHP: ${blockHP})`);
         }
 
         this.sendMiningUpdateEvent(p, damage, oreData?.name || null, blockHP, maxHP, isChest, chestType, gemReward, oreMined, oreMinedColor);
@@ -438,6 +442,12 @@ export class MiningController {
    */
   stopMiningLoop(player: Player): void {
     this.miningSystem.stopMiningLoop(player);
+    
+    // Stop mining animation and return to holding pose (Hyground style)
+    const playerEntity = this.gameManager.getPlayerEntity(player);
+    if (playerEntity && typeof (playerEntity as any).stopMiningAnimation === 'function') {
+      (playerEntity as any).stopMiningAnimation();
+    }
     
     player.ui.sendData({
       type: 'MINING_STATE',
