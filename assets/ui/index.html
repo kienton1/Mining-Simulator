@@ -1409,7 +1409,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           petDetailImageEl.innerHTML = '';
           const img = document.createElement('img');
           img.alt = pet.name || pet.petId || 'Pet';
-          img.src = `{{CDN_ASSETS_URL}}/ui/pets/${pet.petId}.png`;
+          const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+          img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           img.className = 'pet-detail__img-el';
           img.onerror = () => {
             petDetailImageEl.textContent = '🐾';
@@ -1441,7 +1442,8 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
         const img = document.createElement('img');
         img.className = 'pet-tile__img-el';
         img.alt = pet.name || pet.petId || 'Pet';
-        img.src = `{{CDN_ASSETS_URL}}/ui/pets/${pet.petId}.png`;
+        const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+        img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
         img.onerror = () => {
           img.style.display = 'none';
           imgWrap.textContent = '🐾';

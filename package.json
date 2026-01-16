@@ -10,7 +10,8 @@
     "upgrade-assets-library": "hytopia upgrade-assets-library",
     "upgrade-project": "hytopia upgrade-project",
     "generate-pickaxe-thumbnails": "node scripts/render-pickaxe-thumbnails.js",
-    "generate-miner-icons": "python scripts/generate-miner-icons.py"
+    "generate-miner-icons": "python scripts/generate-miner-icons.py",
+    "generate-pet-thumbnails": "node scripts/render-pet-thumbnails.js"
   },
   "keywords": [],
   "author": "",

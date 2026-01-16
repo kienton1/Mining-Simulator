@@ -42,7 +42,7 @@ export const ISLAND2_PET_IDS = {
   BABY_ROCKHERON: 'baby_rockheron',
   BABY_MADMARINER: 'baby_madmariner',
   BABY_TURTE: 'baby_turte',
-  BABY_SEAL: 'baby_seal',
+  BABY_SNAPPER: 'baby_snapper',
 
   // Shipwreck Egg (6 pets)
   BABY_CORALCLAD: 'baby_coralclad',
@@ -70,7 +70,7 @@ const ISLAND2_PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: ISLAND2_PET_IDS.BABY_ROCKHERON, name: 'Baby Rockheron', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.RARE, multiplier: 1000 },
   { id: ISLAND2_PET_IDS.BABY_MADMARINER, name: 'Baby MadMariner', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.EPIC, multiplier: 3000 },
   { id: ISLAND2_PET_IDS.BABY_TURTE, name: 'Baby Turte', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.EPIC, multiplier: 10000 },
-  { id: ISLAND2_PET_IDS.BABY_SEAL, name: 'Baby Seal', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
+  { id: ISLAND2_PET_IDS.BABY_SNAPPER, name: 'Baby Snapper', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
 
   // Shipwreck Egg
   { id: ISLAND2_PET_IDS.BABY_CORALCLAD, name: 'Baby Coralclad', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.COMMON, multiplier: 10000 },
@@ -125,7 +125,7 @@ export const ISLAND2_EGG_LOOT_TABLES: Record<ISLAND2_EGG_TYPE, Island2EggLootEnt
     { petId: ISLAND2_PET_IDS.BABY_ROCKHERON, weight: 4.00 },   // 4.000%
     { petId: ISLAND2_PET_IDS.BABY_MADMARINER, weight: 0.50 },  // 0.500%
     { petId: ISLAND2_PET_IDS.BABY_TURTE, weight: 0.05 },       // 0.050%
-    { petId: ISLAND2_PET_IDS.BABY_SEAL, weight: 0.001 },       // 0.001%
+    { petId: ISLAND2_PET_IDS.BABY_SNAPPER, weight: 0.001 },       // 0.001%
   ],
   [ISLAND2_EGG_TYPE.SHIPWRECK]: [
     { petId: ISLAND2_PET_IDS.BABY_CORALCLAD, weight: 64.269 },  // 64.269%

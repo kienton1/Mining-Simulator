@@ -44,6 +44,8 @@ import { GemTraderEntity } from './src/Shop/GemTraderEntity';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { PetVisualManager } from './src/Pets/PetVisualManager';
+import { getPetImageUri } from './src/Pets/PetVisuals';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 import { WorldRegistry } from './src/WorldRegistry';
@@ -84,6 +86,7 @@ startServer(world => {
    * This manages pickaxe entities attached to players
    */
   const pickaxeManager = new PickaxeManager(world);
+  const petVisualManager = new PetVisualManager(world);
 
   /**
    * Initialize World Registry
@@ -262,6 +265,7 @@ startServer(world => {
         rarity: def?.rarity ?? 'common',
         eggType: def?.eggType ?? 'stone',
         multiplier: def?.multiplier ?? 0,
+        imageUri: getPetImageUri(p.petId) ?? undefined,
       };
     });
 
@@ -536,6 +540,11 @@ startServer(world => {
         
         // Update with loaded data (this updates the in-memory playerDataMap)
         gameManager.updatePlayerData(player, loadedData);
+
+        // Sync equipped pet visuals from loaded data
+        setTimeout(() => {
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
+        }, 100);
         
         // Always restore pickaxe from saved data (ensures persistence works correctly)
         // Use a small delay to ensure entity is fully spawned before attaching pickaxe
@@ -574,6 +583,9 @@ startServer(world => {
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
         }, 100);
+        setTimeout(() => {
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
+        }, 100);
       }
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
@@ -583,6 +595,9 @@ startServer(world => {
       // Still update UI with defaults if load fails
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
+      }, 100);
+      setTimeout(() => {
+        petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
       }, 100);
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
@@ -804,6 +819,7 @@ startServer(world => {
           const res = gameManager.getPetManager().equipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equip', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_UNEQUIP': {
@@ -811,6 +827,7 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequip', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_EQUIP_INSTANCE': {
@@ -818,6 +835,7 @@ startServer(world => {
           const res = gameManager.getPetManager().equipFromInventoryIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_UNEQUIP_INSTANCE': {
@@ -825,18 +843,21 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipFromEquippedIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_EQUIP_BEST': {
           const res = gameManager.getPetManager().equipBest(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipBest', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_UNEQUIP_ALL': {
           const res = gameManager.getPetManager().unequipAll(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipAll', success: res.success, message: res.message });
           sendPetState(player);
+          petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
         case 'PET_DELETE_INV': {
@@ -1488,6 +1509,7 @@ startServer(world => {
     
     // Clean up pickaxe entity
     pickaxeManager.cleanupPlayer(player);
+    petVisualManager.cleanupPlayer(player);
     
     // Clean up player entities
     world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => entity.despawn());

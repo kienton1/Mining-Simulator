@@ -62,7 +62,7 @@ export const PET_IDS = {
   BABY_ROCKHERON: 'baby_rockheron',
   BABY_MADMARINER: 'baby_madmariner',
   BABY_TURTE: 'baby_turte',
-  BABY_SEAL: 'baby_seal',
+  BABY_SNAPPER: 'baby_snapper',
 
   // World 2 (Island 2 / Beach World) - Shipwreck Egg
   BABY_CORALCLAD: 'baby_coralclad',
@@ -74,8 +74,8 @@ export const PET_IDS = {
 
   // World 3 (Island 3 / Volcanic World) - Sand Egg
   BABY_MEERKAT: 'baby_meerkat',
-  BABY_CAMEL: 'baby_camel',
-  BABY_RATTLESNAKE: 'baby_rattlesnake',
+  BABY_SANDDOG: 'baby_sanddog',
+  BABY_DESERTFISH: 'baby_desertfish',
   BABY_SCORPIAN: 'baby_scorpian',
   BABY_SPHINX_CAT: 'baby_sphinx_cat',
   BABY_DESERT_KING: 'baby_desert_king',
@@ -84,15 +84,15 @@ export const PET_IDS = {
   BABY_SNOWDOGGY: 'baby_snowdoggy',
   BABY_POLARBEAR: 'baby_polarbear',
   BABY_PENGUIN: 'baby_penguin',
-  BABY_WALRUS: 'baby_walrus',
+  BABY_SNOWHARE: 'baby_snowhare',
   BABY_BREEZY_FOX: 'baby_breezy_fox',
-  BABY_FROST_DRAGON: 'baby_frost_dragon',
+  BABY_FROST_SPIDER: 'baby_frost_spider',
 
   // World 3 (Island 3 / Volcanic World) - Lava Egg
   BABY_SLICED_MAGMA: 'baby_sliced_magma',
   BABY_LAVA_DEER: 'baby_lava_deer',
   BABY_FLAME_HORSE: 'baby_flame_horse',
-  BABY_FIERY_MONKEY: 'baby_fiery_monkey',
+  BABY_FIERY_ZOMBIE: 'baby_fiery_zombie',
   BABY_PHOENIX: 'baby_phoenix',
   BABY_SCORCHING_MAGMA: 'baby_scorching_magma',
 } as const satisfies Record<string, PetId>;
@@ -132,7 +132,7 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: PET_IDS.BABY_ROCKHERON, name: 'Baby Rockheron', eggType: EggType.BOARDWALK, rarity: PetRarity.RARE, multiplier: 1000 },
   { id: PET_IDS.BABY_MADMARINER, name: 'Baby MadMariner', eggType: EggType.BOARDWALK, rarity: PetRarity.EPIC, multiplier: 3000 },
   { id: PET_IDS.BABY_TURTE, name: 'Baby Turte', eggType: EggType.BOARDWALK, rarity: PetRarity.EPIC, multiplier: 10000 },
-  { id: PET_IDS.BABY_SEAL, name: 'Baby Seal', eggType: EggType.BOARDWALK, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
+  { id: PET_IDS.BABY_SNAPPER, name: 'Baby Snapper', eggType: EggType.BOARDWALK, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
 
   // World 2 (Island 2 / Beach World) - Shipwreck Egg
   { id: PET_IDS.BABY_CORALCLAD, name: 'Baby Coralclad', eggType: EggType.SHIPWRECK, rarity: PetRarity.COMMON, multiplier: 100 },
@@ -144,8 +144,8 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
 
   // World 3 (Island 3 / Volcanic World) - Sand Egg
   { id: PET_IDS.BABY_MEERKAT, name: 'Baby Meerkat', eggType: EggType.SAND, rarity: PetRarity.COMMON, multiplier: 400 },
-  { id: PET_IDS.BABY_CAMEL, name: 'Baby Camel', eggType: EggType.SAND, rarity: PetRarity.COMMON, multiplier: 500 },
-  { id: PET_IDS.BABY_RATTLESNAKE, name: 'Baby Rattlesnake', eggType: EggType.SAND, rarity: PetRarity.RARE, multiplier: 900 },
+  { id: PET_IDS.BABY_SANDDOG, name: 'Baby Sanddog', eggType: EggType.SAND, rarity: PetRarity.COMMON, multiplier: 500 },
+  { id: PET_IDS.BABY_DESERTFISH, name: 'Baby Desertfish', eggType: EggType.SAND, rarity: PetRarity.RARE, multiplier: 900 },
   { id: PET_IDS.BABY_SCORPIAN, name: 'Baby Scorpian', eggType: EggType.SAND, rarity: PetRarity.EPIC, multiplier: 1500 },
   { id: PET_IDS.BABY_SPHINX_CAT, name: 'Baby Sphinx Cat', eggType: EggType.SAND, rarity: PetRarity.EPIC, multiplier: 2500 },
   { id: PET_IDS.BABY_DESERT_KING, name: 'Baby Desert King', eggType: EggType.SAND, rarity: PetRarity.LEGENDARY, multiplier: 5000 },
@@ -154,15 +154,15 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: PET_IDS.BABY_SNOWDOGGY, name: 'Baby Snowdoggy', eggType: EggType.SNOW, rarity: PetRarity.COMMON, multiplier: 800 },
   { id: PET_IDS.BABY_POLARBEAR, name: 'Baby Polarbear', eggType: EggType.SNOW, rarity: PetRarity.COMMON, multiplier: 1300 },
   { id: PET_IDS.BABY_PENGUIN, name: 'Baby Penguin', eggType: EggType.SNOW, rarity: PetRarity.RARE, multiplier: 2000 },
-  { id: PET_IDS.BABY_WALRUS, name: 'Baby Walrus', eggType: EggType.SNOW, rarity: PetRarity.EPIC, multiplier: 3000 },
+  { id: PET_IDS.BABY_SNOWHARE, name: 'Baby Snowhare', eggType: EggType.SNOW, rarity: PetRarity.EPIC, multiplier: 3000 },
   { id: PET_IDS.BABY_BREEZY_FOX, name: 'Baby Breezy Fox', eggType: EggType.SNOW, rarity: PetRarity.EPIC, multiplier: 5000 },
-  { id: PET_IDS.BABY_FROST_DRAGON, name: 'Baby Frost Dragon', eggType: EggType.SNOW, rarity: PetRarity.LEGENDARY, multiplier: 8500 },
+  { id: PET_IDS.BABY_FROST_SPIDER, name: 'Baby Frost Spider', eggType: EggType.SNOW, rarity: PetRarity.LEGENDARY, multiplier: 8500 },
 
   // World 3 (Island 3 / Volcanic World) - Lava Egg
   { id: PET_IDS.BABY_SLICED_MAGMA, name: 'Baby Sliced Magma', eggType: EggType.LAVA, rarity: PetRarity.COMMON, multiplier: 1500 },
   { id: PET_IDS.BABY_LAVA_DEER, name: 'Baby Lava Deer', eggType: EggType.LAVA, rarity: PetRarity.COMMON, multiplier: 2500 },
   { id: PET_IDS.BABY_FLAME_HORSE, name: 'Baby Flame Horse', eggType: EggType.LAVA, rarity: PetRarity.RARE, multiplier: 6000 },
-  { id: PET_IDS.BABY_FIERY_MONKEY, name: 'Baby Fiery Monkey', eggType: EggType.LAVA, rarity: PetRarity.EPIC, multiplier: 10000 },
+  { id: PET_IDS.BABY_FIERY_ZOMBIE, name: 'Baby Fiery Zombie', eggType: EggType.LAVA, rarity: PetRarity.EPIC, multiplier: 10000 },
   { id: PET_IDS.BABY_PHOENIX, name: 'Baby Phoenix', eggType: EggType.LAVA, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
   { id: PET_IDS.BABY_SCORCHING_MAGMA, name: 'Baby Scorching Magma', eggType: EggType.LAVA, rarity: PetRarity.LEGENDARY, multiplier: 30000 },
 ];
@@ -223,7 +223,7 @@ export const EGG_LOOT_TABLES: Record<EggType, EggLootEntry[]> = {
     { petId: PET_IDS.BABY_ROCKHERON, weight: 4.0 }, // 4.000%
     { petId: PET_IDS.BABY_MADMARINER, weight: 0.5 }, // 0.500%
     { petId: PET_IDS.BABY_TURTE, weight: 0.05 }, // 0.050%
-    { petId: PET_IDS.BABY_SEAL, weight: 0.001 }, // 0.001%
+    { petId: PET_IDS.BABY_SNAPPER, weight: 0.001 }, // 0.001%
   ],
   [EggType.SHIPWRECK]: [
     { petId: PET_IDS.BABY_CORALCLAD, weight: 64.269 }, // 64.269%
@@ -237,8 +237,8 @@ export const EGG_LOOT_TABLES: Record<EggType, EggLootEntry[]> = {
   // World 3 (Island 3 / Volcanic World) Eggs
   [EggType.SAND]: [
     { petId: PET_IDS.BABY_MEERKAT, weight: 40.0 }, // 40%
-    { petId: PET_IDS.BABY_CAMEL, weight: 32.0 }, // 32%
-    { petId: PET_IDS.BABY_RATTLESNAKE, weight: 15.0 }, // 15%
+    { petId: PET_IDS.BABY_SANDDOG, weight: 32.0 }, // 32%
+    { petId: PET_IDS.BABY_DESERTFISH, weight: 15.0 }, // 15%
     { petId: PET_IDS.BABY_SCORPIAN, weight: 8.0 }, // 8%
     { petId: PET_IDS.BABY_SPHINX_CAT, weight: 4.0 }, // 4%
     { petId: PET_IDS.BABY_DESERT_KING, weight: 1.0 }, // 1%
@@ -247,15 +247,15 @@ export const EGG_LOOT_TABLES: Record<EggType, EggLootEntry[]> = {
     { petId: PET_IDS.BABY_SNOWDOGGY, weight: 50.0 }, // 50%
     { petId: PET_IDS.BABY_POLARBEAR, weight: 24.0 }, // 24%
     { petId: PET_IDS.BABY_PENGUIN, weight: 15.0 }, // 15%
-    { petId: PET_IDS.BABY_WALRUS, weight: 7.5 }, // 7.50%
+    { petId: PET_IDS.BABY_SNOWHARE, weight: 7.5 }, // 7.50%
     { petId: PET_IDS.BABY_BREEZY_FOX, weight: 3.0 }, // 3%
-    { petId: PET_IDS.BABY_FROST_DRAGON, weight: 0.5 }, // 0.50%
+    { petId: PET_IDS.BABY_FROST_SPIDER, weight: 0.5 }, // 0.50%
   ],
   [EggType.LAVA]: [
     { petId: PET_IDS.BABY_SLICED_MAGMA, weight: 50.0 }, // 50%
     { petId: PET_IDS.BABY_LAVA_DEER, weight: 39.0 }, // 39%
     { petId: PET_IDS.BABY_FLAME_HORSE, weight: 7.67 }, // 7.67%
-    { petId: PET_IDS.BABY_FIERY_MONKEY, weight: 3.0 }, // 3%
+    { petId: PET_IDS.BABY_FIERY_ZOMBIE, weight: 3.0 }, // 3%
     { petId: PET_IDS.BABY_PHOENIX, weight: 0.3 }, // 0.30%
     { petId: PET_IDS.BABY_SCORCHING_MAGMA, weight: 0.03 }, // 0.03%
   ],
