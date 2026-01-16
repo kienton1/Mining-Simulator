@@ -8,7 +8,7 @@
  * Reference: Planning/GemsSystemPlan.md section 2.1
  */
 
-import { World, Player, Entity, RigidBodyType } from 'hytopia';
+import { World, Player, Entity, RigidBodyType, Collider, CollisionGroup } from 'hytopia';
 
 /**
  * Gem Trader Entity Manager
@@ -56,22 +56,31 @@ export class GemTraderEntity {
       return;
     }
 
+    const colliderOptions = Collider.optionsFromModelUri(this.npcModelUri);
+
     // Create NPC entity - make it immovable
     this.npcEntity = new Entity({
       name: 'Gem Trader',
       modelUri: this.npcModelUri,
       modelLoopedAnimations: ['idle'],
-      modelScale: 1.0,
+      modelScale: 3.0, // Increased scale for mailbox
       // Make entity immovable by using STATIC rigid body type
       rigidBodyOptions: {
-        type: RigidBodyType.STATIC,
-        enabledRotations: { x: false, y: true, z: false }, // Only allow Y rotation (yaw)
+        type: RigidBodyType.FIXED,
+        colliders: colliderOptions ? [{
+          ...colliderOptions,
+          collisionGroups: {
+            belongsTo: [CollisionGroup.GROUP_1],
+            collidesWith: [CollisionGroup.ALL],
+          },
+        }] : undefined,
       },
       tag: 'gem-trader',
     });
 
-    // Spawn at specified position
-    this.npcEntity.spawn(this.world, this.npcPosition);
+    // Spawn at specified position with 90 degree rotation on Y axis (for mailbox)
+    const rotation = { x: 0, y: 0.707, z: 0, w: 0.707 }; // 90 degrees on Y axis
+    this.npcEntity.spawn(this.world, this.npcPosition, rotation);
     // Start proximity checking
     this.startProximityChecking();
   }

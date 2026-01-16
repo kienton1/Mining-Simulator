@@ -7,7 +7,7 @@
  * Position: x: 5.08, y: 1.79, z: 14.35
  */
 
-import { World, Player, Entity, RigidBodyType } from 'hytopia';
+import { World, Player, Entity, RigidBodyType, Collider, CollisionGroup, ModelRegistry } from 'hytopia';
 
 /**
  * Mine Reset Upgrade NPC Manager
@@ -55,22 +55,42 @@ export class MineResetUpgradeNPC {
       return;
     }
 
+    const colliderOptions = Collider.optionsFromModelUri(this.npcModelUri);
+
     // Create NPC entity - make it immovable
+    const modelScale = 3.0;
     this.npcEntity = new Entity({
       name: 'Mine Reset Upgrade Vendor',
       modelUri: this.npcModelUri,
       modelLoopedAnimations: ['idle'],
-      modelScale: 1.0,
+      modelScale, // Increased scale for clock
       // Make entity immovable by using STATIC rigid body type
       rigidBodyOptions: {
-        type: RigidBodyType.STATIC,
-        enabledRotations: { x: false, y: true, z: false }, // Only allow Y rotation (yaw)
+        type: RigidBodyType.FIXED,
+        colliders: colliderOptions ? [{
+          ...colliderOptions,
+          collisionGroups: {
+            belongsTo: [CollisionGroup.GROUP_1],
+            collidesWith: [CollisionGroup.ALL],
+          },
+        }] : undefined,
       },
       tag: 'mine-reset-upgrade-npc',
     });
 
-    // Spawn at specified position
-    this.npcEntity.spawn(this.world, this.npcPosition);
+    // Spawn at specified position (lift by bounding box min to sit on ground)
+    let spawnPosition = this.npcPosition;
+    try {
+      const bounds = ModelRegistry.instance.getBoundingBox(this.npcModelUri);
+      if (bounds?.min) {
+        const yOffset = -bounds.min.y * modelScale;
+        spawnPosition = { ...spawnPosition, y: spawnPosition.y + yOffset };
+      }
+    } catch {
+      // If model bounds are unavailable, use the provided position as-is.
+    }
+
+    this.npcEntity.spawn(this.world, spawnPosition);
     // Start proximity checking
     this.startProximityChecking();
   }

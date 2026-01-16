@@ -115,35 +115,35 @@ startServer(world => {
   gameManager.buildSharedMineShaftForIsland3();
 
   /**
-   * Spawn Merchant Entity
+   * Spawn Merchant Entity (Ore Seller)
    * Merchant is located at the specified position and allows players to sell ores
    */
   const merchantEntity = new MerchantEntity(
     world,
-    { x: -12.82, y: 1.79, z: 11.28 },
-    'models/npcs/villager.gltf' // Can be changed to any model
+    { x: -8.56, y: 1.75, z: 14.15 },
+    'models/BuyStations/skeleton-miner.gltf'
   );
   merchantEntity.spawn();
 
   /**
-   * Spawn Mine Reset Upgrade NPC
+   * Spawn Mine Reset Upgrade NPC (Timer Increase)
    * NPC is located at the specified position and allows players to purchase the 5-minute upgrade
    */
   const mineResetUpgradeNPC = new MineResetUpgradeNPC(
     world,
-    { x: 5.08, y: 1.79, z: 14.35 },
-    'models/npcs/villager.gltf'
+    { x: 5.08, y: 1.75, z: 14.35 },
+    'models/BuyStations/clock.gltf'
   );
   mineResetUpgradeNPC.spawn();
 
   /**
-   * Spawn Gem Trader Entity
+   * Spawn Gem Trader Entity (Upgrade Station)
    * NPC is located at the specified position and allows players to purchase gem upgrades
    */
   const gemTraderEntity = new GemTraderEntity(
     world,
-    { x: 14.83, y: 1.75, z: 9.29 },
-    'models/npcs/villager.gltf'
+    { x: 14.83, y: 2.25, z: 9.29 },
+    'models/BuyStations/mailbox.gltf'
   );
   gemTraderEntity.spawn();
 
@@ -230,7 +230,7 @@ startServer(world => {
   ];
 
   // Egg UI should only pop when you're right up on the barrel (~1 block).
-  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 1.1);
+    const eggStationManager = new EggStationManager(world, gameManager, eggStations, 1.6);
   eggStationManager.start();
 
   // Floating name + cost labels (SceneUI), anchored like training rocks.
@@ -470,13 +470,13 @@ startServer(world => {
     // They still collide with blocks, entities, and everything else
     playerEntity.setCollisionGroupsForSolidColliders({
       belongsTo: [CollisionGroup.PLAYER],
-      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER],
+      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER & ~CollisionGroup.GROUP_1],
     });
     
     // Also update sensor colliders (if any) to prevent sensor collisions between players
     playerEntity.setCollisionGroupsForSensorColliders({
       belongsTo: [CollisionGroup.PLAYER],
-      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER],
+      collidesWith: [CollisionGroup.ALL & ~CollisionGroup.PLAYER & ~CollisionGroup.GROUP_1],
     });
 
     // Set and lock camera zoom (zoom out a bit and prevent player from changing it)

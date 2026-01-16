@@ -7,7 +7,7 @@
  * Reference: Planning/inventoryAndSellingSystem.md
  */
 
-import { World, Player, Entity, RigidBodyType, PlayerEvent } from 'hytopia';
+import { World, Player, Entity, RigidBodyType, Collider, CollisionGroup } from 'hytopia';
 
 /**
  * Merchant Entity Manager
@@ -57,6 +57,8 @@ export class MerchantEntity {
       return;
     }
 
+    const colliderOptions = Collider.optionsFromModelUri(this.merchantModelUri);
+
     // Create merchant entity - make it immovable
     this.merchantEntity = new Entity({
       name: 'Merchant',
@@ -65,8 +67,14 @@ export class MerchantEntity {
       modelScale: 1.0,
       // Make entity immovable by using STATIC rigid body type
       rigidBodyOptions: {
-        type: RigidBodyType.STATIC, // STATIC = cannot move
-        enabledRotations: { x: false, y: true, z: false }, // Only allow Y rotation (yaw)
+        type: RigidBodyType.FIXED, // FIXED = cannot move
+        colliders: colliderOptions ? [{
+          ...colliderOptions,
+          collisionGroups: {
+            belongsTo: [CollisionGroup.GROUP_1],
+            collidesWith: [CollisionGroup.ALL],
+          },
+        }] : undefined,
       },
       tag: 'merchant',
     });

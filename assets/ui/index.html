@@ -2022,21 +2022,30 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       const minerActionButton = document.getElementById('miner-action-button');
       if (!minerDetailName || !minerDetailStats || !minerActionButton || !minerDetailIcon) return;
 
-      if (!miner) {
-        // No miner equipped
-        minerDetailIcon.textContent = '⛑️';
-        minerDetailName.textContent = 'No Miner';
-        minerDetailStats.innerHTML = '';
-        if (minerActionButton) {
-          minerActionButton.textContent = 'No Miner';
-          minerActionButton.classList.add('disabled');
-          minerActionButton.disabled = true;
+        if (!miner) {
+          // No miner equipped
+          minerDetailIcon.textContent = '⛑️';
+          minerDetailName.textContent = 'No Miner';
+          minerDetailStats.innerHTML = '';
+          if (minerActionButton) {
+            minerActionButton.textContent = 'No Miner';
+            minerActionButton.classList.add('disabled');
+            minerActionButton.disabled = true;
+          }
+          return;
         }
-        return;
-      }
 
-      minerDetailIcon.textContent = '⛑️';
-      minerDetailName.textContent = miner.name;
+        minerDetailIcon.innerHTML = '';
+        if (miner.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${miner.imageUri}`;
+          img.alt = `${miner.name} miner`;
+          img.className = 'pickaxe-details__icon-img';
+          minerDetailIcon.appendChild(img);
+        } else {
+          minerDetailIcon.textContent = '⛑️';
+        }
+        minerDetailName.textContent = miner.name;
       
       // Clear and rebuild stats with proper styling classes
       minerDetailStats.innerHTML = '';
@@ -2134,10 +2143,18 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
           card.classList.add('locked'); // Greyed out with lock
         }
 
-        const iconEl = document.createElement('div');
-        iconEl.className = 'pickaxe-card__icon';
-        iconEl.textContent = '⛑️';
-        card.appendChild(iconEl);
+          const iconEl = document.createElement('div');
+          iconEl.className = 'pickaxe-card__icon';
+          if (m.imageUri) {
+            const img = document.createElement('img');
+            img.src = `{{CDN_ASSETS_URL}}/${m.imageUri}`;
+            img.alt = `${m.name} miner`;
+            img.className = 'pickaxe-card__icon-img';
+            iconEl.appendChild(img);
+          } else {
+            iconEl.textContent = '⛑️';
+          }
+          card.appendChild(iconEl);
 
         const nameEl = document.createElement('div');
         nameEl.className = 'pickaxe-card__name';

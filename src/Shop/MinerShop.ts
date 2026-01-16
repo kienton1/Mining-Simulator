@@ -235,6 +235,7 @@ export class MinerShop {
       oreLuckBonus: number;
       damageBonus: number;
       rarity: string;
+      imageUri?: string;
       availability: 'owned' | 'equipped' | 'available' | 'locked';
       purchasable: boolean;
     }>;
@@ -281,6 +282,7 @@ export class MinerShop {
         oreLuckBonus: miner.oreLuckBonus,
         damageBonus: miner.damageBonus,
         rarity: miner.rarity,
+        imageUri: `ui/miners/tier-${miner.tier}.png`,
         availability,
         purchasable,
       };
