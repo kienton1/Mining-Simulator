@@ -348,6 +348,37 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       return root;
     });
 
+    hytopia.registerSceneUITemplate('shop:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-shop-prompt visible';
+
+      const title = document.createElement('div');
+      title.className = 'scene-shop-prompt__title';
+      title.textContent = 'Shop';
+      root.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-shop-prompt__subtitle';
+      subtitle.textContent = 'Interact to open';
+      root.appendChild(subtitle);
+
+      onState(state => {
+        const data = state || {};
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) subtitle.textContent = data.subtitle;
+
+        if (data.kind) {
+          root.classList.remove('scene-shop-prompt--ore', 'scene-shop-prompt--timer', 'scene-shop-prompt--upgrades');
+          root.classList.add(`scene-shop-prompt--${data.kind}`);
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
   })();
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -520,18 +551,31 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
       e.preventDefault();
     });
 
-    // Prevent mouse wheel from zooming the camera
+    // Prevent mouse wheel from zooming the camera, but allow wheel in scrollable UI.
+    const getScrollableAncestor = (el) => {
+      let node = el;
+      while (node && node !== document.body) {
+        if (node instanceof HTMLElement) {
+          const style = window.getComputedStyle(node);
+          const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll');
+          const canScrollX = (style.overflowX === 'auto' || style.overflowX === 'scroll');
+          const hasScrollY = node.scrollHeight > node.clientHeight;
+          const hasScrollX = node.scrollWidth > node.clientWidth;
+          if ((canScrollY && hasScrollY) || (canScrollX && hasScrollX)) {
+            return node;
+          }
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
     window.addEventListener('wheel', e => {
-      // Only prevent zoom if not over a scrollable UI element
       const target = e.target;
-      const isScrollable = target && (
-        target.closest('.merchant-ui__content') ||
-        target.closest('[style*="overflow"]') ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'INPUT'
-      );
-      
-      if (!isScrollable) {
+      const scrollable = target instanceof HTMLElement ? getScrollableAncestor(target) : null;
+      const isFormElement = target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
+
+      if (!scrollable && !isFormElement) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -3474,7 +3518,10 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   <!-- Merchant Selling UI -->
   <div id="merchant-ui" class="merchant-ui">
     <div class="merchant-ui__header">
-      <div class="merchant-ui__title">Ores</div>
+      <div class="merchant-ui__title-group">
+        <div class="merchant-ui__title">Ores</div>
+        <div class="merchant-ui__subtitle">Ore Shop</div>
+      </div>
       <button id="merchant-ui-close" class="merchant-ui__close">×</button>
     </div>
     <div id="merchant-ui-content" class="merchant-ui__content">
@@ -3488,7 +3535,10 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   <!-- Mine Reset Upgrade UI -->
   <div id="mine-reset-upgrade-ui" class="mine-reset-upgrade-ui">
     <div class="mine-reset-upgrade-ui__header">
-      <div class="mine-reset-upgrade-ui__title">Mine Reset Upgrade</div>
+      <div class="mine-reset-upgrade-ui__title-group">
+        <div class="mine-reset-upgrade-ui__title">Mine Reset Upgrade</div>
+        <div class="mine-reset-upgrade-ui__subtitle">Timer Shop</div>
+      </div>
       <button id="mine-reset-upgrade-ui-close" class="mine-reset-upgrade-ui__close">×</button>
     </div>
     <div class="mine-reset-upgrade-ui__body">
@@ -3510,7 +3560,10 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
   <div id="gem-trader-ui" class="gem-trader-ui">
     <div class="gem-trader-ui__header">
       <button class="gem-trader-ui__help-button">?</button>
-      <div class="gem-trader-ui__title">Upgrades</div>
+      <div class="gem-trader-ui__title-group">
+        <div class="gem-trader-ui__title">Upgrades</div>
+        <div class="gem-trader-ui__subtitle">Upgrades Shop</div>
+      </div>
       <button id="gem-trader-ui-close" class="gem-trader-ui__close">×</button>
     </div>
     <div id="gem-trader-ui-content" class="gem-trader-ui__content">
@@ -5879,27 +5932,41 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     display: flex;
   }
 
-  .merchant-ui__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 2px solid #4a90e2;
-  }
+.merchant-ui__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #4a90e2;
+}
 
-  .merchant-ui__title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
+.merchant-ui__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-  .merchant-ui__close {
-    width: 32px;
-    height: 32px;
-    background: rgba(244, 67, 54, 0.8);
-    border: 2px solid #f44336;
+.merchant-ui__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.merchant-ui__subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9aa3b2;
+}
+
+.merchant-ui__close {
+  width: 32px;
+  height: 32px;
+  background: rgba(244, 67, 54, 0.8);
+  border: 2px solid #f44336;
     border-radius: 6px;
     color: #fff;
     font-size: 20px;
@@ -5929,10 +5996,11 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     justify-content: space-between;
     padding: 12px 15px;
     margin: 8px 0;
-    background: rgba(30, 40, 80, 0.8);
-    border: 2px solid #4a90e2;
-    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(20, 58, 86, 0.98), rgba(16, 45, 68, 0.98));
+    border: 2px solid #1f5f8e;
+    border-radius: 10px;
     min-height: 60px;
+    box-shadow: 0 4px 12px rgba(8, 20, 32, 0.5);
   }
 
   .merchant-ui__ore-info {
@@ -5944,8 +6012,15 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
 
   .merchant-ui__ore-name {
     font-size: 18px;
-    font-weight: 600;
-    color: #fff;
+    font-weight: 800;
+    color: #f8fafc;
+    text-shadow:
+      -1px -1px 0 rgba(0, 0, 0, 0.6),
+      1px -1px 0 rgba(0, 0, 0, 0.6),
+      -1px 1px 0 rgba(0, 0, 0, 0.6),
+      1px 1px 0 rgba(0, 0, 0, 0.6),
+      0 0 10px rgba(0, 0, 0, 0.6);
+    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.55);
   }
 
   .merchant-ui__ore-name.stone { color: #9e9e9e; }
@@ -6079,27 +6154,41 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     display: flex;
   }
 
-  .mine-reset-upgrade-ui__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 2px solid #4caf50;
-  }
+.mine-reset-upgrade-ui__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #4caf50;
+}
 
-  .mine-reset-upgrade-ui__title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
+.mine-reset-upgrade-ui__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-  .mine-reset-upgrade-ui__close {
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: rgba(244, 67, 54, 0.8);
+.mine-reset-upgrade-ui__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mine-reset-upgrade-ui__subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9aa3b2;
+}
+
+.mine-reset-upgrade-ui__close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(244, 67, 54, 0.8);
     color: #fff;
     font-size: 24px;
     font-weight: 700;
@@ -6239,19 +6328,26 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     display: flex;
   }
 
-  .gem-trader-ui__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 2px solid #4caf50;
-  }
+.gem-trader-ui__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #4caf50;
+}
 
-  .gem-trader-ui__help-button {
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: rgba(76, 175, 80, 0.8);
+.gem-trader-ui__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.gem-trader-ui__help-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(76, 175, 80, 0.8);
     color: #fff;
     font-size: 20px;
     font-weight: 700;
@@ -6268,17 +6364,25 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     transform: scale(1.05);
   }
 
-  .gem-trader-ui__title {
-    font-size: 28px;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.5),
-      1px -1px 0 rgba(0, 0, 0, 0.5),
-      -1px 1px 0 rgba(0, 0, 0, 0.5),
-      1px 1px 0 rgba(0, 0, 0, 0.5);
-  }
+.gem-trader-ui__title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.5),
+    1px -1px 0 rgba(0, 0, 0, 0.5),
+    -1px 1px 0 rgba(0, 0, 0, 0.5),
+    1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.gem-trader-ui__subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9aa3b2;
+}
 
   .gem-trader-ui__close {
     width: 32px;
@@ -6457,4 +6561,514 @@ This UI renders the mini power HUD, floating gain popups, and an interact prompt
     background: rgba(76, 175, 80, 0.8);
   }
 
+</style>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Russo+One&family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@400;500;600;700;800&display=swap");
+
+:root {
+  --od-bg: #0d0f1a;
+  --od-card: #141a2a;
+  --od-card-elevated: #1b2236;
+  --od-border: #2a3350;
+  --od-primary: #f4c44e;
+  --od-primary-strong: #f7d35c;
+  --od-secondary: #37d6e8;
+  --od-secondary-strong: #4be7f5;
+  --od-accent: #2bd67f;
+  --od-epic: #a855f7;
+  --od-legendary-start: #f7d35c;
+  --od-legendary-end: #f59e0b;
+  --od-danger: #ef4444;
+  --od-warning: #f59e0b;
+  --od-success: #22c55e;
+  --od-muted: #9aa3b2;
+  --od-text: #f8f3e6;
+  --od-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --od-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --od-inset: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.ui-root {
+  color: var(--od-text);
+  font-family: "Exo 2", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+.ui-root button,
+.ui-root .stat-hud__value,
+.ui-root .pickaxe-details__name,
+.ui-root .pickaxe-details__stats,
+.ui-root .pickaxe-details__action-button,
+.ui-root .rebirth-button,
+.ui-root .mine-reset-upgrade-ui__button,
+.ui-root .merchant-ui__sell-all-button,
+.ui-root .auto-control-button,
+.ui-root .mining-control-button {
+  font-family: "Orbitron", sans-serif;
+}
+
+.ui-root .merchant-ui__title,
+.ui-root .mine-reset-upgrade-ui__title,
+.ui-root .gem-trader-ui__title,
+.ui-root .pickaxe-modal__title,
+.ui-root .rebirth-modal__title,
+.ui-root .maps-modal__title,
+.ui-root .pets-modal .pickaxe-modal__title {
+  font-family: "Russo One", sans-serif;
+  letter-spacing: 1px;
+}
+
+/* Global interactive polish */
+.ui-root button {
+  box-shadow: var(--od-shadow-soft);
+  border-color: var(--od-border);
+}
+
+.ui-root button:hover {
+  filter: brightness(1.05);
+}
+
+.ui-root button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Stat HUD */
+.stat-hud {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.stat-hud__value {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 12px rgba(244, 196, 78, 0.3);
+}
+
+.stat-hud__icon {
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.5));
+}
+
+.stat-hud--money .stat-hud__value,
+.stat-hud--wins .stat-hud__value {
+  color: var(--od-primary);
+}
+
+.stat-hud--gems .stat-hud__value {
+  color: var(--od-epic);
+}
+
+.stat-hud--power .stat-hud__value {
+  color: var(--od-secondary);
+}
+
+.stat-hud--rebirths .stat-hud__value {
+  color: var(--od-accent);
+}
+
+/* Action cards */
+.action-card {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(13, 17, 30, 0.98));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.action-card--miner {
+  border-color: rgba(55, 214, 232, 0.5);
+}
+
+.action-card--pickaxe {
+  border-color: rgba(244, 196, 78, 0.6);
+}
+
+.action-card--rebirth {
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.action-card--pets {
+  border-color: rgba(43, 214, 127, 0.6);
+}
+
+.action-card--maps {
+  border-color: rgba(88, 118, 255, 0.6);
+}
+
+.action-card__badge {
+  background: radial-gradient(circle, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  box-shadow: 0 0 10px rgba(244, 196, 78, 0.6);
+}
+
+/* Mining HUD */
+.mining-hud__damage {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.5);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.block-health-bar__name {
+  font-family: "Russo One", sans-serif;
+  color: var(--od-text);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+.block-health-bar__outline {
+  background: rgba(10, 14, 24, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.block-health-bar__fill {
+  background: linear-gradient(90deg, var(--od-success), #6ee7b7);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.block-health-bar__text {
+  font-family: "Orbitron", sans-serif;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.mining-depth-counter__text {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.5);
+}
+
+.progress-bar__outline {
+  border: 2px solid var(--od-border);
+  background: rgba(11, 15, 26, 0.95);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.progress-bar__fill {
+  background: linear-gradient(90deg, var(--od-secondary), var(--od-accent), var(--od-primary));
+  box-shadow: 0 0 12px rgba(55, 214, 232, 0.5);
+}
+
+.progress-bar__marker {
+  background: radial-gradient(circle, #ffffff 0%, var(--od-primary) 45%, var(--od-legendary-end) 100%);
+  border: 2px solid var(--od-border);
+}
+
+.progress-bar__marker-label {
+  font-family: "Orbitron", sans-serif;
+}
+
+/* Controls */
+.mining-control-button {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.6);
+  text-shadow: 0 0 8px rgba(55, 214, 232, 0.4);
+}
+
+.mining-control-button--surface {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+  border-color: rgba(43, 214, 127, 0.8);
+}
+
+.auto-control-button {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(244, 196, 78, 0.5);
+}
+
+.auto-control-button.inactive {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+  border-color: rgba(43, 214, 127, 0.8);
+}
+
+.auto-control-button.active {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+  border-color: rgba(239, 68, 68, 0.9);
+}
+
+/* Modals */
+.modal {
+  background: rgba(6, 8, 16, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+.pickaxe-modal__container,
+.rebirth-modal__container,
+.pets-modal .pickaxe-modal__container,
+.maps-modal .pickaxe-modal__container {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.96));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.pickaxe-modal__header,
+.rebirth-modal__header,
+.maps-modal .pickaxe-modal__header {
+  border-bottom: 2px solid var(--od-border);
+}
+
+.pickaxe-modal__close,
+.rebirth-modal__close,
+.maps-modal__close,
+.merchant-ui__close,
+.mine-reset-upgrade-ui__close,
+.gem-trader-ui__close,
+.pet-detail__close {
+  background: rgba(239, 68, 68, 0.85);
+  border: 2px solid rgba(239, 68, 68, 0.9);
+}
+
+.pickaxe-details__icon,
+.pickaxe-details__badge {
+  background: rgba(15, 20, 32, 0.85);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pickaxe-details__action-button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  border: none;
+  color: #1a1202;
+  text-transform: uppercase;
+}
+
+.pickaxe-details__action-button.disabled {
+  background: rgba(120, 120, 120, 0.4);
+  color: #e5e7eb;
+}
+
+.pickaxe-grid {
+  gap: 18px;
+}
+
+.pickaxe-card {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(12, 16, 28, 0.98));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pickaxe-card__cost {
+  color: var(--od-primary);
+}
+
+.pickaxe-card__checkmark {
+  background: var(--od-accent);
+  border: 2px solid rgba(43, 214, 127, 0.9);
+}
+
+.pickaxe-card.equipped {
+  border-color: rgba(43, 214, 127, 0.9);
+  box-shadow: 0 0 16px rgba(43, 214, 127, 0.6);
+}
+
+.pickaxe-card.selected {
+  border-color: rgba(244, 196, 78, 0.9);
+  box-shadow: 0 0 16px rgba(244, 196, 78, 0.6);
+}
+
+/* Rebirth */
+.rebirth-option {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.rebirth-button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  border: none;
+}
+
+.rebirth-button--max {
+  background: linear-gradient(180deg, var(--od-epic), #6d28d9);
+}
+
+.rebirth-button.disabled {
+  background: rgba(120, 120, 120, 0.4);
+  color: #e5e7eb;
+}
+
+/* Pets */
+.pets-pill,
+.pets-mult {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.pet-detail {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pet-detail__card,
+.pet-tile {
+  box-shadow: var(--od-inset);
+}
+
+.pet-detail__action--equip {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.pet-detail__action--unequip {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+.pets-delete-bar {
+  background: rgba(18, 24, 38, 0.98);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.pets-delete-bar__btn--green {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.pets-delete-bar__btn--red {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+/* Egg modal */
+.egg-results__title,
+.egg-result-item__name,
+.egg-result-item__mult {
+  font-family: "Orbitron", sans-serif;
+}
+
+/* Merchant */
+.merchant-ui,
+.mine-reset-upgrade-ui,
+.gem-trader-ui {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.96));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.merchant-ui__header,
+.mine-reset-upgrade-ui__header,
+.gem-trader-ui__header {
+  border-bottom: 2px solid var(--od-border);
+}
+
+.merchant-ui__ore-item,
+.gem-trader-ui__upgrade-item {
+  background: linear-gradient(180deg, rgba(20, 58, 86, 0.98), rgba(16, 45, 68, 0.98));
+  border: 2px solid rgba(31, 95, 142, 0.8);
+}
+
+.merchant-ui__sell-button,
+.merchant-ui__sell-all-button,
+.mine-reset-upgrade-ui__button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  border: none;
+}
+
+.gem-trader-ui__upgrade-button.can-afford {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.gem-trader-ui__upgrade-button.cannot-afford {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+.gem-trader-ui__effect,
+.gem-trader-ui__level-progress,
+.gem-trader-ui__cost {
+  color: var(--od-accent);
+}
+
+/* Scene UI prompts */
+.scene-training-prompt,
+.scene-egg-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Orbitron", sans-serif;
+}
+
+.scene-training-prompt__requirement,
+.scene-training-prompt__rebirth,
+.scene-training-prompt__power-gain,
+.scene-egg-prompt__title,
+.scene-egg-prompt__cost {
+  color: var(--od-primary);
+}
+
+.scene-training-prompt__or {
+  color: var(--od-muted);
+}
+
+/* Scene UI: Shop labels */
+.scene-shop-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Orbitron", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  color: var(--od-text);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: opacity 0.2s ease;
+}
+
+.scene-shop-prompt:not(.visible) {
+  opacity: 0;
+}
+
+.scene-shop-prompt__title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--od-primary);
+}
+
+.scene-shop-prompt__subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--od-muted);
+}
+
+.scene-shop-prompt--ore {
+  border-color: rgba(244, 196, 78, 0.7);
+}
+
+.scene-shop-prompt--timer {
+  border-color: rgba(43, 214, 127, 0.7);
+}
+
+.scene-shop-prompt--upgrades {
+  border-color: rgba(168, 85, 247, 0.7);
+}
+
+/* Scrollable panels: enable wheel + touch drag */
+.merchant-ui__content,
+.gem-trader-ui__content,
+.pets-grid,
+.pickaxe-modal__right-panel,
+.rebirth-modal__body,
+.maps-modal .pickaxe-modal__body,
+.egg-results__list,
+.pickaxe-modal__body {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbars */
+.ui-root ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ui-root ::-webkit-scrollbar-track {
+  background: rgba(18, 24, 38, 0.9);
+  border-radius: 4px;
+}
+
+.ui-root ::-webkit-scrollbar-thumb {
+  background: rgba(244, 196, 78, 0.5);
+  border-radius: 4px;
+}
+
+.ui-root ::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 196, 78, 0.8);
+}
 </style>

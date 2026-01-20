@@ -42,6 +42,7 @@ import { MerchantEntity } from './src/Shop/MerchantEntity';
 import { MineResetUpgradeNPC } from './src/Shop/MineResetUpgradeNPC';
 import { GemTraderEntity } from './src/Shop/GemTraderEntity';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
+import { ShopLabelManager } from './src/Shop/ShopLabelManager';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { PetVisualManager } from './src/Pets/PetVisualManager';
@@ -149,6 +150,34 @@ startServer(world => {
     'models/BuyStations/mailbox.gltf'
   );
   gemTraderEntity.spawn();
+
+  // Floating shop labels (SceneUI), anchored like training rocks.
+  // Delay slightly so the client registers the `shop:prompt` template.
+  const shopLabels = [
+    {
+      id: 'shop-ore',
+      position: { x: -8.56, y: 1.75, z: 14.15 },
+      title: 'Ore Shop',
+      subtitle: 'Sell ores for gold',
+      kind: 'ore' as const,
+    },
+    {
+      id: 'shop-timer',
+      position: { x: 5.08, y: 1.75, z: 14.35 },
+      title: 'Timer Shop',
+      subtitle: 'Increase mine timer',
+      kind: 'timer' as const,
+    },
+    {
+      id: 'shop-upgrades',
+      position: { x: 14.83, y: 2.25, z: 9.29 },
+      title: 'Upgrades Shop',
+      subtitle: 'Spend gems for boosts',
+      kind: 'upgrades' as const,
+    },
+  ];
+  const shopLabelManager = new ShopLabelManager(world, shopLabels);
+  setTimeout(() => shopLabelManager.start(), 1000);
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
