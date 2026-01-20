@@ -48,9 +48,9 @@ export const ISLAND1_CONFIG: WorldConfig = {
   // NPC Positions (original positions)
   npcs: {
     merchant: {
-      x: -12.82,
+      x: -8.56,
       y: 1.79,
-      z: 11.28,
+      z: 14.15,
     },
     mineResetUpgradeNpc: {
       x: 5.08,

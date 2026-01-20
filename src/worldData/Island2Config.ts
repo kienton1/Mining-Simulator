@@ -48,19 +48,19 @@ export const ISLAND2_CONFIG: WorldConfig = {
   // NPC Positions (same relative positions, offset by map offset)
   npcs: {
     merchant: {
-      x: 737.18, // -12.82 + 750
+      x: -295.56,
       y: 1.79,
-      z: 761.28, // 11.28 + 750
+      z: 15.15,
     },
     mineResetUpgradeNpc: {
-      x: 755.08, // 5.08 + 750
+      x: -281.92,
       y: 1.79,
-      z: 764.35, // 14.35 + 750
+      z: 15.35,
     },
     gemTrader: {
-      x: 764.83, // 14.83 + 750
+      x: -272.17,
       y: 1.75,
-      z: 759.29, // 9.29 + 750
+      z: 10.29,
     },
   },
 

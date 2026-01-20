@@ -46,19 +46,19 @@ export const ISLAND3_CONFIG: WorldConfig = {
   // NPC Positions (placeholder near spawn)
   npcs: {
     merchant: {
-      x: -585,
-      y: 1,
-      z: 1,
+      x: -595.56,
+      y: 1.79,
+      z: 17.15,
     },
     mineResetUpgradeNpc: {
-      x: -587,
-      y: 1,
-      z: 3,
+      x: -581.92,
+      y: 1.79,
+      z: 17.35,
     },
     gemTrader: {
-      x: -589,
-      y: 1,
-      z: 1,
+      x: -572.17,
+      y: 1.75,
+      z: 12.29,
     },
   },
 

@@ -6,7 +6,7 @@
 
 import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
-import { EGG_DEFINITIONS, rollPetId, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { EGG_DEFINITIONS, getEggLootTable, isPetId, rollPetId, PET_INVENTORY_CAPACITY } from './PetDatabase';
 import { EggType, type PetId } from './PetData';
 import { PetManager } from './PetManager';
 
@@ -38,6 +38,15 @@ export class HatchingSystem {
     this.updatePlayerDataCb?.(player, data);
   }
 
+  private getAutoDeleteSet(data: PlayerData): Set<PetId> {
+    const raw = Array.isArray(data.autoDeletePets) ? data.autoDeletePets : [];
+    const set = new Set<PetId>();
+    for (const id of raw) {
+      if (isPetId(id)) set.add(id);
+    }
+    return set;
+  }
+
   getEggCostGold(eggType: EggType): number {
     return EGG_DEFINITIONS[eggType]?.costGold ?? 0;
   }
@@ -55,7 +64,10 @@ export class HatchingSystem {
     const invCount = Array.isArray(data.petInventory) ? data.petInventory.length : 0;
     const eqCount = Array.isArray(data.equippedPets) ? data.equippedPets.length : 0;
     const ownedCount = invCount + eqCount;
-    if (ownedCount + count > PET_INVENTORY_CAPACITY) {
+    const autoDeleteSet = this.getAutoDeleteSet(data);
+    const table = getEggLootTable(eggType) || [];
+    const allAutoDeleted = table.length > 0 && table.every((entry) => autoDeleteSet.has(entry.petId));
+    if (!allAutoDeleted && ownedCount + count > PET_INVENTORY_CAPACITY) {
       return { canHatch: false, message: `Pet capacity full (${ownedCount}/${PET_INVENTORY_CAPACITY})` };
     }
 
@@ -75,16 +87,30 @@ export class HatchingSystem {
     data.gold = (data.gold ?? 0) - totalCost;
     this.updatePlayerData(player, data);
 
-    // Roll results and add to inventory
+    // Roll results and add to inventory (auto-delete skips inventory)
     const results: PetId[] = [];
+    const autoDeleteSet = this.getAutoDeleteSet(data);
+    let discoveredChanged = false;
     for (let i = 0; i < count; i++) {
       const petId = rollPetId(eggType);
-      const addRes = this.petManager.addToInventory(player, petId);
-      if (!addRes.success) {
-        // Should not happen due to precheck, but fail gracefully.
-        return { success: false, message: addRes.message ?? 'Failed to add pet' };
+      if (autoDeleteSet.has(petId)) {
+        data.petDiscovered = Array.isArray(data.petDiscovered) ? data.petDiscovered : [];
+        if (!data.petDiscovered.includes(petId)) {
+          data.petDiscovered.push(petId);
+          discoveredChanged = true;
+        }
+      } else {
+        const addRes = this.petManager.addToInventory(player, petId);
+        if (!addRes.success) {
+          // Should not happen due to precheck, but fail gracefully.
+          return { success: false, message: addRes.message ?? 'Failed to add pet' };
+        }
       }
       results.push(petId);
+    }
+
+    if (discoveredChanged) {
+      this.updatePlayerData(player, data);
     }
 
     // Update client gold display (optional, but consistent with other systems)

@@ -37,6 +37,27 @@ export class EggStationLabelManager {
     }
   }
 
+  reload(): void {
+    for (const ui of this.sceneUIs.values()) {
+      try {
+        ui.unload();
+      } catch {
+        // ignore
+      }
+    }
+    this.sceneUIs.clear();
+    for (const station of this.stations) {
+      this.ensureLabel(station);
+    }
+    if (!this.interval) {
+      this.interval = setInterval(() => {
+        for (const station of this.stations) {
+          this.updateLabelPosition(station);
+        }
+      }, 1000);
+    }
+  }
+
   stop(): void {
     if (this.interval) {
       clearInterval(this.interval);

@@ -42,6 +42,27 @@ export class ShopLabelManager {
     }
   }
 
+  reload(): void {
+    for (const ui of this.sceneUIs.values()) {
+      try {
+        ui.unload();
+      } catch {
+        // ignore
+      }
+    }
+    this.sceneUIs.clear();
+    for (const label of this.labels) {
+      this.ensureLabel(label);
+    }
+    if (!this.interval) {
+      this.interval = setInterval(() => {
+        for (const label of this.labels) {
+          this.updateLabelPosition(label);
+        }
+      }, 1000);
+    }
+  }
+
   stop(): void {
     if (this.interval) {
       clearInterval(this.interval);

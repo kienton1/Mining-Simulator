@@ -273,6 +273,7 @@ export class TrainingController {
   }>;
   private playerStates: Map<Player, PlayerTrainingState> = new Map();
   private rockSceneUIs: Map<string, SceneUI> = new Map(); // Map of rock ID -> SceneUI
+  private rockSceneUIInterval?: NodeJS.Timeout;
   private readonly PROXIMITY_CHECK_INTERVAL = 200; // ms
 
   /**
@@ -359,13 +360,28 @@ export class TrainingController {
     }
     
     // Set up periodic position updates to keep SceneUIs anchored to their rocks
-    setInterval(() => {
-      for (const rock of allRocks) {
-        // Use unique ID that includes world ID
-        const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
-        this.updateRockSceneUIPosition(uniqueId, rock);
+    if (!this.rockSceneUIInterval) {
+      this.rockSceneUIInterval = setInterval(() => {
+        const rocks = this.rockManager.getAllTrainingRocks();
+        for (const rock of rocks) {
+          // Use unique ID that includes world ID
+          const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
+          this.updateRockSceneUIPosition(uniqueId, rock);
+        }
+      }, 1000); // Update position every second to ensure it stays anchored
+    }
+  }
+
+  reloadSceneUIs(): void {
+    for (const ui of this.rockSceneUIs.values()) {
+      try {
+        ui.unload();
+      } catch {
+        // ignore
       }
-    }, 1000); // Update position every second to ensure it stays anchored
+    }
+    this.rockSceneUIs.clear();
+    this.initializeAllRockSceneUIs();
   }
   
   private ensureRockSceneUI(rockId: string, rockLocation: TrainingRockLocation): SceneUI {

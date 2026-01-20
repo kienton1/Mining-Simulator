@@ -65,6 +65,8 @@ export interface PlayerData {
   equippedPets?: string[];
   /** Unique list of pets the player has ever obtained (used for "NEW" tagging). */
   petDiscovered?: string[];
+  /** Pet IDs that should be auto-deleted on hatch (per player). */
+  autoDeletePets?: string[];
 
   /**
    * World System
@@ -81,7 +83,7 @@ export interface PlayerData {
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 4;
+export const CURRENT_DATA_VERSION = 5;
 
 /**
  * Inventory data structure
@@ -119,6 +121,7 @@ export function createDefaultPlayerData(): PlayerData {
     petInventory: [],
     equippedPets: [],
     petDiscovered: [],
+    autoDeletePets: [],
     currentWorld: 'island1', // Default to original map
     unlockedWorlds: ['island1'], // Original map is always unlocked
   };

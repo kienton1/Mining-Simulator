@@ -44,7 +44,7 @@ import { GemTraderEntity } from './src/Shop/GemTraderEntity';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { ShopLabelManager } from './src/Shop/ShopLabelManager';
 import { EggType } from './src/Pets/PetData';
-import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { PetVisualManager } from './src/Pets/PetVisualManager';
 import { getPetImageUri } from './src/Pets/PetVisuals';
 import { EggStationManager } from './src/Pets/EggStationManager';
@@ -118,66 +118,64 @@ startServer(world => {
   // Carve shared mine shaft for Island 3 (Volcanic World)
   gameManager.buildSharedMineShaftForIsland3();
 
-  /**
-   * Spawn Merchant Entity (Ore Seller)
-   * Merchant is located at the specified position and allows players to sell ores
-   */
-  const merchantEntity = new MerchantEntity(
-    world,
-    { x: -8.56, y: 1.75, z: 14.15 },
-    'models/BuyStations/skeleton-miner.gltf'
-  );
-  merchantEntity.spawn();
+  const worldConfigs = [ISLAND1_CONFIG, ISLAND2_CONFIG, ISLAND3_CONFIG];
 
   /**
-   * Spawn Mine Reset Upgrade NPC (Timer Increase)
-   * NPC is located at the specified position and allows players to purchase the 5-minute upgrade
+   * Spawn NPCs (Ore Seller, Timer Upgrade, Gem Trader) in every world
    */
-  const mineResetUpgradeNPC = new MineResetUpgradeNPC(
-    world,
-    { x: 5.08, y: 1.75, z: 14.35 },
-    'models/BuyStations/clock.gltf'
-  );
-  mineResetUpgradeNPC.spawn();
+  const merchantEntities = worldConfigs.map((config) => {
+    const entity = new MerchantEntity(world, config.npcs.merchant, 'models/BuyStations/skeleton-miner.gltf');
+    entity.spawn();
+    return entity;
+  });
 
-  /**
-   * Spawn Gem Trader Entity (Upgrade Station)
-   * NPC is located at the specified position and allows players to purchase gem upgrades
-   */
-  const gemTraderEntity = new GemTraderEntity(
-    world,
-    { x: 14.83, y: 2.25, z: 9.29 },
-    'models/BuyStations/mailbox.gltf'
-  );
-  gemTraderEntity.spawn();
+  const mineResetUpgradeNpcs = worldConfigs.map((config) => {
+    const entity = new MineResetUpgradeNPC(world, config.npcs.mineResetUpgradeNpc, 'models/BuyStations/clock.gltf');
+    entity.spawn();
+    return entity;
+  });
+
+  const gemTraderEntities = worldConfigs.map((config) => {
+    const entity = new GemTraderEntity(world, config.npcs.gemTrader, 'models/BuyStations/mailbox.gltf');
+    entity.spawn();
+    return entity;
+  });
 
   // Floating shop labels (SceneUI), anchored like training rocks.
   // Delay slightly so the client registers the `shop:prompt` template.
-  const shopLabels = [
+  const shopLabels = worldConfigs.flatMap((config) => [
     {
-      id: 'shop-ore',
-      position: { x: -8.56, y: 1.75, z: 14.15 },
+      id: `shop-ore-${config.id}`,
+      position: config.npcs.merchant,
       title: 'Ore Shop',
       subtitle: 'Sell ores for gold',
       kind: 'ore' as const,
     },
     {
-      id: 'shop-timer',
-      position: { x: 5.08, y: 1.75, z: 14.35 },
+      id: `shop-timer-${config.id}`,
+      position: config.npcs.mineResetUpgradeNpc,
       title: 'Timer Shop',
       subtitle: 'Increase mine timer',
       kind: 'timer' as const,
     },
     {
-      id: 'shop-upgrades',
-      position: { x: 14.83, y: 2.25, z: 9.29 },
+      id: `shop-upgrades-${config.id}`,
+      position: config.npcs.gemTrader,
       title: 'Upgrades Shop',
       subtitle: 'Spend gems for boosts',
       kind: 'upgrades' as const,
     },
-  ];
+  ]);
   const shopLabelManager = new ShopLabelManager(world, shopLabels);
   setTimeout(() => shopLabelManager.start(), 1000);
+
+  // Some clients may load UI templates after SceneUIs are created.
+  // Refresh loaded SceneUIs when a player UI finishes loading.
+  const refreshSceneUIs = () => {
+    shopLabelManager.reload();
+    eggStationLabelManager.reload();
+    gameManager.getTrainingController()?.reloadSceneUIs();
+  };
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
@@ -317,7 +315,7 @@ startServer(world => {
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
-  merchantEntity.onProximityChange = (player, inProximity, distance) => {
+  const handleMerchantProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send inventory data to show UI
       const inventory = gameManager.getInventoryManager().getInventory(player);
@@ -369,19 +367,25 @@ startServer(world => {
       });
     }
   };
+  merchantEntities.forEach((entity) => {
+    entity.onProximityChange = (player, inProximity) => handleMerchantProximity(player, inProximity);
+  });
 
   /**
    * Handle mine reset upgrade NPC proximity events
    * When player enters/leaves NPC proximity, show/hide upgrade UI
    */
-  mineResetUpgradeNPC.onProximityChange = (player, inProximity, distance) => {
+  const handleMineResetProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
       const currentWorld = playerData?.currentWorld || 'island1';
       const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-      // Cost varies by world: island1 = 2M, island2 = 750B
-      const cost = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
+      // Cost varies by world: island1 = 2M, island2 = 750B, island3 = 2Q
+      const cost =
+        currentWorld === 'island3' ? 2_000_000_000_000_000 :
+        currentWorld === 'island2' ? 750_000_000_000 :
+        2_000_000;
       const gold = playerData?.gold || 0;
       
       player.ui.sendData({
@@ -399,12 +403,15 @@ startServer(world => {
       });
     }
   };
+  mineResetUpgradeNpcs.forEach((entity) => {
+    entity.onProximityChange = (player, inProximity) => handleMineResetProximity(player, inProximity);
+  });
 
   /**
    * Handle gem trader proximity events
    * When player enters/leaves gem trader proximity, show/hide upgrades UI
    */
-  gemTraderEntity.onProximityChange = (player, inProximity, distance) => {
+  const handleGemTraderProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
@@ -451,6 +458,9 @@ startServer(world => {
       });
     }
   };
+  gemTraderEntities.forEach((entity) => {
+    entity.onProximityChange = (player, inProximity) => handleGemTraderProximity(player, inProximity);
+  });
 
   /**
    * Handle player joining the game. The PlayerEvent.JOINED_WORLD
@@ -465,12 +475,10 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
-    // Add player to merchant tracking
-    merchantEntity.addPlayer(player);
-    // Add player to mine reset upgrade NPC tracking
-    mineResetUpgradeNPC.addPlayer(player);
-    // Add player to gem trader tracking
-    gemTraderEntity.addPlayer(player);
+    // Add player to shop/NPC tracking for all worlds
+    merchantEntities.forEach((entity) => entity.addPlayer(player));
+    mineResetUpgradeNpcs.forEach((entity) => entity.addPlayer(player));
+    gemTraderEntities.forEach((entity) => entity.addPlayer(player));
     // Add player to egg station tracking
     eggStationManager.addPlayer(player);
     
@@ -641,6 +649,8 @@ startServer(world => {
     player.ui.on(PlayerUIEvent.LOAD, () => {
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
+      setTimeout(refreshSceneUIs, 250);
+      setTimeout(refreshSceneUIs, 1000);
       loadingGate.uiLoaded = true;
       tryFinishLoading();
     });
@@ -851,6 +861,9 @@ startServer(world => {
           petVisualManager.syncEquippedPets(player, gameManager.getPetManager().getEquipped(player));
           break;
         }
+        case 'SCENE_UI_READY':
+          setTimeout(refreshSceneUIs, 100);
+          break;
         case 'PET_UNEQUIP': {
           const petId = String(data.petId ?? '');
           const res = gameManager.getPetManager().unequipPet(player, petId);
@@ -943,6 +956,31 @@ startServer(world => {
             results,
           });
           sendPetState(player);
+          break;
+        }
+        case 'EGG_AUTO_DELETE_TOGGLE': {
+          const playerData = gameManager.getPlayerData(player);
+          if (!playerData) break;
+
+          const petId = String(data.petId ?? '').trim();
+          if (!isPetId(petId)) {
+            player.ui.sendData({ type: 'EGG_AUTO_DELETE_LIST', autoDeletePets: playerData.autoDeletePets ?? [] });
+            break;
+          }
+
+          const raw = Array.isArray(playerData.autoDeletePets) ? playerData.autoDeletePets : [];
+          const set = new Set(raw.filter(isPetId));
+          const enabled = data.enabled !== undefined ? Boolean(data.enabled) : !set.has(petId);
+
+          if (enabled) {
+            set.add(petId);
+          } else {
+            set.delete(petId);
+          }
+
+          playerData.autoDeletePets = Array.from(set);
+          gameManager.updatePlayerData(player, playerData);
+          player.ui.sendData({ type: 'EGG_AUTO_DELETE_LIST', autoDeletePets: playerData.autoDeletePets });
           break;
         }
         case 'BUY_PICKAXE':
@@ -1117,6 +1155,10 @@ startServer(world => {
           const updatedPlayerData = gameManager.getPlayerData(player);
           const currentWorld = updatedPlayerData?.currentWorld || 'island1';
           const hasUpgrade = updatedPlayerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
+          const worldCost =
+            currentWorld === 'island3' ? 2_000_000_000_000_000 :
+            currentWorld === 'island2' ? 750_000_000_000 :
+            2_000_000;
           
           if (purchaseResult.success) {
             // Update UI with purchase result
@@ -1124,7 +1166,7 @@ startServer(world => {
               type: 'MINE_RESET_UPGRADE_PURCHASED',
               success: true,
               hasUpgrade: true, // Always true after successful purchase
-              cost: 2_000_000,
+              cost: worldCost,
               remainingGold: purchaseResult.remainingGold || 0,
             });
           } else {
@@ -1134,7 +1176,7 @@ startServer(world => {
               success: false,
               message: purchaseResult.message,
               hasUpgrade: hasUpgrade, // Use actual state (might already be purchased)
-              cost: 2_000_000,
+              cost: worldCost,
               remainingGold: updatedPlayerData?.gold || 0,
             });
           }
@@ -1517,10 +1559,10 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => {
-    // Remove player from merchant tracking
-    merchantEntity.removePlayer(player);
-    // Remove player from mine reset upgrade NPC tracking
-    mineResetUpgradeNPC.removePlayer(player);
+    // Remove player from shop/NPC tracking
+    merchantEntities.forEach((entity) => entity.removePlayer(player));
+    mineResetUpgradeNpcs.forEach((entity) => entity.removePlayer(player));
+    gemTraderEntities.forEach((entity) => entity.removePlayer(player));
     // Remove player from egg station tracking
     eggStationManager.removePlayer(player);
     

@@ -54,6 +54,7 @@ function validatePlayerData(data: any): data is PlayerData {
   if (data.petInventory !== undefined && !Array.isArray(data.petInventory)) return false;
   if (data.equippedPets !== undefined && !Array.isArray(data.equippedPets)) return false;
   if (data.petDiscovered !== undefined && !Array.isArray(data.petDiscovered)) return false;
+  if (data.autoDeletePets !== undefined && !Array.isArray(data.autoDeletePets)) return false;
 
   // World system fields are optional for backward compatibility
   if (data.currentWorld !== undefined && typeof data.currentWorld !== 'string') return false;
@@ -178,6 +179,15 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     petDiscovered: (() => {
       const raw = Array.isArray(savedData.petDiscovered) ? savedData.petDiscovered : (defaults.petDiscovered ?? []);
       // Discovered is a unique set; sanitize to valid PetIds and dedupe.
+      const unique: string[] = [];
+      for (const id of raw) {
+        if (!isPetId(id)) continue;
+        if (!unique.includes(id)) unique.push(id);
+      }
+      return unique;
+    })(),
+    autoDeletePets: (() => {
+      const raw = Array.isArray(savedData.autoDeletePets) ? savedData.autoDeletePets : (defaults.autoDeletePets ?? []);
       const unique: string[] = [];
       for (const id of raw) {
         if (!isPetId(id)) continue;

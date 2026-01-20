@@ -10,7 +10,7 @@
 import { World, Player } from 'hytopia';
 import type { GameManager } from '../Core/GameManager';
 import { EggType } from './PetData';
-import { EGG_DEFINITIONS, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { EGG_DEFINITIONS, getEggLootTable, getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
 
 export interface EggStationDefinition {
   id: string;
@@ -95,6 +95,10 @@ export class EggStationManager {
       const invCount = Array.isArray(playerData?.petInventory) ? playerData!.petInventory!.length : 0;
       const equippedCount = Array.isArray(playerData?.equippedPets) ? playerData!.equippedPets!.length : 0;
       const ownedCount = invCount + equippedCount;
+      const autoDeletePets = Array.isArray(playerData?.autoDeletePets)
+        ? playerData!.autoDeletePets!.filter(isPetId)
+        : [];
+      const eggPets = this.getEggShopPets(station.eggType);
 
       player.ui.sendData({
         type: 'EGG_STATION_PROXIMITY',
@@ -105,6 +109,7 @@ export class EggStationManager {
           eggType: station.eggType,
           defaultOpenCount: station.defaultOpenCount,
           costGold: EGG_DEFINITIONS[station.eggType]?.costGold ?? 0,
+          eggPets,
         },
         player: {
           gold,
@@ -112,9 +117,34 @@ export class EggStationManager {
           petInventoryCap: PET_INVENTORY_CAPACITY,
           petEquippedCount: equippedCount,
           petEquippedCap: PET_EQUIP_CAPACITY,
+          autoDeletePets,
         },
       });
     }
+  }
+
+  private getEggShopPets(eggType: EggType): Array<{
+    petId: string;
+    name: string;
+    rarity: string;
+    chance: number;
+  }> {
+    const table = getEggLootTable(eggType) || [];
+    let totalWeight = 0;
+    for (const entry of table) {
+      if (entry.weight > 0) totalWeight += entry.weight;
+    }
+    if (totalWeight <= 0) totalWeight = 1;
+
+    return table.map((entry) => {
+      const def = getPetDefinition(entry.petId);
+      return {
+        petId: entry.petId,
+        name: def?.name ?? entry.petId,
+        rarity: def?.rarity ?? 'common',
+        chance: (entry.weight / totalWeight) * 100,
+      };
+    });
   }
 }
 
