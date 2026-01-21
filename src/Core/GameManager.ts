@@ -1624,8 +1624,11 @@ export class GameManager {
     }
 
     // Get upgrade cost based on world (use WorldManager if available, otherwise default)
-    // For now, use hardcoded values - island1: 2M, island2: 750B
-    const UPGRADE_COST = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
+    // For now, use hardcoded values
+    const UPGRADE_COST =
+      currentWorld === 'island3' ? 2_000_000_000_000_000 :
+      currentWorld === 'island2' ? 750_000_000_000 :
+      2_000_000;
     
     if (playerData.gold < UPGRADE_COST) {
       return {

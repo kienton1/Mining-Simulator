@@ -212,6 +212,12 @@ startServer(world => {
 
   const shopLabelManager = new ShopLabelManager(world, shopLabels);
   setTimeout(() => shopLabelManager.start(), 1000);
+  const sceneUiReadyPlayers = new Set<string>();
+  const getMineResetUpgradeCost = (worldId: string): number => {
+    if (worldId === 'island3') return 2_000_000_000_000_000;
+    if (worldId === 'island2') return 750_000_000_000;
+    return 2_000_000;
+  };
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
@@ -417,8 +423,8 @@ startServer(world => {
       const playerData = gameManager.getPlayerData(player);
       const currentWorld = playerData?.currentWorld || 'island1';
       const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-      // Cost varies by world: island1 = 2M, island2 = 750B
-      const cost = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
+      // Cost varies by world
+      const cost = getMineResetUpgradeCost(currentWorld);
       const gold = playerData?.gold || 0;
       
       player.ui.sendData({
@@ -695,6 +701,15 @@ startServer(world => {
       }
 
       switch (data.type) {
+        case 'SCENE_UI_READY':
+          if (!sceneUiReadyPlayers.has(player.id)) {
+            sceneUiReadyPlayers.add(player.id);
+            const trainingController = gameManager.getTrainingController();
+            trainingController?.reloadSceneUIs();
+            eggStationLabelManager.reload();
+            shopLabelManager.reload();
+          }
+          break;
         case 'TOGGLE_AUTO_MINE':
 
           gameManager.toggleAutoMine(player);
@@ -1151,6 +1166,7 @@ startServer(world => {
           const updatedPlayerData = gameManager.getPlayerData(player);
           const currentWorld = updatedPlayerData?.currentWorld || 'island1';
           const hasUpgrade = updatedPlayerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
+          const upgradeCost = getMineResetUpgradeCost(currentWorld);
           
           if (purchaseResult.success) {
             // Update UI with purchase result
@@ -1158,7 +1174,7 @@ startServer(world => {
               type: 'MINE_RESET_UPGRADE_PURCHASED',
               success: true,
               hasUpgrade: true, // Always true after successful purchase
-              cost: 2_000_000,
+              cost: upgradeCost,
               remainingGold: purchaseResult.remainingGold || 0,
             });
           } else {
@@ -1168,7 +1184,7 @@ startServer(world => {
               success: false,
               message: purchaseResult.message,
               hasUpgrade: hasUpgrade, // Use actual state (might already be purchased)
-              cost: 2_000_000,
+              cost: upgradeCost,
               remainingGold: updatedPlayerData?.gold || 0,
             });
           }
