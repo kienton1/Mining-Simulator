@@ -26,6 +26,7 @@
 import {
   startServer,
   Audio,
+  type Player,
   PlayerEvent,
   PlayerUIEvent,
   CollisionGroup,
@@ -356,7 +357,7 @@ startServer(world => {
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
-  const handleMerchantProximity = (player, inProximity, distance) => {
+  const handleMerchantProximity = (player: Player, inProximity: boolean, distance: number) => {
     if (inProximity) {
       // Player entered proximity - send inventory data to show UI
       const inventory = gameManager.getInventoryManager().getInventory(player);
@@ -417,7 +418,7 @@ startServer(world => {
    * Handle mine reset upgrade NPC proximity events
    * When player enters/leaves NPC proximity, show/hide upgrade UI
    */
-  const handleMineResetUpgradeProximity = (player, inProximity, distance) => {
+  const handleMineResetUpgradeProximity = (player: Player, inProximity: boolean, distance: number) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
@@ -451,7 +452,7 @@ startServer(world => {
    * Handle gem trader proximity events
    * When player enters/leaves gem trader proximity, show/hide upgrades UI
    */
-  const handleGemTraderProximity = (player, inProximity, distance) => {
+  const handleGemTraderProximity = (player: Player, inProximity: boolean, distance: number) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
