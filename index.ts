@@ -42,6 +42,8 @@ import { MerchantEntity } from './src/Shop/MerchantEntity';
 import { MineResetUpgradeNPC } from './src/Shop/MineResetUpgradeNPC';
 import { GemTraderEntity } from './src/Shop/GemTraderEntity';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
+import { ShopLabelManager, type ShopLabelDefinition } from './src/Shop/ShopLabelManager';
+import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from './src/Core/GameConstants';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { EggStationManager } from './src/Pets/EggStationManager';
@@ -115,37 +117,101 @@ startServer(world => {
   gameManager.buildSharedMineShaftForIsland3();
 
   /**
-   * Spawn Merchant Entity (Ore Seller)
-   * Merchant is located at the specified position and allows players to sell ores
+   * Spawn Shop NPCs (Ore Seller, Clock Upgrade, Gem Upgrades)
+   * Positions are placed relative to each world's mining area using Island 1 offsets.
    */
-  const merchantEntity = new MerchantEntity(
-    world,
-    { x: -8.56, y: 1.75, z: 14.15 },
-    'models/BuyStations/skeleton-miner.gltf'
-  );
-  merchantEntity.spawn();
+  const shopReferencePositions = {
+    merchant: { x: -8.56, y: 1.75, z: 14.15 },
+    mineResetUpgradeNpc: { x: 5.08, y: 2.45, z: 14.35 },
+    gemTrader: { x: 14.83, y: 2.25, z: 9.29 },
+  };
 
-  /**
-   * Spawn Mine Reset Upgrade NPC (Timer Increase)
-   * NPC is located at the specified position and allows players to purchase the 5-minute upgrade
-   */
-  const mineResetUpgradeNPC = new MineResetUpgradeNPC(
-    world,
-    { x: 5.08, y: 2.45, z: 14.35 },
-    'models/BuyStations/clock.gltf'
-  );
-  mineResetUpgradeNPC.spawn();
+  const shopOffsets = {
+    merchant: {
+      x: shopReferencePositions.merchant.x - MINING_AREA_BOUNDS.minX,
+      z: shopReferencePositions.merchant.z - MINING_AREA_BOUNDS.minZ,
+      y: shopReferencePositions.merchant.y,
+    },
+    mineResetUpgradeNpc: {
+      x: shopReferencePositions.mineResetUpgradeNpc.x - MINING_AREA_BOUNDS.minX,
+      z: shopReferencePositions.mineResetUpgradeNpc.z - MINING_AREA_BOUNDS.minZ,
+      y: shopReferencePositions.mineResetUpgradeNpc.y,
+    },
+    gemTrader: {
+      x: shopReferencePositions.gemTrader.x - MINING_AREA_BOUNDS.minX,
+      z: shopReferencePositions.gemTrader.z - MINING_AREA_BOUNDS.minZ,
+      y: shopReferencePositions.gemTrader.y,
+    },
+  };
 
-  /**
-   * Spawn Gem Trader Entity (Upgrade Station)
-   * NPC is located at the specified position and allows players to purchase gem upgrades
-   */
-  const gemTraderEntity = new GemTraderEntity(
-    world,
-    { x: 14.83, y: 2.25, z: 9.29 },
-    'models/BuyStations/mailbox.gltf'
-  );
-  gemTraderEntity.spawn();
+  const shopWorldBounds = [MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS];
+
+  const merchantEntities: MerchantEntity[] = [];
+  const mineResetUpgradeNPCs: MineResetUpgradeNPC[] = [];
+  const gemTraderEntities: GemTraderEntity[] = [];
+  const shopLabels: ShopLabelDefinition[] = [];
+
+  for (const [index, bounds] of shopWorldBounds.entries()) {
+    const merchantEntity = new MerchantEntity(
+      world,
+      {
+        x: bounds.minX + shopOffsets.merchant.x,
+        y: shopOffsets.merchant.y,
+        z: bounds.minZ + shopOffsets.merchant.z,
+      },
+      'models/BuyStations/skeleton-miner.gltf'
+    );
+    merchantEntity.spawn();
+    merchantEntities.push(merchantEntity);
+    shopLabels.push({
+      id: `shop-ore-${index + 1}`,
+      position: merchantEntity.getPosition(),
+      title: 'Ore Shop',
+      subtitle: 'Sell Ores',
+      kind: 'ore',
+    });
+
+    const mineResetUpgradeNPC = new MineResetUpgradeNPC(
+      world,
+      {
+        x: bounds.minX + shopOffsets.mineResetUpgradeNpc.x,
+        y: shopOffsets.mineResetUpgradeNpc.y,
+        z: bounds.minZ + shopOffsets.mineResetUpgradeNpc.z,
+      },
+      'models/BuyStations/clock.gltf'
+    );
+    mineResetUpgradeNPC.spawn();
+    mineResetUpgradeNPCs.push(mineResetUpgradeNPC);
+    shopLabels.push({
+      id: `shop-clock-${index + 1}`,
+      position: mineResetUpgradeNPC.getPosition(),
+      title: 'Clock Shop',
+      subtitle: 'Mine Timer',
+      kind: 'timer',
+    });
+
+    const gemTraderEntity = new GemTraderEntity(
+      world,
+      {
+        x: bounds.minX + shopOffsets.gemTrader.x,
+        y: shopOffsets.gemTrader.y,
+        z: bounds.minZ + shopOffsets.gemTrader.z,
+      },
+      'models/BuyStations/mailbox.gltf'
+    );
+    gemTraderEntity.spawn();
+    gemTraderEntities.push(gemTraderEntity);
+    shopLabels.push({
+      id: `shop-upgrades-${index + 1}`,
+      position: gemTraderEntity.getPosition(),
+      title: 'Upgrade Shop',
+      subtitle: 'Gem Upgrades',
+      kind: 'upgrades',
+    });
+  }
+
+  const shopLabelManager = new ShopLabelManager(world, shopLabels);
+  setTimeout(() => shopLabelManager.start(), 1000);
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
@@ -229,8 +295,8 @@ startServer(world => {
     },
   ];
 
-  // Egg UI should only pop when you're right up on the barrel (~1 block).
-  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 1.1);
+  // Egg UI should pop when you're close to the barrel.
+  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 2.5);
   eggStationManager.start();
 
   // Floating name + cost labels (SceneUI), anchored like training rocks.
@@ -284,7 +350,7 @@ startServer(world => {
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
-  merchantEntity.onProximityChange = (player, inProximity, distance) => {
+  const handleMerchantProximity = (player, inProximity, distance) => {
     if (inProximity) {
       // Player entered proximity - send inventory data to show UI
       const inventory = gameManager.getInventoryManager().getInventory(player);
@@ -337,11 +403,15 @@ startServer(world => {
     }
   };
 
+  for (const merchantEntity of merchantEntities) {
+    merchantEntity.onProximityChange = handleMerchantProximity;
+  }
+
   /**
    * Handle mine reset upgrade NPC proximity events
    * When player enters/leaves NPC proximity, show/hide upgrade UI
    */
-  mineResetUpgradeNPC.onProximityChange = (player, inProximity, distance) => {
+  const handleMineResetUpgradeProximity = (player, inProximity, distance) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
@@ -367,11 +437,15 @@ startServer(world => {
     }
   };
 
+  for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
+    mineResetUpgradeNPC.onProximityChange = handleMineResetUpgradeProximity;
+  }
+
   /**
    * Handle gem trader proximity events
    * When player enters/leaves gem trader proximity, show/hide upgrades UI
    */
-  gemTraderEntity.onProximityChange = (player, inProximity, distance) => {
+  const handleGemTraderProximity = (player, inProximity, distance) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
@@ -419,6 +493,10 @@ startServer(world => {
     }
   };
 
+  for (const gemTraderEntity of gemTraderEntities) {
+    gemTraderEntity.onProximityChange = handleGemTraderProximity;
+  }
+
   /**
    * Handle player joining the game. The PlayerEvent.JOINED_WORLD
    * event is emitted to the world when a new player connects to
@@ -433,11 +511,17 @@ startServer(world => {
    */
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
     // Add player to merchant tracking
-    merchantEntity.addPlayer(player);
+    for (const merchantEntity of merchantEntities) {
+      merchantEntity.addPlayer(player);
+    }
     // Add player to mine reset upgrade NPC tracking
-    mineResetUpgradeNPC.addPlayer(player);
+    for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
+      mineResetUpgradeNPC.addPlayer(player);
+    }
     // Add player to gem trader tracking
-    gemTraderEntity.addPlayer(player);
+    for (const gemTraderEntity of gemTraderEntities) {
+      gemTraderEntity.addPlayer(player);
+    }
     // Add player to egg station tracking
     eggStationManager.addPlayer(player);
     
@@ -1468,9 +1552,17 @@ startServer(world => {
    */
   world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => {
     // Remove player from merchant tracking
-    merchantEntity.removePlayer(player);
+    for (const merchantEntity of merchantEntities) {
+      merchantEntity.removePlayer(player);
+    }
     // Remove player from mine reset upgrade NPC tracking
-    mineResetUpgradeNPC.removePlayer(player);
+    for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
+      mineResetUpgradeNPC.removePlayer(player);
+    }
+    // Remove player from gem trader tracking
+    for (const gemTraderEntity of gemTraderEntities) {
+      gemTraderEntity.removePlayer(player);
+    }
     // Remove player from egg station tracking
     eggStationManager.removePlayer(player);
     

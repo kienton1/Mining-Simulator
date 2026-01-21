@@ -36,12 +36,12 @@ export const ISLAND2_CONFIG: WorldConfig = {
     z: 2,
   },
 
-  // Mining Area (same relative bounds, offset by map offset)
+  // Mining Area
   miningArea: {
-    minX: 746, // -4 + 750
-    maxX: 752, // 2 + 750
-    minZ: 766, // 16 + 750
-    maxZ: 772, // 22 + 750
+    minX: -291,
+    maxX: -285,
+    minZ: 17,
+    maxZ: 23,
     y: 0,
   },
 
