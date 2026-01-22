@@ -1,0 +1,1196 @@
+<!-- Egg Station Modal -->
+<div
+  id="egg-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="egg-wrapper">
+    <div class="egg-container">
+      <!-- Header with tabs and close button -->
+      <div class="egg-header">
+        <div class="egg-tabs-container" id="egg-tabs-container">
+          <!-- Tabs will be populated dynamically -->
+        </div>
+        <button id="egg-close-btn" class="egg-close-btn">X</button>
+      </div>
+
+      <!-- Main content area -->
+      <div class="egg-content-wrapper">
+        <!-- Left Side: Selected egg + actions -->
+        <div class="egg-left-panel">
+          <!-- Stats bar -->
+          <div class="egg-stats-bar">
+            <div class="egg-stat-pill">
+              <span class="egg-stat-icon">&#x1F4B0;</span>
+              <span id="egg-header-gold">0</span>
+            </div>
+            <div class="egg-stat-pill">
+              <span class="egg-stat-icon">&#x1F43E;</span>
+              <span id="egg-header-pets">0/50</span>
+            </div>
+          </div>
+
+          <!-- Selected egg display -->
+          <div class="egg-selected-area">
+            <div id="egg-station-icon" class="egg-selected-icon">&#x1F95A;</div>
+            <div class="egg-selected-info">
+              <div id="egg-station-name" class="egg-selected-name">Stone Egg</div>
+              <div class="egg-selected-cost">
+                <span id="egg-station-cost">10</span> gold
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="egg-actions">
+            <button id="egg-open-1" class="egg-btn egg-btn-primary">Open 1</button>
+            <button id="egg-open-3" class="egg-btn egg-btn-primary">Open 3</button>
+            <button id="egg-auto" class="egg-btn egg-btn-auto">Auto</button>
+          </div>
+
+          <!-- Status message -->
+          <div id="egg-station-status" class="egg-status">Ready</div>
+        </div>
+
+        <!-- Right Side: Possible pets -->
+        <div class="egg-right-panel">
+          <div class="egg-pets-header">
+            <span class="egg-section-title">POSSIBLE PETS</span>
+            <span class="egg-pets-hint">Tap = auto-delete</span>
+          </div>
+          <div class="egg-pets-grid-container">
+            <div id="egg-shop-grid" class="egg-pets-grid">
+              <!-- Pet cards populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Egg Hatch Overlay -->
+<div id="egg-hatch-overlay" class="egg-hatch-overlay" hidden>
+  <div id="egg-hatch-slots" class="egg-hatch-slots"></div>
+</div>
+
+<style>
+  #egg-modal.visible {
+    display: flex !important;
+  }
+
+  .egg-wrapper {
+    position: relative;
+    width: 900px;
+    max-width: 95vw;
+    max-height: 90vh;
+    font-family: "Fredoka", sans-serif;
+  }
+
+  .egg-container {
+    background: linear-gradient(
+      180deg,
+      rgba(30, 30, 40, 0.98),
+      rgba(20, 20, 30, 0.98)
+    );
+    border: 3px solid rgba(168, 85, 247, 0.8);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(168, 85, 247, 0.3), 0 0 60px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: eggSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .egg-wrapper.closing .egg-container {
+    animation: eggSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes eggSlideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes eggSlideOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+  }
+
+  /* Header row with tabs and close button */
+  .egg-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.4);
+    border-bottom: 2px solid rgba(168, 85, 247, 0.4);
+    position: relative;
+  }
+
+  /* Tabs container - now inline in header */
+  .egg-tabs-container {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(168, 85, 247, 0.5);
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .egg-tab {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    color: #aaa;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 80px;
+  }
+
+  .egg-tab:hover:not(.egg-tab--active) {
+    color: #fff;
+    background: rgba(168, 85, 247, 0.2);
+  }
+
+  .egg-tab--active {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.9), rgba(109, 40, 217, 0.9));
+    box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+  }
+
+  .egg-tab__icon {
+    font-size: 22px;
+  }
+
+  .egg-tab__name {
+    font-size: 11px;
+    white-space: nowrap;
+    font-weight: 800;
+  }
+
+  .egg-tab__cost {
+    font-size: 10px;
+    color: #ffd700;
+    font-weight: 700;
+  }
+
+  .egg-tab--active .egg-tab__cost {
+    color: #ffd700;
+  }
+
+  .egg-close-btn {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 2px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .egg-close-btn:hover {
+    background: linear-gradient(135deg, rgba(255, 91, 107, 1), rgba(240, 60, 75, 1));
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  /* Content wrapper */
+  .egg-content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left panel */
+  .egg-left-panel {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 8px;
+    min-width: 200px;
+    max-width: 280px;
+    overflow-y: auto;
+  }
+
+  .egg-stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .egg-stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 2px solid rgba(168, 85, 247, 0.4);
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .egg-stat-icon {
+    font-size: 14px;
+  }
+
+  .egg-selected-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .egg-selected-icon {
+    font-size: 60px;
+    animation: eggBounce 2s ease-in-out infinite;
+  }
+
+  @keyframes eggBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .egg-selected-info {
+    text-align: center;
+  }
+
+  .egg-selected-name {
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+    margin-bottom: 2px;
+  }
+
+  .egg-selected-cost {
+    font-size: 14px;
+    color: #ffd700;
+    font-weight: 700;
+  }
+
+  .egg-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .egg-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px solid;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  }
+
+  .egg-btn-primary {
+    background: linear-gradient(180deg, #a855f7, #6d28d9);
+    border-color: rgba(168, 85, 247, 0.9);
+    color: #fff;
+  }
+
+  .egg-btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #c084fc, #a855f7);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+  }
+
+  .egg-btn-auto {
+    background: linear-gradient(180deg, #ffd700, #ffb700);
+    border-color: rgba(255, 215, 0, 0.9);
+    color: #000;
+  }
+
+  .egg-btn-auto:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffed4e, #ffd700);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+  }
+
+  .egg-btn-auto.active {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: rgba(34, 197, 94, 0.9);
+    color: #fff;
+  }
+
+  .egg-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+  }
+
+  .egg-status {
+    text-align: center;
+    font-size: 13px;
+    color: #a6b7d3;
+    min-height: 18px;
+  }
+
+  .egg-results-section {
+    margin-top: auto;
+    border-top: 2px solid rgba(168, 85, 247, 0.3);
+    padding-top: 12px;
+  }
+
+  .egg-section-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .egg-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+
+  .egg-result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(168, 85, 247, 0.3);
+    border-radius: 6px;
+  }
+
+  .egg-result-item__name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .egg-result-item__mult {
+    font-size: 12px;
+    font-weight: 800;
+    color: #ffd700;
+  }
+
+  .egg-empty {
+    text-align: center;
+    color: #a6b7d3;
+    padding: 12px 0;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  /* Right panel */
+  .egg-right-panel {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 2px solid rgba(168, 85, 247, 0.3);
+    min-width: 300px;
+  }
+
+  .egg-pets-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    margin-top: 20px;
+  }
+
+  .egg-pets-hint {
+    font-size: 10px;
+    color: #a6b7d3;
+    font-weight: 600;
+  }
+
+  .egg-pets-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+  }
+
+  .egg-pets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .egg-pet-card {
+    position: relative;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .egg-pet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .egg-pet-card--common { border-color: rgba(148, 163, 184, 0.5); }
+  .egg-pet-card--rare { border-color: rgba(59, 130, 246, 0.6); }
+  .egg-pet-card--epic { border-color: rgba(168, 85, 247, 0.7); }
+  .egg-pet-card--legendary { border-color: rgba(245, 158, 11, 0.8); }
+
+  .egg-pet-card.is-auto-delete {
+    border-color: rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+
+  .egg-pet-card__chance {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.6);
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .egg-pet-card__auto {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.9);
+    color: #fff;
+    font-weight: 900;
+    font-size: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .egg-pet-card.is-auto-delete .egg-pet-card__auto {
+    display: flex;
+  }
+
+  .egg-pet-card__thumb {
+    width: 44px;
+    height: 44px;
+    margin: 12px auto 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    overflow: hidden;
+  }
+
+  .egg-pet-card__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .egg-pet-card__name {
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Scrollbar styling */
+  .egg-results-list::-webkit-scrollbar,
+  .egg-pets-grid-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .egg-results-list::-webkit-scrollbar-track,
+  .egg-pets-grid-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+  }
+
+  .egg-results-list::-webkit-scrollbar-thumb,
+  .egg-pets-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.5);
+    border-radius: 3px;
+  }
+
+  /* Hatch overlay */
+  .egg-hatch-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 12000;
+  }
+
+  .egg-hatch-overlay[hidden] {
+    display: none;
+  }
+
+  .egg-hatch-slots {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .egg-hatch-slot {
+    width: 120px;
+    height: 150px;
+    border-radius: 14px;
+    border: 3px solid rgba(168, 85, 247, 0.8);
+    background: rgba(30, 30, 40, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    animation: eggHatchPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes eggHatchPop {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .egg-hatch-slot__icon {
+    font-size: 48px;
+  }
+
+  .egg-hatch-slot__name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+  }
+
+  .egg-hatch-slot__mult {
+    font-size: 16px;
+    font-weight: 900;
+    color: #ffd700;
+  }
+
+  /* Mobile scrolling support */
+  body.mobile .egg-pets-grid-container,
+  body.mobile .egg-pets-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Mobile responsive */
+  body.mobile .egg-wrapper {
+    max-width: 98vw;
+    max-height: 85vh;
+  }
+
+  body.mobile .egg-header {
+    padding: 6px 10px;
+  }
+
+  body.mobile .egg-tabs-container {
+    padding: 2px;
+    gap: 2px;
+  }
+
+  body.mobile .egg-tab {
+    padding: 4px 10px;
+    min-width: 55px;
+  }
+
+  body.mobile .egg-tab__icon {
+    font-size: 16px;
+  }
+
+  body.mobile .egg-tab__name {
+    font-size: 8px;
+  }
+
+  body.mobile .egg-tab__cost {
+    font-size: 7px;
+  }
+
+  body.mobile .egg-close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+    right: 6px;
+  }
+
+  body.mobile .egg-content-wrapper {
+    flex-direction: row;
+    max-height: calc(85vh - 50px);
+    overflow: hidden;
+  }
+
+  body.mobile .egg-left-panel {
+    padding: 8px;
+    gap: 6px;
+    min-width: 160px;
+    max-width: 200px;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+
+  body.mobile .egg-stats-bar {
+    gap: 4px;
+    margin-top: 0;
+  }
+
+  body.mobile .egg-stat-pill {
+    padding: 3px 6px;
+    font-size: 9px;
+  }
+
+  body.mobile .egg-selected-area {
+    padding: 4px;
+    gap: 2px;
+  }
+
+  body.mobile .egg-selected-icon {
+    font-size: 40px;
+  }
+
+  body.mobile .egg-selected-name {
+    font-size: 12px;
+  }
+
+  body.mobile .egg-selected-cost {
+    font-size: 11px;
+  }
+
+  body.mobile .egg-actions {
+    gap: 4px;
+  }
+
+  body.mobile .egg-btn {
+    padding: 6px 10px;
+    font-size: 10px;
+    min-width: 55px;
+  }
+
+  body.mobile .egg-status {
+    font-size: 9px;
+    min-height: 14px;
+  }
+
+  body.mobile .egg-right-panel {
+    padding: 8px;
+    border-left: 2px solid rgba(168, 85, 247, 0.3);
+    border-top: none;
+    min-width: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  body.mobile .egg-pets-header {
+    margin-top: 0;
+    margin-bottom: 6px;
+  }
+
+  body.mobile .egg-section-title {
+    font-size: 9px;
+  }
+
+  body.mobile .egg-pets-hint {
+    font-size: 7px;
+  }
+
+  body.mobile .egg-pets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 4px;
+  }
+
+  body.mobile .egg-pet-card {
+    padding: 3px;
+  }
+
+  body.mobile .egg-pet-card__thumb {
+    width: 26px;
+    height: 26px;
+    margin: 6px auto 2px;
+    font-size: 14px;
+  }
+
+  body.mobile .egg-pet-card__name {
+    font-size: 7px;
+  }
+
+  body.mobile .egg-pet-card__chance {
+    font-size: 6px;
+    padding: 1px 3px;
+  }
+</style>
+
+<script>
+  (function() {
+    const eggOverlay = document.getElementById("egg-modal");
+    const eggCloseBtn = document.getElementById("egg-close-btn");
+    const eggTabsContainer = document.getElementById("egg-tabs-container");
+    const eggStationIcon = document.getElementById("egg-station-icon");
+    const eggStationName = document.getElementById("egg-station-name");
+    const eggStationCost = document.getElementById("egg-station-cost");
+    const eggStationStatus = document.getElementById("egg-station-status");
+    const eggHeaderGold = document.getElementById("egg-header-gold");
+    const eggHeaderPets = document.getElementById("egg-header-pets");
+    const eggShopGrid = document.getElementById("egg-shop-grid");
+    const eggOpen1 = document.getElementById("egg-open-1");
+    const eggOpen3 = document.getElementById("egg-open-3");
+    const eggAuto = document.getElementById("egg-auto");
+
+    const eggHatchOverlay = document.getElementById("egg-hatch-overlay");
+    const eggHatchSlots = document.getElementById("egg-hatch-slots");
+
+    let eggData = null;
+    let selectedEggId = null;
+    let autoDeletePets = new Set();
+    let isAutoMode = false;
+    let autoInterval = null;
+    let cachedStations = []; // Cache raw station data for tab switching
+    let cachedPlayerData = {};
+
+    function openEggModal(eggId) {
+      eggOverlay.style.display = "flex";
+      selectedEggId = eggId || null;
+      isAutoMode = false;
+      stopAutoMode();
+
+      const wrapper = document.querySelector(".egg-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "GET_EGG_SHOP_DATA", payload: { eggId: selectedEggId } });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closeEggModal() {
+      stopAutoMode();
+      const wrapper = document.querySelector(".egg-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        eggOverlay.style.display = "none";
+        eggOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderEggShop(data) {
+      eggData = data;
+      const { eggs, currentEgg, gold, pets, maxPets, lastHatch } = data;
+
+      // Update header stats
+      eggHeaderGold.textContent = formatNumber(gold || 0);
+      eggHeaderPets.textContent = `${pets || 0}/${maxPets || 50}`;
+
+      // Render egg tabs
+      if (eggs && eggs.length > 0) {
+        // Auto-select first egg if none selected
+        if (!selectedEggId) {
+          selectedEggId = eggs[0].id;
+        }
+
+        eggTabsContainer.innerHTML = eggs.map(egg => {
+          const isActive = egg.id === selectedEggId;
+          return `
+            <button class="egg-tab ${isActive ? 'egg-tab--active' : ''}" data-id="${egg.id}">
+              <span class="egg-tab__icon">${egg.icon || '&#x1F95A;'}</span>
+              <span class="egg-tab__name">${egg.name}</span>
+              <span class="egg-tab__cost">${formatNumber(egg.cost)}g</span>
+            </button>
+          `;
+        }).join('');
+
+        // Add tab click handlers
+        eggTabsContainer.querySelectorAll('.egg-tab').forEach(tab => {
+          if (typeof window.attachClickSounds === "function") {
+            window.attachClickSounds(tab);
+          }
+
+          tab.addEventListener('click', () => {
+            stopAutoMode();
+            selectedEggId = tab.dataset.id;
+            // Use cached data for instant tab switching
+            if (cachedStations.length > 0) {
+              renderFromStations(selectedEggId);
+            } else {
+              hytopia.sendData({ type: "GET_EGG_SHOP_DATA", payload: { eggId: selectedEggId } });
+            }
+          });
+        });
+      }
+
+      // Render selected egg
+      if (currentEgg) {
+        eggStationIcon.innerHTML = currentEgg.icon || '&#x1F95A;';
+        eggStationName.textContent = currentEgg.name;
+        eggStationCost.textContent = formatNumber(currentEgg.cost);
+
+        // Update button states
+        const canAfford1 = gold >= currentEgg.cost;
+        const canAfford3 = gold >= currentEgg.cost * 3;
+        const petsFull = (pets || 0) >= (maxPets || 50);
+
+        eggOpen1.disabled = !canAfford1 || petsFull;
+        eggOpen3.disabled = !canAfford3 || petsFull;
+        eggAuto.disabled = petsFull;
+
+        // Update button text with cost
+        eggOpen1.textContent = `Open 1 (${formatNumber(currentEgg.cost)})`;
+        eggOpen3.textContent = `Open 3 (${formatNumber(currentEgg.cost * 3)})`;
+
+        if (petsFull) {
+          eggStationStatus.textContent = "Pet storage is full!";
+          eggStationStatus.style.color = "#ff6b6b";
+        } else if (!canAfford1) {
+          eggStationStatus.textContent = `Need ${formatNumber(currentEgg.cost - gold)} more gold`;
+          eggStationStatus.style.color = "#ffd700";
+        } else {
+          eggStationStatus.textContent = "Ready to hatch!";
+          eggStationStatus.style.color = "#00d26a";
+        }
+
+        // Render possible pets
+        if (currentEgg.possiblePets && currentEgg.possiblePets.length > 0) {
+          eggShopGrid.innerHTML = currentEgg.possiblePets.map(pet => {
+            const rarity = (pet.rarity || "common").toLowerCase();
+            const isAutoDelete = autoDeletePets.has(pet.id);
+
+            const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+            const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
+
+            return `
+              <div class="egg-pet-card egg-pet-card--${rarity} ${isAutoDelete ? 'is-auto-delete' : ''}" data-id="${pet.id}">
+                <div class="egg-pet-card__chance">${pet.chance || '?'}%</div>
+                <div class="egg-pet-card__auto">X</div>
+                <div class="egg-pet-card__thumb">
+                  ${iconPath
+                    ? `<img src="${iconPath}" alt="${pet.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='&#x1F43E;';" />`
+                    : '&#x1F43E;'
+                  }
+                </div>
+                <div class="egg-pet-card__name">${pet.name}</div>
+              </div>
+            `;
+          }).join('');
+
+          // Add click handlers for auto-delete toggle
+          eggShopGrid.querySelectorAll('.egg-pet-card').forEach(card => {
+            if (typeof window.attachClickSounds === "function") {
+              window.attachClickSounds(card);
+            }
+
+            card.addEventListener('click', () => {
+              const id = card.dataset.id;
+              if (autoDeletePets.has(id)) {
+                autoDeletePets.delete(id);
+              } else {
+                autoDeletePets.add(id);
+              }
+              renderEggShop(eggData);
+            });
+          });
+        } else {
+          eggShopGrid.innerHTML = '<div class="egg-empty">No pet data available</div>';
+        }
+      }
+
+      // Update auto button state
+      eggAuto.classList.toggle('active', isAutoMode);
+      eggAuto.textContent = isAutoMode ? 'Stop' : 'Auto';
+    }
+
+    function showHatchResults(results) {
+      if (!results || results.length === 0) return;
+
+      eggHatchSlots.innerHTML = results.map((pet, i) => {
+        return `
+          <div class="egg-hatch-slot" style="animation-delay: ${i * 0.1}s">
+            <div class="egg-hatch-slot__icon">&#x1F43E;</div>
+            <div class="egg-hatch-slot__name">${pet.name}</div>
+            <div class="egg-hatch-slot__mult">x${pet.multiplier || 1}</div>
+          </div>
+        `;
+      }).join('');
+
+      eggHatchOverlay.hidden = false;
+
+      setTimeout(() => {
+        eggHatchOverlay.hidden = true;
+        hytopia.sendData({ type: "GET_EGG_SHOP_DATA", payload: { eggId: selectedEggId } });
+      }, 2000);
+    }
+
+    function startAutoMode() {
+      isAutoMode = true;
+      eggAuto.classList.add('active');
+      eggAuto.textContent = 'Stop';
+
+      autoInterval = setInterval(() => {
+        if (!eggData || !eggData.currentEgg) return;
+
+        const canAfford = (eggData.gold || 0) >= eggData.currentEgg.cost;
+        const petsFull = (eggData.pets || 0) >= (eggData.maxPets || 50);
+
+        if (!canAfford || petsFull) {
+          stopAutoMode();
+          return;
+        }
+
+        hytopia.sendData({
+          type: "OPEN_EGG",
+          payload: {
+            eggId: selectedEggId,
+            count: 1,
+            autoDelete: Array.from(autoDeletePets)
+          }
+        });
+      }, 1000);
+    }
+
+    function stopAutoMode() {
+      isAutoMode = false;
+      if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+      }
+      eggAuto.classList.remove('active');
+      eggAuto.textContent = 'Auto';
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e12) return (num / 1e12).toFixed(1) + "T";
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + "B";
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + "M";
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
+      return num.toString();
+    }
+
+    // Event listeners
+    eggCloseBtn?.addEventListener("click", closeEggModal);
+
+    eggOpen1?.addEventListener("click", () => {
+      if (!selectedEggId) return;
+      hytopia.sendData({
+        type: "OPEN_EGG",
+        payload: { eggId: selectedEggId, count: 1, autoDelete: Array.from(autoDeletePets) }
+      });
+    });
+
+    eggOpen3?.addEventListener("click", () => {
+      if (!selectedEggId) return;
+      hytopia.sendData({
+        type: "OPEN_EGG",
+        payload: { eggId: selectedEggId, count: 3, autoDelete: Array.from(autoDeletePets) }
+      });
+    });
+
+    eggAuto?.addEventListener("click", () => {
+      if (isAutoMode) {
+        stopAutoMode();
+      } else {
+        startAutoMode();
+      }
+    });
+
+    eggOverlay?.addEventListener("click", (e) => {
+      if (e.target === eggOverlay) {
+        closeEggModal();
+      }
+    });
+
+    eggHatchOverlay?.addEventListener("click", () => {
+      eggHatchOverlay.hidden = true;
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (eggOverlay.style.display !== "flex") return;
+      if (e.key === "Escape") {
+        closeEggModal();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(eggCloseBtn);
+      window.attachClickSounds(eggOpen1);
+      window.attachClickSounds(eggOpen3);
+      window.attachClickSounds(eggAuto);
+    }
+
+    hytopia.onData((data) => {
+      if (data?.type === "EGG_SHOP_DATA") {
+        renderEggShop(data.payload);
+      }
+
+      // Handle proximity-based egg station data from server
+      if (data?.type === "EGG_STATION_PROXIMITY") {
+        if (data.inProximity) {
+          // Cache the raw data for tab switching
+          cachedStations = data.stations || [];
+          cachedPlayerData = data.player || {};
+          const currentStation = data.station || cachedStations[0];
+
+          // Auto-select first egg if none selected
+          if (!selectedEggId && cachedStations.length > 0) {
+            selectedEggId = cachedStations[0].id;
+          }
+
+          // Open modal and render
+          eggOverlay.style.display = "flex";
+          const wrapper = document.querySelector(".egg-wrapper");
+          wrapper.classList.remove("closing");
+          hytopia.lockPointer(false, true);
+          if (window.setModalOpen) window.setModalOpen(true);
+
+          renderFromStations(selectedEggId);
+        } else {
+          // Close modal when leaving proximity
+          closeEggModal();
+        }
+      }
+
+      if (data?.type === "OPEN_EGG_MODAL") {
+        openEggModal(data.payload?.eggId);
+      }
+
+      if (data?.type === "EGG_HATCH_SUCCESS") {
+        showHatchResults(data.payload?.results);
+      }
+    });
+
+    // Helper to get egg icon based on type
+    function getEggIcon(eggType) {
+      const icons = {
+        stone: '🪨',
+        gem: '💎',
+        crystal: '🔮',
+        abyssal: '🌊',
+        boardwalk: '🏖️',
+        shipwreck: '🚢',
+        sand: '🏜️',
+        snow: '❄️',
+        lava: '🌋'
+      };
+      return icons[eggType] || '🥚';
+    }
+
+    // Render from cached stations data
+    function renderFromStations(selectedId) {
+      if (!cachedStations.length) return;
+
+      // Find selected station
+      const currentStation = cachedStations.find(s => s.id === selectedId) || cachedStations[0];
+
+      // Convert stations to eggs format for tabs
+      const eggs = cachedStations.map(s => ({
+        id: s.id,
+        name: s.name,
+        icon: getEggIcon(s.eggType),
+        cost: s.costGold || 0
+      }));
+
+      // Convert current station to currentEgg format
+      const currentEgg = currentStation ? {
+        id: currentStation.id,
+        name: currentStation.name,
+        icon: getEggIcon(currentStation.eggType),
+        cost: currentStation.costGold || 0,
+        possiblePets: (currentStation.eggPets || []).map(p => ({
+          id: p.petId,
+          name: p.name,
+          rarity: p.rarity,
+          chance: Math.round(p.chance * 10) / 10,
+          icon: `ui/icons/pets/${p.petId}.png`
+        }))
+      } : null;
+
+      renderEggShop({
+        eggs,
+        currentEgg,
+        gold: cachedPlayerData.gold || 0,
+        pets: cachedPlayerData.petInventoryCount || 0,
+        maxPets: cachedPlayerData.petInventoryCap || 50
+      });
+    }
+
+    window.openEggModal = openEggModal;
+    window.closeEggModal = closeEggModal;
+    window.renderEggShop = renderEggShop;
+    window.showEggHatchResults = showHatchResults;
+
+    window.openEggModalDirect = function() {
+      eggOverlay.style.display = "flex";
+      isAutoMode = false;
+      stopAutoMode();
+      const wrapper = document.querySelector(".egg-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+      hytopia.lockPointer(false, true);
+    };
+  })();
+</script>

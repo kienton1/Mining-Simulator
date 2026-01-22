@@ -290,22 +290,26 @@ export class MiningSystem {
     const existingState = this.miningStates.get(player);
     if (!existingState) {
       // Player is not in the mine, ignore mining click
+      console.log('[MiningSystem] handleMiningClick: No mining state for player', player.username);
       return;
     }
 
     // Player is in the mine, proceed with mining
     // Check if blocking modal is open (if callback provided)
     if (isBlockingModalOpen && isBlockingModalOpen()) {
+      console.log('[MiningSystem] handleMiningClick: Blocking modal open');
       return;
     }
 
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
+      console.log('[MiningSystem] handleMiningClick: No player entity');
       return;
     }
-    
+
     // Check if player.camera exists
     if (!player.camera) {
+      console.log('[MiningSystem] handleMiningClick: No player camera');
       return;
     }
 
@@ -333,7 +337,7 @@ export class MiningSystem {
     // Get player data for power calculation
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
-
+      console.log('[MiningSystem] handleMiningClick: No player data');
       return;
     }
 
@@ -364,6 +368,7 @@ export class MiningSystem {
     
     if (!hitResult) {
       // No hit, clear target
+      console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
       state.currentTargetBlock = null;
       return;
     }
@@ -400,6 +405,7 @@ export class MiningSystem {
     
     if (!isInMiningArea) {
       // Block is not in mining area, cannot mine it
+      console.log('[MiningSystem] handleMiningClick: Block not in mining area', resolvedBlockCoordinate, 'bounds:', offsetBounds);
       state.currentTargetBlock = null;
       return;
     }
@@ -587,9 +593,10 @@ export class MiningSystem {
 
     // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
     const baseDamage = calculateMiningDamage(playerData.power);
-    
+
     // Apply More Damage upgrade multiplier and round to integer
     const damage = Math.round(baseDamage * damageMultiplier);
+    console.log('[MiningSystem] Mining! Power:', playerData.power, 'BaseDamage:', baseDamage, 'FinalDamage:', damage, 'Block:', block.oreType, 'HP:', block.currentHP);
     
     // Deal damage to shared block
     const blockDestroyed = block.takeDamage(damage);
@@ -707,6 +714,7 @@ export class MiningSystem {
     damageMultiplier: number = 1.0,
     isBlockingModalOpen?: () => boolean
   ): void {
+    console.log('[MiningSystem] startMiningLoop called for player:', player.username);
     // Stop any existing loop
     this.stopMiningLoop(player);
 
@@ -720,19 +728,27 @@ export class MiningSystem {
     const speedMultiplier = 1 + (pickaxe.miningSpeed / 100);
     const effectiveHitRate = BASE_SWING_RATE * speedMultiplier;
     const hitInterval = 1000 / effectiveHitRate; // Convert to milliseconds
-    
+    console.log('[MiningSystem] startMiningLoop: hitInterval=', hitInterval, 'ms');
+
     // Safety check: ensure hitInterval is a valid number (not Infinity or NaN)
     if (!isFinite(hitInterval) || hitInterval <= 0) {
-
+      console.log('[MiningSystem] startMiningLoop: Invalid hitInterval, aborting');
       return; // Don't start mining loop with invalid interval
     }
 
     // Perform mining hits at regular intervals
+    let hitCount = 0;
     const performHit = () => {
+      hitCount++;
       const currentState = this.miningStates.get(player);
       if (!currentState) {
-
+        console.log('[MiningSystem] performHit: No state for player, hit #', hitCount);
         return;
+      }
+
+      // Log every 5th hit to avoid spam
+      if (hitCount <= 3 || hitCount % 10 === 0) {
+        console.log('[MiningSystem] performHit #', hitCount, 'for player:', player.username, 'depth:', currentState.currentDepth);
       }
 
       // Perform mining click (auto-mining mode)
@@ -740,12 +756,16 @@ export class MiningSystem {
     };
 
     // Perform first hit immediately
+    console.log('[MiningSystem] startMiningLoop: Performing first hit');
     performHit();
 
     // Set up interval for continuous hits
     const currentState = this.miningStates.get(player);
     if (currentState) {
       currentState.miningIntervalId = setInterval(performHit, hitInterval);
+      console.log('[MiningSystem] startMiningLoop: Mining interval set up');
+    } else {
+      console.log('[MiningSystem] startMiningLoop: No state after getOrCreateState, cannot set interval!');
     }
   }
 
@@ -830,12 +850,14 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData
   ): { x: number; y: number; z: number } {
+    console.log('[MiningSystem] preparePlayerMine called for player:', player.username);
     const state = this.getOrCreateState(player, pickaxe);
     const center = this.getMineCenter(player);
-    
+    console.log('[MiningSystem] preparePlayerMine: state currentDepth:', state.currentDepth, 'center:', center);
+
     // Reset first block mined flag when entering mine (so timer can start on first block)
     this.firstBlockMined.delete(player);
-    
+
     return { x: center.x, y: state.currentDepth + 1, z: center.z };
   }
 
@@ -847,8 +869,12 @@ export class MiningSystem {
    * @param player - Player whose mine to reset
    */
   resetMineToLevel0(player: Player): void {
+    console.log('[MiningSystem] resetMineToLevel0 called for player:', player.username);
     const state = this.miningStates.get(player);
-    if (!state) return;
+    if (!state) {
+      console.log('[MiningSystem] resetMineToLevel0: No mining state found!');
+      return;
+    }
 
     const startTime = Date.now();
 
@@ -914,9 +940,11 @@ export class MiningSystem {
    * @param player - Player who left
    */
   cleanupPlayer(player: Player): void {
+    console.log('[MiningSystem] cleanupPlayer called for player:', player.username);
     this.stopMiningLoop(player);
     this.miningStates.delete(player);
-    
+    console.log('[MiningSystem] Mining state DELETED for player:', player.username);
+
     // Remove all offsets for this player (all worlds)
     const keysToDelete: string[] = [];
     for (const key of this.mineOffsets.keys()) {
@@ -927,7 +955,7 @@ export class MiningSystem {
     for (const key of keysToDelete) {
       this.mineOffsets.delete(key);
     }
-    
+
     this.firstBlockMined.delete(player);
   }
 
@@ -1060,15 +1088,17 @@ export class MiningSystem {
   private getOrCreateState(player: Player, pickaxe: PickaxeData): MiningState {
     const worldId = this.getPlayerWorldId(player);
     const correctOffset = this.getOrCreateOffset(player, worldId);
-    
+
     let state = this.miningStates.get(player);
     if (state) {
+      console.log('[MiningSystem] getOrCreateState: Existing state found for player:', player.username);
       // Check if the state's offset matches the current world's offset
       // If not, regenerate the state for the current world
       const currentOffsetKey = `${player.id}:${worldId}`;
       const stateOffsetKey = this.findOffsetKeyForOffset(player, state.offset);
-      
+
       if (stateOffsetKey !== currentOffsetKey || (state.offset.x === 0 && state.offset.z === 0)) {
+        console.log('[MiningSystem] getOrCreateState: Regenerating state for different world');
         // State is for a different world or legacy state, regenerate for current world
         state.blockMap.clear();
         state.chestMap.clear();
@@ -1087,6 +1117,7 @@ export class MiningSystem {
       return state;
     }
 
+    console.log('[MiningSystem] getOrCreateState: CREATING NEW state for player:', player.username, 'worldId:', worldId);
     const offset = correctOffset;
     state = {
       blockMap: new Map(),
@@ -1102,10 +1133,11 @@ export class MiningSystem {
       winTriggered: false,
     };
     this.miningStates.set(player, state);
+    console.log('[MiningSystem] getOrCreateState: State created and stored');
 
     // Generate initial 20 levels (will generate more ahead as player mines)
     this.generateInitialMiningLevels(player, state, pickaxe);
-    
+
     return state;
   }
 

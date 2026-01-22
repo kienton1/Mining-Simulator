@@ -159,15 +159,18 @@ export class GameManager {
    * @param player - Player whose mine to initialize
    */
   initializePlayerMine(player: Player): void {
+    console.log('[GameManager] initializePlayerMine called for player:', player.username);
     const pickaxe = this.getPlayerPickaxe(player);
     if (!pickaxe) {
       // Can't initialize mine without a pickaxe, skip for now
       // This should rarely happen as pickaxe is attached during join
+      console.log('[GameManager] initializePlayerMine: No pickaxe for player:', player.username);
       return;
     }
 
     const miningSystem = this.miningController?.getMiningSystem();
     if (!miningSystem) {
+      console.log('[GameManager] initializePlayerMine: No mining system');
       return;
     }
 
@@ -175,6 +178,7 @@ export class GameManager {
     // We access the private method through a workaround - call preparePlayerMine
     // which internally calls getOrCreateState, but we don't need the return value
     miningSystem.preparePlayerMine(player, pickaxe);
+    console.log('[GameManager] initializePlayerMine: Mine prepared for player:', player.username);
   }
 
   /**
@@ -741,10 +745,17 @@ export class GameManager {
 
   /**
    * Called after the player's UI has loaded so we can send initial HUD data
-   * 
+   *
    * @param player - Player whose UI finished loading
    */
   onPlayerUILoaded(player: Player): void {
+    // Send INIT message with player ID for Scene UI player-specific filtering
+    player.ui.sendData({
+      type: 'INIT',
+      payload: {
+        playerId: player.id,
+      },
+    });
     this.sendPowerStatsToUI(player);
   }
 
@@ -805,6 +816,10 @@ export class GameManager {
     this.playerAutoStates.set(player, autoState);
 
     if (autoState.autoMineEnabled) {
+      // Clear any stale modal states that might block mining
+      // This handles cases where modals were open but UI didn't send MODAL_CLOSED
+      this.clearBlockingModalStates(player);
+
       // Disable auto train when enabling auto mine
       // Always stop auto train first to clear any intervals/state before starting auto mine
       // This prevents race conditions where the interval might still fire after teleporting
@@ -833,10 +848,11 @@ export class GameManager {
    * @param player - Player to start auto mine for
    */
   private startAutoMine(player: Player): void {
+    console.log('[GameManager] startAutoMine called for player:', player.username);
 
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
-
+      console.log('[GameManager] startAutoMine: No player entity');
       return;
     }
 
@@ -844,9 +860,10 @@ export class GameManager {
     const mineCenter = miningSystem?.getMineCenter(player);
     const centerX = mineCenter?.x ?? (MINING_AREA_BOUNDS.minX + MINING_AREA_BOUNDS.maxX) / 2;
     const centerZ = mineCenter?.z ?? (MINING_AREA_BOUNDS.minZ + MINING_AREA_BOUNDS.maxZ) / 2;
-    
+
     // Get current depth from mining system
     const miningState = this.miningController?.getMiningState(player);
+    console.log('[GameManager] startAutoMine: miningState exists?', !!miningState, 'currentDepth:', miningState?.currentDepth);
     const currentDepth = miningState?.currentDepth ?? MINING_AREA_BOUNDS.y;
 
     // Teleport player to center of mining area at current depth
@@ -877,25 +894,30 @@ export class GameManager {
 
     // Wait a moment for teleport, then start mining
     setTimeout(() => {
+      console.log('[GameManager] startAutoMine: 500ms timeout fired for player:', player.username);
       const autoState = this.playerAutoStates.get(player);
       if (!autoState?.autoMineEnabled) {
-
+        console.log('[GameManager] startAutoMine: autoMineEnabled is false, aborting');
         return;
       }
 
       // Start mining loop
       if (!this.miningController) {
-
+        console.log('[GameManager] startAutoMine: No mining controller');
         return;
       }
-      
+
       if (this.miningController.isPlayerMining(player)) {
-
+        console.log('[GameManager] startAutoMine: Player already mining');
         return;
       }
+
+      // Check mining state before calling startMiningLoop
+      const stateCheck = this.miningController.getMiningState(player);
+      console.log('[GameManager] startAutoMine: About to call startMiningLoop. Mining state exists?', !!stateCheck);
 
       this.miningController.startMiningLoop(player);
-
+      console.log('[GameManager] startAutoMine: startMiningLoop called');
     }, 500);
 
     // Check periodically if player needs to be recentered after falling down a level
@@ -998,7 +1020,7 @@ export class GameManager {
       mapsModalOpen: false,
       lastModalOpenTime: 0,
     };
-    
+
     if (modalType === 'miner') {
       modalState.minerModalOpen = isOpen;
     } else if (modalType === 'pickaxe') {
@@ -1012,13 +1034,32 @@ export class GameManager {
     } else if (modalType === 'maps') {
       modalState.mapsModalOpen = isOpen;
     }
-    
+
     // Update timestamp when opening a modal (to prevent race conditions with clicks)
     if (isOpen) {
       modalState.lastModalOpenTime = Date.now();
     }
-    
+
     this.playerModalStates.set(player, modalState);
+  }
+
+  /**
+   * Clears all blocking modal states for a player
+   * Called when auto-mine is enabled or mine timer expires to ensure clean state
+   *
+   * @param player - Player to clear modal states for
+   */
+  clearBlockingModalStates(player: Player): void {
+    const modalState = this.playerModalStates.get(player);
+    if (modalState) {
+      modalState.minerModalOpen = false;
+      modalState.pickaxeModalOpen = false;
+      modalState.rebirthModalOpen = false;
+      modalState.petsModalOpen = false;
+      modalState.eggModalOpen = false;
+      // Don't touch mapsModalOpen as it's not a blocking modal for mining
+      console.log('[GameManager] Cleared all blocking modal states for player:', player.username);
+    }
   }
 
   /**
@@ -1032,7 +1073,7 @@ export class GameManager {
   isBlockingModalOpen(player: Player): boolean {
     const modalState = this.playerModalStates.get(player);
     if (!modalState) return false;
-    
+
     // Check if modal is currently open
     if (
       modalState.minerModalOpen ||
@@ -1041,16 +1082,24 @@ export class GameManager {
       modalState.petsModalOpen ||
       modalState.eggModalOpen
     ) {
+      console.log('[GameManager] isBlockingModalOpen: TRUE - modals:', {
+        miner: modalState.minerModalOpen,
+        pickaxe: modalState.pickaxeModalOpen,
+        rebirth: modalState.rebirthModalOpen,
+        pets: modalState.petsModalOpen,
+        egg: modalState.eggModalOpen,
+      });
       return true;
     }
-    
+
     // Check if modal was opened very recently (within 200ms) to prevent race conditions
     // This handles the case where the click happens before the server receives MODAL_OPENED
     const timeSinceModalOpen = Date.now() - modalState.lastModalOpenTime;
     if (timeSinceModalOpen < 200) {
+      console.log('[GameManager] isBlockingModalOpen: TRUE - modal opened recently (', timeSinceModalOpen, 'ms ago)');
       return true;
     }
-    
+
     return false;
   }
 
@@ -1088,12 +1137,15 @@ export class GameManager {
       autoState.autoMineInterval = undefined;
 
     }
-    
+
     // Stop mining loop if active
     if (this.miningController?.isPlayerMining(player)) {
 
       this.miningController.stopMiningLoop(player);
     }
+
+    // Stop block detection to clear the mining UI
+    this.miningController?.stopBlockDetection(player);
   }
 
   /**
@@ -1103,6 +1155,11 @@ export class GameManager {
    * @param player - Player who reached the win condition
    */
   handlePlayerWin(player: Player): void {
+    console.log('[GameManager] handlePlayerWin for player:', player.username);
+
+    // Clear any stale modal states
+    this.clearBlockingModalStates(player);
+
     const playerData = this.getPlayerData(player);
     if (!playerData) {
       return;
@@ -1257,7 +1314,16 @@ export class GameManager {
     // Teleport player to be within bounds first
 
     this.teleportPlayer(player, initialTeleportPosition);
-    
+
+    // Mark player as not in the mine (they're on the surface training)
+    this.setPlayerInMine(player, false);
+
+    // Update UI to clear the mining display
+    player.ui.sendData({
+      type: 'MINING_STATE_UPDATE',
+      isInMine: false,
+    });
+
     // Wait a moment for teleport to complete, then start training
     setTimeout(() => {
       const autoState = this.playerAutoStates.get(player);
@@ -1658,6 +1724,10 @@ export class GameManager {
    * @param player - Player whose timer expired
    */
   private onMineResetTimerExpired(player: Player): void {
+    console.log('[GameManager] onMineResetTimerExpired for player:', player.username);
+
+    // Clear any stale modal states (UI might not send MODAL_CLOSED when state changes)
+    this.clearBlockingModalStates(player);
 
     // Stop timer updates
     this.stopMineResetTimer(player);
@@ -1665,39 +1735,50 @@ export class GameManager {
     // Check if player is in the mine
     const isInMine = this.isPlayerInMine(player);
 
-    // Stop auto modes and mining
+    // Check if player is currently training - if so, don't interrupt their training
+    const isTraining = this.trainingController?.isPlayerTraining(player) ?? false;
+
+    // Stop auto modes and mining (but not if player is training)
     const autoState = this.playerAutoStates.get(player);
+    console.log('[GameManager] onMineResetTimerExpired - isTraining:', isTraining, 'autoTrainEnabled:', autoState?.autoTrainEnabled, 'isInMine:', isInMine);
     if (autoState) {
       if (autoState.autoMineEnabled) {
         this.stopAutoMine(player);
         autoState.autoMineEnabled = false;
         player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
       }
-      if (autoState.autoTrainEnabled) {
+      // Don't stop auto-train if player is currently training
+      if (autoState.autoTrainEnabled && !isTraining) {
         this.stopAutoTrain(player);
         autoState.autoTrainEnabled = false;
         player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
       }
     }
 
-    // Stop mining if active
-    this.miningController?.stopMiningLoop(player);
-    // Stop block detection so mining UI clears when timer boots player out
-    this.miningController?.stopBlockDetection(player);
+    // Stop mining if active (but not if player is training - they use the same animation)
+    if (!isTraining) {
+      this.miningController?.stopMiningLoop(player);
+      // Stop block detection so mining UI clears when timer boots player out
+      this.miningController?.stopBlockDetection(player);
+    }
 
     // Only teleport if player is in the mine (they need to be moved out)
     // If they're not in the mine, we don't need to teleport them
-    if (isInMine) {
+    // Also skip teleport if player is training - they're on the surface at a training rock
+    if (isInMine && !isTraining) {
       // Get player's current world to teleport to the correct surface
       const playerData = this.getPlayerData(player);
       const currentWorldId = playerData?.currentWorld || 'island1';
       const worldConfig = WorldRegistry.getWorldConfig(currentWorldId);
       const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
-      
+
       // Teleport to surface of the current world
       this.teleportPlayer(player, spawnPoint);
 
       // Mark player as not in the mine (disables mining and raycasting)
+      this.setPlayerInMine(player, false);
+    } else if (isInMine && isTraining) {
+      // Player is training on surface but isInMine flag was stale - just clear the flag
       this.setPlayerInMine(player, false);
     }
 

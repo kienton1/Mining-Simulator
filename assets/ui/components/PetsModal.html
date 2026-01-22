@@ -1,0 +1,1040 @@
+<!-- Pets Modal -->
+<div
+  id="pets-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="pets-wrapper">
+    <!-- Title container -->
+    <div class="pets-title-container">
+      <h2 class="pets-title">PETS</h2>
+    </div>
+    <!-- Close button -->
+    <button id="pets-close-btn" class="pets-close-btn">X</button>
+
+    <div class="pets-container">
+      <!-- Main Content: Left Details + Right Grid -->
+      <div class="pets-content-wrapper">
+        <!-- Left Side: Pet Details -->
+        <div class="pets-left-panel">
+          <div class="pets-details">
+            <div class="pets-details__preview">
+              <div id="pet-detail-image" class="pets-details__icon-wrapper">
+                <img id="pet-detail-img-el" class="pets-details__icon-img" src="" alt="" style="display: none;" />
+                <span id="pet-detail-emoji" class="pets-details__icon-emoji">&#x1F43E;</span>
+              </div>
+              <div id="pet-detail-mult" class="pets-details__mult-badge"></div>
+            </div>
+            <div id="pet-detail-name" class="pets-details__name">No Pet Selected</div>
+            <div id="pet-detail-stats" class="pets-details__stats">
+              <div class="pets-stat-row" style="justify-content: center; color: #7a8ba3;">Select a pet</div>
+            </div>
+            <button id="pet-detail-action" class="pets-details__action-btn" disabled>—</button>
+          </div>
+        </div>
+
+        <!-- Right Side: Pet Grid -->
+        <div class="pets-right-panel">
+          <div class="pets-grid-container">
+            <div id="pets-grid" class="pets-grid">
+              <!-- Pet tiles populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating bottom badges -->
+    <div class="pets-bottom-badges">
+      <button id="pets-equip-best" class="pets-badge pets-badge--green">Equip Best</button>
+      <button id="pets-unequip-all" class="pets-badge pets-badge--red">Unequip All</button>
+      <button id="pets-trash-toggle" class="pets-badge pets-badge--icon" title="Delete pets">&#x1F5D1;&#xFE0F;</button>
+    </div>
+
+    <!-- Pet count badge at bottom center -->
+    <div class="pets-count">
+      <span id="pets-owned-count">0</span>/<span id="pets-max-count">50</span>
+      <span class="pets-count__mult">x<span id="pets-multiplier-sum">1</span></span>
+    </div>
+
+    <!-- Delete confirmation bar -->
+    <div id="pets-delete-bar" class="pets-delete-bar" hidden>
+      <div id="pets-delete-text" class="pets-delete-bar__text">Delete 0 Pets!</div>
+      <div class="pets-delete-bar__actions">
+        <button id="pets-delete-confirm" class="pets-delete-bar__btn pets-delete-bar__btn--green" disabled>Confirm</button>
+        <button id="pets-delete-cancel" class="pets-delete-bar__btn pets-delete-bar__btn--red">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #pets-modal.visible {
+    display: flex !important;
+  }
+
+  .pets-wrapper {
+    position: relative;
+    width: 800px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 30px;
+  }
+
+  .pets-container {
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
+    border: 3px solid rgba(139, 69, 19, 0.9);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    min-height: 70vh;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: petsSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .pets-wrapper.closing .pets-container {
+    animation: petsSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes petsSlideInUp {
+    from { opacity: 0; transform: translateY(60px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes petsSlideOutDown {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(60px) scale(0.95); }
+  }
+
+  /* Title */
+  .pets-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(45, 106, 79, 0.95), rgba(34, 85, 65, 0.95));
+    border: 3px solid rgba(100, 200, 150, 0.8);
+    border-radius: 12px;
+    padding: 6px 20px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .pets-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  /* Close button */
+  .pets-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .pets-close-btn:hover {
+    background: linear-gradient(135deg, rgba(255, 91, 107, 1), rgba(240, 60, 75, 1));
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  /* Content wrapper */
+  .pets-content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left Panel - Compact Details */
+  .pets-left-panel {
+    width: 160px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: linear-gradient(180deg, rgba(40, 35, 30, 0.9), rgba(30, 25, 20, 0.9));
+    border-right: 2px solid rgba(139, 69, 19, 0.5);
+  }
+
+  .pets-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+  }
+
+  .pets-details__preview {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 10px;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .pets-details__preview:hover {
+    border-color: rgba(255, 215, 0, 0.6);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+  }
+
+  .pets-details__icon-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pets-details__icon-img {
+    max-width: 80px;
+    max-height: 80px;
+    object-fit: contain;
+  }
+
+  .pets-details__icon-emoji {
+    font-size: 50px;
+  }
+
+  .pets-details__mult-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #ffd700;
+    font-weight: 900;
+    font-size: 11px;
+    border: 2px solid rgba(255, 215, 0, 0.5);
+  }
+
+  .pets-details__mult-badge:empty {
+    display: none;
+  }
+
+  .pets-details__name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+  }
+
+  .pets-details__stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    border: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .pets-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #fff;
+  }
+
+  .pets-stat-row__label {
+    color: #a6b7d3;
+    font-weight: 600;
+  }
+
+  .pets-stat-row__value {
+    font-weight: 700;
+  }
+
+  .pets-stat-row__value--mult { color: #ffd700; }
+  .pets-stat-row__value--rarity { color: #a855f7; }
+
+  .pets-details__action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-top: auto;
+    border-radius: 6px;
+    border: 2px solid rgba(34, 197, 94, 0.9);
+    font-size: 12px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    color: #fff;
+  }
+
+  .pets-details__action-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #4ade80, #22c55e);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .pets-details__action-btn:disabled {
+    background: linear-gradient(180deg, rgba(100, 100, 100, 0.5), rgba(80, 80, 80, 0.5));
+    border-color: rgba(100, 100, 100, 0.5);
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .pets-details__action-btn--unequip {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: rgba(239, 68, 68, 0.9);
+  }
+
+  /* Right Panel - Grid */
+  .pets-right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .pets-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+  }
+
+  .pets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+    padding: 4px;
+  }
+
+  /* Pet tiles */
+  .pet-tile {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 3px solid rgba(0, 0, 0, 0.5);
+    position: relative;
+    cursor: pointer;
+    padding: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .pet-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  .pet-tile--common { background: linear-gradient(180deg, #6b7280, #4b5563); border-color: #6b7280; }
+  .pet-tile--rare { background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-color: #3b82f6; }
+  .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); border-color: #a855f7; }
+  .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); border-color: #facc15; }
+
+  .pet-tile--equipped {
+    outline: 3px solid rgba(255, 255, 255, 0.9);
+    outline-offset: -5px;
+  }
+
+  .pet-tile--selected {
+    outline: 3px solid #00d26a;
+    outline-offset: -5px;
+  }
+
+  .pet-tile--delete-selected {
+    outline: 3px solid #ff5252;
+    outline-offset: -5px;
+  }
+
+  .pet-tile__img {
+    width: 70%;
+    height: 70%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pet-tile__img-el {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .pet-tile__emoji {
+    font-size: 32px;
+  }
+
+  .pet-tile__mult {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    padding: 2px 5px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .pet-tile__delete-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 900;
+    color: rgba(255, 0, 0, 0.9);
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
+
+  .pets-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #a6b7d3;
+    padding: 30px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pets-empty__icon {
+    font-size: 36px;
+    opacity: 0.6;
+  }
+
+  .pets-empty__hint {
+    font-size: 11px;
+    color: #7a8ba3;
+  }
+
+  /* Floating bottom badges */
+  .pets-bottom-badges {
+    position: absolute;
+    bottom: 0;
+    right: 12px;
+    transform: translateY(50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .pets-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 2px solid;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .pets-badge--green {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: rgba(34, 197, 94, 0.9);
+    color: #fff;
+  }
+
+  .pets-badge--red {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: rgba(239, 68, 68, 0.9);
+    color: #fff;
+  }
+
+  .pets-badge--icon {
+    padding: 6px 10px;
+    background: rgba(30, 30, 40, 0.95);
+    border-color: rgba(139, 69, 19, 0.7);
+    font-size: 14px;
+  }
+
+  .pets-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  }
+
+  .pets-badge--icon:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.7);
+  }
+
+  .pets-badge--icon.active {
+    background: rgba(239, 68, 68, 0.4);
+    border-color: #ef4444;
+  }
+
+  /* Pet count badge at bottom center */
+  .pets-count {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    font-size: 13px;
+    color: #fff;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(45, 106, 79, 0.95), rgba(34, 85, 65, 0.95));
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 3px solid rgba(100, 200, 150, 0.8);
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pets-count__mult {
+    color: #ffd700;
+    font-weight: 900;
+  }
+
+  /* Delete bar */
+  .pets-delete-bar {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(400px, 85%);
+    border-radius: 12px;
+    border: 3px solid rgba(239, 68, 68, 0.6);
+    background: rgba(20, 20, 30, 0.95);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .pets-delete-bar[hidden] {
+    display: none !important;
+  }
+
+  .pets-delete-bar__text {
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff;
+    text-align: center;
+  }
+
+  .pets-delete-bar__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .pets-delete-bar__btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    min-width: 80px;
+  }
+
+  .pets-delete-bar__btn--green {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: rgba(34, 197, 94, 0.9);
+    color: #fff;
+  }
+
+  .pets-delete-bar__btn--red {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: rgba(239, 68, 68, 0.9);
+    color: #fff;
+  }
+
+  .pets-delete-bar__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Scrollbar */
+  .pets-grid-container::-webkit-scrollbar {
+    width: 6px;
+  }
+  .pets-grid-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  .pets-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(139, 69, 19, 0.6);
+    border-radius: 3px;
+  }
+
+  /* ========== MOBILE STYLES ========== */
+  body.mobile .pets-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .pets-container {
+    min-height: 70vh;
+    max-height: 75vh;
+  }
+
+  body.mobile .pets-title-container {
+    padding: 5px 14px;
+  }
+
+  body.mobile .pets-title {
+    font-size: 16px;
+  }
+
+  body.mobile .pets-close-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  /* Mobile: Keep side-by-side layout with smaller left panel */
+  body.mobile .pets-left-panel {
+    width: 130px;
+    min-width: 130px;
+    padding: 10px;
+  }
+
+  body.mobile .pets-details {
+    gap: 6px;
+  }
+
+  body.mobile .pets-details__preview {
+    width: 80px;
+    height: 80px;
+  }
+
+  body.mobile .pets-details__icon-img {
+    max-width: 60px;
+    max-height: 60px;
+  }
+
+  body.mobile .pets-details__icon-emoji {
+    font-size: 40px;
+  }
+
+  body.mobile .pets-details__name {
+    font-size: 12px;
+  }
+
+  body.mobile .pets-details__stats {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  body.mobile .pets-stat-row {
+    font-size: 10px;
+  }
+
+  body.mobile .pets-details__action-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  body.mobile .pets-right-panel {
+    padding: 10px;
+  }
+
+  body.mobile .pets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 8px;
+  }
+
+  body.mobile .pet-tile {
+    padding: 4px;
+  }
+
+  body.mobile .pet-tile__emoji {
+    font-size: 24px;
+  }
+
+  body.mobile .pet-tile__mult {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+
+  body.mobile .pets-bottom-badges {
+    right: 8px;
+    gap: 6px;
+  }
+
+  body.mobile .pets-badge {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+
+  body.mobile .pets-badge--icon {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  body.mobile .pets-count {
+    padding: 5px 12px;
+    font-size: 11px;
+    gap: 8px;
+  }
+
+  body.mobile .pets-delete-bar {
+    bottom: 45px;
+    padding: 8px;
+  }
+
+  body.mobile .pets-delete-bar__text {
+    font-size: 14px;
+  }
+
+  body.mobile .pets-delete-bar__btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    min-width: 70px;
+  }
+
+  /* Mobile scrolling */
+  body.mobile .pets-grid-container {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+</style>
+
+<script>
+  (function() {
+    const petsOverlay = document.getElementById("pets-modal");
+    const petsCloseBtn = document.getElementById("pets-close-btn");
+    const petsGrid = document.getElementById("pets-grid");
+    const petsOwnedCount = document.getElementById("pets-owned-count");
+    const petsMaxCount = document.getElementById("pets-max-count");
+    const petsMultiplierSum = document.getElementById("pets-multiplier-sum");
+
+    // Detail panel elements
+    const petDetailName = document.getElementById("pet-detail-name");
+    const petDetailImgEl = document.getElementById("pet-detail-img-el");
+    const petDetailEmoji = document.getElementById("pet-detail-emoji");
+    const petDetailMult = document.getElementById("pet-detail-mult");
+    const petDetailStats = document.getElementById("pet-detail-stats");
+    const petDetailAction = document.getElementById("pet-detail-action");
+
+    // Badge elements (moved from footer)
+    const petsEquipBest = document.getElementById("pets-equip-best");
+    const petsUnequipAll = document.getElementById("pets-unequip-all");
+    const petsTrashToggle = document.getElementById("pets-trash-toggle");
+
+    // Delete bar elements
+    const petsDeleteBar = document.getElementById("pets-delete-bar");
+    const petsDeleteText = document.getElementById("pets-delete-text");
+    const petsDeleteConfirm = document.getElementById("pets-delete-confirm");
+    const petsDeleteCancel = document.getElementById("pets-delete-cancel");
+
+    let petsData = null;
+    let pets = [];
+    let selectedPetId = null;
+    let deleteMode = false;
+    let petsToDelete = new Set();
+
+    function openPetsModal() {
+      petsOverlay.style.display = "flex";
+      selectedPetId = null;
+      deleteMode = false;
+      petsToDelete.clear();
+
+      const wrapper = document.querySelector(".pets-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      updateDeleteModeUI();
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "GET_PETS_DATA" });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closePetsModal() {
+      const wrapper = document.querySelector(".pets-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        petsOverlay.style.display = "none";
+        petsOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+        deleteMode = false;
+        petsToDelete.clear();
+        updateDeleteModeUI();
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderPetsGrid(data) {
+      petsData = data;
+      pets = data.pets || [];
+      const maxPets = data.maxPets || 50;
+      const maxEquipped = data.maxEquipped || 8;
+      const equippedPets = pets.filter(p => p.equipped);
+
+      // Update count badge
+      petsOwnedCount.textContent = pets.length;
+      petsMaxCount.textContent = maxPets;
+
+      // Calculate total multiplier
+      const totalMult = equippedPets.reduce((sum, p) => sum + (p.multiplier || 1), 0);
+      petsMultiplierSum.textContent = totalMult > 0 ? totalMult.toFixed(1) : "0";
+
+      if (pets.length === 0) {
+        petsGrid.innerHTML = `
+          <div class="pets-empty">
+            <span class="pets-empty__icon">🥚</span>
+            <span>No pets yet!</span>
+            <span class="pets-empty__hint">Visit an Egg Station to hatch pets</span>
+          </div>
+        `;
+        renderPetDetail(null);
+        return;
+      }
+
+      // Auto-select first pet if none selected
+      if (!selectedPetId) {
+        selectedPetId = pets[0].id;
+      }
+
+      // Sort: equipped first, then by multiplier desc
+      const sortedPets = [...pets].sort((a, b) => {
+        if (a.equipped !== b.equipped) return b.equipped - a.equipped;
+        return (b.multiplier || 1) - (a.multiplier || 1);
+      });
+
+      petsGrid.innerHTML = sortedPets.map(pet => {
+        const isSelected = pet.id === selectedPetId;
+        const isEquipped = pet.equipped;
+        const isDeleteSelected = petsToDelete.has(pet.id);
+        const rarity = (pet.rarity || "common").toLowerCase();
+
+        const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+        const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
+
+        let selectionClass = "";
+        if (deleteMode && isDeleteSelected) selectionClass = "pet-tile--delete-selected";
+        else if (!deleteMode && isSelected) selectionClass = "pet-tile--selected";
+
+        return `
+          <div class="pet-tile pet-tile--${rarity} ${isEquipped ? "pet-tile--equipped" : ""} ${selectionClass}" data-pet-id="${pet.id}">
+            <div class="pet-tile__img">
+              ${iconPath
+                ? `<img class="pet-tile__img-el" src="${iconPath}" alt="${pet.name}" />`
+                : `<span class="pet-tile__emoji">&#x1F43E;</span>`
+              }
+            </div>
+            <div class="pet-tile__mult">x${pet.multiplier || 1}</div>
+            ${deleteMode && isDeleteSelected ? '<div class="pet-tile__delete-overlay">✕</div>' : ''}
+          </div>
+        `;
+      }).join("");
+
+      // Add click handlers
+      petsGrid.querySelectorAll(".pet-tile").forEach(tile => {
+        tile.addEventListener("click", () => {
+          const id = tile.dataset.petId;
+          if (deleteMode) {
+            if (petsToDelete.has(id)) {
+              petsToDelete.delete(id);
+            } else {
+              petsToDelete.add(id);
+            }
+            updateDeleteModeUI();
+            renderPetsGrid(petsData);
+          } else {
+            selectedPetId = id;
+            const pet = pets.find(p => p.id === id);
+            renderPetDetail(pet);
+            renderPetsGrid(petsData);
+          }
+        });
+      });
+
+      // Update detail panel
+      if (!deleteMode) {
+        const selectedPet = pets.find(p => p.id === selectedPetId);
+        renderPetDetail(selectedPet || null);
+      } else {
+        renderPetDetail(null);
+      }
+    }
+
+    function renderPetDetail(pet) {
+      if (!pet) {
+        petDetailImgEl.style.display = "none";
+        petDetailEmoji.style.display = "block";
+        petDetailEmoji.innerHTML = "&#x1F43E;";
+        petDetailName.textContent = "No Pet Selected";
+        petDetailMult.textContent = "";
+        petDetailStats.innerHTML = '<div class="pets-stat-row" style="justify-content: center; color: #7a8ba3;">Select a pet</div>';
+        petDetailAction.textContent = "—";
+        petDetailAction.disabled = true;
+        petDetailAction.className = "pets-details__action-btn";
+        return;
+      }
+
+      const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+      const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
+
+      if (iconPath) {
+        petDetailImgEl.src = iconPath;
+        petDetailImgEl.style.display = "block";
+        petDetailEmoji.style.display = "none";
+      } else {
+        petDetailImgEl.style.display = "none";
+        petDetailEmoji.style.display = "block";
+        petDetailEmoji.innerHTML = "&#x1F43E;";
+      }
+
+      petDetailName.textContent = pet.name || "Pet";
+      petDetailMult.textContent = `x${pet.multiplier || 1}`;
+
+      const rarity = (pet.rarity || "common").toLowerCase();
+      let statsHtml = '';
+      statsHtml += `<div class="pets-stat-row"><span class="pets-stat-row__label">Multiplier</span><span class="pets-stat-row__value pets-stat-row__value--mult">x${pet.multiplier || 1}</span></div>`;
+      statsHtml += `<div class="pets-stat-row"><span class="pets-stat-row__label">Rarity</span><span class="pets-stat-row__value pets-stat-row__value--rarity">${rarity.charAt(0).toUpperCase() + rarity.slice(1)}</span></div>`;
+      petDetailStats.innerHTML = statsHtml;
+
+      petDetailAction.disabled = false;
+      if (pet.equipped) {
+        petDetailAction.textContent = "Unequip";
+        petDetailAction.className = "pets-details__action-btn pets-details__action-btn--unequip";
+      } else {
+        petDetailAction.textContent = "Equip";
+        petDetailAction.className = "pets-details__action-btn";
+      }
+    }
+
+    function updateDeleteModeUI() {
+      petsTrashToggle.classList.toggle("active", deleteMode);
+
+      if (deleteMode) {
+        petsDeleteBar.hidden = false;
+        petsDeleteText.textContent = `Delete ${petsToDelete.size} Pet${petsToDelete.size !== 1 ? 's' : ''}!`;
+        petsDeleteConfirm.disabled = petsToDelete.size === 0;
+        renderPetDetail(null);
+      } else {
+        petsDeleteBar.hidden = true;
+        petsToDelete.clear();
+      }
+    }
+
+    // Event listeners
+    petsCloseBtn?.addEventListener("click", closePetsModal);
+
+    petDetailAction?.addEventListener("click", () => {
+      if (petDetailAction.disabled) return;
+      if (!selectedPetId) return;
+      const pet = pets.find(p => p.id === selectedPetId);
+      if (!pet) return;
+
+      if (pet.equipped) {
+        hytopia.sendData({ type: "UNEQUIP_PET", petId: selectedPetId });
+      } else {
+        hytopia.sendData({ type: "EQUIP_PET", petId: selectedPetId });
+      }
+    });
+
+    petsEquipBest?.addEventListener("click", () => {
+      hytopia.sendData({ type: "EQUIP_BEST_PETS" });
+    });
+
+    petsUnequipAll?.addEventListener("click", () => {
+      hytopia.sendData({ type: "UNEQUIP_ALL_PETS" });
+    });
+
+    petsTrashToggle?.addEventListener("click", () => {
+      deleteMode = !deleteMode;
+      petsToDelete.clear();
+      updateDeleteModeUI();
+      if (petsData) renderPetsGrid(petsData);
+    });
+
+    petsDeleteConfirm?.addEventListener("click", () => {
+      if (petsToDelete.size === 0) return;
+      hytopia.sendData({ type: "DELETE_PETS", petIds: Array.from(petsToDelete) });
+      deleteMode = false;
+      petsToDelete.clear();
+      updateDeleteModeUI();
+    });
+
+    petsDeleteCancel?.addEventListener("click", () => {
+      deleteMode = false;
+      petsToDelete.clear();
+      updateDeleteModeUI();
+      if (petsData) renderPetsGrid(petsData);
+    });
+
+    // Listen for data from server
+    hytopia.onData(data => {
+      if (data.type === "PETS_DATA") {
+        renderPetsGrid(data);
+      }
+      if (data.type === "OPEN_PETS_MODAL") {
+        openPetsModal();
+      }
+    });
+
+    // Global function to open modal
+    window.openPetsModal = openPetsModal;
+
+    // Attach click sounds
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(petsCloseBtn);
+      window.attachClickSounds(petDetailAction);
+      window.attachClickSounds(petsEquipBest);
+      window.attachClickSounds(petsUnequipAll);
+      window.attachClickSounds(petsTrashToggle);
+      window.attachClickSounds(petsDeleteConfirm);
+      window.attachClickSounds(petsDeleteCancel);
+    }
+  })();
+</script>

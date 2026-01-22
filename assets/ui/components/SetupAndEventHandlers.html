@@ -1,0 +1,3517 @@
+
+<script>
+  // Format number for popups - max 3 digits (including decimals) followed by letter suffix
+  function formatPopupNumber(value) {
+    if (value < 0) return '-' + formatPopupNumber(-value);
+    if (value === 0) return '0';
+    
+    // Helper to format with exactly max 3 digits total (including decimals, excluding decimal point)
+    const formatWithMax3Digits = (num, suffix) => {
+      // Count digits in integer part
+      const intPart = Math.floor(num);
+      const intDigits = intPart.toString().length;
+      
+      // If integer part is 3+ digits, show as integer (e.g., 100-999)
+      if (intDigits >= 3) {
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // If integer part is 2 digits (10-99), can add 1 decimal place to make 3 digits total
+      if (intDigits === 2) {
+        const with1Dec = num.toFixed(1);
+        const digitsCount = with1Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // If adding decimal exceeds 3 digits, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // If integer part is 1 digit (1-9), can add up to 2 decimal places to make 3 digits total
+      if (intDigits === 1) {
+        const with2Dec = num.toFixed(2);
+        const digitsCount = with2Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with2Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Try 1 decimal place
+        const with1Dec = num.toFixed(1);
+        const digitsCount1 = with1Dec.replace('.', '').length;
+        if (digitsCount1 <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Fallback to integer
+        return Math.round(num).toString() + suffix;
+      }
+      
+      // For numbers < 1 (intDigits === 0), show up to 3 significant digits
+      // This is rare for power gains, but handle it
+      const with3Dec = num.toFixed(3);
+      const digitsCount = with3Dec.replace('.', '').replace(/^0+/, '').length;
+      if (digitsCount <= 3) {
+        return with3Dec.replace(/\.?0+$/, '').replace(/^0\./, '0.') + suffix;
+      }
+      return num.toFixed(2).replace(/\.?0+$/, '') + suffix;
+    };
+    
+    // Handle very large numbers (same structure as formatNumber)
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'De');
+      return formatWithMax3Digits(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
+      return formatWithMax3Digits(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
+      return formatWithMax3Digits(num, 'Oc');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
+      return formatWithMax3Digits(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sp');
+      return formatWithMax3Digits(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sx');
+      return formatWithMax3Digits(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Qn');
+      return formatWithMax3Digits(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Q');
+      return formatWithMax3Digits(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'T');
+      return formatWithMax3Digits(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'B');
+      return formatWithMax3Digits(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'M');
+      return formatWithMax3Digits(num, 'K');
+    }
+    // Less than 1000 - show as integer (max 3 digits naturally)
+    return Math.round(value).toString();
+  }
+
+  // Global number formatting function - limits to 1-2 decimal places max with letter abbreviations
+  function formatNumber(value) {
+    if (value < 0) return '-' + formatNumber(-value);
+    if (value === 0) return '0';
+    
+    // Helper to format with 1-2 decimal places and remove trailing zeros
+    const formatWithSuffix = (num, suffix) => {
+      // Try 1 decimal place first
+      const with1Dec = num.toFixed(1);
+      if (with1Dec.endsWith('.0')) {
+        // If it ends in .0, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Try 2 decimal places if needed
+      const with2Dec = num.toFixed(2);
+      if (with2Dec.endsWith('.00')) {
+        // If it ends in .00, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Remove trailing zeros (e.g., 1.50 -> 1.5, 2.30 -> 2.3)
+      return with2Dec.replace(/\.?0+$/, '') + suffix;
+    };
+    
+    // Handle very large numbers
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
+      return formatWithSuffix(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
+      return formatWithSuffix(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
+      return formatWithSuffix(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
+      return formatWithSuffix(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+      return formatWithSuffix(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
+      return formatWithSuffix(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
+      return formatWithSuffix(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
+      return formatWithSuffix(num, 'K');
+    }
+    // Less than 1000 - show as integer
+    return Math.round(value).toString();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('[UI] DOMContentLoaded, setting up UI');
+    setupMobileButtons();
+    setupRightClickCamera();
+    setupPowerHud();
+    setupMerchantUI();
+    setupMineResetUpgradeUI();
+    setupGemTraderUI();
+    setupEggStationUI();
+    setupKeyboardDebug();
+    console.log('[UI] UI setup complete');
+  });
+
+  // Also try setting up immediately if DOM is already loaded
+  if (document.readyState === 'loading') {
+    console.log('[UI] DOM is still loading, waiting for DOMContentLoaded');
+  } else {
+    console.log('[UI] DOM already loaded, setting up UI immediately');
+    setupMobileButtons();
+    setupRightClickCamera();
+    setupPowerHud();
+    setupMerchantUI();
+    setupMineResetUpgradeUI();
+    setupGemTraderUI();
+    setupEggStationUI();
+    setupKeyboardDebug();
+  }
+
+  /**
+   * Debug keyboard input to see what's blocking movement
+   */
+  function setupKeyboardDebug() {
+    // Log all keydown events
+    window.addEventListener('keydown', (e) => {
+      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+      if (wasdKeys.includes(e.code)) {
+        console.log('[DEBUG] Keydown:', e.code, {
+          defaultPrevented: e.defaultPrevented,
+          target: e.target?.tagName,
+          targetId: e.target?.id,
+          targetClass: e.target?.className,
+          isTrusted: e.isTrusted
+        });
+      }
+    }, true); // Use capture phase to catch early
+
+    // Log all keyup events
+    window.addEventListener('keyup', (e) => {
+      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+      if (wasdKeys.includes(e.code)) {
+        console.log('[DEBUG] Keyup:', e.code, {
+          defaultPrevented: e.defaultPrevented,
+          target: e.target?.tagName
+        });
+      }
+    }, true);
+
+    // Check if hytopia is available and can receive input
+    if (typeof hytopia !== 'undefined') {
+      console.log('[DEBUG] Hytopia available:', {
+        hasPressInput: typeof hytopia.pressInput === 'function',
+        hasLockPointer: typeof hytopia.lockPointer === 'function'
+      });
+    } else {
+      console.warn('[DEBUG] Hytopia not available yet');
+    }
+
+    // Check document focus
+    console.log('[DEBUG] Document focus:', {
+      activeElement: document.activeElement?.tagName,
+      activeElementId: document.activeElement?.id,
+      hasFocus: document.hasFocus()
+    });
+
+    // Monitor focus changes
+    window.addEventListener('focus', () => {
+      console.log('[DEBUG] Window gained focus');
+      // Ensure document can receive keyboard input
+      if (document.activeElement && document.activeElement.tagName === 'BODY') {
+        document.body.focus();
+      }
+    });
+    window.addEventListener('blur', () => {
+      console.log('[DEBUG] Window lost focus');
+    });
+
+    // Ensure body can receive focus for keyboard events
+    document.body.setAttribute('tabindex', '-1');
+    
+    // Click on body to ensure focus
+    document.addEventListener('click', (e) => {
+      // If clicking on UI root (which has pointer-events: none), focus body
+      if (e.target && e.target.closest && e.target.closest('.ui-root')) {
+        // Don't interfere with UI clicks
+        return;
+      }
+      // Focus body to ensure keyboard events work
+      if (document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        document.body.focus();
+      }
+    }, true);
+  }
+
+  function setupMobileButtons() {
+    const mobileInteractButton = document.getElementById('mobile-interact-button');
+    const mobileJumpButton = document.getElementById('mobile-jump-button');
+
+    if (mobileInteractButton) {
+      mobileInteractButton.addEventListener('touchstart', e => {
+        e.preventDefault();
+        mobileInteractButton.classList.add('active');
+        hytopia.pressInput('ml', true);
+      });
+
+      mobileInteractButton.addEventListener('touchend', e => {
+        e.preventDefault();
+        mobileInteractButton.classList.remove('active');
+        hytopia.pressInput('ml', false);
+      });
+    }
+
+    if (mobileJumpButton) {
+      mobileJumpButton.addEventListener('touchstart', e => {
+        e.preventDefault();
+        mobileJumpButton.classList.add('active');
+        hytopia.pressInput(' ', true);
+      });
+
+      mobileJumpButton.addEventListener('touchend', e => {
+        e.preventDefault();
+        mobileJumpButton.classList.remove('active');
+        hytopia.pressInput(' ', false);
+      });
+    }
+  }
+
+  /**
+   * Roblox-style camera: mouse stays free; hold right click to look around.
+   * Uses lockPointer(lock, maintainInput=true) so movement keys keep working
+   * even when the pointer is unlocked for UI interaction.
+   */
+  function setupRightClickCamera() {
+    let rightMouseHeld = false;
+
+    const lockPointerSafe = (lock) => {
+      if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
+      try {
+        hytopia.lockPointer(lock, true);
+        console.log('[DEBUG] Pointer lock set to:', lock);
+      } catch (err) {
+        console.warn('[UI] lockPointer failed', err);
+      }
+    };
+
+    // Try locking pointer initially - Hytopia may require this for keyboard input
+    // The maintainInput=true parameter should allow movement even when locked
+    console.log('[DEBUG] Attempting initial pointer lock for keyboard input');
+    lockPointerSafe(true);
+    
+    // If that doesn't work, unlock after a short delay to allow UI interaction
+    setTimeout(() => {
+      console.log('[DEBUG] Unlocking pointer after initial lock attempt');
+      lockPointerSafe(false);
+    }, 100);
+
+    // Prevent context menu so RMB can be used for camera look
+    window.addEventListener('contextmenu', e => {
+      e.preventDefault();
+    });
+
+    // Prevent mouse wheel from zooming the camera, but allow wheel in scrollable UI.
+    const getScrollableAncestor = (el) => {
+      let node = el;
+      while (node && node !== document.body) {
+        if (node instanceof HTMLElement) {
+          const style = window.getComputedStyle(node);
+          const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll');
+          const canScrollX = (style.overflowX === 'auto' || style.overflowX === 'scroll');
+          const hasScrollY = node.scrollHeight > node.clientHeight;
+          const hasScrollX = node.scrollWidth > node.clientWidth;
+          if ((canScrollY && hasScrollY) || (canScrollX && hasScrollX)) {
+            return node;
+          }
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
+    window.addEventListener('wheel', e => {
+      const target = e.target;
+      const scrollable = target instanceof HTMLElement ? getScrollableAncestor(target) : null;
+      const isFormElement = target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
+
+      if (!scrollable && !isFormElement) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    }, { passive: false, capture: true });
+
+    window.addEventListener('mousedown', e => {
+      if (e.button !== 2) return;
+      e.preventDefault();
+      rightMouseHeld = true;
+      lockPointerSafe(true);
+    });
+
+    window.addEventListener('mouseup', e => {
+      if (e.button !== 2) return;
+      rightMouseHeld = false;
+      lockPointerSafe(false);
+    });
+
+    // Safety: release pointer if focus is lost
+    window.addEventListener('blur', () => {
+      if (!rightMouseHeld) return;
+      rightMouseHeld = false;
+      lockPointerSafe(false);
+    });
+  }
+
+
+  /**
+   * Setup Merchant UI
+   * Handles merchant selling interface
+   */
+  function setupMerchantUI() {
+    const merchantUI = document.getElementById('merchant-ui');
+    const merchantUIClose = document.getElementById('merchant-ui-close');
+    const merchantUISellAll = document.getElementById('merchant-ui-sell-all');
+
+    if (!merchantUI || !merchantUIClose || !merchantUISellAll) {
+      console.warn('[UI] Merchant UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    merchantUIClose.addEventListener('click', () => {
+      console.log('[UI] Merchant UI close clicked');
+      merchantUI.classList.remove('visible');
+      hytopia.sendData({ type: 'CLOSE_MERCHANT_UI' });
+      setTimeout(() => {
+        if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+          if (window.setModalOpen) window.setModalOpen(false);
+        }
+      }, 10);
+    });
+
+    // Sell All button handler
+    merchantUISellAll.addEventListener('click', () => {
+      console.log('[UI] Sell All clicked');
+      hytopia.sendData({ type: 'SELL_ALL' });
+    });
+  }
+
+  /**
+   * Setup Mine Reset Upgrade UI
+   * Handles mine reset upgrade interface
+   */
+  function setupMineResetUpgradeUI() {
+    const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+    const upgradeUIClose = document.getElementById('mine-reset-upgrade-ui-close');
+    const upgradeButton = document.getElementById('mine-reset-upgrade-button');
+
+    if (!upgradeUI || !upgradeUIClose || !upgradeButton) {
+      console.warn('[UI] Mine Reset Upgrade UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    upgradeUIClose.addEventListener('click', () => {
+      console.log('[UI] Mine Reset Upgrade UI close clicked');
+      upgradeUI.classList.remove('visible');
+      hytopia.sendData({ type: 'CLOSE_MINE_RESET_UPGRADE_UI' });
+      setTimeout(() => {
+        if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+          if (window.setModalOpen) window.setModalOpen(false);
+        }
+      }, 10);
+    });
+
+    // Purchase button handler - only process if not bought/disabled
+    upgradeButton.addEventListener('click', (e) => {
+      // Prevent click if button is disabled or bought
+      if (upgradeButton.disabled || upgradeButton.classList.contains('bought')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      console.log('[UI] Mine Reset Upgrade button clicked');
+      hytopia.sendData({ type: 'PURCHASE_MINE_RESET_UPGRADE' });
+    });
+
+    // Hover effect for button - only if not bought/disabled
+    upgradeButton.addEventListener('mouseenter', () => {
+      if (!upgradeButton.disabled && !upgradeButton.classList.contains('bought')) {
+        console.log('[UI] Hovering over 2M button - button should increase in size');
+        upgradeButton.style.transform = 'scale(1.05)';
+      }
+    });
+
+    upgradeButton.addEventListener('mouseleave', () => {
+      upgradeButton.style.transform = 'scale(1)';
+    });
+  }
+
+  /**
+   * Update Mine Reset Upgrade UI with player data
+   */
+  function updateMineResetUpgradeUI(hasUpgrade, cost, gold) {
+    const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+    const upgradeButton = document.getElementById('mine-reset-upgrade-button');
+    const upgradeStatus = document.getElementById('mine-reset-upgrade-status');
+    const buttonText = upgradeButton?.querySelector('.mine-reset-upgrade-ui__button-text');
+
+    if (!upgradeUI || !upgradeButton || !upgradeStatus || !buttonText) return;
+
+    if (hasUpgrade) {
+      buttonText.textContent = 'Bought!';
+      upgradeButton.disabled = true;
+      upgradeButton.classList.add('bought');
+      upgradeButton.classList.add('disabled'); // Also add disabled class for styling
+      upgradeButton.style.pointerEvents = 'none'; // Prevent any interaction
+      upgradeButton.style.cursor = 'default';
+      upgradeStatus.textContent = 'You have already purchased this upgrade!';
+      upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--bought';
+    } else {
+      buttonText.textContent = formatNumber(cost);
+      upgradeButton.disabled = false;
+      upgradeButton.classList.remove('bought');
+      upgradeButton.style.pointerEvents = 'auto'; // Re-enable interaction
+      upgradeButton.style.cursor = 'pointer';
+      const canAfford = gold >= cost;
+      if (canAfford) {
+        upgradeButton.classList.remove('disabled');
+        upgradeStatus.textContent = `You have ${formatNumber(gold)} gold`;
+        upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--can-afford';
+      } else {
+        upgradeButton.classList.add('disabled');
+        upgradeStatus.textContent = `You need ${formatNumber(cost - gold)} more gold`;
+        upgradeStatus.className = 'mine-reset-upgrade-ui__status mine-reset-upgrade-ui__status--cannot-afford';
+      }
+    }
+  }
+
+  /**
+   * Setup Gem Trader UI
+   * Handles gem trader upgrades interface
+   */
+  function setupGemTraderUI() {
+    const gemTraderUI = document.getElementById('gem-trader-ui');
+    const gemTraderUIClose = document.getElementById('gem-trader-ui-close');
+
+    if (!gemTraderUI || !gemTraderUIClose) {
+      console.warn('[UI] Gem Trader UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    gemTraderUIClose.addEventListener('click', () => {
+      console.log('[UI] Gem Trader UI close clicked');
+      gemTraderUI.classList.remove('visible');
+      setTimeout(() => {
+        if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+          if (window.setModalOpen) window.setModalOpen(false);
+        }
+      }, 10);
+    });
+  }
+
+  /**
+   * Setup Egg Station UI
+   * Handles egg station/hatching interface
+   */
+  function setupEggStationUI() {
+    const eggModal = document.getElementById('egg-modal');
+    const eggModalClose = eggModal?.querySelector('[data-close="egg-modal"]');
+
+    if (!eggModal) {
+      console.warn('[UI] Egg Station UI elements not found');
+      return;
+    }
+
+    // Close button handler
+    if (eggModalClose) {
+      eggModalClose.addEventListener('click', () => {
+        console.log('[UI] Egg Station UI close clicked');
+        eggModal.classList.remove('visible');
+        hytopia.sendData({ type: 'CLOSE_EGG_MODAL' });
+        setTimeout(() => {
+          if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+            if (window.setModalOpen) window.setModalOpen(false);
+          }
+        }, 10);
+      });
+    }
+
+    // Open 1 egg button
+    const open1Btn = document.getElementById('egg-open-1');
+    if (open1Btn) {
+      open1Btn.addEventListener('click', () => {
+        console.log('[UI] Open 1 egg clicked');
+        hytopia.sendData({ type: 'OPEN_EGG', count: 1 });
+      });
+    }
+
+    // Open 3 eggs button
+    const open3Btn = document.getElementById('egg-open-3');
+    if (open3Btn) {
+      open3Btn.addEventListener('click', () => {
+        console.log('[UI] Open 3 eggs clicked');
+        hytopia.sendData({ type: 'OPEN_EGG', count: 3 });
+      });
+    }
+
+    // Auto open button
+    const autoBtn = document.getElementById('egg-auto');
+    if (autoBtn) {
+      autoBtn.addEventListener('click', () => {
+        console.log('[UI] Auto open eggs clicked');
+        hytopia.sendData({ type: 'TOGGLE_AUTO_HATCH' });
+      });
+    }
+  }
+
+  /**
+   * Update Gem Trader UI with upgrade data
+   */
+  function updateGemTraderUI(upgrades, gems) {
+    const gemTraderUIContent = document.getElementById('gem-trader-ui-content');
+    if (!gemTraderUIContent) return;
+
+    // Clear existing items
+    gemTraderUIContent.innerHTML = '';
+
+    // Upgrade definitions
+    const upgradeDefs = [
+      {
+        key: 'moreGems',
+        title: 'More Gems',
+        icon: '💎',
+        getEffect: (level) => {
+          // UI shows level, backend is level + 1 (always 1 ahead)
+          const displayLevel = level;
+          const nextDisplayLevel = level + 1;
+          return `${displayLevel}x -> ${nextDisplayLevel}x`;
+        },
+        getLevelProgress: (level) => {
+          // TODO: Get max level from somewhere when defined
+          const maxLevel = 50;
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreRebirths',
+        title: 'More Rebirths',
+        icon: '🔄',
+        getEffect: (level) => {
+          return `${level} -> ${level + 1}`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 35;
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreCoins',
+        title: 'More Coins',
+        icon: '💰',
+        getEffect: (level) => {
+          // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
+          // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
+          const currentPercent = level * 10;
+          const nextPercent = (level + 1) * 10;
+          return `${currentPercent}% -> ${nextPercent}%`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 160; // 0-159 = 160 total levels
+          return `${level}/${maxLevel}`;
+        },
+      },
+      {
+        key: 'moreDamage',
+        title: 'More Damage',
+        icon: '⛏️',
+        getEffect: (level) => {
+          // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
+          // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
+          const currentPercent = level * 10;
+          const nextPercent = (level + 1) * 10;
+          return `${currentPercent}% -> ${nextPercent}%`;
+        },
+        getLevelProgress: (level) => {
+          const maxLevel = 50; // 0-49 = 50 total levels
+          return `${level}/${maxLevel}`;
+        },
+      },
+    ];
+
+    for (const upgradeDef of upgradeDefs) {
+      const upgradeData = upgrades[upgradeDef.key];
+      if (!upgradeData) continue;
+
+      const level = upgradeData.level || 0;
+      const cost = upgradeData.cost || 0;
+      const canAfford = upgradeData.canAfford || false;
+
+      // Create upgrade item container
+      const item = document.createElement('div');
+      item.className = 'gem-trader-ui__upgrade-item';
+
+      // Icon with arrow overlay
+      const iconContainer = document.createElement('div');
+      iconContainer.className = 'gem-trader-ui__icon-container';
+      const icon = document.createElement('div');
+      icon.className = 'gem-trader-ui__icon';
+      icon.textContent = upgradeDef.icon;
+      const arrowOverlay = document.createElement('div');
+      arrowOverlay.className = 'gem-trader-ui__arrow-overlay';
+      arrowOverlay.textContent = '↑';
+      iconContainer.appendChild(icon);
+      iconContainer.appendChild(arrowOverlay);
+      item.appendChild(iconContainer);
+
+      // Upgrade details (title, effect, level, cost)
+      const details = document.createElement('div');
+      details.className = 'gem-trader-ui__details';
+
+      // Title
+      const title = document.createElement('div');
+      title.className = 'gem-trader-ui__upgrade-title';
+      title.textContent = upgradeDef.title;
+      details.appendChild(title);
+
+      // Effect (current -> next)
+      const effect = document.createElement('div');
+      effect.className = 'gem-trader-ui__effect';
+      effect.textContent = upgradeDef.getEffect(level);
+      details.appendChild(effect);
+
+      // Level progress and cost container
+      const levelCostContainer = document.createElement('div');
+      levelCostContainer.className = 'gem-trader-ui__level-cost-container';
+
+      // Level progress
+      const levelProgress = document.createElement('div');
+      levelProgress.className = 'gem-trader-ui__level-progress';
+      const levelArrow = document.createElement('span');
+      levelArrow.className = 'gem-trader-ui__level-arrow';
+      levelArrow.textContent = '↑';
+      levelProgress.appendChild(levelArrow);
+      const levelText = document.createElement('span');
+      levelText.textContent = upgradeDef.getLevelProgress(level);
+      levelProgress.appendChild(levelText);
+      levelCostContainer.appendChild(levelProgress);
+
+      // Cost
+      const costContainer = document.createElement('div');
+      costContainer.className = 'gem-trader-ui__cost';
+      const gemIcon = document.createElement('span');
+      gemIcon.className = 'gem-trader-ui__gem-icon';
+      gemIcon.textContent = '💎';
+      costContainer.appendChild(gemIcon);
+      const costText = document.createElement('span');
+      costText.textContent = formatNumber(cost);
+      costContainer.appendChild(costText);
+      levelCostContainer.appendChild(costContainer);
+
+      details.appendChild(levelCostContainer);
+      item.appendChild(details);
+
+      // Upgrade button
+      const upgradeButton = document.createElement('button');
+      upgradeButton.className = `gem-trader-ui__upgrade-button ${canAfford ? 'can-afford' : 'cannot-afford'}`;
+      upgradeButton.textContent = '+';
+      upgradeButton.disabled = !canAfford;
+      upgradeButton.addEventListener('click', () => {
+        console.log(`[UI] Upgrade ${upgradeDef.key} clicked`);
+        hytopia.sendData({ type: 'PURCHASE_UPGRADE', upgradeType: upgradeDef.key });
+      });
+      item.appendChild(upgradeButton);
+
+      gemTraderUIContent.appendChild(item);
+    }
+  }
+
+  /**
+   * Update Merchant UI with inventory data
+   */
+  function updateMerchantUI(inventory, totalValue, gold, oreSellValues) {
+    const merchantUIContent = document.getElementById('merchant-ui-content');
+    if (!merchantUIContent) return;
+
+    // Clear existing items
+    merchantUIContent.innerHTML = '';
+
+    // Get ore data for values (matching ORE_DATABASE from OreData.ts and ISLAND2_ORE_DATABASE from Ores.ts)
+    // Colors are hex values from the ore data files
+    const oreData = {
+      // Island 1 ores
+      'stone': { name: 'Stone', value: 2, color: '#808080' },
+      'deepslate': { name: 'Deepslate', value: 5, color: '#2F2F2F' },
+      'coal': { name: 'Coal', value: 6, color: '#1A1A1A' },
+      'iron': { name: 'Iron', value: 10, color: '#C0C0C0' },
+      'tin': { name: 'Tin', value: 15, color: '#D3D3D3' },
+      'cobalt': { name: 'Cobalt', value: 50, color: '#0047AB' },
+      'pyrite': { name: 'Pyrite', value: 100, color: '#FFD700' },
+      'gold': { name: 'Gold', value: 250, color: '#FFD700' },
+      'obsidian': { name: 'Obsidian', value: 500, color: '#000000' },
+      'ruby': { name: 'Ruby', value: 1000, color: '#E0115F' },
+      'diamond': { name: 'Diamond', value: 2000, color: '#B9F2FF' },
+      'amber': { name: 'Amber', value: 3500, color: '#FFBF00' },
+      'quartz': { name: 'Quartz', value: 5000, color: '#F5F5DC' },
+      'topaz': { name: 'Topaz', value: 10000, color: '#FFC87C' },
+      'emerald': { name: 'Emerald', value: 20000, color: '#50C878' },
+      'relic': { name: 'Relic', value: 50000, color: '#8B7355' },
+      'amethyst': { name: 'Amethyst', value: 75000, color: '#9966CC' },
+      'sapphire': { name: 'Sapphire', value: 150000, color: '#0F52BA' },
+      'luminite': { name: 'Luminite', value: 250000, color: '#00FF00' },
+      'prismatic': { name: 'Prismatic', value: 350000, color: '#E0E0E0' },
+      'sunstone': { name: 'Sunstone', value: 450000, color: '#FFA500' },
+      'mithrial': { name: 'Mithrial', value: 600000, color: '#C0C0C0' },
+      'astralite': { name: 'Astralite', value: 800000, color: '#708090' },
+      'dragonstone': { name: 'Dragonstone', value: 1500000, color: '#8B0000' },
+      // Island 2 ores
+      'dunestone': { name: 'Dunestone', value: 1000, color: '#8B7D6B' },
+      'driftite': { name: 'Driftite', value: 15000, color: '#A8A8A8' },
+      'anchorite': { name: 'Anchorite', value: 30000, color: '#4A4A4A' },
+      'barnacite': { name: 'Barnacite', value: 35000, color: '#6B4423' },
+      'seaglassium': { name: 'Seaglassium', value: 100000, color: '#87CEEB' },
+      'shellchromite': { name: 'Shellchromite', value: 250000, color: '#F5DEB3' },
+      'turtlite': { name: 'Turtlite', value: 650000, color: '#228B22' },
+      'prismarine': { name: 'Prismarine', value: 2500000, color: '#00CED1' },
+      'opalstone': { name: 'Opalstone', value: 4000000, color: '#E6E6FA' },
+      'azurite': { name: 'Azurite', value: 7500000, color: '#007FFF' },
+      'mangrovite': { name: 'Mangrovite', value: 19000000, color: '#8B4513' },
+      'basaltite': { name: 'Basaltite', value: 15000000, color: '#2F2F2F' },
+      'reefium': { name: 'Reefium', value: 25000000, color: '#FF6347' },
+      'kelpite': { name: 'Kelpite', value: 27500000, color: '#2E8B57' },
+      'sunstonite': { name: 'Sunstonite', value: 40000000, color: '#FFD700' },
+      'riptidite': { name: 'Riptidite', value: 75000000, color: '#4682B4' },
+      'trenchite': { name: 'Trenchite', value: 100000000, color: '#191970' },
+      'stormium': { name: 'Stormium', value: 150000000, color: '#708090' },
+      'lavastone': { name: 'Lavastone', value: 200000000, color: '#FF4500' },
+      'wreckite': { name: 'Wreckite', value: 250000000, color: '#8B4513' },
+      'biolumite': { name: 'Biolumite', value: 300000000, color: '#00FF00' },
+      'oceanium': { name: 'Oceanium', value: 400000000, color: '#0000CD' },
+      'palmitite': { name: 'Palmitite', value: 400000000, color: '#FFE4B5' },
+      'tradewindite': { name: 'Tradewindite', value: 1750000000, color: '#87CEFA' },
+    };
+
+    // Create ore items
+    const oreTypes = Object.keys(inventory).filter(oreType => inventory[oreType] > 0);
+    
+    // Debug: Log inventory and oreData keys
+    console.log('[MerchantUI] Inventory keys:', oreTypes);
+    console.log('[MerchantUI] OreData keys count:', Object.keys(oreData).length);
+    
+    if (oreTypes.length === 0) {
+      const emptyMessage = document.createElement('div');
+      emptyMessage.style.padding = '20px';
+      emptyMessage.style.textAlign = 'center';
+      emptyMessage.style.color = '#aaa';
+      emptyMessage.textContent = 'No ores in inventory';
+      merchantUIContent.appendChild(emptyMessage);
+      return;
+    }
+
+    // Sort ores by value (highest first)
+    oreTypes.sort((a, b) => {
+      const valueA = oreData[a]?.value || 0;
+      const valueB = oreData[b]?.value || 0;
+      return valueB - valueA;
+    });
+
+    for (const oreType of oreTypes) {
+      const amount = inventory[oreType];
+      const data = oreData[oreType];
+      
+      // Debug: Log missing ores
+      if (!data) {
+        console.warn(`[MerchantUI] No data found for ore type: ${oreType}`);
+        continue;
+      }
+      
+      if (amount <= 0) continue;
+
+      const item = document.createElement('div');
+      item.className = 'merchant-ui__ore-item';
+
+      // Ore info (left side)
+      const oreInfo = document.createElement('div');
+      oreInfo.className = 'merchant-ui__ore-info';
+
+      const oreName = document.createElement('div');
+      oreName.className = 'merchant-ui__ore-name';
+      oreName.style.color = data.color; // Use actual hex color from ore data
+      oreName.textContent = `${data.name} (x${amount})`;
+      oreInfo.appendChild(oreName);
+
+      item.appendChild(oreInfo);
+
+      // Value (middle)
+      const oreValue = document.createElement('div');
+      oreValue.className = 'merchant-ui__ore-value';
+      const coinIcon = document.createElement('span');
+      coinIcon.className = 'merchant-ui__coin-icon';
+      oreValue.appendChild(coinIcon);
+      const valueText = document.createElement('span');
+      // Use oreSellValues if provided (includes all multipliers), otherwise use base value
+      const sellPrice = oreSellValues && oreSellValues[oreType] !== undefined 
+        ? oreSellValues[oreType] 
+        : data.value;
+      valueText.textContent = formatNumber(sellPrice);
+      oreValue.appendChild(valueText);
+      item.appendChild(oreValue);
+
+      // Sell button (right side)
+      const sellButton = document.createElement('button');
+      sellButton.className = 'merchant-ui__sell-button';
+      sellButton.textContent = 'Sell';
+      sellButton.addEventListener('click', () => {
+        console.log(`[UI] Sell ${oreType} clicked`);
+        hytopia.sendData({ type: 'SELL_ORE', oreType });
+      });
+      item.appendChild(sellButton);
+
+      merchantUIContent.appendChild(item);
+    }
+  }
+
+  function setupPowerHud() {
+    const powerValueEl = document.getElementById('power-value');
+    const moneyValueEl = document.getElementById('money-value');
+    const gemsValueEl = document.getElementById('gems-value');
+    const winsValueEl = document.getElementById('wins-value');
+    const rebirthsValueEl = document.getElementById('rebirths-value');
+    const powerGainLayer = document.getElementById('power-gain-layer');
+    const trainingPromptEl = document.getElementById('training-prompt');
+    const trainingPromptTitleEl = document.getElementById('training-prompt-title');
+    const trainingPromptSubtitleEl = document.getElementById('training-prompt-subtitle');
+    const trainingPromptKeyEl = document.getElementById('training-prompt-key');
+
+    // Mining UI elements
+    const miningHudEl = document.getElementById('mining-hud');
+    const damageDisplayEl = document.getElementById('damage-display');
+    const minedOreLayerEl = document.getElementById('mined-ore-layer');
+    const damagePopupLayerEl = document.getElementById('damage-popup-layer');
+    const blockHealthBarEl = document.getElementById('block-health-bar');
+    const blockHealthBarNameEl = document.getElementById('block-health-bar-name');
+    const blockHealthBarFillEl = document.getElementById('block-health-bar-fill');
+    const blockHealthBarTextEl = document.getElementById('block-health-bar-text');
+    const blockRewardDisplayEl = document.getElementById('block-reward-display');
+    const mineResetTimerEl = document.getElementById('mine-reset-timer');
+    const mineResetTimerTextEl = document.getElementById('mine-reset-timer-text');
+    const miningDepthCounterEl = document.getElementById('mining-depth-counter');
+    const miningDepthCounterTextEl = document.getElementById('mining-depth-counter-text');
+
+    console.log('[UI] Setting up power HUD');
+    console.log('[UI] powerValueEl:', powerValueEl);
+    console.log('[UI] powerGainLayer:', powerGainLayer);
+
+    const minerButton = document.getElementById('miner-button');
+    const pickaxeButton = document.getElementById('pickaxe-button');
+    const rebirthButton = document.getElementById('rebirth-button');
+    const petsButton = document.getElementById('pets-button');
+    const mapsButton = document.getElementById('maps-button');
+    const minerModal = document.getElementById('miner-modal');
+    const pickaxeModal = document.getElementById('pickaxe-modal');
+    const rebirthModal = document.getElementById('rebirth-modal');
+    const petsModal = document.getElementById('pets-modal');
+    const mapsModal = document.getElementById('maps-modal');
+    const eggModal = document.getElementById('egg-modal');
+
+    // Array of all modals for closing others when opening one
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, mapsModal, eggModal].filter(Boolean);
+
+    const minerGridEl = document.getElementById('miner-grid');
+    const mapsListEl = document.getElementById('maps-list');
+    const minerDetailName = document.getElementById('miner-detail-name');
+    const minerDetailStats = document.getElementById('miner-detail-stats');
+    const minerDetailBadge = document.getElementById('miner-detail-badge');
+    const minerDetailIcon = document.getElementById('miner-detail-icon');
+    const pickaxeGridEl = document.getElementById('pickaxe-grid');
+    const pickaxeDetailName = document.getElementById('pickaxe-detail-name');
+    const pickaxeDetailIcon = document.getElementById('pickaxe-detail-icon');
+    const pickaxeDetailStats = document.getElementById('pickaxe-detail-stats');
+    const pickaxeDetailCost = document.getElementById('pickaxe-detail-cost');
+
+    // Pets UI elements (grid)
+    const petsGridEl = document.getElementById('pets-grid');
+    const petsOwnedCountEl = document.getElementById('pets-owned-count');
+    const petsEquippedCountEl = document.getElementById('pets-equipped-count');
+    const petsMultiplierSumEl = document.getElementById('pets-multiplier-sum');
+    const petsEquipBestBtn = document.getElementById('pets-equip-best');
+    const petsUnequipAllBtn = document.getElementById('pets-unequip-all');
+    const petsTrashToggleBtn = document.getElementById('pets-trash-toggle');
+    const petsDeleteBarEl = document.getElementById('pets-delete-bar');
+    const petsDeleteTextEl = document.getElementById('pets-delete-text');
+    const petsDeleteConfirmBtn = document.getElementById('pets-delete-confirm');
+    const petsDeleteCancelBtn = document.getElementById('pets-delete-cancel');
+    const petDetailPanelEl = document.getElementById('pet-detail-panel');
+    const petDetailCloseEl = document.getElementById('pet-detail-close');
+    const petDetailNameEl = document.getElementById('pet-detail-name');
+    const petDetailImageEl = document.getElementById('pet-detail-image');
+    const petDetailMultEl = document.getElementById('pet-detail-mult');
+    const petDetailRarityEl = document.getElementById('pet-detail-rarity');
+    const petDetailActionEl = document.getElementById('pet-detail-action');
+
+    // Egg station UI elements
+    const eggModalTitleEl = document.getElementById('egg-modal-title');
+    const eggStationNameEl = document.getElementById('egg-station-name');
+    const eggStationCostEl = document.getElementById('egg-station-cost');
+    const eggStationGoldEl = document.getElementById('egg-station-gold');
+    const eggStationInvEl = document.getElementById('egg-station-inv');
+    const eggStationStatusEl = document.getElementById('egg-station-status');
+    const eggOpen1Btn = document.getElementById('egg-open-1');
+    const eggOpen3Btn = document.getElementById('egg-open-3');
+    const eggAutoBtn = document.getElementById('egg-auto');
+    const eggResultsListEl = document.getElementById('egg-results-list');
+    const eggShopGridEl = document.getElementById('egg-shop-grid');
+    const eggTabsEl = document.getElementById('egg-tabs');
+    const eggStationIconEl = document.getElementById('egg-station-icon');
+    const eggHatchOverlayEl = document.getElementById('egg-hatch-overlay');
+    const eggHatchSlotsEl = document.getElementById('egg-hatch-slots');
+
+    // Setup miner button click handler
+    if (minerButton) {
+      minerButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'miner' });
+        hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+      });
+    }
+
+    // Setup pickaxe button click handler
+    if (pickaxeButton) {
+      pickaxeButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[UI] Pickaxe button clicked');
+        // Immediately notify server that modal is opening (before sending shop data request)
+        // This prevents any click events from triggering mining
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pickaxe' });
+        hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+      });
+    }
+
+    // Setup rebirth button click handler
+    if (rebirthButton) {
+      rebirthButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[UI] Rebirth button clicked');
+        // Immediately notify server that modal is opening (before sending rebirth data request)
+        // This prevents any click events from triggering mining
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'rebirth' });
+        hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
+      });
+    }
+
+    // Setup pets button click handler (HUD below rebirth)
+    if (petsButton) {
+      petsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Always start with delete mode OFF when opening the pets UI.
+        // This ensures the delete bar stays hidden until the trashcan is clicked.
+        state.pets.deleteMode = false;
+        state.pets.deleteSelected = {};
+        state.pets.selectedPetInstanceId = null;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+        if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pets' });
+        hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+        showModal(petsModal);
+        petsButton.blur();
+        window.focus();
+      });
+    }
+
+    // Setup maps button click handler (HUD below pets)
+    if (mapsButton) {
+      mapsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'maps' });
+        hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+        showModal(mapsModal);
+        mapsButton.blur();
+        window.focus();
+      });
+    }
+
+    // Setup modal close handlers
+    document.addEventListener('click', (e) => {
+      // Use closest to find the close button (handles clicks on text/children inside button)
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close');
+      
+      if (closeButton) {
+        const modalId = closeButton.getAttribute('data-close');
+        if (modalId) {
+          const modal = document.getElementById(modalId);
+          if (modal) {
+            e.preventDefault();
+            e.stopPropagation();
+            hideModal(modal); // Use hideModal to notify server
+            console.log(`[UI] Closed modal: ${modalId}`);
+          }
+        }
+      }
+    });
+    const rebirthOptionsEl = document.getElementById('rebirth-options');
+    const rebirthBadge = document.getElementById('rebirth-badge');
+
+    const state = {
+      power: 0,
+      gold: 0,
+      gems: 0,
+      wins: 0,
+      rebirths: 0,
+      miner: {
+        currentTier: -1,
+        selectedTier: -1,
+        miners: [],
+      },
+      pickaxe: {
+        currentTier: 0,
+        selectedTier: undefined,
+        pickaxes: [],
+      },
+      rebirth: {
+        options: [],
+        power: 0,
+        rebirths: 0,
+        maxRebirths: 0,
+      },
+      prompt: {
+        visible: false,
+        rockName: 'Training Rock',
+        requirements: { power: 0, rebirths: 0 },
+        canTrain: false,
+        powerPerHit: 0,
+        actionKey: 'E',
+      },
+      mining: {
+        isMining: false,
+        isInMine: false,
+        currentOre: null,
+        damage: 0,
+        lastBlockInfo: null, // Store last known block info to prevent UI disappearing during fast mining
+      },
+      pets: {
+        pets: [],
+        ownedCount: 0,
+        ownedCap: 50,
+        equippedCount: 0,
+        equippedCap: 8,
+        multiplierSum: 0,
+        trainingMultiplier: 1,
+        selectedPetInstanceId: null,
+        deleteMode: false,
+        deleteSelected: {}, // map instanceId -> true (inventory only)
+      },
+      eggStation: {
+        inProximity: false,
+        stationId: null,
+        stationName: 'Egg Station',
+        eggType: 'stone',
+        defaultOpenCount: 1,
+        costGold: 0,
+        lastHatch: [],
+        eggPets: [],
+        autoDeletePets: [],
+        autoEnabled: false,
+        autoArmed: false,
+        autoCount: 1,
+        stations: [], // All available stations in the current group
+      },
+    };
+
+    const EGG_HATCH_SHAKE_MS = 2000;
+    const EGG_HATCH_TOTAL_MS = 3000;
+    const EGG_HATCH_COOLDOWN_MS = 1000;
+    let eggHatchInProgress = false;
+    let currentEggHatch = null;
+
+    const resetEggHatchOverlay = () => {
+      if (currentEggHatch?.cleanupTimer) {
+        clearTimeout(currentEggHatch.cleanupTimer);
+      }
+      currentEggHatch = null;
+      eggHatchInProgress = false;
+      if (eggHatchOverlayEl) eggHatchOverlayEl.hidden = true;
+      if (eggHatchSlotsEl) eggHatchSlotsEl.innerHTML = '';
+      if (eggModal && state.eggStation.inProximity) {
+        eggModal.classList.remove('hatch-hidden');
+      }
+    };
+
+    const buildEggHatchSlots = (count) => {
+      if (!eggHatchSlotsEl) return [];
+      eggHatchSlotsEl.innerHTML = '';
+      const slots = [];
+      for (let i = 0; i < count; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'egg-hatch-slot';
+
+        const egg = document.createElement('div');
+        egg.className = 'egg-hatch-egg';
+
+        const particles = document.createElement('div');
+        particles.className = 'egg-hatch-particles';
+
+        const result = document.createElement('div');
+        result.className = 'egg-hatch-result';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'egg-hatch-result__thumb';
+        thumb.textContent = '🥚';
+
+        const name = document.createElement('div');
+        name.className = 'egg-hatch-result__name';
+        name.textContent = 'Hatching...';
+
+        result.appendChild(thumb);
+        result.appendChild(name);
+        slot.appendChild(egg);
+        slot.appendChild(particles);
+        slot.appendChild(result);
+        eggHatchSlotsEl.appendChild(slot);
+        slots.push(slot);
+      }
+      return slots;
+    };
+
+    const renderEggHatchResults = (results) => {
+      if (!currentEggHatch || !currentEggHatch.slots) return;
+      const list = Array.isArray(results) ? results : [];
+      currentEggHatch.slots.forEach((slot, index) => {
+        const entry = list[index] || null;
+        const nameEl = slot.querySelector('.egg-hatch-result__name');
+        const thumbEl = slot.querySelector('.egg-hatch-result__thumb');
+
+        if (!nameEl || !thumbEl) return;
+
+        if (!entry) {
+          nameEl.textContent = 'Hatching...';
+          thumbEl.textContent = '🥚';
+          return;
+        }
+
+        const entryId = typeof entry === 'string' ? entry : (entry.petId || entry.id || entry.name);
+        const petName = (typeof entry === 'string' ? entry : (entry.name || entry.petId || entry.id)) || 'Pet';
+        const petImageUri =
+          (typeof entry === 'object' && entry.imageUri) ||
+          (entryId ? `ui/pets/${entryId}.png` : null);
+
+        nameEl.textContent = petName;
+        thumbEl.innerHTML = '';
+
+        if (petImageUri) {
+          const img = document.createElement('img');
+          img.alt = petName;
+          img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
+          img.onerror = () => {
+            thumbEl.textContent = '🐾';
+          };
+          thumbEl.appendChild(img);
+        } else {
+          thumbEl.textContent = '🐾';
+        }
+      });
+    };
+
+    const formatEggChance = (value) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '0%';
+      if (num >= 10) return `${Math.round(num)}%`;
+      if (num >= 1) return `${num.toFixed(1).replace(/\.0$/, '')}%`;
+      if (num >= 0.1) return `${num.toFixed(2).replace(/\.0+$/, '')}%`;
+      return `${num.toFixed(3).replace(/\.0+$/, '')}%`;
+    };
+
+    const renderEggShopPets = () => {
+      if (!eggShopGridEl) return;
+      eggShopGridEl.innerHTML = '';
+      const list = Array.isArray(state.eggStation.eggPets) ? state.eggStation.eggPets : [];
+      const autoDelete = new Set(Array.isArray(state.eggStation.autoDeletePets) ? state.eggStation.autoDeletePets : []);
+
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'egg-shop-empty';
+        empty.textContent = 'No pets available.';
+        eggShopGridEl.appendChild(empty);
+        return;
+      }
+
+      list.forEach((pet) => {
+        const petId = pet?.petId || pet?.id;
+        if (!petId) return;
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `egg-shop-card egg-shop-card--${pet?.rarity || 'common'}`;
+        card.dataset.petId = petId;
+
+        if (autoDelete.has(petId)) {
+          card.classList.add('is-auto-delete');
+        }
+
+        const chance = document.createElement('div');
+        chance.className = 'egg-shop-card__chance';
+        chance.textContent = formatEggChance(pet?.chance ?? 0);
+
+        const autoMark = document.createElement('div');
+        autoMark.className = 'egg-shop-card__auto';
+        autoMark.textContent = 'X';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'egg-shop-card__thumb';
+        const img = document.createElement('img');
+        img.alt = pet?.name || petId;
+        img.src = `{{CDN_ASSETS_URL}}/ui/pets/${petId}.png`;
+        img.onerror = () => {
+          thumb.textContent = 'pet';
+        };
+        thumb.appendChild(img);
+
+        const name = document.createElement('div');
+        name.className = 'egg-shop-card__name';
+        name.textContent = pet?.name || petId;
+
+        card.appendChild(chance);
+        card.appendChild(autoMark);
+        card.appendChild(thumb);
+        card.appendChild(name);
+        eggShopGridEl.appendChild(card);
+      });
+    };
+
+    const maybeFinishEggHatch = () => {
+      if (!currentEggHatch || !currentEggHatch.revealed || !currentEggHatch.results) return;
+      renderEggHatchResults(currentEggHatch.results);
+      if (currentEggHatch.cleanupTimer) return;
+      currentEggHatch.cleanupTimer = setTimeout(() => {
+        resetEggHatchOverlay();
+        if (state.eggStation.autoEnabled && state.eggStation.inProximity) {
+          startEggHatchSequence(state.eggStation.autoCount);
+        }
+      }, EGG_HATCH_COOLDOWN_MS);
+    };
+
+    const startEggHatchSequence = (count) => {
+      if (!eggHatchOverlayEl || !eggHatchSlotsEl) return;
+      if (eggHatchInProgress) return;
+
+      eggHatchInProgress = true;
+      if (eggModal) {
+        eggModal.classList.add('hatch-hidden');
+      }
+      eggHatchOverlayEl.hidden = false;
+
+      const slots = buildEggHatchSlots(count);
+      currentEggHatch = {
+        count,
+        slots,
+        results: null,
+        revealed: false,
+        cleanupTimer: null,
+      };
+
+      setTimeout(() => {
+        if (!currentEggHatch) return;
+        slots.forEach((slot) => slot.classList.add('is-cracking'));
+        hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count });
+      }, EGG_HATCH_SHAKE_MS);
+
+      setTimeout(() => {
+        if (!currentEggHatch) return;
+        slots.forEach((slot) => slot.classList.add('is-revealed'));
+        currentEggHatch.revealed = true;
+        renderEggHatchResults(currentEggHatch.results);
+        maybeFinishEggHatch();
+      }, EGG_HATCH_TOTAL_MS);
+    };
+
+    // Egg station local auto-open loop (client-side)
+    const stopEggAuto = () => {
+      state.eggStation.autoEnabled = false;
+      state.eggStation.autoArmed = false;
+      if (eggAutoBtn) {
+        eggAutoBtn.textContent = 'Auto';
+      }
+    };
+
+    const startEggAuto = (count) => {
+      stopEggAuto();
+      state.eggStation.autoEnabled = true;
+      state.eggStation.autoCount = count;
+      if (eggAutoBtn) {
+        eggAutoBtn.textContent = `Auto ${count}`;
+      }
+      if (!state.eggStation.inProximity) {
+        stopEggAuto();
+        return;
+      }
+      // Start immediately; next hatch is chained after reveal/cleanup.
+      startEggHatchSequence(state.eggStation.autoCount);
+    };
+
+    // Get emoji icon for egg type
+    const getEggIcon = (eggType) => {
+      const icons = {
+        stone: '🪨',
+        gem: '💎',
+        crystal: '🔮',
+        abyssal: '🌊',
+        boardwalk: '🏖️',
+        shipwreck: '🚢',
+        sand: '🏜️',
+        snow: '❄️',
+        lava: '🌋',
+      };
+      return icons[eggType] || '🥚';
+    };
+
+    // Switch to a different egg station
+    const selectEggStation = (station) => {
+      if (!station) return;
+      state.eggStation.stationId = station.id;
+      state.eggStation.stationName = station.name;
+      state.eggStation.eggType = station.eggType;
+      state.eggStation.defaultOpenCount = station.defaultOpenCount ?? 1;
+      state.eggStation.costGold = station.costGold ?? 0;
+      state.eggStation.eggPets = station.eggPets ?? [];
+      renderEggStation();
+    };
+
+    const renderEggStation = () => {
+      if (!eggModal) return;
+      if (!state.eggStation.inProximity) return;
+
+      // Render egg tabs (if multiple stations available)
+      if (eggTabsEl) {
+        const stations = state.eggStation.stations || [];
+        if (stations.length > 1) {
+          eggTabsEl.innerHTML = '';
+          for (const station of stations) {
+            const isActive = station.id === state.eggStation.stationId;
+            const tab = document.createElement('div');
+            tab.className = 'egg-tab' + (isActive ? ' egg-tab--active' : '');
+            tab.dataset.id = station.id;
+            tab.innerHTML = `
+              <div class="egg-tab__icon">${getEggIcon(station.eggType)}</div>
+              <div class="egg-tab__name">${station.name}</div>
+              <div class="egg-tab__cost">${formatNumber(station.costGold)}g</div>
+            `;
+            tab.addEventListener('click', () => {
+              if (station.id !== state.eggStation.stationId) {
+                selectEggStation(station);
+              }
+            });
+            eggTabsEl.appendChild(tab);
+          }
+        } else {
+          eggTabsEl.innerHTML = '';
+        }
+      }
+
+      if (eggModalTitleEl) eggModalTitleEl.textContent = 'Egg Station';
+      if (eggStationNameEl) eggStationNameEl.textContent = state.eggStation.stationName || 'Egg Station';
+      if (eggStationIconEl) eggStationIconEl.textContent = getEggIcon(state.eggStation.eggType);
+      if (eggStationCostEl) eggStationCostEl.textContent = formatNumber(state.eggStation.costGold || 0);
+      if (eggStationGoldEl) eggStationGoldEl.textContent = formatNumber(state.gold || 0);
+      if (eggStationInvEl) eggStationInvEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
+      if (eggStationStatusEl) {
+        if (state.eggStation.autoArmed && !state.eggStation.autoEnabled) {
+          eggStationStatusEl.textContent = 'Choose Open 1 or Open 3';
+        } else if (state.eggStation.autoEnabled) {
+          eggStationStatusEl.textContent = `Auto Opening ${state.eggStation.autoCount}...`;
+        } else {
+          eggStationStatusEl.textContent = 'Ready';
+        }
+      }
+
+      if (eggOpen1Btn) {
+        const c = state.eggStation.costGold || 0;
+        eggOpen1Btn.textContent = `Open 1 (${formatNumber(c)})`;
+      }
+      if (eggOpen3Btn) {
+        const c = (state.eggStation.costGold || 0) * 3;
+        eggOpen3Btn.textContent = `Open 3 (${formatNumber(c)})`;
+      }
+
+      if (eggResultsListEl) {
+        eggResultsListEl.innerHTML = '';
+        const last = Array.isArray(state.eggStation.lastHatch) ? state.eggStation.lastHatch : [];
+        if (last.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.opacity = '0.8';
+          empty.textContent = 'No hatches yet.';
+          eggResultsListEl.appendChild(empty);
+        } else {
+          for (const pet of last.slice(0, 12)) {
+            const row = document.createElement('div');
+            row.className = 'egg-result-item';
+            const left = document.createElement('div');
+            left.className = 'egg-result-item__name';
+            left.textContent = pet.name || pet.id || 'Pet';
+            const right = document.createElement('div');
+            right.className = 'egg-result-item__mult';
+            right.textContent = `+${formatMultiplier(pet.multiplier ?? 0)}`;
+            row.appendChild(left);
+            row.appendChild(right);
+            eggResultsListEl.appendChild(row);
+          }
+        }
+      }
+
+      renderEggShopPets();
+    };
+
+    // Format multiplier with K, M, B suffixes (max 1 decimal place)
+    const formatMultiplier = (value) => {
+      if (value < 0) return '-' + formatMultiplier(-value);
+      if (value === 0) return '0';
+      if (value < 1000) return String(Math.round(value));
+      
+      if (value >= 1e9) {
+        const billions = value / 1e9;
+        const formatted = billions % 1 === 0 
+          ? billions.toFixed(0)
+          : billions.toFixed(1).replace(/\.0+$/, '');
+        return formatted + 'B';
+      }
+      if (value >= 1e6) {
+        const millions = value / 1e6;
+        const formatted = millions % 1 === 0
+          ? millions.toFixed(0)
+          : millions.toFixed(1).replace(/\.0+$/, '');
+        return formatted + 'M';
+      }
+      if (value >= 1000) {
+        const thousands = value / 1000;
+        const formatted = thousands % 1 === 0
+          ? thousands.toFixed(0)
+          : thousands.toFixed(1).replace(/\.0+$/, '');
+        return formatted + 'K';
+      }
+      return String(Math.round(value));
+    };
+
+    const renderPets = () => {
+      // Top counters
+      if (petsOwnedCountEl) petsOwnedCountEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
+      if (petsEquippedCountEl) petsEquippedCountEl.textContent = `${state.pets.equippedCount}/${state.pets.equippedCap}`;
+      if (petsMultiplierSumEl) petsMultiplierSumEl.textContent = formatMultiplier(state.pets.multiplierSum ?? 0);
+
+      // Delete bar
+      if (petsDeleteBarEl) {
+        const selectedCount = state.pets.deleteSelected ? Object.keys(state.pets.deleteSelected).length : 0;
+        // Show whenever delete mode is enabled (even at 0 selected), like the reference UX.
+        petsDeleteBarEl.hidden = !state.pets.deleteMode;
+        if (petsDeleteTextEl) petsDeleteTextEl.textContent = `Delete ${selectedCount} Pets!`;
+        if (petsDeleteConfirmBtn) petsDeleteConfirmBtn.disabled = selectedCount === 0;
+      }
+
+      // Disable bulk actions during delete mode
+      if (petsEquipBestBtn) petsEquipBestBtn.disabled = Boolean(state.pets.deleteMode);
+      if (petsUnequipAllBtn) petsUnequipAllBtn.disabled = Boolean(state.pets.deleteMode);
+
+      if (!petsGridEl) return;
+      petsGridEl.innerHTML = '';
+
+      const rarityToClass = (rarity) => {
+        switch ((rarity || '').toLowerCase()) {
+          case 'legendary': return 'pet-tile--legendary';
+          case 'epic': return 'pet-tile--epic';
+          case 'rare': return 'pet-tile--rare';
+          default: return 'pet-tile--common';
+        }
+      };
+
+      const list = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+      // Sort like typical pet inventories: equipped first, then highest multiplier.
+      list.sort((a, b) => {
+        const ea = Boolean(a.equipped);
+        const eb = Boolean(b.equipped);
+        if (ea !== eb) return ea ? -1 : 1;
+        return (b.multiplier ?? 0) - (a.multiplier ?? 0);
+      });
+
+      const getSelectedPet = () => {
+        if (!state.pets.selectedPetInstanceId) return null;
+        return list.find(p => p.instanceId === state.pets.selectedPetInstanceId) || null;
+      };
+
+      const renderPetDetail = (pet) => {
+        if (!petDetailPanelEl) return;
+        if (!pet) {
+          petDetailPanelEl.hidden = true;
+          return;
+        }
+        petDetailPanelEl.hidden = false;
+
+        if (petDetailNameEl) petDetailNameEl.textContent = pet.name || pet.id || 'Pet';
+        if (petDetailMultEl) petDetailMultEl.textContent = formatMultiplier(pet.multiplier ?? 0);
+        if (petDetailRarityEl) petDetailRarityEl.textContent = (pet.rarity || '').toUpperCase();
+
+        if (petDetailImageEl) {
+          petDetailImageEl.innerHTML = '';
+          const img = document.createElement('img');
+          img.alt = pet.name || pet.petId || 'Pet';
+          const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+          img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
+          img.className = 'pet-detail__img-el';
+          img.onerror = () => {
+            petDetailImageEl.textContent = '🐾';
+          };
+          petDetailImageEl.appendChild(img);
+        }
+
+        if (petDetailActionEl) {
+          const isEquipped = Boolean(pet.equipped);
+          petDetailActionEl.textContent = isEquipped ? 'Unequip' : 'Equip';
+          petDetailActionEl.classList.toggle('pet-detail__action--equip', !isEquipped);
+          petDetailActionEl.classList.toggle('pet-detail__action--unequip', isEquipped);
+        }
+      };
+
+      // Keep detail panel synced with latest state
+      renderPetDetail(getSelectedPet());
+
+      for (const pet of list) {
+        const tile = document.createElement('button');
+        const isMarkedForDelete = Boolean(state.pets.deleteSelected?.[pet.instanceId]);
+        tile.className = `pet-tile ${rarityToClass(pet.rarity)} ${pet.equipped ? 'pet-tile--equipped' : ''} ${state.pets.deleteMode ? 'pet-tile--delete-mode' : ''} ${isMarkedForDelete ? 'pet-tile--delete-selected' : ''}`;
+        tile.setAttribute('tabindex', '-1');
+
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'pet-tile__img';
+
+        // If you later add images at assets/ui/pets/<petId>.png this will pick them up automatically.
+        const img = document.createElement('img');
+        img.className = 'pet-tile__img-el';
+        img.alt = pet.name || pet.petId || 'Pet';
+        const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+        img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
+        img.onerror = () => {
+          img.style.display = 'none';
+          imgWrap.textContent = '🐾';
+        };
+        imgWrap.appendChild(img);
+
+        const mult = document.createElement('div');
+        mult.className = 'pet-tile__mult';
+        mult.textContent = formatMultiplier(pet.multiplier ?? 0);
+
+        tile.appendChild(imgWrap);
+        tile.appendChild(mult);
+
+        if (state.pets.deleteMode) {
+          const overlay = document.createElement('div');
+          overlay.className = 'pet-tile__delete-overlay';
+          overlay.textContent = '✖';
+          overlay.style.display = isMarkedForDelete ? 'flex' : 'none';
+          tile.appendChild(overlay);
+        }
+
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.pets.deleteMode) {
+            // Only allow marking inventory pets (inv:<idx>) and never equipped
+            const isInventory = typeof pet.instanceId === 'string' && pet.instanceId.startsWith('inv:');
+            if (!isInventory || pet.equipped) return;
+
+            if (!state.pets.deleteSelected) state.pets.deleteSelected = {};
+            if (state.pets.deleteSelected[pet.instanceId]) {
+              delete state.pets.deleteSelected[pet.instanceId];
+            } else {
+              state.pets.deleteSelected[pet.instanceId] = true;
+            }
+            // Close detail panel while in delete mode
+            state.pets.selectedPetInstanceId = null;
+            if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+            // Re-render to update overlays
+            renderPets();
+            return;
+          }
+
+          state.pets.selectedPetInstanceId = pet.instanceId;
+          renderPetDetail(pet);
+        });
+
+        petsGridEl.appendChild(tile);
+      }
+    };
+
+    // Footer buttons
+    if (petsEquipBestBtn) {
+      petsEquipBestBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'PET_EQUIP_BEST' });
+      });
+    }
+    if (petsUnequipAllBtn) {
+      petsUnequipAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'PET_UNEQUIP_ALL' });
+      });
+    }
+
+    if (petsTrashToggleBtn) {
+      petsTrashToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.deleteMode = !state.pets.deleteMode;
+        // Reset selection when leaving delete mode
+        if (!state.pets.deleteMode) {
+          state.pets.deleteSelected = {};
+        }
+        // Hide detail panel while in delete mode
+        if (state.pets.deleteMode) {
+          state.pets.selectedPetInstanceId = null;
+          if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+        }
+        renderPets();
+      });
+    }
+
+    if (petsDeleteCancelBtn) {
+      petsDeleteCancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.deleteSelected = {};
+        state.pets.deleteMode = false;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+        renderPets();
+      });
+    }
+
+    if (petsDeleteConfirmBtn) {
+      petsDeleteConfirmBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const selected = state.pets.deleteSelected || {};
+        const instanceIds = Object.keys(selected);
+        const indices = instanceIds
+          .filter((id) => id.startsWith('inv:'))
+          .map((id) => Number(id.split(':')[1]))
+          .filter((n) => Number.isFinite(n));
+        if (indices.length === 0) return;
+        hytopia.sendData({ type: 'PET_DELETE_INV', indices });
+        // Optimistically exit delete mode; server PET_STATE will refresh the grid
+        state.pets.deleteSelected = {};
+        state.pets.deleteMode = false;
+        if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+      });
+    }
+
+    // Pet detail panel controls
+    if (petDetailCloseEl) {
+      petDetailCloseEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.pets.selectedPetInstanceId = null;
+        if (petDetailPanelEl) petDetailPanelEl.hidden = true;
+      });
+    }
+    if (petDetailActionEl) {
+      petDetailActionEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const list = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+        const current = state.pets.selectedPetInstanceId ? (list.find(p => p.instanceId === state.pets.selectedPetInstanceId) || null) : null;
+        if (!current) return;
+        if (current.equipped) {
+          hytopia.sendData({ type: 'PET_UNEQUIP_INSTANCE', slotIndex: current.slotIndex });
+        } else {
+          hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
+        }
+      });
+    }
+
+    // Render maps list
+    function renderMapsList(worlds) {
+      if (!mapsListEl) return;
+      mapsListEl.innerHTML = '';
+
+      worlds.forEach((world) => {
+        const worldCard = document.createElement('div');
+        worldCard.className = `maps-card ${world.isCurrent ? 'maps-card--current' : ''} ${!world.isUnlocked ? 'maps-card--locked' : ''}`;
+
+        const worldName = document.createElement('div');
+        worldName.className = 'maps-card__name';
+        worldName.textContent = world.name;
+        worldCard.appendChild(worldName);
+
+        const worldInfo = document.createElement('div');
+        worldInfo.className = 'maps-card__info';
+        
+        if (world.trophyMultiplier > 1) {
+          const trophyMultiplier = document.createElement('div');
+          trophyMultiplier.className = 'maps-card__multiplier';
+          trophyMultiplier.innerHTML = `🏆 x${world.trophyMultiplier}`;
+          worldInfo.appendChild(trophyMultiplier);
+        }
+
+        if (world.isCurrent) {
+          const currentBadge = document.createElement('div');
+          currentBadge.className = 'maps-card__current';
+          currentBadge.textContent = 'Current';
+          worldInfo.appendChild(currentBadge);
+        }
+
+        worldCard.appendChild(worldInfo);
+
+        const worldActions = document.createElement('div');
+        worldActions.className = 'maps-card__actions';
+
+        if (!world.isUnlocked) {
+          const unlockBtn = document.createElement('button');
+          unlockBtn.className = 'maps-card__btn maps-card__btn--unlock';
+          if (world.unlockRequirement) {
+            unlockBtn.textContent = `Unlock (${world.unlockRequirement.amount} wins)`;
+          } else {
+            unlockBtn.textContent = 'Unlock';
+          }
+          unlockBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hytopia.sendData({ type: 'UNLOCK_WORLD', worldId: world.id });
+          });
+          worldActions.appendChild(unlockBtn);
+        } else {
+          const teleportBtn = document.createElement('button');
+          teleportBtn.className = 'maps-card__btn maps-card__btn--teleport';
+          teleportBtn.textContent = world.isCurrent ? 'Current' : 'Teleport';
+          teleportBtn.disabled = world.isCurrent;
+          if (!world.isCurrent) {
+            teleportBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setLoadingScreenVisible(true);
+              hytopia.sendData({ type: 'TELEPORT_TO_WORLD', worldId: world.id });
+            });
+          }
+          worldActions.appendChild(teleportBtn);
+        }
+
+        worldCard.appendChild(worldActions);
+        mapsListEl.appendChild(worldCard);
+      });
+    }
+
+    // Wire egg station buttons once
+    if (eggOpen1Btn) {
+      eggOpen1Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.eggStation.autoEnabled) return;
+        if (state.eggStation.autoArmed) {
+          state.eggStation.autoArmed = false;
+          startEggAuto(1);
+          renderEggStation();
+          return;
+        }
+        startEggHatchSequence(1);
+      });
+    }
+    if (eggOpen3Btn) {
+      eggOpen3Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.eggStation.autoEnabled) return;
+        if (state.eggStation.autoArmed) {
+          state.eggStation.autoArmed = false;
+          startEggAuto(3);
+          renderEggStation();
+          return;
+        }
+        startEggHatchSequence(3);
+      });
+    }
+    if (eggAutoBtn) {
+      eggAutoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!state.eggStation.autoEnabled) {
+          state.eggStation.autoArmed = true;
+        }
+        renderEggStation();
+      });
+    }
+    if (eggShopGridEl) {
+      eggShopGridEl.addEventListener('click', (e) => {
+        const target = e.target?.closest ? e.target.closest('.egg-shop-card') : null;
+        if (!target) return;
+        const petId = target.dataset.petId;
+        if (!petId) return;
+        const enabled = !target.classList.contains('is-auto-delete');
+        hytopia.sendData({ type: 'EGG_AUTO_DELETE_TOGGLE', petId, enabled });
+      });
+    }
+
+    // Store background click handlers and container click handlers for cleanup
+    const modalBackgroundHandlers = new Map();
+    const modalContainerHandlers = new Map();
+
+    const showModal = (el) => {
+      if (!el) return;
+
+      // Close all other modals first to ensure only one modal is open at a time
+      allModals.forEach(modal => {
+        if (modal && modal !== el && modal.classList.contains('visible')) {
+          hideModal(modal);
+        }
+      });
+
+      el.classList.add('visible');
+
+      // Set body.modal-open to hide HUD elements
+      if (window.setModalOpen) window.setModalOpen(true);
+
+      // Create and store background click handler
+      const handleBackgroundClick = (e) => {
+        // Only close if clicking directly on the modal background (not on the container)
+        if (e.target === el) {
+          hideModal(el);
+        }
+      };
+      
+      // Remove any existing listener first
+      const existingHandler = modalBackgroundHandlers.get(el);
+      if (existingHandler) {
+        el.removeEventListener('click', existingHandler);
+      }
+      
+      // Add new handler and store it
+      el.addEventListener('click', handleBackgroundClick);
+      modalBackgroundHandlers.set(el, handleBackgroundClick);
+      
+      // Prevent clicks inside the modal container from closing
+      // But allow close button clicks to work
+      const container = el.querySelector('.pickaxe-modal__container');
+      if (container) {
+        // Remove existing container handler if any
+        const existingContainerHandler = modalContainerHandlers.get(container);
+        if (existingContainerHandler) {
+          container.removeEventListener('click', existingContainerHandler);
+        }
+        
+        const handleContainerClick = (e) => {
+          // Don't stop propagation if clicking the close button
+          const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close');
+          if (!closeButton) {
+            e.stopPropagation();
+          }
+        };
+        
+        container.addEventListener('click', handleContainerClick);
+        modalContainerHandlers.set(container, handleContainerClick);
+      }
+      
+      // Note: MODAL_OPENED is already sent from button click handlers
+      // This ensures the modal state is set before any click processing
+      // No need to send it again here
+    };
+
+    const hideModal = (el) => {
+      if (!el) return;
+      el.classList.remove('visible');
+      
+      // Remove background click listener using stored reference
+      const backgroundHandler = modalBackgroundHandlers.get(el);
+      if (backgroundHandler) {
+        el.removeEventListener('click', backgroundHandler);
+        modalBackgroundHandlers.delete(el);
+      }
+      
+      // Remove container click listener
+      const container = el.querySelector('.pickaxe-modal__container');
+      if (container) {
+        const containerHandler = modalContainerHandlers.get(container);
+        if (containerHandler) {
+          container.removeEventListener('click', containerHandler);
+          modalContainerHandlers.delete(container);
+        }
+      }
+      
+      // Notify server that a modal is closed (allows manual mining again)
+      if (el.id === 'miner-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'miner' });
+      } else if (el.id === 'pickaxe-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pickaxe' });
+      } else if (el.id === 'rebirth-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
+      } else if (el.id === 'pets-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
+      } else if (el.id === 'egg-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'egg' });
+      }
+
+      // Check if any modals are still open, if not, remove body.modal-open
+      setTimeout(() => {
+        if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+          if (window.setModalOpen) window.setModalOpen(false);
+        }
+      }, 10);
+    };
+
+    const renderPickaxeDetails = () => {
+      // Show selected pickaxe, or equipped if none selected
+      let pickaxeToShow = null;
+      
+      if (state.pickaxe.selectedTier !== undefined) {
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.selectedTier);
+      }
+      
+      if (!pickaxeToShow) {
+        // Fallback to equipped pickaxe
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
+      }
+      
+      if (!pickaxeToShow) {
+        // Fallback to current tier
+        pickaxeToShow = state.pickaxe.pickaxes.find(p => p.tier === state.pickaxe.currentTier);
+      }
+      
+      if (pickaxeToShow) {
+        renderEquippedPickaxe(pickaxeToShow);
+      }
+    };
+
+    const renderEquippedPickaxe = (pickaxe) => {
+      if (!pickaxe) return;
+      
+      // Update name
+      if (pickaxeDetailName) {
+        pickaxeDetailName.textContent = `${pickaxe.name} Pickaxe`;
+      }
+
+      if (pickaxeDetailIcon) {
+        pickaxeDetailIcon.innerHTML = '';
+        if (pickaxe.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${pickaxe.imageUri}`;
+          img.alt = `${pickaxe.name} pickaxe`;
+          img.className = 'pickaxe-details__icon-img';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'contain';
+          pickaxeDetailIcon.appendChild(img);
+        } else {
+          pickaxeDetailIcon.textContent = '⛏️';
+        }
+      }
+
+      // Update stats display (per planning document format)
+      // REBALANCED: Pickaxes now only affect Speed, Luck, and Sell Value Multiplier
+      if (pickaxeDetailStats) {
+        pickaxeDetailStats.innerHTML = '';
+        
+        // Speed (display as percentage increase, e.g., "+5 Speed" means +5% speed)
+        const speed = pickaxe.miningSpeed ? Math.round(pickaxe.miningSpeed) : 0;
+        const speedStat = document.createElement('div');
+        speedStat.className = 'pickaxe-stat pickaxe-stat--speed';
+        speedStat.textContent = `+${speed} Speed`;
+        pickaxeDetailStats.appendChild(speedStat);
+        
+        // Luck bonus
+        const luckBonus = pickaxe.luckBonus ? (pickaxe.luckBonus * 100).toFixed(0) : '0';
+        const luckStat = document.createElement('div');
+        luckStat.className = 'pickaxe-stat pickaxe-stat--luck';
+        luckStat.textContent = `+${luckBonus}% Ore Luck`;
+        pickaxeDetailStats.appendChild(luckStat);
+        
+        // Sell Value Multiplier
+        const sellMultiplier = pickaxe.sellValueMultiplier ? pickaxe.sellValueMultiplier.toFixed(2) : '1.00';
+        const sellStat = document.createElement('div');
+        sellStat.className = 'pickaxe-stat pickaxe-stat--sell';
+        sellStat.textContent = `${sellMultiplier}× Sell Value`;
+        pickaxeDetailStats.appendChild(sellStat);
+      }
+
+      // Action button logic
+      // IMPORTANT: Do NOT cache the action button element globally.
+      // We replace it when updating listeners (clone/remove), so we must re-query it each render.
+      const pickaxeActionButtonEl = document.getElementById('pickaxe-action-button');
+      if (pickaxeActionButtonEl) {
+        // Remove existing click listeners by cloning
+        const newButton = pickaxeActionButtonEl.cloneNode(true);
+        pickaxeActionButtonEl.parentNode.replaceChild(newButton, pickaxeActionButtonEl);
+        const actionButton = document.getElementById('pickaxe-action-button');
+        
+        if (pickaxe.availability === 'equipped') {
+          // Currently equipped - show "Equipped" text (not a button)
+          actionButton.textContent = 'Equipped';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        } else if (pickaxe.availability === 'owned') {
+          // Player owns this pickaxe but it's not equipped - show green Equip button
+          actionButton.textContent = 'Equip';
+          actionButton.classList.remove('disabled');
+          actionButton.disabled = false;
+          actionButton.dataset.tier = String(pickaxe.tier);
+          actionButton.addEventListener('click', () => {
+            console.log(`[UI] Equip pickaxe tier ${pickaxe.tier} from action button`);
+            hytopia.sendData({ type: 'EQUIP_PICKAXE', tier: pickaxe.tier });
+          });
+        } else if (pickaxe.availability === 'available') {
+          // Next tier available - show buy button with cost, grey out if can't afford
+          actionButton.textContent = `🪙 ${formatNumber(pickaxe.cost)}`;
+          actionButton.disabled = false;
+          if (!pickaxe.purchasable) {
+            actionButton.classList.add('disabled');
+          } else {
+            actionButton.classList.remove('disabled');
+          }
+          actionButton.dataset.tier = String(pickaxe.tier);
+          actionButton.addEventListener('click', () => {
+            if (pickaxe.purchasable) {
+              console.log(`[UI] Buy pickaxe tier ${pickaxe.tier} from action button`);
+              hytopia.sendData({ type: 'BUY_PICKAXE', tier: pickaxe.tier });
+            }
+          });
+        } else {
+          // Locked - show locked state
+          actionButton.textContent = 'Locked';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        }
+      }
+    };
+
+    const renderPickaxeGrid = () => {
+      if (!pickaxeGridEl) return;
+      pickaxeGridEl.innerHTML = '';
+      const currentTier = state.pickaxe.currentTier;
+      
+      state.pickaxe.pickaxes.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'pickaxe-card';
+        
+        // Determine state based on availability from backend
+        const isEquipped = p.availability === 'equipped';
+        const isOwned = p.availability === 'owned';
+        const isAvailable = p.availability === 'available';
+        const isLocked = p.availability === 'locked';
+        const isNextTier = p.tier === currentTier + 1;
+
+        // Apply appropriate classes
+        if (isEquipped) {
+          card.classList.add('equipped');
+        } else if (isOwned) {
+          card.classList.add('purchased'); // Owned but not equipped - normal appearance
+        } else if (isAvailable) {
+          card.classList.add('next-tier'); // Available to purchase
+        } else if (isLocked) {
+          card.classList.add('locked'); // Greyed out with lock
+        }
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'pickaxe-card__icon';
+        if (p.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${p.imageUri}`;
+          img.alt = `${p.name} pickaxe`;
+          img.className = 'pickaxe-card__icon-img';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'contain';
+          iconEl.appendChild(img);
+        } else {
+          iconEl.textContent = '⛏️';
+        }
+        card.appendChild(iconEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pickaxe-card__name';
+        nameEl.textContent = p.name;
+        card.appendChild(nameEl);
+
+        // Cost display (only if not equipped and not owned)
+        if (!isEquipped && !isOwned) {
+          const costEl = document.createElement('div');
+          costEl.className = 'pickaxe-card__cost';
+          costEl.innerHTML = `<span>🪙</span> ${formatNumber(p.cost)}`;
+          card.appendChild(costEl);
+        }
+
+        // No buy/equip buttons on cards - all interactions happen in sidebar
+
+        // Equipped checkmark
+        if (isEquipped) {
+          const checkmark = document.createElement('div');
+          checkmark.className = 'pickaxe-card__checkmark';
+          checkmark.textContent = '✓';
+          card.appendChild(checkmark);
+        }
+
+        // Lock icon (if locked)
+        if (isLocked) {
+          const lock = document.createElement('div');
+          lock.className = 'pickaxe-card__lock';
+          lock.textContent = '🔒';
+          card.appendChild(lock);
+        }
+
+        // Highlight selected card
+        if (state.pickaxe.selectedTier === p.tier) {
+          card.classList.add('selected');
+        }
+
+        // Click to select (for details view) - for all pickaxes
+        card.addEventListener('click', () => {
+          state.pickaxe.selectedTier = p.tier;
+          renderPickaxeGrid();
+          renderPickaxeDetails();
+        });
+
+        pickaxeGridEl.appendChild(card);
+      });
+    };
+
+    const updatePickaxeModal = (data) => {
+      state.pickaxe.pickaxes = data.pickaxes || [];
+      state.pickaxe.currentTier = data.currentTier ?? 0;
+      state.gold = data.gold ?? state.gold;
+
+      // If no selection, select the equipped pickaxe
+      if (state.pickaxe.selectedTier === undefined || state.pickaxe.selectedTier === -1) {
+        const equipped = state.pickaxe.pickaxes.find(p => p.availability === 'equipped');
+        state.pickaxe.selectedTier = equipped ? equipped.tier : (state.pickaxe.currentTier >= 0 ? state.pickaxe.currentTier : (data.pickaxes && data.pickaxes.length > 0 ? data.pickaxes[0].tier : 0));
+      }
+
+      renderPickaxeGrid();
+      renderPickaxeDetails();
+      showModal(pickaxeModal);
+    };
+
+    const renderMinerDetails = () => {
+      // Show selected miner, or equipped if none selected
+      let minerToShow = null;
+      
+      if (state.miner.selectedTier !== undefined && state.miner.selectedTier !== -1) {
+        minerToShow = state.miner.miners.find(m => m.tier === state.miner.selectedTier);
+      }
+      
+      if (!minerToShow) {
+        // Fallback to equipped miner
+        minerToShow = state.miner.miners.find(m => m.availability === 'equipped');
+      }
+      
+      if (minerToShow) {
+        renderEquippedMiner(minerToShow);
+      } else {
+        renderEquippedMiner(null);
+      }
+    };
+
+    const renderEquippedMiner = (miner) => {
+      const minerActionButton = document.getElementById('miner-action-button');
+      if (!minerDetailName || !minerDetailStats || !minerActionButton || !minerDetailIcon) return;
+
+        if (!miner) {
+          // No miner equipped
+          minerDetailIcon.textContent = '⛑️';
+          minerDetailName.textContent = 'No Miner';
+          minerDetailStats.innerHTML = '';
+          if (minerActionButton) {
+            minerActionButton.textContent = 'No Miner';
+            minerActionButton.classList.add('disabled');
+            minerActionButton.disabled = true;
+          }
+          return;
+        }
+
+        minerDetailIcon.innerHTML = '';
+        if (miner.imageUri) {
+          const img = document.createElement('img');
+          img.src = `{{CDN_ASSETS_URL}}/${miner.imageUri}`;
+          img.alt = `${miner.name} miner`;
+          img.className = 'pickaxe-details__icon-img';
+          minerDetailIcon.appendChild(img);
+        } else {
+          minerDetailIcon.textContent = '⛑️';
+        }
+        minerDetailName.textContent = miner.name;
+      
+      // Clear and rebuild stats with proper styling classes
+      minerDetailStats.innerHTML = '';
+      
+      // Coin Bonus
+      const coinStat = document.createElement('div');
+      coinStat.className = 'pickaxe-stat pickaxe-stat--sell';
+      coinStat.textContent = `+${miner.coinBonus}% Coins`;
+      minerDetailStats.appendChild(coinStat);
+      
+      // Ore Luck Bonus
+      const luckStat = document.createElement('div');
+      luckStat.className = 'pickaxe-stat pickaxe-stat--luck';
+      luckStat.textContent = `+${miner.oreLuckBonus}% Ore Luck`;
+      minerDetailStats.appendChild(luckStat);
+      
+      // Damage Bonus
+      const damageStat = document.createElement('div');
+      damageStat.className = 'pickaxe-stat pickaxe-stat--damage';
+      damageStat.textContent = `+${miner.damageBonus}% Damage`;
+      minerDetailStats.appendChild(damageStat);
+      
+      // Action button logic
+      if (minerActionButton) {
+        // Remove existing click listeners by cloning
+        const newButton = minerActionButton.cloneNode(true);
+        minerActionButton.parentNode.replaceChild(newButton, minerActionButton);
+        const actionButton = document.getElementById('miner-action-button');
+        
+        if (miner.availability === 'equipped') {
+          // Currently equipped - show "Equipped" text (not a button)
+          actionButton.textContent = 'Equipped';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        } else if (miner.availability === 'owned') {
+          // Player owns this miner but it's not equipped - show green Equip button
+          actionButton.textContent = 'Equip';
+          actionButton.classList.remove('disabled');
+          actionButton.disabled = false;
+          actionButton.dataset.tier = String(miner.tier);
+          actionButton.addEventListener('click', () => {
+            console.log(`[UI] Equip miner tier ${miner.tier} from action button`);
+            hytopia.sendData({ type: 'EQUIP_MINER', tier: miner.tier });
+          });
+        } else if (miner.availability === 'available') {
+          // Next tier available - show buy button with cost, grey out if can't afford
+          actionButton.textContent = `🪙 ${formatNumber(miner.cost)}`;
+          actionButton.disabled = false;
+          if (!miner.purchasable) {
+            actionButton.classList.add('disabled');
+          } else {
+            actionButton.classList.remove('disabled');
+          }
+          actionButton.dataset.tier = String(miner.tier);
+          actionButton.addEventListener('click', () => {
+            if (miner.purchasable) {
+              console.log(`[UI] Buy miner tier ${miner.tier} from action button`);
+              hytopia.sendData({ type: 'BUY_MINER', tier: miner.tier });
+            }
+          });
+        } else {
+          // Locked - show locked state
+          actionButton.textContent = 'Locked';
+          actionButton.classList.add('disabled');
+          actionButton.disabled = true;
+        }
+      }
+    };
+
+    const renderMinerGrid = () => {
+      if (!minerGridEl) return;
+      minerGridEl.innerHTML = '';
+
+      const currentTier = state.miner.currentTier;
+      const gold = state.gold;
+
+      state.miner.miners.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'pickaxe-card';
+        
+        // Determine state based on availability from backend
+        const isEquipped = m.availability === 'equipped';
+        const isOwned = m.availability === 'owned';
+        const isAvailable = m.availability === 'available';
+        const isLocked = m.availability === 'locked';
+
+        // Apply appropriate classes (similar to pickaxe grid)
+        if (isEquipped) {
+          card.classList.add('equipped');
+        } else if (isOwned) {
+          card.classList.add('purchased'); // Owned but not equipped - normal appearance
+        } else if (isAvailable) {
+          card.classList.add('next-tier'); // Available to purchase
+        } else if (isLocked) {
+          card.classList.add('locked'); // Greyed out with lock
+        }
+
+          const iconEl = document.createElement('div');
+          iconEl.className = 'pickaxe-card__icon';
+          if (m.imageUri) {
+            const img = document.createElement('img');
+            img.src = `{{CDN_ASSETS_URL}}/${m.imageUri}`;
+            img.alt = `${m.name} miner`;
+            img.className = 'pickaxe-card__icon-img';
+            iconEl.appendChild(img);
+          } else {
+            iconEl.textContent = '⛑️';
+          }
+          card.appendChild(iconEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pickaxe-card__name';
+        nameEl.textContent = m.name;
+        card.appendChild(nameEl);
+
+        // Cost display (only if not equipped and not owned)
+        if (!isEquipped && !isOwned) {
+          const costEl = document.createElement('div');
+          costEl.className = 'pickaxe-card__cost';
+          costEl.innerHTML = `<span>🪙</span> ${formatNumber(m.cost)}`;
+          card.appendChild(costEl);
+        }
+
+        // No buy/equip buttons on cards - all interactions happen in sidebar
+
+        // Equipped checkmark
+        if (isEquipped) {
+          const checkmark = document.createElement('div');
+          checkmark.className = 'pickaxe-card__checkmark';
+          checkmark.textContent = '✓';
+          card.appendChild(checkmark);
+        }
+
+        // Lock icon (if locked)
+        if (isLocked) {
+          const lock = document.createElement('div');
+          lock.className = 'pickaxe-card__lock';
+          lock.textContent = '🔒';
+          card.appendChild(lock);
+        }
+
+        // Highlight selected card
+        if (state.miner.selectedTier === m.tier) {
+          card.classList.add('selected');
+        }
+
+        card.addEventListener('click', () => {
+          state.miner.selectedTier = m.tier;
+          renderMinerGrid();
+          renderMinerDetails();
+        });
+
+        minerGridEl.appendChild(card);
+      });
+    };
+
+    const updateMinerModal = (data) => {
+      state.miner.miners = data.miners || [];
+      state.miner.currentTier = data.currentTier ?? -1;
+      state.gold = data.gold ?? state.gold;
+      
+      // If no selection, select the equipped miner
+      if (state.miner.selectedTier === undefined || state.miner.selectedTier === -1) {
+        const equipped = state.miner.miners.find(m => m.availability === 'equipped');
+        state.miner.selectedTier = equipped ? equipped.tier : (state.miner.currentTier >= 0 ? state.miner.currentTier : (data.miners && data.miners.length > 0 ? data.miners[0].tier : -1));
+      }
+      
+      renderMinerGrid();
+      renderMinerDetails();
+      showModal(minerModal);
+    };
+
+    const renderRebirthOptions = () => {
+      if (!rebirthOptionsEl) return;
+      rebirthOptionsEl.innerHTML = '';
+      
+      // Sort options by count (1, 5, 20)
+      const sortedOptions = [...state.rebirth.options].sort((a, b) => a.count - b.count);
+
+      sortedOptions.forEach(opt => {
+        const card = document.createElement('div');
+        card.className = 'rebirth-option';
+
+        // Left side: Rebirth count and cost
+        const info = document.createElement('div');
+        info.className = 'rebirth-option__info';
+        
+        const title = document.createElement('div');
+        title.className = 'rebirth-option__title';
+        // Format the count using formatNumber for readability (e.g., "1K Rebirths" instead of "1000 Rebirths")
+        const formattedCount = formatNumber(opt.count);
+        title.textContent = `${formattedCount} Rebirth${opt.count > 1 ? 's' : ''}`;
+        info.appendChild(title);
+        
+        const cost = document.createElement('div');
+        cost.className = 'rebirth-option__cost';
+        cost.textContent = `${formatNumber(opt.cost)} Power`;
+        info.appendChild(cost);
+        
+        card.appendChild(info);
+
+        // Right side: Button
+        const actionWrapper = document.createElement('div');
+        actionWrapper.className = 'rebirth-option__action';
+        const btn = document.createElement('button');
+        btn.className = 'rebirth-button';
+        btn.textContent = 'Rebirth';
+        const affordable = state.power >= opt.cost;
+        if (!affordable) {
+          btn.classList.add('disabled');
+          card.classList.add('unavailable');
+        }
+        btn.addEventListener('click', () => {
+          if (!affordable) return;
+          console.log(`[UI] Performing rebirth: ${opt.count}`);
+          hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: opt.count });
+        });
+        actionWrapper.appendChild(btn);
+        card.appendChild(actionWrapper);
+
+        rebirthOptionsEl.appendChild(card);
+      });
+    };
+
+    const updateRebirthModal = (data) => {
+      state.power = data.currentPower ?? state.power;
+      state.rebirths = data.currentRebirths ?? state.rebirths;
+      state.rebirth.options = data.options || [];
+      state.rebirth.maxRebirths = data.maxRebirths ?? 0;
+      renderRebirthOptions();
+      showModal(rebirthModal);
+      if (rebirthBadge) rebirthBadge.hidden = !(data.canRebirth);
+    };
+
+    const spawnMinedOrePopup = (oreName, oreColor) => {
+      // Skip mined ore popup on mobile - too cluttered
+      if (document.body.classList.contains('mobile')) {
+        return;
+      }
+
+      const timestamp = Date.now();
+      console.log(`[UI] spawnMinedOrePopup called with oreName: ${oreName}, oreColor: ${oreColor}, timestamp: ${timestamp}`);
+
+      // Check for existing popups to see if they're being reused
+      const existingPopups = minedOreLayerEl.querySelectorAll('.mined-ore-popup');
+      if (existingPopups.length > 0) {
+        console.log(`[UI] WARNING: ${existingPopups.length} existing ore popups found when spawning new one!`);
+        existingPopups.forEach((popup, index) => {
+          console.log(`[UI] Existing popup ${index}: classes: ${popup.className}, text: ${popup.textContent}`);
+        });
+      }
+      if (!minedOreLayerEl) {
+        console.error('[UI] minedOreLayerEl not found! Cannot spawn popup.');
+        return;
+      }
+      
+      const popup = document.createElement('div');
+      popup.className = 'mined-ore-popup';
+      
+      // Create text with + prefix
+      const oreText = document.createElement('span');
+      oreText.className = 'mined-ore-popup__text';
+      oreText.textContent = `+${oreName}`;
+      // Apply ore color if provided, otherwise use default white
+      oreText.style.color = oreColor || '#ffffff';
+      popup.appendChild(oreText);
+      
+      // Position above the block health bar name (centered, above the ore name)
+      // Block health bar is at bottom: 120px, name is at the top of it
+      // Position popup above the name text
+      popup.style.left = '50%';
+      popup.style.bottom = '220px'; // Above the ore name
+      popup.style.transform = 'translateX(-50%)';
+      
+      minedOreLayerEl.appendChild(popup);
+      
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+      
+      // Add active class to trigger float up animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+
+      // Fade out and remove
+      setTimeout(() => {
+        popup.classList.add('fade-out');
+        setTimeout(() => popup.remove(), 300); // Wait for fade out animation
+      }, 900); // Total visible time ~1 second
+    };
+
+    const spawnPowerGain = (amount, rockPosition) => {
+      console.log('[UI] spawnPowerGain called with amount:', amount, 'rockPosition:', rockPosition);
+      if (!powerGainLayer) {
+        console.error('[UI] powerGainLayer not found! Cannot spawn popup.');
+        return;
+      }
+      console.log('[UI] powerGainLayer found, creating popup');
+      
+      const popup = document.createElement('div');
+      popup.className = 'power-gain';
+      
+      // Add explosion icon and power amount
+      const icon = document.createElement('span');
+      icon.className = 'power-gain__icon';
+      icon.textContent = '💥';
+      popup.appendChild(icon);
+      
+      const text = document.createElement('span');
+      text.className = 'power-gain__text';
+      text.textContent = `+${formatPopupNumber(amount)}`;
+      popup.appendChild(text);
+      
+      // Position popup near the rock if position is provided
+      if (rockPosition && typeof hytopia !== 'undefined' && hytopia.worldToScreen) {
+        try {
+          // Convert world position to screen coordinates
+          const screenPos = hytopia.worldToScreen(rockPosition.x, rockPosition.y + 2, rockPosition.z);
+          if (screenPos && screenPos.x !== undefined && screenPos.y !== undefined) {
+            // Position near the rock with slight random offset
+            const offsetX = (Math.random() - 0.5) * 60; // -30 to +30 pixels
+            const offsetY = (Math.random() - 0.5) * 60; // -30 to +30 pixels
+            popup.style.left = `${screenPos.x + offsetX}px`;
+            popup.style.top = `${screenPos.y + offsetY}px`;
+            popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+          } else {
+            // Fallback to center screen with random offset
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const offsetX = (Math.random() - 0.5) * 200;
+            const offsetY = (Math.random() - 0.5) * 200;
+            popup.style.left = `${centerX + offsetX}px`;
+            popup.style.top = `${centerY + offsetY}px`;
+            popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+          }
+        } catch (e) {
+          console.warn('[UI] Failed to convert world to screen position:', e);
+          // Fallback to center screen
+          popup.style.left = '50%';
+          popup.style.top = '50%';
+          popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        }
+      } else {
+        // Fallback: center of screen with random offset
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const offsetX = (Math.random() - 0.5) * 200;
+        const offsetY = (Math.random() - 0.5) * 200;
+        popup.style.left = `${centerX + offsetX}px`;
+        popup.style.top = `${centerY + offsetY}px`;
+        popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+      }
+      
+      powerGainLayer.appendChild(popup);
+      
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+      
+      // Add active class to trigger animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+      
+      setTimeout(() => {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 600); // Wait for fade out animation
+      }, 1000); // Disappear after 1 second
+    };
+
+    const spawnDamagePopup = (damage) => {
+      if (!damagePopupLayerEl) {
+        console.error('[UI] damagePopupLayerEl not found! Cannot spawn damage popup.');
+        return;
+      }
+
+      if (damage <= 0) {
+        return; // Don't show popup for 0 damage
+      }
+
+      const popup = document.createElement('div');
+      popup.className = 'damage-popup';
+
+      const isMobile = document.body.classList.contains('mobile');
+
+      if (isMobile) {
+        // On mobile: position centered like power gain popups
+        const icon = document.createElement('span');
+        icon.className = 'damage-popup__icon';
+        icon.textContent = '⚔️';
+        popup.appendChild(icon);
+
+        const damageText = document.createElement('span');
+        damageText.className = 'damage-popup__text';
+        damageText.textContent = `-${formatNumber(damage)}`;
+        popup.appendChild(damageText);
+
+        // Position near center with random offset (like power gain)
+        const offsetX = (Math.random() - 0.5) * 60;
+        const offsetY = (Math.random() - 0.5) * 40;
+        popup.style.left = `${(window.innerWidth / 2) + offsetX}px`;
+        popup.style.top = `${(window.innerHeight / 2) + offsetY}px`;
+        popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        popup.classList.add('mobile');
+      } else {
+        // On desktop: position to the right of the HP bar
+        const damageText = document.createElement('span');
+        damageText.className = 'damage-popup__text';
+        damageText.textContent = `${formatNumber(damage)} Dmg`;
+        popup.appendChild(damageText);
+
+        const hpBarCenter = window.innerWidth / 2;
+        const hpBarRightEdge = hpBarCenter + 150;
+        const gap = 240;
+        const leftPosition = hpBarRightEdge + gap + (Math.random() * 20 - 10);
+        const bottomOffset = 180 + (Math.random() * 10 - 5);
+        popup.style.left = `${leftPosition}px`;
+        popup.style.bottom = `${bottomOffset}px`;
+      }
+
+      damagePopupLayerEl.appendChild(popup);
+
+      // Force a reflow before adding active class
+      popup.offsetHeight;
+
+      // Add active class to trigger animation
+      requestAnimationFrame(() => {
+        popup.classList.add('active');
+      });
+
+      setTimeout(() => {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 400); // Wait for fade out animation after removing active class
+      }, isMobile ? 1000 : 1500); // Shorter duration on mobile like power gain
+    };
+
+    const renderTrainingPrompt = () => {
+      if (!trainingPromptEl || !trainingPromptTitleEl || !trainingPromptSubtitleEl || !trainingPromptKeyEl) return;
+      if (!state.prompt.visible) {
+        trainingPromptEl.classList.remove('visible');
+        return;
+      }
+
+      // Show "Hold E to interact" message
+      trainingPromptTitleEl.textContent = state.prompt.rockName;
+      trainingPromptSubtitleEl.textContent = `Hold ${state.prompt.actionKey || 'E'} to interact`;
+      trainingPromptKeyEl.textContent = (state.prompt.actionKey || 'E').toUpperCase();
+      trainingPromptEl.classList.toggle('locked', state.prompt.canTrain === false);
+      trainingPromptEl.classList.add('visible');
+    };
+
+    // Setup button handlers
+    const autoMineButton = document.getElementById('auto-mine-button');
+    const autoTrainButton = document.getElementById('auto-train-button');
+    const toSurfaceButton = document.getElementById('to-surface-button');
+
+    // Ensure buttons don't have focus on load - blur them immediately
+    if (autoMineButton) autoMineButton.blur();
+    if (autoTrainButton) autoTrainButton.blur();
+    if (toSurfaceButton) toSurfaceButton.blur();
+    
+    // Ensure body has focus for keyboard input
+    if (document.body) {
+      document.body.focus();
+    }
+
+  // Default auto-mine state to inactive (green) until server sends state
+  if (autoMineButton) {
+    // Prevent focus so space/enter (jump) don't trigger the button
+    autoMineButton.setAttribute('tabindex', '-1');
+    autoMineButton.setAttribute('role', 'button');
+    
+    // Prevent keyboard events from triggering the button
+    autoMineButton.addEventListener('keydown', e => {
+      // Only prevent Space and Enter from triggering the button
+      // Let all other keys (WASD, etc.) pass through to the game
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    });
+    
+    // Prevent mousedown from focusing the button
+    autoMineButton.addEventListener('mousedown', e => {
+      e.preventDefault();
+      // Don't let mousedown focus the button
+      autoMineButton.blur();
+    });
+    
+    autoMineButton.classList.add('inactive');
+    
+    // Set up click handler
+    autoMineButton.addEventListener('click', (e) => {
+      console.log('[UI] AUTO MINE button clicked');
+      // Optimistically toggle UI state for instant feedback
+      const nextEnabled = !autoMineButton.classList.contains('active');
+      updateAutoMineButton(nextEnabled);
+
+      // Send data to server using correct Hytopia SDK method
+      console.log('[UI] Sending TOGGLE_AUTO_MINE to server');
+      hytopia.sendData({ type: 'TOGGLE_AUTO_MINE' });
+
+      // Return focus to game so movement keys keep working
+      autoMineButton.blur();
+      window.focus();
+    });
+  }
+
+    // Default auto-train state to inactive (green) until server sends state
+    if (autoTrainButton) {
+      // Prevent focus so space/enter (jump) don't trigger the button
+      autoTrainButton.setAttribute('tabindex', '-1');
+      autoTrainButton.setAttribute('role', 'button');
+      
+      // Prevent keyboard events from triggering the button
+      autoTrainButton.addEventListener('keydown', e => {
+        // Only prevent Space and Enter from triggering the button
+        // Let all other keys (WASD, etc.) pass through to the game
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Prevent mousedown from focusing the button
+      autoTrainButton.addEventListener('mousedown', e => {
+        e.preventDefault();
+        // Don't let mousedown focus the button
+        autoTrainButton.blur();
+      });
+      
+      autoTrainButton.classList.add('inactive');
+      
+      // Set up click handler
+      autoTrainButton.addEventListener('click', (e) => {
+        console.log('[UI] AUTO TRAIN button clicked');
+        // Optimistically toggle UI state for instant feedback
+        const nextEnabled = !autoTrainButton.classList.contains('active');
+        updateAutoTrainButton(nextEnabled);
+
+        // Send data to server using correct Hytopia SDK method
+        console.log('[UI] Sending TOGGLE_AUTO_TRAIN to server');
+        hytopia.sendData({ type: 'TOGGLE_AUTO_TRAIN' });
+
+        // Return focus to game so movement keys keep working
+        autoTrainButton.blur();
+        window.focus();
+      });
+    }
+
+    if (toSurfaceButton) {
+      // Prevent focus so space/enter (jump) don't trigger the button
+      toSurfaceButton.setAttribute('tabindex', '-1');
+      toSurfaceButton.setAttribute('role', 'button');
+      
+      // Prevent keyboard events from triggering the button
+      toSurfaceButton.addEventListener('keydown', e => {
+        // Only prevent Space and Enter from triggering the button
+        // Let all other keys (WASD, etc.) pass through to the game
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Prevent mousedown from focusing the button
+      toSurfaceButton.addEventListener('mousedown', e => {
+        e.preventDefault();
+        // Don't let mousedown focus the button
+        toSurfaceButton.blur();
+      });
+      
+      // Set up click handler
+      toSurfaceButton.addEventListener('click', (e) => {
+        console.log('[UI] TELEPORT TO SURFACE button clicked');
+        hytopia.sendData({ type: 'TELEPORT_TO_SURFACE' });
+
+        // Return focus to game so movement keys keep working
+        toSurfaceButton.blur();
+        window.focus();
+      });
+    }
+
+    function updateProgressBar(currentDepth, goalDepth) {
+      const progressBarFillEl = document.getElementById('progress-bar-fill');
+      const progressBarMarkerEl = document.getElementById('progress-bar-marker');
+      const progressBarEl = document.getElementById('progress-bar');
+
+      if (!progressBarFillEl || !progressBarMarkerEl || !progressBarEl) return;
+
+      const progress = Math.min(100, (currentDepth / goalDepth) * 100);
+
+      // Check if we're in mobile mode (vertical progress bar)
+      const isMobile = document.body.classList.contains('mobile');
+
+      if (isMobile) {
+        // Vertical mode: use height and bottom
+        progressBarFillEl.style.height = `${progress}%`;
+        progressBarFillEl.style.width = '100%';
+        progressBarMarkerEl.style.bottom = `${progress}%`;
+        progressBarMarkerEl.style.left = '-6px';
+      } else {
+        // Horizontal mode: use width and left
+        progressBarFillEl.style.width = `${progress}%`;
+        progressBarFillEl.style.height = '100%';
+        progressBarMarkerEl.style.left = `${progress}%`;
+        progressBarMarkerEl.style.bottom = 'auto';
+      }
+    }
+
+    function updateAutoMineButton(enabled) {
+      if (!autoMineButton) return;
+      if (enabled) {
+        autoMineButton.classList.add('active');
+        autoMineButton.classList.remove('inactive');
+      } else {
+        autoMineButton.classList.remove('active');
+        autoMineButton.classList.add('inactive');
+      }
+    }
+
+    function updateAutoTrainButton(enabled) {
+      if (!autoTrainButton) return;
+      if (enabled) {
+        autoTrainButton.classList.add('active');
+        autoTrainButton.classList.remove('inactive');
+      } else {
+        autoTrainButton.classList.remove('active');
+        autoTrainButton.classList.add('inactive');
+      }
+    }
+
+    function setLoadingScreenVisible(visible) {
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.toggle('visible', Boolean(visible));
+      }
+      if (document.body) {
+        document.body.classList.toggle('loading', Boolean(visible));
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Default to visible until the server tells us to hide it.
+      setLoadingScreenVisible(true);
+    });
+
+    hytopia.onData(data => {
+      console.log('[UI] Received data:', data.type, data);
+      switch (data.type) {
+        case 'LOADING_SCREEN':
+          setLoadingScreenVisible(Boolean(data.visible));
+          break;
+        case 'POWER_STATS':
+          state.power = data.power ?? 0;
+          state.gold = data.gold ?? state.gold;
+          state.gems = data.gems ?? state.gems;
+          state.wins = data.wins ?? state.wins;
+          state.rebirths = data.rebirths ?? state.rebirths;
+          if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          break;
+        case 'GOLD_STATS':
+          state.gold = data.gold ?? 0;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          console.log('[UI] Updated gold stats:', state.gold);
+          break;
+        case 'GEMS_STATS':
+          state.gems = data.gems ?? 0;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          console.log('[UI] Updated gems stats:', state.gems);
+          break;
+        case 'WINS_STATS':
+          state.wins = data.wins ?? 0;
+          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          console.log('[UI] Updated wins stats:', state.wins);
+          break;
+        case 'REBIRTHS_STATS':
+          state.rebirths = data.rebirths ?? 0;
+          if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          console.log('[UI] Updated rebirths stats:', state.rebirths);
+          break;
+        case 'POWER_GAIN':
+          console.log('[UI] Processing POWER_GAIN:', data);
+          state.power = data.totalPower ?? state.power + (data.amount ?? 0);
+          console.log('[UI] New power total:', state.power);
+          if (powerValueEl) {
+            powerValueEl.textContent = formatNumber(state.power);
+            console.log('[UI] Updated power value element');
+          } else {
+            console.warn('[UI] powerValueEl is null!');
+          }
+          if (typeof data.amount === 'number' && data.amount > 0) {
+            console.log('[UI] Spawning power gain popup:', data.amount, 'at rock position:', data.rockPosition);
+            spawnPowerGain(data.amount, data.rockPosition);
+          } else {
+            console.warn('[UI] Invalid amount for popup:', data.amount);
+          }
+          break;
+        case 'TRAINING_PROMPT':
+          // Show or hide the training prompt based on visibility
+          state.prompt.visible = data.visible ?? false;
+          if (data.visible) {
+            // Update prompt data when showing
+            state.prompt.rockName = data.rockName || 'Training Rock';
+            state.prompt.requirements = data.requirements || { power: 0, rebirths: 0 };
+            state.prompt.canTrain = data.canTrain ?? false;
+            state.prompt.actionKey = data.actionKey || 'E';
+          }
+          renderTrainingPrompt();
+          break;
+        case 'MINING_STATE':
+          state.mining.isMining = data.isMining ?? false;
+          if (miningHudEl) {
+            if (state.mining.isMining) {
+              miningHudEl.classList.add('visible');
+            } else {
+              miningHudEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MERCHANT_PROXIMITY':
+          console.log('[UI] Merchant proximity:', data.inProximity);
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const merchantUI = document.getElementById('merchant-ui');
+          if (merchantUI) {
+            if (data.inProximity) {
+              merchantUI.classList.add('visible');
+              if (window.setModalOpen) window.setModalOpen(true);
+              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
+            } else {
+              merchantUI.classList.remove('visible');
+              setTimeout(() => {
+                if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+                  if (window.setModalOpen) window.setModalOpen(false);
+                }
+              }, 10);
+            }
+          }
+          break;
+        case 'MINE_RESET_UPGRADE_PROXIMITY':
+          console.log('[UI] Mine Reset Upgrade proximity:', data.inProximity);
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
+          if (upgradeUI) {
+            if (data.inProximity) {
+              upgradeUI.classList.add('visible');
+              if (window.setModalOpen) window.setModalOpen(true);
+              updateMineResetUpgradeUI(
+                data.hasUpgrade ?? false,
+                data.cost ?? 2_000_000,
+                data.gold ?? 0
+              );
+            } else {
+              upgradeUI.classList.remove('visible');
+              setTimeout(() => {
+                if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+                  if (window.setModalOpen) window.setModalOpen(false);
+                }
+              }, 10);
+            }
+          }
+          break;
+        case 'GEM_TRADER_PROXIMITY':
+          console.log('[UI] Gem Trader proximity:', data.inProximity);
+          state.gems = data.gems ?? state.gems;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          const gemTraderUI = document.getElementById('gem-trader-ui');
+          if (gemTraderUI) {
+            if (data.inProximity) {
+              gemTraderUI.classList.add('visible');
+              if (window.setModalOpen) window.setModalOpen(true);
+              updateGemTraderUI(data.upgrades || {}, data.gems || 0);
+            } else {
+              gemTraderUI.classList.remove('visible');
+              setTimeout(() => {
+                if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+                  if (window.setModalOpen) window.setModalOpen(false);
+                }
+              }, 10);
+            }
+          }
+          break;
+        case 'EGG_STATION_PROXIMITY': {
+          // Server-driven proximity: show/hide egg modal
+          if (!data.inProximity) {
+            state.eggStation.inProximity = false;
+            state.eggStation.stationId = null;
+            state.eggStation.stations = [];
+            state.eggStation.eggPets = [];
+            state.eggStation.autoDeletePets = [];
+            stopEggAuto();
+            if (eggModal) hideModal(eggModal);
+            break;
+          }
+
+          state.eggStation.inProximity = true;
+          state.eggStation.stations = Array.isArray(data.stations) ? data.stations : [];
+          state.eggStation.stationId = data.station?.id ?? null;
+          state.eggStation.stationName = data.station?.name ?? 'Egg Station';
+          state.eggStation.eggType = data.station?.eggType ?? 'stone';
+          state.eggStation.defaultOpenCount = data.station?.defaultOpenCount ?? 1;
+          state.eggStation.costGold = data.station?.costGold ?? 0;
+          state.eggStation.eggPets = data.station?.eggPets ?? [];
+          state.eggStation.autoDeletePets = data.player?.autoDeletePets ?? [];
+
+          // Update gold + pet counts snapshot (for display)
+          if (typeof data.player?.gold === 'number') {
+            state.gold = data.player.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          }
+          if (typeof data.player?.petInventoryCount === 'number') {
+            state.pets.ownedCount = data.player.petInventoryCount;
+          }
+          if (typeof data.player?.petInventoryCap === 'number') {
+            state.pets.ownedCap = data.player.petInventoryCap;
+          }
+          if (typeof data.player?.petEquippedCount === 'number') {
+            state.pets.equippedCount = data.player.petEquippedCount;
+          }
+          if (typeof data.player?.petEquippedCap === 'number') {
+            state.pets.equippedCap = data.player.petEquippedCap;
+          }
+
+          // Open modal and block manual mining clicks
+          if (eggModal && !eggModal.classList.contains('visible')) {
+            hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'egg' });
+            showModal(eggModal);
+            // Refresh pets immediately so inventory/equipped counts are accurate
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          }
+          renderEggStation();
+          break;
+        }
+        case 'EGG_AUTO_DELETE_LIST':
+          state.eggStation.autoDeletePets = Array.isArray(data.autoDeletePets) ? data.autoDeletePets : [];
+          renderEggStation();
+          break;
+        case 'EGG_HATCH_RESULT': {
+          if (!data.success) {
+            console.log('[UI] Egg hatch failed:', data.message);
+            // Stop auto if we can't hatch (insufficient gold, inventory full, etc.)
+            stopEggAuto();
+            if (eggStationStatusEl) {
+              eggStationStatusEl.textContent = data.message || 'Failed';
+            }
+            resetEggHatchOverlay();
+            break;
+          }
+
+          state.eggStation.lastHatch = data.results || [];
+          if (currentEggHatch) {
+            currentEggHatch.results = data.results || [];
+            maybeFinishEggHatch();
+          }
+          if (typeof data.goldSpent === 'number') {
+            // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
+            state.gold = Math.max(0, state.gold - data.goldSpent);
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          }
+          renderEggStation();
+          break;
+        }
+        case 'PET_STATE':
+          state.pets.pets = data.pets || [];
+          state.pets.ownedCount = data.ownedCount ?? state.pets.ownedCount;
+          state.pets.ownedCap = data.ownedCap ?? state.pets.ownedCap;
+          state.pets.equippedCount = data.equippedCount ?? state.pets.equippedCount;
+          state.pets.equippedCap = data.equippedCap ?? state.pets.equippedCap;
+          state.pets.multiplierSum = data.multiplierSum ?? 0;
+          state.pets.trainingMultiplier = data.trainingMultiplier ?? 1;
+          renderPets();
+          // Egg modal also displays pet inventory count, so refresh it too
+          renderEggStation();
+          break;
+        case 'PET_ACTION_RESULT':
+          if (!data.success) {
+            console.log('[UI] Pet action failed:', data.message);
+          }
+          break;
+        case 'UPGRADE_PURCHASED':
+          console.log('[UI] Upgrade purchased:', data);
+          state.gems = data.remainingGems ?? state.gems;
+          if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          // Refresh the UI by requesting updated data (if UI is visible)
+          const gemTraderUIVisible = document.getElementById('gem-trader-ui')?.classList.contains('visible');
+          if (gemTraderUIVisible && data.success) {
+            // Request refresh - in a real implementation, we'd re-request the data
+            // For now, the server will send GEM_TRADER_PROXIMITY again to refresh
+            console.log('[UI] Upgrade purchased successfully, UI should refresh');
+          }
+          break;
+        case 'MINE_RESET_UPGRADE_PURCHASED':
+          console.log('[UI] Mine Reset Upgrade purchase result:', data);
+          state.gold = data.remainingGold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const upgradeUIVisible = document.getElementById('mine-reset-upgrade-ui')?.classList.contains('visible');
+          if (upgradeUIVisible) {
+            // Always update with the hasUpgrade flag from server
+            updateMineResetUpgradeUI(
+              data.hasUpgrade ?? true, // Default to true if purchase was successful
+              data.cost ?? 2_000_000,
+              data.remainingGold ?? 0
+            );
+          }
+          break;
+        case 'INVENTORY_UPDATE':
+          console.log('[UI] Inventory update received');
+          state.gold = data.gold ?? state.gold;
+          if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          const merchantUIVisible = document.getElementById('merchant-ui')?.classList.contains('visible');
+          if (merchantUIVisible) {
+            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
+            if (data.goldEarned && data.goldEarned > 0) {
+              // Show gold earned notification
+              console.log(`[UI] Gold earned: ${data.goldEarned}`);
+            }
+          }
+          break;
+        case 'MINING_UPDATE':
+          if (!state.mining.isInMine) {
+            break;
+          }
+          state.mining.damage = data.damage ?? 0;
+          state.mining.currentOre = data.currentOreName ?? null;
+          const blockHP = data.blockHP ?? 0;
+          const maxHP = data.maxHP ?? 100;
+          const isChest = data.isChest ?? false;
+          const sellValue = data.sellValue ?? null;
+          const gemReward = data.gemReward ?? null;
+          
+          // Spawn damage popup for each mining swing
+          if (state.mining.damage > 0) {
+            spawnDamagePopup(state.mining.damage);
+          }
+
+          // Spawn ore mined popup when block is destroyed (like damage popups)
+          if (data.oreMined && data.oreMinedColor) {
+            console.log(`[UI] MINING_UPDATE received ore mined: ${data.oreMined}, spawning popup (damage: ${data.damage}, blockHP: ${data.blockHP})`);
+            spawnMinedOrePopup(data.oreMined, data.oreMinedColor);
+          }
+
+          // Update block health bar (bottom center, above progress bar)
+          if (blockHealthBarEl && blockHealthBarNameEl && blockHealthBarFillEl && blockHealthBarTextEl && blockRewardDisplayEl) {
+            // Store current block info if valid
+            const oreColor = data.oreColor ?? null;
+            let currentBlockInfo = null;
+            if (state.mining.currentOre && blockHP > 0 && maxHP > 0) {
+              currentBlockInfo = {
+                name: state.mining.currentOre,
+                blockHP: blockHP,
+                maxHP: maxHP,
+                isChest: isChest,
+                sellValue: sellValue,
+                gemReward: gemReward,
+                color: oreColor // Store color for display
+              };
+              state.mining.lastBlockInfo = currentBlockInfo; // Update last known block
+            }
+            
+            // Use current block info if available, otherwise use last known block info
+            // This prevents UI from disappearing during fast mining transitions
+            const displayInfo = currentBlockInfo || state.mining.lastBlockInfo;
+            
+            if (displayInfo) {
+              // Update ALL content FIRST before showing (prevents flicker when switching ores quickly)
+              // This ensures the UI never disappears - it just updates content instantly
+              blockHealthBarNameEl.textContent = displayInfo.name;
+              // Apply ore color if available (for ores, not chests)
+              if (!displayInfo.isChest && displayInfo.color) {
+                blockHealthBarNameEl.style.color = displayInfo.color;
+              } else {
+                // Use white for chests or if no color available
+                blockHealthBarNameEl.style.color = '#fff';
+              }
+              blockHealthBarTextEl.textContent = `${formatNumber(Math.floor(displayInfo.blockHP))}/${formatNumber(Math.floor(displayInfo.maxHP))} HP`;
+              
+              // Calculate fill percentage
+              const fillPercent = Math.max(0, Math.min(100, (displayInfo.blockHP / displayInfo.maxHP) * 100));
+              blockHealthBarFillEl.style.width = `${fillPercent}%`;
+              
+              // Update reward display (sell value for ores, gem reward for chests)
+              // On mobile, show compact format (icon + number only)
+              const isMobile = document.body.classList.contains('mobile');
+              if (displayInfo.isChest && displayInfo.gemReward !== null && displayInfo.gemReward > 0) {
+                // Display gem reward for chests
+                const gemLabel = isMobile ? '' : ' Gems';
+                blockRewardDisplayEl.innerHTML = `<span style="color: #4caf50;">💎</span> <span style="color: #4caf50; font-weight: 700;">${formatNumber(displayInfo.gemReward)}${gemLabel}</span>`;
+                blockRewardDisplayEl.style.display = 'flex';
+              } else if (!displayInfo.isChest && displayInfo.sellValue !== null && displayInfo.sellValue > 0) {
+                // Display sell value for ores
+                const goldLabel = isMobile ? '' : ' Gold';
+                blockRewardDisplayEl.innerHTML = `<span style="color: #ffd700;">🪙</span> <span style="color: #ffd700; font-weight: 700;">${formatNumber(displayInfo.sellValue)}${goldLabel}</span>`;
+                blockRewardDisplayEl.style.display = 'flex';
+              } else {
+                blockRewardDisplayEl.style.display = 'none';
+              }
+              
+              // Show UI instantly with no transition - ensures UI is always visible
+              // Use both class and inline style to override any transitions
+              blockHealthBarEl.style.opacity = '1';
+              blockHealthBarEl.style.transition = 'none';
+              blockHealthBarEl.classList.add('visible');
+            } else {
+              // Only hide if we truly have no block info at all
+              // Clear last known block when leaving mine
+              state.mining.lastBlockInfo = null;
+              blockHealthBarEl.style.opacity = '0';
+              blockHealthBarEl.style.transition = 'none';
+              blockHealthBarEl.classList.remove('visible');
+              blockRewardDisplayEl.style.display = 'none';
+            }
+          }
+          
+          // Old current ore display removed - now using mining target display
+          
+          // Update damage display (bottom middle right)
+          if (damageDisplayEl) {
+            if (state.mining.damage > 0) {
+              damageDisplayEl.textContent = `${Math.round(state.mining.damage)} Dmg`;
+              damageDisplayEl.classList.add('visible');
+            } else {
+              damageDisplayEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'PROGRESS_UPDATE':
+          updateProgressBar(data.currentDepth ?? 0, data.goalDepth ?? 1000);
+          break;
+        case 'MINING_STATE_UPDATE':
+          state.mining.isInMine = data.isInMine ?? false;
+          // Show/hide mining controls
+          const miningControlsEl = document.getElementById('mining-controls');
+          if (miningControlsEl) {
+            if (data.isInMine) {
+              miningControlsEl.classList.add('visible');
+            } else {
+              miningControlsEl.classList.remove('visible');
+            }
+          }
+          
+          // Clear block health bar when leaving mine
+          if (!data.isInMine) {
+            // Clear last known block info when leaving mine
+            state.mining.lastBlockInfo = null;
+            if (blockHealthBarEl) {
+              blockHealthBarEl.style.opacity = '0';
+              blockHealthBarEl.style.transition = 'none';
+              blockHealthBarEl.classList.remove('visible');
+            }
+            if (blockRewardDisplayEl) {
+              blockRewardDisplayEl.style.display = 'none';
+            }
+            if (damageDisplayEl) {
+              damageDisplayEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MINE_RESET_TIMER':
+          // Update mine reset timer display (compact format, icon added via CSS)
+          if (mineResetTimerEl && mineResetTimerTextEl) {
+            if (data.timeRemaining !== null && data.timeRemaining !== undefined) {
+              mineResetTimerTextEl.textContent = data.timeRemaining;
+              mineResetTimerEl.classList.add('visible');
+            } else {
+              mineResetTimerEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'MINING_DEPTH_COUNTER':
+          // Update mining depth counter display (shows depth / maxDepth)
+          if (miningDepthCounterEl && miningDepthCounterTextEl) {
+            const depth = data.depth ?? 0;
+            const maxDepth = data.maxDepth ?? 1000;
+            if (data.visible !== false) {
+              miningDepthCounterTextEl.textContent = `${depth} / ${maxDepth}`;
+              miningDepthCounterEl.classList.add('visible');
+            } else {
+              miningDepthCounterEl.classList.remove('visible');
+            }
+          }
+          break;
+        case 'AUTO_MINE_STATE':
+          updateAutoMineButton(data.enabled ?? false);
+          break;
+        case 'AUTO_TRAIN_STATE':
+          updateAutoTrainButton(data.enabled ?? false);
+          break;
+        case 'MINER_SHOP_DATA':
+          updateMinerModal(data);
+          break;
+        case 'MINER_PURCHASED':
+          if (data.success) {
+            state.gold = data.remainingGold ?? state.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+            // Refresh miner shop data
+            hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+          }
+          break;
+        case 'MINER_EQUIPPED':
+          if (data.success) {
+            // Refresh miner shop data and update the detail panel
+            hytopia.sendData({ type: 'OPEN_MINER_SHOP' });
+            // Also re-render details to update button state
+            renderMinerDetails();
+          }
+          break;
+        case 'PICKAXE_SHOP_DATA':
+          console.log('[UI] Pickaxe shop data received');
+          updatePickaxeModal(data);
+          break;
+        case 'PICKAXE_PURCHASED':
+          console.log('[UI] Pickaxe purchase result:', data);
+          if (data.success) {
+            state.gold = data.remainingGold ?? state.gold;
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+            // Update pickaxe state
+            state.pickaxe.currentTier = data.newTier ?? state.pickaxe.currentTier;
+            // Refresh shop data
+            hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+          } else {
+            console.warn('[UI] Pickaxe purchase failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'PICKAXE_EQUIPPED':
+          console.log('[UI] Pickaxe equip result:', data);
+          if (data.success) {
+            // Update pickaxe state
+            state.pickaxe.currentTier = data.newTier ?? state.pickaxe.currentTier;
+            // Refresh shop data to update availability status
+            hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+            // Also re-render details to update button state
+            renderPickaxeDetails();
+          } else {
+            console.warn('[UI] Pickaxe equip failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'REBIRTH_UI_DATA':
+          console.log('[UI] Rebirth UI data received');
+          updateRebirthModal(data);
+          break;
+        case 'REBIRTH_COMPLETE':
+          console.log('[UI] Rebirth complete:', data);
+          if (data.success) {
+            state.power = data.newPower ?? state.power;
+            state.rebirths = data.newRebirths ?? state.rebirths;
+            if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
+            if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+            // Refresh rebirth UI data
+            hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
+          } else {
+            console.warn('[UI] Rebirth failed:', data.message);
+          }
+          break;
+        case 'WORLDS_PANEL_DATA':
+          console.log('[UI] Worlds panel data received:', data);
+          renderMapsList(data.worlds || []);
+          break;
+        case 'WORLD_UNLOCKED':
+          console.log('[UI] World unlocked:', data);
+          if (data.success) {
+            // Refresh worlds panel data
+            hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+            if (data.message) {
+              // Could show success message here
+            }
+          } else {
+            console.warn('[UI] World unlock failed:', data.message);
+            // Could show error message to user here
+          }
+          break;
+        case 'WORLD_TELEPORTED':
+          console.log('[UI] World teleported:', data);
+          if (data.success) {
+            // Close modal on successful teleport
+            if (mapsModal) hideModal(mapsModal);
+            // Refresh worlds panel data
+            hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+          } else {
+            console.warn('[UI] World teleport failed:', data.message);
+            setLoadingScreenVisible(false);
+            // Could show error message to user here
+          }
+          break;
+        default:
+          console.log('[UI] Unknown event type:', data.type);
+        break;
+      }
+    });
+  }
+</script>

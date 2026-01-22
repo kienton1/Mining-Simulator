@@ -73,10 +73,9 @@ startServer(world => {
    * debugging physics.
    */
   
-  world.simulation.enableDebugRendering(true);
+  world.simulation.enableDebugRendering(false);
   if ((world.simulation as any).enableDebugRaycasting) {
-
-    (world.simulation as any).enableDebugRaycasting(true);
+    (world.simulation as any).enableDebugRaycasting(false);
   }
 
   /**
@@ -229,8 +228,8 @@ startServer(world => {
     },
   ];
 
-  // Egg UI should only pop when you're right up on the barrel (~1 block).
-  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 1.1);
+  // Egg UI should pop when you're near the barrel (~3 blocks horizontal distance).
+  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 3.0);
   eggStationManager.start();
 
   // Floating name + cost labels (SceneUI), anchored like training rocks.
@@ -1138,13 +1137,6 @@ startServer(world => {
 
       }
     });
-    
-    // Send initial UI stats after a brief delay to allow saved data to load first
-    // If saved data loads, it will update the UI with correct values
-    // If not, this will send the default values
-    setTimeout(() => {
-      gameManager.onPlayerUILoaded(player);
-    }, 150);
 
     // Set up mining input handling
     const miningController = gameManager.getMiningController();
@@ -1157,29 +1149,35 @@ startServer(world => {
     
     // Set up left click callbacks (like NewGame does with shoot)
     playerEntity.setOnLeftClickStart(() => {
+      console.log('[LeftClick] Click detected for player:', player.username);
+
       // Don't allow mining if player is not in the mine
       // This prevents mining animations and raycasting on the surface
       if (!gameManager.isPlayerInMine(player)) {
+        console.log('[LeftClick] Player not in mine');
         return;
       }
-      
+
       // Don't allow manual mining if:
       // 1. Auto-mine is enabled (it handles mining automatically)
       // 2. A blocking modal (pickaxe or rebirth) is open
       const autoState = gameManager.getPlayerAutoState(player);
       if (autoState?.autoMineEnabled) {
         // Auto-mine is on - don't allow manual clicks to mine
+        console.log('[LeftClick] Auto-mine enabled, ignoring manual click');
         return;
       }
-      
+
       // Check if any blocking modal is open
       if (gameManager.isBlockingModalOpen(player)) {
         // Modal is open - don't allow manual mining
         // Auto-mine can still work, but manual clicks are blocked
+        console.log('[LeftClick] Blocking modal open');
         return;
       }
-      
+
       // Player is in the mine, auto-mine is off, and no blocking modals - allow manual mining
+      console.log('[LeftClick] Starting mining loop');
       if (miningController && !miningController.isPlayerMining(player)) {
         miningController.startMiningLoop(player);
       }
@@ -1494,6 +1492,61 @@ startServer(world => {
     
     // Clean up player data (saves to persistence before cleanup)
     await gameManager.cleanupPlayer(player);
+  });
+
+  /**
+   * Handle player interact events (tap-to-interact for training rocks)
+   * This enables mobile players to tap on training rocks from any distance
+   * The player will be teleported to the rock and training will start
+   */
+  world.on(PlayerEvent.INTERACT, ({ player, raycastHit }) => {
+    const trainingController = gameManager.getTrainingController();
+    if (!trainingController) return;
+
+    // Get hit position from raycast (works for tapping rock blocks or SceneUI)
+    const hitPosition = raycastHit?.hitPoint;
+
+    // Try to find training rock at hit position OR nearby player
+    trainingController.handleInteract(player, hitPosition);
+  });
+
+  /**
+   * Handle player reconnecting to the game. The PlayerEvent.RECONNECTED_WORLD
+   * event is emitted when a player quickly disconnects and reconnects (within ~5 seconds).
+   * Without this handler, the UI would not reload for these players.
+   */
+  world.on(PlayerEvent.RECONNECTED_WORLD, ({ player }) => {
+    // Reload the UI
+    player.ui.load('ui/index.html');
+
+    // Re-attach camera to player entity
+    const playerEntities = world.entityManager.getPlayerEntitiesByPlayer(player);
+    if (playerEntities.length > 0) {
+      player.camera.setAttachedToEntity(playerEntities[0]);
+    }
+
+    // Re-send initial UI data after UI loads
+    player.ui.on(PlayerUIEvent.LOAD, () => {
+      gameManager.onPlayerUILoaded(player);
+
+      // Re-add to proximity tracking systems
+      merchantEntity.addPlayer(player);
+      mineResetUpgradeNPC.addPlayer(player);
+      gemTraderEntity.addPlayer(player);
+      eggStationManager.addPlayer(player);
+
+      // Re-send mining state if in mine
+      if (gameManager.isPlayerInMine(player)) {
+        player.ui.sendData({ type: 'MINING_STATE_UPDATE', isInMine: true });
+      }
+
+      // Re-send auto mode states
+      const autoState = gameManager.getPlayerAutoState(player);
+      if (autoState) {
+        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: autoState.autoMineEnabled });
+        player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: autoState.autoTrainEnabled });
+      }
+    });
   });
 
   /**

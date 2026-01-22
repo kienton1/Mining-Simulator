@@ -6,6 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "hytopia build",
+    "build:ui": "node assets/ui/build.js",
+    "dev": "npm run build:ui && nodemon --watch src --watch assets/ui/components --watch assets/ui/core.html --ext ts,js,html,css --exec \"npm run build:ui && node index.js\"",
+    "dev:ui": "nodemon --watch assets/ui/components --watch assets/ui/core.html --ext html,js,css --exec \"node assets/ui/build.js\"",
+    "dev:ui:live": "npx livereload assets/ui -e html,js,css -w 500 & nodemon --watch assets/ui/components --watch assets/ui/core.html --ext html,js,css --exec \"node assets/ui/build.js --livereload\"",
     "package": "hytopia package",
     "upgrade-assets-library": "hytopia upgrade-assets-library",
     "upgrade-project": "hytopia upgrade-project",
@@ -18,7 +22,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "hytopia": "^0.14.26"
+    "hytopia": "^0.14.42"
   },
   "optionalDependencies": {
     "@hytopia.com/assets": "^0.4.6"
@@ -32,6 +36,8 @@
   },
   "homepage": "https://github.com/kienton1/Mining-Simulator#readme",
   "devDependencies": {
+    "livereload": "^0.10.3",
+    "nodemon": "^3.1.11",
     "puppeteer": "^24.35.0",
     "three": "^0.182.0"
   }

@@ -1,0 +1,557 @@
+<!-- Maps Modal -->
+<div
+  id="maps-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="maps-wrapper">
+    <!-- Title container -->
+    <div class="maps-title-container">
+      <h2 class="maps-title">WORLDS</h2>
+    </div>
+    <!-- Close button -->
+    <button id="maps-close-btn" class="maps-close-btn">X</button>
+
+    <div class="maps-container">
+      <div class="maps-content">
+        <div id="maps-grid" class="maps-grid">
+          <!-- World cards populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Support for .visible class from legacy code */
+  #maps-modal.visible {
+    display: flex !important;
+  }
+
+  .maps-wrapper {
+    position: relative;
+    width: 700px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  .maps-container {
+    background: linear-gradient(
+      180deg,
+      rgba(20, 25, 40, 0.95),
+      rgba(15, 18, 30, 0.95)
+    );
+    border: 3px solid rgba(55, 214, 232, 0.6);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(55, 214, 232, 0.2), 0 0 60px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: mapsSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .maps-wrapper.closing .maps-container {
+    animation: mapsSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes mapsSlideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes mapsSlideOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+  }
+
+  .maps-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(
+      135deg,
+      rgba(55, 214, 232, 0.95),
+      rgba(37, 99, 235, 0.95)
+    );
+    border: 3px solid rgba(55, 214, 232, 0.9);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .maps-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .maps-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 71, 87, 0.95),
+      rgba(220, 50, 65, 0.95)
+    );
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .maps-close-btn:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 91, 107, 1),
+      rgba(240, 60, 75, 1)
+    );
+    border-color: #ff4757;
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  .maps-content {
+    padding: 24px 20px 20px;
+    overflow-y: auto;
+  }
+
+  .maps-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .maps-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 6px 16px;
+    padding: 16px 18px;
+    background: linear-gradient(
+      135deg,
+      rgba(30, 35, 55, 0.9),
+      rgba(20, 25, 40, 0.9)
+    );
+    border: 2px solid rgba(55, 214, 232, 0.3);
+    border-radius: 14px;
+    transition: all 0.2s ease;
+    overflow: hidden;
+  }
+
+  .maps-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      120deg,
+      rgba(55, 214, 232, 0.05),
+      transparent 50%,
+      rgba(255, 215, 0, 0.05)
+    );
+    pointer-events: none;
+  }
+
+  .maps-card:hover:not(.maps-card--locked) {
+    border-color: rgba(55, 214, 232, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .maps-card--current {
+    border-color: rgba(76, 175, 80, 0.8);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+  }
+
+  .maps-card--current::before {
+    background: linear-gradient(
+      120deg,
+      rgba(76, 175, 80, 0.1),
+      transparent 50%
+    );
+  }
+
+  .maps-card--locked {
+    opacity: 0.6;
+    border-color: rgba(100, 100, 100, 0.4);
+  }
+
+  .maps-card__name {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+    position: relative;
+    z-index: 1;
+  }
+
+  .maps-card__info {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+  }
+
+  .maps-card__badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .maps-card__badge--multiplier {
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    color: #ffd700;
+  }
+
+  .maps-card__badge--current {
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    color: #4caf50;
+  }
+
+  .maps-card__badge--locked {
+    background: rgba(255, 82, 82, 0.15);
+    border: 1px solid rgba(255, 82, 82, 0.5);
+    color: #ff5252;
+  }
+
+  .maps-card__actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .maps-card__btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px solid;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .maps-card__btn--teleport {
+    background: linear-gradient(180deg, #4be7f5, #37d6e8);
+    border-color: rgba(55, 214, 232, 0.9);
+    color: #0b1220;
+    box-shadow: 0 4px 12px rgba(55, 214, 232, 0.3);
+  }
+
+  .maps-card__btn--teleport:hover:not(:disabled) {
+    background: linear-gradient(180deg, #6df0fc, #4be7f5);
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(55, 214, 232, 0.5);
+  }
+
+  .maps-card__btn--teleport:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+    transform: none;
+  }
+
+  .maps-card__btn--unlock {
+    background: linear-gradient(180deg, #ffd700, #ffb700);
+    border-color: rgba(255, 215, 0, 0.9);
+    color: #0b1220;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+  }
+
+  .maps-card__btn--unlock:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffed4e, #ffd700);
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.5);
+  }
+
+  .maps-card__btn--unlock:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+    transform: none;
+  }
+
+  .maps-empty {
+    text-align: center;
+    color: #cdd8f3;
+    padding: 40px 0;
+    font-weight: 700;
+  }
+
+  /* Scrollbar styling */
+  .maps-content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .maps-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+  }
+
+  .maps-content::-webkit-scrollbar-thumb {
+    background: rgba(55, 214, 232, 0.4);
+    border-radius: 4px;
+  }
+
+  .maps-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(55, 214, 232, 0.6);
+  }
+
+  /* Mobile scrolling support */
+  body.mobile .maps-content,
+  body.mobile .maps-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Mobile-specific responsive styles */
+  body.mobile .maps-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .maps-title-container {
+    padding: 6px 16px;
+  }
+
+  body.mobile .maps-title {
+    font-size: 18px;
+    -webkit-text-stroke: 1.5px #000;
+    letter-spacing: 1px;
+  }
+
+  body.mobile .maps-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  body.mobile .maps-content {
+    padding: 20px 16px 16px;
+  }
+
+  body.mobile .maps-grid {
+    gap: 10px;
+  }
+
+  body.mobile .maps-card {
+    padding: 12px 14px;
+    gap: 4px 12px;
+  }
+
+  body.mobile .maps-card__name {
+    font-size: 16px;
+  }
+
+  body.mobile .maps-card__badge {
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+
+  body.mobile .maps-card__btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+</style>
+
+<script>
+  (function() {
+    const mapsOverlay = document.getElementById("maps-modal");
+    const mapsCloseBtn = document.getElementById("maps-close-btn");
+    const mapsGrid = document.getElementById("maps-grid");
+
+    let mapsData = null;
+
+    function openMapsModal() {
+      mapsOverlay.style.display = "flex";
+
+      const wrapper = document.querySelector(".maps-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "OPEN_WORLDS_PANEL" });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closeMapsModal() {
+      const wrapper = document.querySelector(".maps-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        mapsOverlay.style.display = "none";
+        mapsOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderMapsGrid(data) {
+      mapsData = data;
+      const { worlds } = data;
+
+      if (!worlds || worlds.length === 0) {
+        mapsGrid.innerHTML = '<div class="maps-empty">No worlds available.</div>';
+        return;
+      }
+
+      mapsGrid.innerHTML = worlds.map((world, index) => {
+        // Support both old format (isCurrent, isUnlocked) and new format (unlocked)
+        const isCurrent = world.isCurrent || false;
+        const isUnlocked = world.isUnlocked !== undefined ? world.isUnlocked : (world.unlocked || false);
+        const multiplier = world.trophyMultiplier || world.multiplier || 1;
+        const winsRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
+
+        return `
+          <div class="maps-card ${isCurrent ? 'maps-card--current' : ''} ${!isUnlocked ? 'maps-card--locked' : ''}"
+               data-id="${world.id}">
+            <div class="maps-card__name">${world.name}</div>
+            <div class="maps-card__info">
+              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier">x${multiplier} Trophies</span>` : ''}
+              ${isCurrent ? '<span class="maps-card__badge maps-card__badge--current">Current</span>' : ''}
+              ${!isUnlocked && winsRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked">${winsRequired} Wins Required</span>` : ''}
+            </div>
+            <div class="maps-card__actions">
+              ${isUnlocked && !isCurrent
+                ? `<button class="maps-card__btn maps-card__btn--teleport" data-action="teleport" data-id="${world.id}">Teleport</button>`
+                : ''
+              }
+              ${!isUnlocked
+                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">Unlock</button>`
+                : ''
+              }
+              ${isCurrent ? '<span style="color: #4caf50; font-weight: 700;">You are here</span>' : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers
+      mapsGrid.querySelectorAll('.maps-card__btn').forEach(btn => {
+        if (typeof window.attachClickSounds === "function") {
+          window.attachClickSounds(btn);
+        }
+
+        btn.addEventListener('click', () => {
+          if (btn.disabled) return;
+          const action = btn.dataset.action;
+          const worldId = btn.dataset.id;
+
+          if (action === "teleport") {
+            hytopia.sendData({
+              type: "TELEPORT_TO_WORLD",
+              payload: { worldId }
+            });
+            closeMapsModal();
+          } else if (action === "unlock") {
+            hytopia.sendData({
+              type: "UNLOCK_WORLD",
+              payload: { worldId }
+            });
+          }
+        });
+      });
+    }
+
+    // Event listeners
+    mapsCloseBtn?.addEventListener("click", closeMapsModal);
+
+    // Close when clicking outside
+    mapsOverlay?.addEventListener("click", (e) => {
+      if (e.target === mapsOverlay) {
+        closeMapsModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (mapsOverlay.style.display !== "flex") return;
+      if (e.key === "Escape") {
+        closeMapsModal();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // Attach click sounds
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(mapsCloseBtn);
+    }
+
+    // Listen for data events
+    hytopia.onData((data) => {
+      if (data?.type === "WORLDS_PANEL_DATA") {
+        renderMapsGrid({ worlds: data.worlds || [] });
+      }
+
+      if (data?.type === "OPEN_MAPS_MODAL") {
+        openMapsModal();
+      }
+
+      if (data?.type === "WORLD_UNLOCK_SUCCESS" || data?.type === "WORLD_UNLOCKED") {
+        hytopia.sendData({ type: "OPEN_WORLDS_PANEL" });
+      }
+    });
+
+    // Expose globally
+    window.openMapsModal = openMapsModal;
+    window.closeMapsModal = closeMapsModal;
+  })();
+</script>

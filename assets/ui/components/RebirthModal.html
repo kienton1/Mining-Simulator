@@ -1,0 +1,616 @@
+<!-- Rebirth Modal -->
+<div
+  id="rebirth-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="rebirth-wrapper">
+    <!-- Title container -->
+    <div class="rebirth-title-container">
+      <h2 class="rebirth-title">REBIRTH</h2>
+    </div>
+    <!-- Close button -->
+    <button id="rebirth-close-btn" class="rebirth-close-btn">X</button>
+
+    <div class="rebirth-container">
+      <div class="rebirth-content">
+        <!-- Explanation -->
+        <div class="rebirth-explanation">
+          <span class="rebirth-explanation__icon">&#x1f504;</span>
+          <span class="rebirth-explanation__text">1 Rebirth = +10% Power</span>
+        </div>
+
+        <!-- Current stats -->
+        <div class="rebirth-stats">
+          <div class="rebirth-stat">
+            <span class="rebirth-stat__label">Current Rebirths</span>
+            <span id="rebirth-current-count" class="rebirth-stat__value rebirth-stat__value--green">0</span>
+          </div>
+          <div class="rebirth-stat">
+            <span class="rebirth-stat__label">Power Bonus</span>
+            <span id="rebirth-power-bonus" class="rebirth-stat__value rebirth-stat__value--red">+0%</span>
+          </div>
+        </div>
+
+        <!-- Rebirth options -->
+        <div id="rebirth-options" class="rebirth-options-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Support for .visible class from legacy code */
+  #rebirth-modal.visible {
+    display: flex !important;
+  }
+
+  .rebirth-wrapper {
+    position: relative;
+    width: 600px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  .rebirth-container {
+    background: linear-gradient(
+      180deg,
+      rgba(30, 30, 40, 0.95),
+      rgba(20, 20, 30, 0.95)
+    );
+    border: 3px solid rgba(139, 69, 19, 0.9);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: rebirthSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .rebirth-wrapper.closing .rebirth-container {
+    animation: rebirthSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes rebirthSlideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes rebirthSlideOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+  }
+
+  .rebirth-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(
+      135deg,
+      rgba(76, 175, 80, 0.95),
+      rgba(56, 142, 60, 0.95)
+    );
+    border: 3px solid rgba(76, 175, 80, 0.8);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .rebirth-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .rebirth-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 71, 87, 0.95),
+      rgba(220, 50, 65, 0.95)
+    );
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .rebirth-close-btn:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 91, 107, 1),
+      rgba(240, 60, 75, 1)
+    );
+    border-color: #ff4757;
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  .rebirth-content {
+    padding: 24px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .rebirth-explanation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 2px solid rgba(76, 175, 80, 0.4);
+  }
+
+  .rebirth-explanation__icon {
+    font-size: 24px;
+  }
+
+  .rebirth-explanation__text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .rebirth-stats {
+    display: flex;
+    gap: 12px;
+  }
+
+  .rebirth-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 2px solid rgba(139, 69, 19, 0.4);
+  }
+
+  .rebirth-stat__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #a6b7d3;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .rebirth-stat__value {
+    font-size: 22px;
+    font-weight: 900;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+  }
+
+  .rebirth-stat__value--green {
+    color: #4caf50;
+  }
+
+  .rebirth-stat__value--red {
+    color: #ff5252;
+  }
+
+  .rebirth-options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rebirth-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: linear-gradient(
+      180deg,
+      rgba(60, 50, 40, 0.7),
+      rgba(40, 35, 30, 0.7)
+    );
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 10px;
+    transition: all 0.2s ease;
+  }
+
+  .rebirth-option:hover:not(.rebirth-option--unavailable) {
+    background: linear-gradient(
+      180deg,
+      rgba(80, 65, 50, 0.8),
+      rgba(50, 40, 30, 0.8)
+    );
+    border-color: rgba(76, 175, 80, 0.6);
+    transform: translateY(-2px);
+  }
+
+  .rebirth-option--max {
+    border-color: rgba(255, 215, 0, 0.6);
+    background: linear-gradient(
+      180deg,
+      rgba(80, 65, 40, 0.8),
+      rgba(50, 40, 25, 0.8)
+    );
+  }
+
+  .rebirth-option--max:hover:not(.rebirth-option--unavailable) {
+    border-color: rgba(255, 215, 0, 0.9);
+  }
+
+  .rebirth-option--unavailable {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .rebirth-option__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .rebirth-option__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #4caf50;
+  }
+
+  .rebirth-option--max .rebirth-option__title {
+    color: #ffd700;
+  }
+
+  .rebirth-option__cost {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ff5252;
+  }
+
+  .rebirth-option__btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 2px solid;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .rebirth-option__btn--rebirth {
+    background: linear-gradient(180deg, #66bb6a, #2e7d32);
+    border-color: rgba(76, 175, 80, 0.9);
+    color: #fff;
+  }
+
+  .rebirth-option__btn--rebirth:hover:not(:disabled) {
+    background: linear-gradient(180deg, #81c784, #43a047);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  }
+
+  .rebirth-option__btn--max {
+    background: linear-gradient(180deg, #ffd700, #ffb700);
+    border-color: rgba(255, 215, 0, 0.9);
+    color: #000;
+  }
+
+  .rebirth-option__btn--max:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffed4e, #ffd700);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+  }
+
+  .rebirth-option__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+    transform: none !important;
+  }
+
+  /* Mobile scrolling support */
+  body.mobile .rebirth-content {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Mobile-specific responsive styles */
+  body.mobile .rebirth-wrapper {
+    width: 420px;
+    max-width: 85vw;
+    margin-top: 15px;
+  }
+
+  body.mobile .rebirth-container {
+    border-width: 2px;
+    border-radius: 12px;
+  }
+
+  body.mobile .rebirth-title-container {
+    padding: 5px 14px;
+    border-radius: 8px;
+    border-width: 2px;
+  }
+
+  body.mobile .rebirth-title {
+    font-size: 14px;
+    -webkit-text-stroke: 1px #000;
+  }
+
+  body.mobile .rebirth-close-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    border-width: 2px;
+    border-radius: 6px;
+  }
+
+  body.mobile .rebirth-content {
+    padding: 16px 12px 12px;
+    gap: 8px;
+  }
+
+  body.mobile .rebirth-explanation {
+    padding: 8px 10px;
+    gap: 6px;
+    border-radius: 8px;
+  }
+
+  body.mobile .rebirth-explanation__icon {
+    font-size: 16px;
+  }
+
+  body.mobile .rebirth-explanation__text {
+    font-size: 12px;
+  }
+
+  body.mobile .rebirth-stats {
+    gap: 6px;
+  }
+
+  body.mobile .rebirth-stat {
+    padding: 8px;
+    border-radius: 8px;
+  }
+
+  body.mobile .rebirth-stat__label {
+    font-size: 9px;
+  }
+
+  body.mobile .rebirth-stat__value {
+    font-size: 16px;
+  }
+
+  body.mobile .rebirth-options-grid {
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  body.mobile .rebirth-option {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  body.mobile .rebirth-option__title {
+    font-size: 12px;
+  }
+
+  body.mobile .rebirth-option__cost {
+    font-size: 10px;
+  }
+
+  body.mobile .rebirth-option__btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+</style>
+
+<script>
+  (function() {
+    const rebirthOverlay = document.getElementById("rebirth-modal");
+    const rebirthCloseBtn = document.getElementById("rebirth-close-btn");
+    const rebirthOptionsGrid = document.getElementById("rebirth-options");
+    const rebirthCurrentCount = document.getElementById("rebirth-current-count");
+    const rebirthPowerBonus = document.getElementById("rebirth-power-bonus");
+
+    let rebirthData = null;
+
+    function openRebirthModal() {
+      rebirthOverlay.style.display = "flex";
+
+      const wrapper = document.querySelector(".rebirth-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "GET_REBIRTH_DATA" });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closeRebirthModal() {
+      const wrapper = document.querySelector(".rebirth-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        rebirthOverlay.style.display = "none";
+        rebirthOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderRebirthOptions(data) {
+      rebirthData = data;
+      const { currentRebirths, power, options } = data;
+
+      // Update stats display
+      rebirthCurrentCount.textContent = formatNumber(currentRebirths || 0);
+      const powerBonus = (currentRebirths || 0) * 10;
+      rebirthPowerBonus.textContent = `+${powerBonus}%`;
+
+      if (!options || options.length === 0) {
+        rebirthOptionsGrid.innerHTML = '<div class="rebirth-empty">No rebirth options available.</div>';
+        return;
+      }
+
+      rebirthOptionsGrid.innerHTML = options.map((option, index) => {
+        const canAfford = BigInt(power || "0") >= BigInt(option.cost || "0");
+        const isMax = option.isMax;
+
+        return `
+          <div class="rebirth-option ${isMax ? 'rebirth-option--max' : ''} ${!canAfford ? 'rebirth-option--unavailable' : ''}"
+               data-index="${index}">
+            <div class="rebirth-option__info">
+              <div class="rebirth-option__title">${isMax ? 'MAX REBIRTH' : `+${formatNumber(option.rebirths)} Rebirth${option.rebirths > 1 ? 's' : ''}`}</div>
+              <div class="rebirth-option__cost">Requires: ${formatBigNumber(option.cost)} Power</div>
+            </div>
+            <button class="rebirth-option__btn ${isMax ? 'rebirth-option__btn--max' : 'rebirth-option__btn--rebirth'}"
+                    ${!canAfford ? 'disabled' : ''}
+                    data-index="${index}">
+              ${isMax ? 'Rebirth All' : 'Rebirth'}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers
+      rebirthOptionsGrid.querySelectorAll('.rebirth-option__btn').forEach(btn => {
+        if (typeof window.attachClickSounds === "function") {
+          window.attachClickSounds(btn);
+        }
+
+        btn.addEventListener('click', () => {
+          if (btn.disabled) return;
+          const index = parseInt(btn.dataset.index);
+          const option = options[index];
+
+          hytopia.sendData({
+            type: "DO_REBIRTH",
+            payload: { rebirths: option.rebirths, isMax: option.isMax }
+          });
+        });
+      });
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e12) return (num / 1e12).toFixed(1) + "T";
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + "B";
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + "M";
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
+      return num.toString();
+    }
+
+    function formatBigNumber(numStr) {
+      try {
+        const num = BigInt(numStr || "0");
+        const trillion = BigInt("1000000000000");
+        const billion = BigInt("1000000000");
+        const million = BigInt("1000000");
+        const thousand = BigInt("1000");
+
+        if (num >= trillion) {
+          return (Number(num / (trillion / BigInt(10))) / 10).toFixed(1) + "T";
+        }
+        if (num >= billion) {
+          return (Number(num / (billion / BigInt(10))) / 10).toFixed(1) + "B";
+        }
+        if (num >= million) {
+          return (Number(num / (million / BigInt(10))) / 10).toFixed(1) + "M";
+        }
+        if (num >= thousand) {
+          return (Number(num / (thousand / BigInt(10))) / 10).toFixed(1) + "K";
+        }
+        return num.toString();
+      } catch (e) {
+        return numStr || "0";
+      }
+    }
+
+    // Event listeners
+    rebirthCloseBtn?.addEventListener("click", closeRebirthModal);
+
+    // Close when clicking outside
+    rebirthOverlay?.addEventListener("click", (e) => {
+      if (e.target === rebirthOverlay) {
+        closeRebirthModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (rebirthOverlay.style.display !== "flex") return;
+      if (e.key === "Escape") {
+        closeRebirthModal();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // Attach click sounds
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(rebirthCloseBtn);
+    }
+
+    // Listen for data events
+    hytopia.onData((data) => {
+      if (data?.type === "REBIRTH_DATA") {
+        renderRebirthOptions(data.payload);
+      }
+
+      if (data?.type === "OPEN_REBIRTH_MODAL") {
+        openRebirthModal();
+      }
+
+      if (data?.type === "REBIRTH_SUCCESS") {
+        hytopia.sendData({ type: "GET_REBIRTH_DATA" });
+      }
+    });
+
+    // Expose globally
+    window.openRebirthModal = openRebirthModal;
+    window.closeRebirthModal = closeRebirthModal;
+  })();
+</script>

@@ -174,7 +174,7 @@ export class MiningController {
         }
       },
       damageMultiplier,
-      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
+      undefined // Modal check is done at entry point, not per-tick
     );
   }
 
@@ -332,43 +332,64 @@ export class MiningController {
    * @param player - Player who is mining
    */
   startMiningLoop(player: Player): void {
+    console.log('[MiningController] startMiningLoop called for player:', player.username);
+
     // Start mining animation on player entity (Hyground style)
     const playerEntity = this.gameManager.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
       (playerEntity as any).startMiningAnimation();
     }
-    
+
     // First check if player is in the mine - if not, do nothing
     const initialMiningState = this.miningSystem.getMiningState(player);
     if (!initialMiningState) {
       // Player is not in the mine, cannot start mining loop
-      return;
+      console.log('[MiningController] No mining state for player - THIS IS THE PROBLEM');
+      console.log('[MiningController] Attempting to create mining state now...');
+      // Try to create the state by calling preparePlayerMine
+      const pickaxe = this.gameManager.getPlayerPickaxe(player);
+      if (pickaxe) {
+        const entryPos = this.miningSystem.preparePlayerMine(player, pickaxe);
+        console.log('[MiningController] Created mining state, entry position:', entryPos);
+        // Now try again
+        const retryState = this.miningSystem.getMiningState(player);
+        if (!retryState) {
+          console.log('[MiningController] Still no mining state after retry, giving up');
+          return;
+        }
+        console.log('[MiningController] Mining state now exists, continuing...');
+      } else {
+        console.log('[MiningController] No pickaxe, cannot create mining state');
+        return;
+      }
+    } else {
+      console.log('[MiningController] Mining state exists, currentDepth:', initialMiningState.currentDepth);
     }
 
-    // Player is in the mine, proceed with mining
-    // Don't start mining if a blocking modal is open
-    if (this.gameManager.isBlockingModalOpen(player)) {
-      return;
-    }
+    // Note: Modal check is NOT done here because:
+    // - For manual mining, the left-click handler in index.ts already checks isBlockingModalOpen
+    // - For auto-mining, the user explicitly requested mining, so modals shouldn't block it
 
     // Get More Damage multiplier from upgrade system (e.g., 1.2 = +20%)
     const moreDamageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
-    
+
     // Get miner damage bonus percentage (e.g., 10 = +10%)
     const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
     const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
-    
+
     // Convert multipliers to percentages, add them together, then convert back
     const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
     const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
     const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
+      console.log('[MiningController] No player data, aborting');
       return;
     }
 
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
+      console.log('[MiningController] No pickaxe, aborting');
       return;
     }
 
@@ -412,7 +433,7 @@ export class MiningController {
         }
       },
       damageMultiplier,
-      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
+      undefined // Modal check is done at entry point, not per-tick
     );
 
     // Send initial progress update and mining state

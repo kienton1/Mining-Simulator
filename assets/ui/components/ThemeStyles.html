@@ -1,0 +1,658 @@
+
+  body.mobile .training-prompt__title {
+    font-size: 14px;
+  }
+
+  body.mobile .training-prompt__requirement {
+    font-size: 11px;
+  }
+
+</style>
+<style>
+/* Fredoka font is loaded dynamically at the top of this file */
+
+:root {
+  --od-bg: #0d0f1a;
+  --od-card: #141a2a;
+  --od-card-elevated: #1b2236;
+  --od-border: #2a3350;
+  --od-primary: #f4c44e;
+  --od-primary-strong: #f7d35c;
+  --od-secondary: #37d6e8;
+  --od-secondary-strong: #4be7f5;
+  --od-accent: #2bd67f;
+  --od-epic: #a855f7;
+  --od-legendary-start: #f7d35c;
+  --od-legendary-end: #f59e0b;
+  --od-danger: #ef4444;
+  --od-warning: #f59e0b;
+  --od-success: #22c55e;
+  --od-muted: #9aa3b2;
+  --od-text: #f8f3e6;
+  --od-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --od-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --od-inset: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.ui-root {
+  color: var(--od-text);
+  font-family: "Fredoka", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+.ui-root button,
+.ui-root .stat-hud__value,
+.ui-root .pickaxe-details__name,
+.ui-root .pickaxe-details__stats,
+.ui-root .pickaxe-details__action-button,
+.ui-root .rebirth-button,
+.ui-root .mine-reset-upgrade-ui__button,
+.ui-root .merchant-ui__sell-all-button,
+.ui-root .auto-control-button,
+.ui-root .mining-control-button {
+  font-family: "Fredoka", sans-serif;
+}
+
+.ui-root .merchant-ui__title,
+.ui-root .mine-reset-upgrade-ui__title,
+.ui-root .gem-trader-ui__title,
+.ui-root .pickaxe-modal__title,
+.ui-root .rebirth-modal__title,
+.ui-root .maps-modal__title,
+.ui-root .pets-modal .pickaxe-modal__title {
+  font-family: "Fredoka", sans-serif;
+  letter-spacing: 1px;
+}
+
+/* Global interactive polish */
+.ui-root button {
+  box-shadow: var(--od-shadow-soft);
+  border-color: var(--od-border);
+}
+
+.ui-root button:hover {
+  filter: brightness(1.05);
+}
+
+.ui-root button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Stat HUD */
+.stat-hud {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.stat-hud__value {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 12px rgba(244, 196, 78, 0.3);
+}
+
+.stat-hud__icon {
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.5));
+}
+
+.stat-hud--money .stat-hud__value,
+.stat-hud--wins .stat-hud__value {
+  color: var(--od-primary);
+}
+
+.stat-hud--gems .stat-hud__value {
+  color: var(--od-epic);
+}
+
+.stat-hud--power .stat-hud__value {
+  color: var(--od-secondary);
+}
+
+.stat-hud--rebirths .stat-hud__value {
+  color: var(--od-accent);
+}
+
+/* Action cards */
+.action-card {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(13, 17, 30, 0.98));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.action-card--miner {
+  border-color: rgba(55, 214, 232, 0.5);
+}
+
+.action-card--pickaxe {
+  border-color: rgba(244, 196, 78, 0.6);
+}
+
+.action-card--rebirth {
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.action-card--pets {
+  border-color: rgba(43, 214, 127, 0.6);
+}
+
+.action-card--maps {
+  border-color: rgba(88, 118, 255, 0.6);
+}
+
+.action-card__badge {
+  background: radial-gradient(circle, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  box-shadow: 0 0 10px rgba(244, 196, 78, 0.6);
+}
+
+/* Mining HUD */
+.mining-hud__damage {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.5);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.block-health-bar__name {
+  font-family: "Fredoka", sans-serif;
+  color: var(--od-text);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+.block-health-bar__outline {
+  background: rgba(10, 14, 24, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.block-health-bar__fill {
+  background: linear-gradient(90deg, var(--od-success), #6ee7b7);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.block-health-bar__text {
+  font-family: "Fredoka", sans-serif;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.mining-depth-counter__text {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.5);
+}
+
+.progress-bar__outline {
+  border: 2px solid var(--od-border);
+  background: rgba(11, 15, 26, 0.95);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.progress-bar__fill {
+  background: linear-gradient(90deg, var(--od-secondary), var(--od-accent), var(--od-primary));
+  box-shadow: 0 0 12px rgba(55, 214, 232, 0.5);
+}
+
+.progress-bar__marker {
+  background: radial-gradient(circle, #ffffff 0%, var(--od-primary) 45%, var(--od-legendary-end) 100%);
+  border: 2px solid var(--od-border);
+}
+
+.progress-bar__marker-label {
+  font-family: "Fredoka", sans-serif;
+}
+
+/* Controls */
+.mining-control-button {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(55, 214, 232, 0.6);
+  text-shadow: 0 0 8px rgba(55, 214, 232, 0.4);
+}
+
+.mining-control-button--surface {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+  border-color: rgba(43, 214, 127, 0.8);
+}
+
+.auto-control-button {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  border: 2px solid rgba(244, 196, 78, 0.5);
+}
+
+.auto-control-button.inactive {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+  border-color: rgba(43, 214, 127, 0.8);
+}
+
+.auto-control-button.active {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+  border-color: rgba(239, 68, 68, 0.9);
+}
+
+/* Modals */
+.modal {
+  background: rgba(6, 8, 16, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+.pickaxe-modal__container,
+.rebirth-modal__container,
+.pets-modal .pickaxe-modal__container,
+.maps-modal .pickaxe-modal__container {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.96));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.pickaxe-modal__header,
+.rebirth-modal__header,
+.maps-modal .pickaxe-modal__header {
+  border-bottom: 2px solid var(--od-border);
+}
+
+.pickaxe-modal__close,
+.rebirth-modal__close,
+.maps-modal__close,
+.merchant-ui__close,
+.mine-reset-upgrade-ui__close,
+.gem-trader-ui__close,
+.pet-detail__close {
+  background: rgba(239, 68, 68, 0.85);
+  border: 2px solid rgba(239, 68, 68, 0.9);
+}
+
+.pickaxe-details__icon,
+.pickaxe-details__badge {
+  background: rgba(15, 20, 32, 0.85);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pickaxe-details__action-button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  border: none;
+  color: #1a1202;
+  text-transform: uppercase;
+}
+
+.pickaxe-details__action-button.disabled {
+  background: rgba(120, 120, 120, 0.4);
+  color: #e5e7eb;
+}
+
+.pickaxe-grid {
+  gap: 18px;
+}
+
+.pickaxe-card {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(12, 16, 28, 0.98));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pickaxe-card__cost {
+  color: var(--od-primary);
+}
+
+.pickaxe-card__checkmark {
+  background: var(--od-accent);
+  border: 2px solid rgba(43, 214, 127, 0.9);
+}
+
+.pickaxe-card.equipped {
+  border-color: rgba(43, 214, 127, 0.9);
+  box-shadow: 0 0 16px rgba(43, 214, 127, 0.6);
+}
+
+.pickaxe-card.selected {
+  border-color: rgba(244, 196, 78, 0.9);
+  box-shadow: 0 0 16px rgba(244, 196, 78, 0.6);
+}
+
+/* Rebirth */
+.rebirth-option {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.rebirth-button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  border: none;
+}
+
+.rebirth-button--max {
+  background: linear-gradient(180deg, var(--od-epic), #6d28d9);
+}
+
+.rebirth-button.disabled {
+  background: rgba(120, 120, 120, 0.4);
+  color: #e5e7eb;
+}
+
+/* Pets */
+.pets-pill,
+.pets-mult {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+}
+
+.pet-detail {
+  background: rgba(18, 24, 38, 0.95);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+}
+
+.pet-detail__card,
+.pet-tile {
+  box-shadow: var(--od-inset);
+}
+
+.pet-detail__action--equip {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.pet-detail__action--unequip {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+.pets-delete-bar {
+  background: rgba(18, 24, 38, 0.98);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.pets-delete-bar__btn--green {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.pets-delete-bar__btn--red {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+/* Egg modal */
+.egg-results__title,
+.egg-result-item__name,
+.egg-result-item__mult {
+  font-family: "Fredoka", sans-serif;
+}
+
+/* Egg hatch overlay */
+  .egg-hatch-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1400;
+  }
+
+  .egg-hatch-overlay[hidden] {
+    display: none;
+  }
+
+  .egg-modal.hatch-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+.egg-hatch-slots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.egg-hatch-slot {
+  width: 200px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.egg-hatch-egg {
+  width: 120px;
+  height: 160px;
+  border-radius: 55% 55% 45% 45%;
+  background: radial-gradient(circle at 30% 30%, #fff7e1 0%, #f3d1a0 45%, #cfa86d 100%);
+  border: 4px solid rgba(17, 24, 39, 0.7);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+  animation: eggShake 2s ease-in-out;
+}
+
+.egg-hatch-slot.is-cracking .egg-hatch-egg {
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.egg-hatch-particles {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  opacity: 0;
+  background:
+    radial-gradient(circle, rgba(255, 214, 102, 0.9) 0%, rgba(255, 214, 102, 0.3) 35%, transparent 60%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.2) 40%, transparent 65%);
+  filter: blur(0.5px);
+}
+
+.egg-hatch-slot.is-cracking .egg-hatch-particles {
+  animation: eggBurst 0.6s ease-out forwards;
+}
+
+.egg-hatch-result {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  text-align: center;
+}
+
+.egg-hatch-slot.is-revealed .egg-hatch-result {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.egg-hatch-result__thumb {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  background: rgba(18, 24, 38, 0.9);
+  border: 3px solid rgba(244, 196, 78, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.egg-hatch-result__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.egg-hatch-result__name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #f8fafc;
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.7),
+    1px -1px 0 rgba(0, 0, 0, 0.7),
+    -1px 1px 0 rgba(0, 0, 0, 0.7),
+    1px 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+@keyframes eggShake {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(2deg); }
+  20% { transform: rotate(-2deg); }
+  30% { transform: rotate(3deg); }
+  40% { transform: rotate(-3deg); }
+  50% { transform: rotate(2deg); }
+  60% { transform: rotate(-2deg); }
+  70% { transform: rotate(2deg); }
+  80% { transform: rotate(-2deg); }
+  90% { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes eggBurst {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+/* Merchant */
+.merchant-ui,
+.mine-reset-upgrade-ui,
+.gem-trader-ui {
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.96));
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow);
+}
+
+.merchant-ui__header,
+.mine-reset-upgrade-ui__header,
+.gem-trader-ui__header {
+  border-bottom: 2px solid var(--od-border);
+}
+
+.merchant-ui__ore-item,
+.gem-trader-ui__upgrade-item {
+  background: linear-gradient(180deg, rgba(20, 58, 86, 0.98), rgba(16, 45, 68, 0.98));
+  border: 2px solid rgba(31, 95, 142, 0.8);
+}
+
+.merchant-ui__sell-button,
+.merchant-ui__sell-all-button,
+.mine-reset-upgrade-ui__button {
+  background: linear-gradient(180deg, var(--od-primary), var(--od-legendary-end));
+  color: #1a1202;
+  border: none;
+}
+
+.gem-trader-ui__upgrade-button.can-afford {
+  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
+}
+
+.gem-trader-ui__upgrade-button.cannot-afford {
+  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
+}
+
+.gem-trader-ui__effect,
+.gem-trader-ui__level-progress,
+.gem-trader-ui__cost {
+  color: var(--od-accent);
+}
+
+/* Scene UI prompts */
+.scene-training-prompt,
+.scene-egg-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Fredoka", sans-serif;
+}
+
+.scene-training-prompt__requirement,
+.scene-training-prompt__rebirth,
+.scene-training-prompt__power-gain,
+.scene-egg-prompt__title,
+.scene-egg-prompt__cost {
+  color: var(--od-primary);
+}
+
+.scene-training-prompt__or {
+  color: var(--od-muted);
+}
+
+/* Scene UI: Shop labels */
+.scene-shop-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid var(--od-border);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Fredoka", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  color: var(--od-text);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: opacity 0.2s ease;
+}
+
+.scene-shop-prompt:not(.visible) {
+  opacity: 0;
+}
+
+.scene-shop-prompt__title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--od-primary);
+}
+
+.scene-shop-prompt__subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--od-muted);
+}
+
+.scene-shop-prompt--ore {
+  border-color: rgba(244, 196, 78, 0.7);
+}
+
+.scene-shop-prompt--timer {
+  border-color: rgba(43, 214, 127, 0.7);
+}
+
+.scene-shop-prompt--upgrades {
+  border-color: rgba(168, 85, 247, 0.7);
+}
+
+/* Scrollable panels: enable wheel + touch drag */
+.merchant-ui__content,
+.gem-trader-ui__content,
+.pets-grid,
+.pickaxe-modal__right-panel,
+.rebirth-modal__body,
+.maps-modal .pickaxe-modal__body,
+.egg-results__list,
+.egg-shop-grid,
+.pickaxe-modal__body {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbars */
+.ui-root ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ui-root ::-webkit-scrollbar-track {
+  background: rgba(18, 24, 38, 0.9);
+  border-radius: 4px;
+}
+
+.ui-root ::-webkit-scrollbar-thumb {
+  background: rgba(244, 196, 78, 0.5);
+  border-radius: 4px;
+}
+
+.ui-root ::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 196, 78, 0.8);
+}
+</style>

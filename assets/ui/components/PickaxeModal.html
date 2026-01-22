@@ -1,0 +1,859 @@
+<!-- Pickaxe Shop Modal -->
+<div
+  id="pickaxe-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="pickaxe-wrapper">
+    <!-- Title container -->
+    <div class="pickaxe-title-container">
+      <h2 class="pickaxe-title">PICKAXES</h2>
+    </div>
+    <!-- Close button -->
+    <button id="pickaxe-close-btn" class="pickaxe-close-btn">X</button>
+
+    <div class="pickaxe-container">
+      <div class="pickaxe-content-wrapper">
+        <!-- Left Side: Equipped Pickaxe Details -->
+        <div class="pickaxe-left-panel">
+          <div class="pickaxe-details">
+            <div class="pickaxe-details__preview">
+              <div id="pickaxe-detail-icon" class="pickaxe-details__icon-wrapper">
+                <img id="pickaxe-detail-icon-img" class="pickaxe-details__icon-img" src="" alt="" style="display: none;" />
+                <span id="pickaxe-detail-icon-emoji" class="pickaxe-details__icon-emoji"></span>
+              </div>
+            </div>
+            <div id="pickaxe-detail-name" class="pickaxe-details__name">Select a Pickaxe</div>
+            <div id="pickaxe-detail-stats" class="pickaxe-details__stats"></div>
+            <button id="pickaxe-action-button" class="pickaxe-details__action-btn">Select</button>
+          </div>
+        </div>
+
+        <!-- Right Side: Pickaxe Grid -->
+        <div class="pickaxe-right-panel">
+          <div class="pickaxe-grid-container">
+            <div id="pickaxe-grid" class="pickaxe-grid">
+              <!-- Pickaxe cards populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Support for .visible class from legacy code */
+  #pickaxe-modal.visible {
+    display: flex !important;
+  }
+
+  .pickaxe-wrapper {
+    position: relative;
+    width: 900px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  .pickaxe-container {
+    background: linear-gradient(
+      180deg,
+      rgba(30, 30, 40, 0.95),
+      rgba(20, 20, 30, 0.95)
+    );
+    border: 3px solid rgba(139, 69, 19, 0.9);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    min-height: 70vh;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: pickaxeSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .pickaxe-wrapper.closing .pickaxe-container {
+    animation: pickaxeSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes pickaxeSlideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes pickaxeSlideOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+  }
+
+  .pickaxe-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(
+      135deg,
+      rgba(180, 120, 60, 0.95),
+      rgba(140, 90, 45, 0.95)
+    );
+    border: 3px solid rgba(255, 215, 0, 0.8);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .pickaxe-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .pickaxe-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 71, 87, 0.95),
+      rgba(220, 50, 65, 0.95)
+    );
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .pickaxe-close-btn:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 91, 107, 1),
+      rgba(240, 60, 75, 1)
+    );
+    border-color: #ff4757;
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  .pickaxe-content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left Panel - Details */
+  .pickaxe-left-panel {
+    width: 220px;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: linear-gradient(
+      180deg,
+      rgba(40, 35, 30, 0.9),
+      rgba(30, 25, 20, 0.9)
+    );
+    border-right: 2px solid rgba(139, 69, 19, 0.5);
+  }
+
+  .pickaxe-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    height: 100%;
+  }
+
+  .pickaxe-details__preview {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 12px;
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .pickaxe-details__preview:hover {
+    border-color: rgba(255, 215, 0, 0.6);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+  }
+
+  .pickaxe-details__icon-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pickaxe-details__icon-img {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .pickaxe-details__icon-emoji {
+    font-size: 80px;
+  }
+
+  .pickaxe-details__name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+  }
+
+  .pickaxe-details__stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .pickaxe-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #fff;
+  }
+
+  .pickaxe-stat-row__label {
+    color: #a6b7d3;
+    font-weight: 600;
+  }
+
+  .pickaxe-stat-row__value {
+    font-weight: 700;
+  }
+
+  .pickaxe-stat-row__value--power { color: #ff5252; }
+  .pickaxe-stat-row__value--luck { color: #4caf50; }
+  .pickaxe-stat-row__value--speed { color: #87ceeb; }
+  .pickaxe-stat-row__value--damage { color: #ffd700; }
+  .pickaxe-stat-row__value--sell { color: #ffd700; }
+  .pickaxe-stat-row__value--cost { color: #ffd700; }
+
+  .pickaxe-details__action-btn {
+    width: 100%;
+    padding: 12px 16px;
+    margin-top: auto;
+    border-radius: 8px;
+    border: 2px solid rgba(139, 69, 19, 0.6);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: linear-gradient(180deg, #ffd700, #ffb700);
+    color: #000;
+    border-color: rgba(255, 215, 0, 0.9);
+  }
+
+  .pickaxe-details__action-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffed4e, #ffd700);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .pickaxe-details__action-btn:disabled {
+    background: linear-gradient(
+      180deg,
+      rgba(100, 100, 100, 0.5),
+      rgba(80, 80, 80, 0.5)
+    );
+    border-color: rgba(100, 100, 100, 0.5);
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .pickaxe-details__action-btn--equipped {
+    background: linear-gradient(180deg, #00d26a, #00a854);
+    border-color: rgba(0, 210, 106, 0.9);
+    color: #fff;
+  }
+
+  .pickaxe-details__action-btn--equipped:hover {
+    background: linear-gradient(180deg, #00e673, #00b35c);
+    box-shadow: 0 4px 12px rgba(0, 210, 106, 0.4);
+  }
+
+  /* Right Panel - Grid */
+  .pickaxe-right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .pickaxe-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    min-height: 0;
+  }
+
+  .pickaxe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+    padding: 4px;
+  }
+
+  .pickaxe-card {
+    background: linear-gradient(
+      180deg,
+      rgba(60, 50, 40, 0.7),
+      rgba(40, 35, 30, 0.7)
+    );
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+  }
+
+  .pickaxe-card:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(80, 65, 50, 0.8),
+      rgba(50, 40, 30, 0.8)
+    );
+    border-color: rgba(255, 215, 0, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .pickaxe-card.selected {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 215, 0, 0.3),
+      rgba(255, 165, 0, 0.3)
+    );
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  }
+
+  .pickaxe-card.equipped {
+    border-color: #00d26a;
+  }
+
+  .pickaxe-card.locked {
+    opacity: 0.5;
+    filter: grayscale(0.5);
+  }
+
+  .pickaxe-card__equipped-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: #00d26a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .pickaxe-card__lock-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 16px;
+  }
+
+  .pickaxe-card__icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pickaxe-card__icon-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .pickaxe-card__icon-emoji {
+    font-size: 40px;
+  }
+
+  .pickaxe-card__name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .pickaxe-card__cost {
+    font-size: 11px;
+    color: #ffd700;
+    font-weight: 700;
+  }
+
+  .pickaxe-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #cdd8f3;
+    padding: 60px 0;
+    font-weight: 700;
+  }
+
+  /* Scrollbar styling */
+  .pickaxe-grid-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .pickaxe-grid-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+  }
+
+  .pickaxe-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(139, 69, 19, 0.6);
+    border-radius: 4px;
+  }
+
+  .pickaxe-grid-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 69, 19, 0.8);
+  }
+
+  /* Mobile scrolling support */
+  body.mobile .pickaxe-right-panel,
+  body.mobile .pickaxe-right-panel *,
+  body.mobile .pickaxe-grid-container,
+  body.mobile .pickaxe-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Mobile-specific responsive styles */
+  body.mobile .pickaxe-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .pickaxe-container {
+    min-height: 70vh;
+    max-height: 75vh;
+  }
+
+  body.mobile .pickaxe-title-container {
+    padding: 6px 16px;
+  }
+
+  body.mobile .pickaxe-title {
+    font-size: 18px;
+    -webkit-text-stroke: 1.5px #000;
+  }
+
+  body.mobile .pickaxe-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Mobile: Keep vertical layout (left/right) with adjusted sizes */
+  body.mobile .pickaxe-left-panel {
+    width: 180px;
+    min-width: 180px;
+    padding: 10px;
+  }
+
+  body.mobile .pickaxe-details {
+    gap: 8px;
+  }
+
+  body.mobile .pickaxe-details__preview {
+    width: 100px;
+    height: 100px;
+  }
+
+  body.mobile .pickaxe-details__icon-img {
+    max-width: 80px;
+    max-height: 80px;
+  }
+
+  body.mobile .pickaxe-details__icon-emoji {
+    font-size: 48px;
+  }
+
+  body.mobile .pickaxe-details__name {
+    font-size: 13px;
+  }
+
+  body.mobile .pickaxe-details__stats {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  body.mobile .pickaxe-stat-row {
+    font-size: 10px;
+  }
+
+  body.mobile .pickaxe-details__action-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  body.mobile .pickaxe-right-panel {
+    padding: 10px;
+  }
+
+  body.mobile .pickaxe-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 6px;
+  }
+
+  body.mobile .pickaxe-card {
+    min-height: 85px;
+    padding: 6px;
+  }
+
+  body.mobile .pickaxe-card__icon {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 4px;
+  }
+
+  body.mobile .pickaxe-card__icon-emoji {
+    font-size: 26px;
+  }
+
+  body.mobile .pickaxe-card__name {
+    font-size: 9px;
+  }
+
+  body.mobile .pickaxe-card__cost {
+    font-size: 8px;
+  }
+</style>
+
+<script>
+  (function() {
+    const pickaxeOverlay = document.getElementById("pickaxe-modal");
+    const pickaxeGrid = document.getElementById("pickaxe-grid");
+    const pickaxeCloseBtn = document.getElementById("pickaxe-close-btn");
+    const pickaxeActionBtn = document.getElementById("pickaxe-action-button");
+    const pickaxeDetailIcon = document.getElementById("pickaxe-detail-icon");
+    const pickaxeDetailIconImg = document.getElementById("pickaxe-detail-icon-img");
+    const pickaxeDetailIconEmoji = document.getElementById("pickaxe-detail-icon-emoji");
+    const pickaxeDetailName = document.getElementById("pickaxe-detail-name");
+    const pickaxeDetailStats = document.getElementById("pickaxe-detail-stats");
+
+    let pickaxeData = null;
+    let pickaxes = [];
+    let selectedPickaxeId = null;
+    let equippedPickaxeId = null;
+    let playerGold = 0;
+
+    function openPickaxeModal() {
+      pickaxeOverlay.style.display = "flex";
+      selectedPickaxeId = null;
+
+      const wrapper = document.querySelector(".pickaxe-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "GET_PICKAXE_SHOP_DATA" });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closePickaxeModal() {
+      const wrapper = document.querySelector(".pickaxe-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        pickaxeOverlay.style.display = "none";
+        pickaxeOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderPickaxeGrid(data) {
+      pickaxeData = data;
+      pickaxes = data.pickaxes || [];
+      equippedPickaxeId = data.equippedPickaxeId;
+      playerGold = data.gold || 0;
+
+      if (pickaxes.length === 0) {
+        pickaxeGrid.innerHTML = '<div class="pickaxe-empty">No pickaxes available.</div>';
+        renderPickaxeDetails(null);
+        return;
+      }
+
+      // Auto-select equipped pickaxe or first one
+      if (!selectedPickaxeId) {
+        selectedPickaxeId = equippedPickaxeId || pickaxes[0].id;
+      }
+
+      pickaxeGrid.innerHTML = pickaxes.map(pickaxe => {
+        const isSelected = pickaxe.id === selectedPickaxeId;
+        const isEquipped = pickaxe.id === equippedPickaxeId;
+        const isOwned = pickaxe.owned;
+        const isLocked = !isOwned && pickaxe.cost > playerGold;
+
+        const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+        const iconPath = pickaxe.icon ? (cdn ? `${cdn}/${pickaxe.icon}` : `../${pickaxe.icon}`) : null;
+
+        return `
+          <div class="pickaxe-card ${isSelected ? 'selected' : ''} ${isEquipped ? 'equipped' : ''} ${isLocked && !isOwned ? 'locked' : ''}"
+               data-id="${pickaxe.id}">
+            ${isEquipped ? '<div class="pickaxe-card__equipped-badge">+</div>' : ''}
+            ${!isOwned && isLocked ? '<div class="pickaxe-card__lock-badge">*</div>' : ''}
+            <div class="pickaxe-card__icon">
+              ${iconPath
+                ? `<img src="${iconPath}" alt="${pickaxe.name}" class="pickaxe-card__icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" /><span class="pickaxe-card__icon-emoji" style="display:none;">&#x26cf;&#xfe0f;</span>`
+                : `<span class="pickaxe-card__icon-emoji">&#x26cf;&#xfe0f;</span>`
+              }
+            </div>
+            <div class="pickaxe-card__name">${pickaxe.name}</div>
+            <div class="pickaxe-card__cost">${isOwned ? 'Owned' : `${formatNumber(pickaxe.cost)} Gold`}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers
+      pickaxeGrid.querySelectorAll('.pickaxe-card').forEach(card => {
+        if (typeof window.attachClickSounds === "function") {
+          window.attachClickSounds(card);
+        }
+
+        card.addEventListener('click', () => {
+          const id = card.dataset.id;
+          selectedPickaxeId = id;
+
+          pickaxeGrid.querySelectorAll('.pickaxe-card').forEach(c => {
+            c.classList.toggle('selected', c.dataset.id === id);
+          });
+
+          const pickaxe = pickaxes.find(p => p.id === id);
+          renderPickaxeDetails(pickaxe);
+        });
+      });
+
+      // Render selected pickaxe details
+      const selectedPickaxe = pickaxes.find(p => p.id === selectedPickaxeId);
+      renderPickaxeDetails(selectedPickaxe);
+    }
+
+    function renderPickaxeDetails(pickaxe) {
+      if (!pickaxe) {
+        pickaxeDetailIconImg.style.display = "none";
+        pickaxeDetailIconEmoji.style.display = "block";
+        pickaxeDetailIconEmoji.textContent = "?";
+        pickaxeDetailName.textContent = "Select a Pickaxe";
+        pickaxeDetailStats.innerHTML = "";
+        pickaxeActionBtn.textContent = "Select";
+        pickaxeActionBtn.disabled = true;
+        return;
+      }
+
+      const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+      const iconPath = pickaxe.icon ? (cdn ? `${cdn}/${pickaxe.icon}` : `../${pickaxe.icon}`) : null;
+
+      if (iconPath) {
+        pickaxeDetailIconImg.src = iconPath;
+        pickaxeDetailIconImg.style.display = "block";
+        pickaxeDetailIconEmoji.style.display = "none";
+      } else {
+        pickaxeDetailIconImg.style.display = "none";
+        pickaxeDetailIconEmoji.style.display = "block";
+        pickaxeDetailIconEmoji.innerHTML = "&#x26cf;&#xfe0f;";
+      }
+
+      pickaxeDetailName.textContent = pickaxe.name;
+
+      // Build stats HTML
+      let statsHtml = '';
+      if (pickaxe.power) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Power</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--power">+${formatNumber(pickaxe.power)}</span></div>`;
+      }
+      if (pickaxe.damage) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Damage</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--damage">+${formatNumber(pickaxe.damage)}</span></div>`;
+      }
+      if (pickaxe.luck) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Luck</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--luck">+${pickaxe.luck}%</span></div>`;
+      }
+      if (pickaxe.speed) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Speed</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--speed">+${pickaxe.speed}%</span></div>`;
+      }
+      if (pickaxe.sellMultiplier) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Sell Bonus</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--sell">x${pickaxe.sellMultiplier}</span></div>`;
+      }
+      if (!pickaxe.owned) {
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Cost</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--cost">${formatNumber(pickaxe.cost)} Gold</span></div>`;
+      }
+
+      pickaxeDetailStats.innerHTML = statsHtml;
+
+      // Update action button
+      const isEquipped = pickaxe.id === equippedPickaxeId;
+      const isOwned = pickaxe.owned;
+      const canAfford = playerGold >= pickaxe.cost;
+
+      if (isEquipped) {
+        pickaxeActionBtn.textContent = "Equipped";
+        pickaxeActionBtn.disabled = true;
+        pickaxeActionBtn.className = "pickaxe-details__action-btn pickaxe-details__action-btn--equipped";
+      } else if (isOwned) {
+        pickaxeActionBtn.textContent = "Equip";
+        pickaxeActionBtn.disabled = false;
+        pickaxeActionBtn.className = "pickaxe-details__action-btn";
+      } else if (canAfford) {
+        pickaxeActionBtn.textContent = `Buy for ${formatNumber(pickaxe.cost)} Gold`;
+        pickaxeActionBtn.disabled = false;
+        pickaxeActionBtn.className = "pickaxe-details__action-btn";
+      } else {
+        pickaxeActionBtn.textContent = `Need ${formatNumber(pickaxe.cost - playerGold)} more Gold`;
+        pickaxeActionBtn.disabled = true;
+        pickaxeActionBtn.className = "pickaxe-details__action-btn";
+      }
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e12) return (num / 1e12).toFixed(1) + "T";
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + "B";
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + "M";
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
+      return num.toString();
+    }
+
+    // Event listeners
+    pickaxeCloseBtn?.addEventListener("click", closePickaxeModal);
+
+    pickaxeActionBtn?.addEventListener("click", () => {
+      if (!selectedPickaxeId || pickaxeActionBtn.disabled) return;
+
+      const pickaxe = pickaxes.find(p => p.id === selectedPickaxeId);
+      if (!pickaxe) return;
+
+      if (pickaxe.owned) {
+        hytopia.sendData({
+          type: "EQUIP_PICKAXE",
+          payload: { pickaxeId: selectedPickaxeId }
+        });
+      } else {
+        hytopia.sendData({
+          type: "BUY_PICKAXE",
+          payload: { pickaxeId: selectedPickaxeId }
+        });
+      }
+    });
+
+    // Close when clicking outside
+    pickaxeOverlay?.addEventListener("click", (e) => {
+      if (e.target === pickaxeOverlay) {
+        closePickaxeModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (pickaxeOverlay.style.display !== "flex") return;
+      if (e.key === "Escape") {
+        closePickaxeModal();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // Attach click sounds
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(pickaxeCloseBtn);
+      window.attachClickSounds(pickaxeActionBtn);
+    }
+
+    // Listen for data events
+    hytopia.onData((data) => {
+      if (data?.type === "PICKAXE_SHOP_DATA") {
+        renderPickaxeGrid(data.payload);
+      }
+
+      if (data?.type === "OPEN_PICKAXE_MODAL") {
+        openPickaxeModal();
+      }
+
+      if (data?.type === "PICKAXE_PURCHASE_SUCCESS" || data?.type === "PICKAXE_EQUIP_SUCCESS") {
+        hytopia.sendData({ type: "GET_PICKAXE_SHOP_DATA" });
+      }
+    });
+
+    // Expose globally
+    window.openPickaxeModal = openPickaxeModal;
+    window.closePickaxeModal = closePickaxeModal;
+  })();
+</script>

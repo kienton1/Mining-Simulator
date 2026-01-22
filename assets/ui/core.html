@@ -1,0 +1,256 @@
+<!--
+  Core utilities and global functions
+  Includes number formatting and global state initialization
+-->
+
+<script>
+  // Global function to show/hide HUD elements when modals are open
+  window.setModalOpen = function(isOpen) {
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+  };
+
+  // Check if any modal is currently open (has .visible class)
+  window.isAnyModalOpen = function() {
+    // Check all known modal IDs
+    const modalIds = [
+      'pickaxe-modal',
+      'miner-modal',
+      'rebirth-modal',
+      'pets-modal',
+      'egg-modal',
+      'maps-modal',
+      'merchant-ui',
+      'gem-trader-ui',
+      'mine-reset-upgrade-ui'
+    ];
+
+    for (const id of modalIds) {
+      const modal = document.getElementById(id);
+      if (modal && modal.classList.contains('visible')) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Format number for popups - max 3 digits (including decimals) followed by letter suffix
+  function formatPopupNumber(value) {
+    if (value < 0) return '-' + formatPopupNumber(-value);
+    if (value === 0) return '0';
+
+    // Helper to format with exactly max 3 digits total (including decimals, excluding decimal point)
+    const formatWithMax3Digits = (num, suffix) => {
+      // Count digits in integer part
+      const intPart = Math.floor(num);
+      const intDigits = intPart.toString().length;
+
+      // If integer part is 3+ digits, show as integer (e.g., 100-999)
+      if (intDigits >= 3) {
+        return Math.round(num).toString() + suffix;
+      }
+
+      // If integer part is 2 digits (10-99), can add 1 decimal place to make 3 digits total
+      if (intDigits === 2) {
+        const with1Dec = num.toFixed(1);
+        const digitsCount = with1Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // If adding decimal exceeds 3 digits, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+
+      // If integer part is 1 digit (1-9), can add up to 2 decimal places to make 3 digits total
+      if (intDigits === 1) {
+        const with2Dec = num.toFixed(2);
+        const digitsCount = with2Dec.replace('.', '').length;
+        if (digitsCount <= 3) {
+          return with2Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Try 1 decimal place
+        const with1Dec = num.toFixed(1);
+        const digitsCount1 = with1Dec.replace('.', '').length;
+        if (digitsCount1 <= 3) {
+          return with1Dec.replace(/\.0+$/, '') + suffix;
+        }
+        // Fallback to integer
+        return Math.round(num).toString() + suffix;
+      }
+
+      // For numbers < 1 (intDigits === 0), show up to 3 significant digits
+      // This is rare for power gains, but handle it
+      const with3Dec = num.toFixed(3);
+      const digitsCount = with3Dec.replace('.', '').replace(/^0+/, '').length;
+      if (digitsCount <= 3) {
+        return with3Dec.replace(/\.?0+$/, '').replace(/^0\./, '0.') + suffix;
+      }
+      return num.toFixed(2).replace(/\.?0+$/, '') + suffix;
+    };
+
+    // Handle very large numbers (same structure as formatNumber)
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      return formatWithMax3Digits(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'De');
+      return formatWithMax3Digits(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
+      return formatWithMax3Digits(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
+      return formatWithMax3Digits(num, 'Oc');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
+      return formatWithMax3Digits(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sp');
+      return formatWithMax3Digits(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Sx');
+      return formatWithMax3Digits(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Qn');
+      return formatWithMax3Digits(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Q');
+      return formatWithMax3Digits(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'T');
+      return formatWithMax3Digits(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'B');
+      return formatWithMax3Digits(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'M');
+      return formatWithMax3Digits(num, 'K');
+    }
+    // Less than 1000 - show as integer (max 3 digits naturally)
+    return Math.round(value).toString();
+  }
+
+  // Global number formatting function - limits to 1-2 decimal places max with letter abbreviations
+  function formatNumber(value) {
+    if (value < 0) return '-' + formatNumber(-value);
+    if (value === 0) return '0';
+
+    // Helper to format with 1-2 decimal places and remove trailing zeros
+    const formatWithSuffix = (num, suffix) => {
+      // Try 1 decimal place first
+      const with1Dec = num.toFixed(1);
+      if (with1Dec.endsWith('.0')) {
+        // If it ends in .0, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Try 2 decimal places if needed
+      const with2Dec = num.toFixed(2);
+      if (with2Dec.endsWith('.00')) {
+        // If it ends in .00, show as integer
+        return Math.round(num).toString() + suffix;
+      }
+      // Remove trailing zeros (e.g., 1.50 -> 1.5, 2.30 -> 2.3)
+      return with2Dec.replace(/\.?0+$/, '') + suffix;
+    };
+
+    // Handle very large numbers
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
+      return formatWithSuffix(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e26) {
+      const num = value / 1e26;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
+      return formatWithSuffix(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
+      return formatWithSuffix(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
+      return formatWithSuffix(num, 'Q');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+      return formatWithSuffix(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
+      return formatWithSuffix(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
+      return formatWithSuffix(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
+      return formatWithSuffix(num, 'K');
+    }
+    // Less than 1000 - show as integer
+    return Math.round(value).toString();
+  }
+</script>

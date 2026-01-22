@@ -1,0 +1,850 @@
+<!-- Miner Shop Modal -->
+<div
+  id="miner-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="miner-wrapper">
+    <!-- Title container -->
+    <div class="miner-title-container">
+      <h2 class="miner-title">MINERS</h2>
+    </div>
+    <!-- Close button -->
+    <button id="miner-close-btn" class="miner-close-btn">X</button>
+
+    <div class="miner-container">
+      <div class="miner-content-wrapper">
+        <!-- Left Side: Equipped Miner Details -->
+        <div class="miner-left-panel">
+          <div class="miner-details">
+            <div class="miner-details__preview">
+              <div id="miner-detail-icon" class="miner-details__icon-wrapper">
+                <img id="miner-detail-icon-img" class="miner-details__icon-img" src="" alt="" style="display: none;" />
+                <span id="miner-detail-icon-emoji" class="miner-details__icon-emoji"></span>
+              </div>
+            </div>
+            <div id="miner-detail-name" class="miner-details__name">Select a Miner</div>
+            <div id="miner-detail-stats" class="miner-details__stats"></div>
+            <button id="miner-action-button" class="miner-details__action-btn">Select</button>
+          </div>
+        </div>
+
+        <!-- Right Side: Miner Grid -->
+        <div class="miner-right-panel">
+          <div class="miner-grid-container">
+            <div id="miner-grid" class="miner-grid">
+              <!-- Miner cards populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Support for .visible class from legacy code */
+  #miner-modal.visible {
+    display: flex !important;
+  }
+
+  .miner-wrapper {
+    position: relative;
+    width: 900px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  .miner-container {
+    background: linear-gradient(
+      180deg,
+      rgba(30, 30, 40, 0.95),
+      rgba(20, 20, 30, 0.95)
+    );
+    border: 3px solid rgba(139, 69, 19, 0.9);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    min-height: 70vh;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: minerSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .miner-wrapper.closing .miner-container {
+    animation: minerSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes minerSlideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes minerSlideOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(60px) scale(0.95);
+    }
+  }
+
+  .miner-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(
+      135deg,
+      rgba(180, 120, 60, 0.95),
+      rgba(140, 90, 45, 0.95)
+    );
+    border: 3px solid rgba(255, 215, 0, 0.8);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .miner-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .miner-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 71, 87, 0.95),
+      rgba(220, 50, 65, 0.95)
+    );
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .miner-close-btn:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 91, 107, 1),
+      rgba(240, 60, 75, 1)
+    );
+    border-color: #ff4757;
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  .miner-content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left Panel - Details */
+  .miner-left-panel {
+    width: 220px;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: linear-gradient(
+      180deg,
+      rgba(40, 35, 30, 0.9),
+      rgba(30, 25, 20, 0.9)
+    );
+    border-right: 2px solid rgba(139, 69, 19, 0.5);
+  }
+
+  .miner-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    height: 100%;
+  }
+
+  .miner-details__preview {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 12px;
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .miner-details__preview:hover {
+    border-color: rgba(255, 215, 0, 0.6);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+  }
+
+  .miner-details__icon-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .miner-details__icon-img {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .miner-details__icon-emoji {
+    font-size: 80px;
+  }
+
+  .miner-details__name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+  }
+
+  .miner-details__stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .miner-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #fff;
+  }
+
+  .miner-stat-row__label {
+    color: #a6b7d3;
+    font-weight: 600;
+  }
+
+  .miner-stat-row__value {
+    font-weight: 700;
+  }
+
+  .miner-stat-row__value--power { color: #ff5252; }
+  .miner-stat-row__value--speed { color: #87ceeb; }
+  .miner-stat-row__value--sell { color: #ffd700; }
+  .miner-stat-row__value--cost { color: #ffd700; }
+
+  .miner-details__action-btn {
+    width: 100%;
+    padding: 12px 16px;
+    margin-top: auto;
+    border-radius: 8px;
+    border: 2px solid rgba(139, 69, 19, 0.6);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: linear-gradient(180deg, #ffd700, #ffb700);
+    color: #000;
+    border-color: rgba(255, 215, 0, 0.9);
+  }
+
+  .miner-details__action-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffed4e, #ffd700);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .miner-details__action-btn:disabled {
+    background: linear-gradient(
+      180deg,
+      rgba(100, 100, 100, 0.5),
+      rgba(80, 80, 80, 0.5)
+    );
+    border-color: rgba(100, 100, 100, 0.5);
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .miner-details__action-btn--equipped {
+    background: linear-gradient(180deg, #00d26a, #00a854);
+    border-color: rgba(0, 210, 106, 0.9);
+    color: #fff;
+  }
+
+  .miner-details__action-btn--equipped:hover {
+    background: linear-gradient(180deg, #00e673, #00b35c);
+    box-shadow: 0 4px 12px rgba(0, 210, 106, 0.4);
+  }
+
+  /* Right Panel - Grid */
+  .miner-right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .miner-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    min-height: 0;
+  }
+
+  .miner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+    padding: 4px;
+  }
+
+  .miner-card {
+    background: linear-gradient(
+      180deg,
+      rgba(60, 50, 40, 0.7),
+      rgba(40, 35, 30, 0.7)
+    );
+    border: 2px solid rgba(139, 69, 19, 0.5);
+    border-radius: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+  }
+
+  .miner-card:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(80, 65, 50, 0.8),
+      rgba(50, 40, 30, 0.8)
+    );
+    border-color: rgba(255, 215, 0, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .miner-card.selected {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 215, 0, 0.3),
+      rgba(255, 165, 0, 0.3)
+    );
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  }
+
+  .miner-card.equipped {
+    border-color: #00d26a;
+  }
+
+  .miner-card.locked {
+    opacity: 0.5;
+    filter: grayscale(0.5);
+  }
+
+  .miner-card__equipped-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: #00d26a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .miner-card__lock-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 16px;
+  }
+
+  .miner-card__icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .miner-card__icon-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .miner-card__icon-emoji {
+    font-size: 40px;
+  }
+
+  .miner-card__name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .miner-card__cost {
+    font-size: 11px;
+    color: #ffd700;
+    font-weight: 700;
+  }
+
+  .miner-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #cdd8f3;
+    padding: 60px 0;
+    font-weight: 700;
+  }
+
+  /* Scrollbar styling */
+  .miner-grid-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .miner-grid-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+  }
+
+  .miner-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(139, 69, 19, 0.6);
+    border-radius: 4px;
+  }
+
+  .miner-grid-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 69, 19, 0.8);
+  }
+
+  /* Mobile scrolling support */
+  body.mobile .miner-right-panel,
+  body.mobile .miner-right-panel *,
+  body.mobile .miner-grid-container,
+  body.mobile .miner-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Mobile-specific responsive styles */
+  body.mobile .miner-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .miner-container {
+    min-height: 70vh;
+    max-height: 75vh;
+  }
+
+  body.mobile .miner-title-container {
+    padding: 6px 16px;
+  }
+
+  body.mobile .miner-title {
+    font-size: 18px;
+    -webkit-text-stroke: 1.5px #000;
+  }
+
+  body.mobile .miner-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Mobile: Keep vertical layout (left/right) with adjusted sizes */
+  body.mobile .miner-left-panel {
+    width: 180px;
+    min-width: 180px;
+    padding: 10px;
+  }
+
+  body.mobile .miner-details {
+    gap: 8px;
+  }
+
+  body.mobile .miner-details__preview {
+    width: 100px;
+    height: 100px;
+  }
+
+  body.mobile .miner-details__icon-img {
+    max-width: 80px;
+    max-height: 80px;
+  }
+
+  body.mobile .miner-details__icon-emoji {
+    font-size: 48px;
+  }
+
+  body.mobile .miner-details__name {
+    font-size: 13px;
+  }
+
+  body.mobile .miner-details__stats {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  body.mobile .miner-stat-row {
+    font-size: 10px;
+  }
+
+  body.mobile .miner-details__action-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  body.mobile .miner-right-panel {
+    padding: 10px;
+  }
+
+  body.mobile .miner-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 6px;
+  }
+
+  body.mobile .miner-card {
+    min-height: 90px;
+    padding: 6px;
+  }
+
+  body.mobile .miner-card__icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 4px;
+  }
+
+  body.mobile .miner-card__icon-emoji {
+    font-size: 28px;
+  }
+
+  body.mobile .miner-card__name {
+    font-size: 9px;
+  }
+
+  body.mobile .miner-card__cost {
+    font-size: 8px;
+  }
+</style>
+
+<script>
+  (function() {
+    const minerOverlay = document.getElementById("miner-modal");
+    const minerGrid = document.getElementById("miner-grid");
+    const minerCloseBtn = document.getElementById("miner-close-btn");
+    const minerActionBtn = document.getElementById("miner-action-button");
+    const minerDetailIconImg = document.getElementById("miner-detail-icon-img");
+    const minerDetailIconEmoji = document.getElementById("miner-detail-icon-emoji");
+    const minerDetailName = document.getElementById("miner-detail-name");
+    const minerDetailStats = document.getElementById("miner-detail-stats");
+
+    let minerData = null;
+    let miners = [];
+    let selectedMinerId = null;
+    let equippedMinerId = null;
+    let playerGold = 0;
+
+    function openMinerModal() {
+      minerOverlay.style.display = "flex";
+      selectedMinerId = null;
+
+      const wrapper = document.querySelector(".miner-wrapper");
+      wrapper.classList.remove("closing");
+      void wrapper.offsetWidth;
+
+      hytopia.lockPointer(false, true);
+      hytopia.sendData({ type: "GET_MINER_SHOP_DATA" });
+      if (window.setModalOpen) window.setModalOpen(true);
+    }
+
+    function closeMinerModal() {
+      const wrapper = document.querySelector(".miner-wrapper");
+      wrapper.classList.add("closing");
+
+      setTimeout(() => {
+        minerOverlay.style.display = "none";
+        minerOverlay.classList.remove("visible");
+        wrapper.classList.remove("closing");
+      }, 400);
+
+      hytopia.lockPointer(true);
+      if (window.setModalOpen) window.setModalOpen(false);
+    }
+
+    function renderMinerGrid(data) {
+      minerData = data;
+      miners = data.miners || [];
+      equippedMinerId = data.equippedMinerId;
+      playerGold = data.gold || 0;
+
+      if (miners.length === 0) {
+        minerGrid.innerHTML = '<div class="miner-empty">No miners available.</div>';
+        renderMinerDetails(null);
+        return;
+      }
+
+      // Auto-select equipped miner or first one
+      if (!selectedMinerId) {
+        selectedMinerId = equippedMinerId || miners[0].id;
+      }
+
+      minerGrid.innerHTML = miners.map(miner => {
+        const isSelected = miner.id === selectedMinerId;
+        const isEquipped = miner.id === equippedMinerId;
+        const isOwned = miner.owned;
+        const isLocked = !isOwned && miner.cost > playerGold;
+
+        const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+        const iconPath = miner.icon ? (cdn ? `${cdn}/${miner.icon}` : `../${miner.icon}`) : null;
+
+        return `
+          <div class="miner-card ${isSelected ? 'selected' : ''} ${isEquipped ? 'equipped' : ''} ${isLocked && !isOwned ? 'locked' : ''}"
+               data-id="${miner.id}">
+            ${isEquipped ? '<div class="miner-card__equipped-badge">+</div>' : ''}
+            ${!isOwned && isLocked ? '<div class="miner-card__lock-badge">*</div>' : ''}
+            <div class="miner-card__icon">
+              ${iconPath
+                ? `<img src="${iconPath}" alt="${miner.name}" class="miner-card__icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" /><span class="miner-card__icon-emoji" style="display:none;">&#x26d1;&#xfe0f;</span>`
+                : `<span class="miner-card__icon-emoji">&#x26d1;&#xfe0f;</span>`
+              }
+            </div>
+            <div class="miner-card__name">${miner.name}</div>
+            <div class="miner-card__cost">${isOwned ? 'Owned' : `${formatNumber(miner.cost)} Gold`}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers
+      minerGrid.querySelectorAll('.miner-card').forEach(card => {
+        if (typeof window.attachClickSounds === "function") {
+          window.attachClickSounds(card);
+        }
+
+        card.addEventListener('click', () => {
+          const id = card.dataset.id;
+          selectedMinerId = id;
+
+          minerGrid.querySelectorAll('.miner-card').forEach(c => {
+            c.classList.toggle('selected', c.dataset.id === id);
+          });
+
+          const miner = miners.find(m => m.id === id);
+          renderMinerDetails(miner);
+        });
+      });
+
+      // Render selected miner details
+      const selectedMiner = miners.find(m => m.id === selectedMinerId);
+      renderMinerDetails(selectedMiner);
+    }
+
+    function renderMinerDetails(miner) {
+      if (!miner) {
+        minerDetailIconImg.style.display = "none";
+        minerDetailIconEmoji.style.display = "block";
+        minerDetailIconEmoji.textContent = "?";
+        minerDetailName.textContent = "Select a Miner";
+        minerDetailStats.innerHTML = "";
+        minerActionBtn.textContent = "Select";
+        minerActionBtn.disabled = true;
+        return;
+      }
+
+      const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+      const iconPath = miner.icon ? (cdn ? `${cdn}/${miner.icon}` : `../${miner.icon}`) : null;
+
+      if (iconPath) {
+        minerDetailIconImg.src = iconPath;
+        minerDetailIconImg.style.display = "block";
+        minerDetailIconEmoji.style.display = "none";
+      } else {
+        minerDetailIconImg.style.display = "none";
+        minerDetailIconEmoji.style.display = "block";
+        minerDetailIconEmoji.innerHTML = "&#x26d1;&#xfe0f;";
+      }
+
+      minerDetailName.textContent = miner.name;
+
+      // Build stats HTML
+      let statsHtml = '';
+      if (miner.sellMultiplier) {
+        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Sell Bonus</span><span class="miner-stat-row__value miner-stat-row__value--sell">x${miner.sellMultiplier}</span></div>`;
+      }
+      if (miner.speedBonus) {
+        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Speed Bonus</span><span class="miner-stat-row__value miner-stat-row__value--speed">+${miner.speedBonus}%</span></div>`;
+      }
+      if (miner.powerBonus) {
+        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Power Bonus</span><span class="miner-stat-row__value miner-stat-row__value--power">+${formatNumber(miner.powerBonus)}</span></div>`;
+      }
+      if (!miner.owned) {
+        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Cost</span><span class="miner-stat-row__value miner-stat-row__value--cost">${formatNumber(miner.cost)} Gold</span></div>`;
+      }
+
+      minerDetailStats.innerHTML = statsHtml;
+
+      // Update action button
+      const isEquipped = miner.id === equippedMinerId;
+      const isOwned = miner.owned;
+      const canAfford = playerGold >= miner.cost;
+
+      if (isEquipped) {
+        minerActionBtn.textContent = "Equipped";
+        minerActionBtn.disabled = true;
+        minerActionBtn.className = "miner-details__action-btn miner-details__action-btn--equipped";
+      } else if (isOwned) {
+        minerActionBtn.textContent = "Equip";
+        minerActionBtn.disabled = false;
+        minerActionBtn.className = "miner-details__action-btn";
+      } else if (canAfford) {
+        minerActionBtn.textContent = `Buy for ${formatNumber(miner.cost)} Gold`;
+        minerActionBtn.disabled = false;
+        minerActionBtn.className = "miner-details__action-btn";
+      } else {
+        minerActionBtn.textContent = `Need ${formatNumber(miner.cost - playerGold)} more Gold`;
+        minerActionBtn.disabled = true;
+        minerActionBtn.className = "miner-details__action-btn";
+      }
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e12) return (num / 1e12).toFixed(1) + "T";
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + "B";
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + "M";
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
+      return num.toString();
+    }
+
+    // Event listeners
+    minerCloseBtn?.addEventListener("click", closeMinerModal);
+
+    minerActionBtn?.addEventListener("click", () => {
+      if (!selectedMinerId || minerActionBtn.disabled) return;
+
+      const miner = miners.find(m => m.id === selectedMinerId);
+      if (!miner) return;
+
+      if (miner.owned) {
+        hytopia.sendData({
+          type: "EQUIP_MINER",
+          payload: { minerId: selectedMinerId }
+        });
+      } else {
+        hytopia.sendData({
+          type: "BUY_MINER",
+          payload: { minerId: selectedMinerId }
+        });
+      }
+    });
+
+    // Close when clicking outside
+    minerOverlay?.addEventListener("click", (e) => {
+      if (e.target === minerOverlay) {
+        closeMinerModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (minerOverlay.style.display !== "flex") return;
+      if (e.key === "Escape") {
+        closeMinerModal();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // Attach click sounds
+    if (typeof window.attachClickSounds === "function") {
+      window.attachClickSounds(minerCloseBtn);
+      window.attachClickSounds(minerActionBtn);
+    }
+
+    // Listen for data events
+    hytopia.onData((data) => {
+      if (data?.type === "MINER_SHOP_DATA") {
+        renderMinerGrid(data.payload);
+      }
+
+      if (data?.type === "OPEN_MINER_MODAL") {
+        openMinerModal();
+      }
+
+      if (data?.type === "MINER_PURCHASE_SUCCESS" || data?.type === "MINER_EQUIP_SUCCESS") {
+        hytopia.sendData({ type: "GET_MINER_SHOP_DATA" });
+      }
+    });
+
+    // Expose globally
+    window.openMinerModal = openMinerModal;
+    window.closeMinerModal = closeMinerModal;
+  })();
+</script>
