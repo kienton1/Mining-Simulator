@@ -8,6 +8,7 @@
  */
 
 import { OreType } from '../Mining/Ore/World1OreData';
+import type { TutorialProgress } from '../Tutorial/TutorialTypes';
 
 /**
  * Player's persistent statistics
@@ -67,6 +68,9 @@ export interface PlayerData {
   petDiscovered?: string[];
   /** Pet IDs that should be auto-deleted on hatch (per player). */
   autoDeletePets?: string[];
+
+  /** Tutorial progress for new players */
+  tutorial?: TutorialProgress;
 
   /**
    * World System

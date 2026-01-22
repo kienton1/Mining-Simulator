@@ -29,6 +29,7 @@ export class EggStationManager {
   private playerStationMap: Map<Player, string | null> = new Map();
   private interval?: NodeJS.Timeout;
   private stations: EggStationDefinition[];
+  public onProximityChange?: (player: Player, inProximity: boolean, station: EggStationDefinition | null) => void;
 
   constructor(world: World, gameManager: GameManager, stations: EggStationDefinition[], proximityRadius = 3.5) {
     this.world = world;
@@ -85,11 +86,17 @@ export class EggStationManager {
       this.playerStationMap.set(player, nextStationId);
 
       if (!nextStationId) {
+        if (this.onProximityChange) {
+          this.onProximityChange(player, false, null);
+        }
         player.ui.sendData({ type: 'EGG_STATION_PROXIMITY', inProximity: false });
         continue;
       }
 
       const station = closest!.station;
+      if (this.onProximityChange) {
+        this.onProximityChange(player, true, station);
+      }
       const playerData = this.gameManager.getPlayerData(player);
       const gold = playerData?.gold ?? 0;
       const invCount = Array.isArray(playerData?.petInventory) ? playerData!.petInventory!.length : 0;

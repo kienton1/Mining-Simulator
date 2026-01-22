@@ -311,6 +311,36 @@ startServer(world => {
   const eggStationLabelManager = new EggStationLabelManager(world, eggStations);
   setTimeout(() => eggStationLabelManager.start(), 1000);
 
+  const tutorialWorldIds = ['island1', 'island2', 'island3'] as const;
+  const tutorialMerchants: Record<string, { x: number; y: number; z: number }> = {};
+  for (const [index, merchantEntity] of merchantEntities.entries()) {
+    const worldId = tutorialWorldIds[index] ?? 'island1';
+    tutorialMerchants[worldId] = merchantEntity.getPosition();
+  }
+
+  const tutorialEggStations: Record<string, { x: number; y: number; z: number }> = {};
+  const tutorialStationByWorld = {
+    island1: eggStations.find((station) => station.eggType === EggType.STONE),
+    island2: eggStations.find((station) => station.eggType === EggType.ABYSSAL),
+    island3: eggStations.find((station) => station.eggType === EggType.SAND),
+  };
+  for (const [worldId, station] of Object.entries(tutorialStationByWorld)) {
+    if (station) {
+      tutorialEggStations[worldId] = station.position;
+    }
+  }
+
+  gameManager.getTutorialManager().setLocations({
+    merchants: tutorialMerchants,
+    eggStations: tutorialEggStations,
+  });
+
+  eggStationManager.onProximityChange = (player, inProximity) => {
+    if (inProximity) {
+      gameManager.getTutorialManager().handleEggStationEntered(player);
+    }
+  };
+
   function sendPetState(player: any) {
     const playerData = gameManager.getPlayerData(player);
     if (!playerData) return;
@@ -352,6 +382,7 @@ startServer(world => {
       trainingMultiplier,
     });
   }
+
 
   /**
    * Handle merchant proximity events
@@ -666,6 +697,10 @@ startServer(world => {
           gameManager.sendPowerStatsToUI(player);
         }, 100);
       }
+      gameManager.getTutorialManager().initializePlayer(player);
+      if (loadingGate.uiLoaded) {
+        gameManager.getTutorialManager().sendState(player);
+      }
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
       tryFinishLoading();
@@ -675,6 +710,10 @@ startServer(world => {
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
       }, 100);
+      gameManager.getTutorialManager().initializePlayer(player);
+      if (loadingGate.uiLoaded) {
+        gameManager.getTutorialManager().sendState(player);
+      }
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
       tryFinishLoading();
@@ -688,6 +727,8 @@ startServer(world => {
     player.ui.on(PlayerUIEvent.LOAD, () => {
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
+      gameManager.getTutorialManager().initializePlayer(player);
+      gameManager.getTutorialManager().sendState(player);
       loadingGate.uiLoaded = true;
       tryFinishLoading();
     });
@@ -762,6 +803,7 @@ startServer(world => {
             gold: playerDataAfterSell?.gold || 0,
             goldEarned,
           });
+          gameManager.getTutorialManager().handleOreSold(player, goldEarned);
           break;
         case 'SELL_ALL':
           const totalGoldEarned = gameManager.getSellingSystem().sellAll(player);
@@ -802,6 +844,7 @@ startServer(world => {
             gold: playerDataAfterSellAll?.gold || 0,
             goldEarned: totalGoldEarned,
           });
+          gameManager.getTutorialManager().handleOreSold(player, totalGoldEarned);
           break;
         case 'CLOSE_MERCHANT_UI':
 
@@ -904,6 +947,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equip', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().handlePetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP': {
@@ -918,6 +964,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipFromInventoryIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().handlePetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP_INSTANCE': {
@@ -931,6 +980,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipBest(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipBest', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().handlePetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP_ALL': {
@@ -993,6 +1045,7 @@ startServer(world => {
             results,
           });
           sendPetState(player);
+          gameManager.getTutorialManager().handleEggHatch(player);
           break;
         }
         case 'BUY_PICKAXE':

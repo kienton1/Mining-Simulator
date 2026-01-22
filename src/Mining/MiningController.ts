@@ -149,6 +149,7 @@ export class MiningController {
       (p, oreType, amount) => {
         // Add ore to inventory
         this.gameManager.addOreToInventory(p, oreType, amount);
+        this.gameManager.getTutorialManager().handleOreMined(p, amount);
       },
       (p, damage, currentOre, blockHP, maxHP, isChest, chestType, gemReward) => {
         // Send UI event for damage and current ore display

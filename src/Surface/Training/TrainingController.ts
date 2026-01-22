@@ -642,6 +642,7 @@ export class TrainingController {
         
         const newTotal = this.gameManager.addPower(p, finalGain);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
+        this.gameManager.getTutorialManager().handleTrainingHit(p);
       },
       worldId,
       hitRate

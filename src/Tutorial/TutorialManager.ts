@@ -4,7 +4,7 @@ import { EGG_DEFINITIONS } from '../Pets/PetDatabase';
 import { ISLAND2_SHARED_MINE_SHAFT, ISLAND3_SHARED_MINE_SHAFT, SHARED_MINE_SHAFT } from '../Core/GameConstants';
 import type { GameManager } from '../Core/GameManager';
 import type { PlayerData } from '../Core/PlayerData';
-import { createDefaultTutorialProgress, type TutorialProgress, type TutorialPhase } from './TutorialTypes';
+import { createCompletedTutorialProgress, createDefaultTutorialProgress, type TutorialProgress, type TutorialPhase } from './TutorialTypes';
 
 type Vector3 = { x: number; y: number; z: number };
 
@@ -36,12 +36,20 @@ export class TutorialManager {
     this.locations = locations;
   }
 
+  initializePlayer(player: Player): void {
+    const data = this.gameManager.getPlayerData(player);
+    if (!data || data.tutorial) return;
+
+    const isNewPlayer = this.isLikelyNewPlayer(data);
+    data.tutorial = isNewPlayer ? createDefaultTutorialProgress() : createCompletedTutorialProgress();
+    this.gameManager.updatePlayerData(player, data);
+  }
+
   ensureProgress(player: Player): TutorialProgress | null {
     const data = this.gameManager.getPlayerData(player);
     if (!data) return null;
     if (!data.tutorial) {
-      data.tutorial = createDefaultTutorialProgress();
-      this.gameManager.updatePlayerData(player, data);
+      this.initializePlayer(player);
     }
     return data.tutorial;
   }
@@ -103,6 +111,15 @@ export class TutorialManager {
     progress.phase = 'pet_acquire';
     this.commitProgress(player, progress);
     this.grantPetGold(player);
+  }
+
+  handleEggStationEntered(player: Player): void {
+    const progress = this.ensureProgress(player);
+    if (!progress || progress.completed) return;
+    if (progress.phase !== 'pet_acquire') return;
+
+    progress.phase = 'pet_hatch';
+    this.commitProgress(player, progress);
   }
 
   handleEggHatch(player: Player): void {
@@ -218,7 +235,7 @@ export class TutorialManager {
 
   private getTrainingTarget(player: Player): Vector3 | null {
     const trainingController = this.gameManager.getTrainingController();
-    const rock = trainingController?.getBestAccessibleTrainingRock(player);
+    const rock = trainingController?.findBestAccessibleTrainingRock(player);
     if (!rock) return null;
     return { x: rock.position.x, y: rock.position.y, z: rock.position.z };
   }
@@ -236,5 +253,31 @@ export class TutorialManager {
     data.tutorial.rewardGranted = true;
     this.gameManager.updatePlayerData(player, data);
     this.sendState(player);
+  }
+
+  private isLikelyNewPlayer(data: PlayerData): boolean {
+    const hasGold = (data.gold ?? 0) > 0;
+    const hasGems = (data.gems ?? 0) > 0;
+    const hasWins = (data.wins ?? 0) > 0;
+    const hasRebirths = (data.rebirths ?? 0) > 0;
+    const hasPower = data.power !== '1' && data.power !== '0';
+    const hasInventory = Object.values(data.inventory ?? {}).some((amount) => (amount ?? 0) > 0);
+    const hasPets = (data.petInventory?.length ?? 0) > 0 || (data.equippedPets?.length ?? 0) > 0;
+    const hasPickaxeUpgrades = (data.ownedPickaxes?.length ?? 1) > 1 || (data.currentPickaxeTier ?? 0) > 0;
+    const hasMiners = (data.ownedMiners?.length ?? 0) > 0 || (data.currentMinerTier ?? -1) >= 0;
+    const hasWorldUnlocks = (data.unlockedWorlds?.length ?? 1) > 1;
+
+    return !(
+      hasGold ||
+      hasGems ||
+      hasWins ||
+      hasRebirths ||
+      hasPower ||
+      hasInventory ||
+      hasPets ||
+      hasPickaxeUpgrades ||
+      hasMiners ||
+      hasWorldUnlocks
+    );
   }
 }

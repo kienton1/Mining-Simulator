@@ -1,7 +1,7 @@
 # Tutorial System Planning
 
 ## Overview
-Create a comprehensive tutorial system that guides new players through the core gameplay loop: mining → selling → training → pets. The tutorial should be progressive, non-intrusive, and provide clear visual cues and instructions.
+Create a comprehensive tutorial system that guides new players through the core gameplay loop: mining, selling, training, and pets. The tutorial should be progressive, non-intrusive, and provide clear visual cues and instructions.
 
 ## Tutorial Flow Structure
 
@@ -9,7 +9,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Guide player from spawn to the mine entrance
 
 **Visual Elements**:
-- **Directional Arrows**: Floating arrow entities pointing toward the mine entrance
+- **Directional Arrows**: Client arrow from the player entity to the mine entrance (HytopiaUI.connectArrow)
 - **Top-Right UI Panel**: "Enter Mines" instruction with progress indicator
 - **Ground Markers**: Optional glowing path markers on the ground
 
@@ -26,6 +26,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Teach player to mine 5 ores
 
 **Visual Elements**:
+- **Directional Arrow**: Player -> nearest highlighted ore target (connectArrow to block position)
 - **Mining Highlight**: Glowing outline around nearby mineable blocks
 - **Progress UI**: Top-right panel showing "Mine 5 Ores (0/5)"
 - **Tooltips**: Contextual hints when looking at blocks
@@ -45,6 +46,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Teach player how to sell mined ores
 
 **Visual Elements**:
+- **Directional Arrow**: Player -> merchant NPC entity (connectArrow to merchant entity ID)
 - **Merchant Highlight**: Glowing effect around the merchant NPC
 - **UI Guidance**: Top-right panel with "Sell Your Ores" and inventory hints
 - **Interactive Prompts**: "Press E to sell" when near merchant
@@ -65,6 +67,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Teach player about the training system
 
 **Visual Elements**:
+- **Directional Arrow**: Player -> selected training rock position (connectArrow to block position)
 - **Training Rock Highlight**: Glowing effect on accessible training rocks
 - **Progress UI**: "Complete Training" with requirements shown
 - **Power Gain Visualization**: Animated power increases during training
@@ -85,6 +88,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Give player money and teach pet purchasing
 
 **Visual Elements**:
+- **Directional Arrow**: Player -> pet merchant entity (connectArrow to pet merchant entity ID)
 - **Pet Shop Highlight**: Glowing effect around pet merchant
 - **UI Guidance**: "Buy Your First Pet" with cost display
 - **Gold Reward Notification**: "Tutorial Reward: X Gold!"
@@ -105,6 +109,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 **Goal**: Teach player how to hatch purchased pets
 
 **Visual Elements**:
+- **Directional Arrow**: Player -> egg station entity/position (connectArrow to station entity ID or barrel position)
 - **Egg Station Highlight**: Glowing effect around egg stations
 - **UI Guidance**: "Hatch Your Pet" with egg selection
 - **Hatching Animation**: Special tutorial hatching effects
@@ -158,10 +163,21 @@ Create a comprehensive tutorial system that guides new players through the core 
 - Contextual hints and tooltips
 
 #### Visual Cue System
-- Arrow entity management
-- Glowing highlight effects
+- Arrow entity management (client-side HytopiaUI.connectArrow/disconnectArrow)
+- Glowing highlight effects (client-side color correction on target entities)
 - Ground marker placement
 - Animated transitions
+
+#### Directional Arrow System (Client)
+- Access the API via the `hytopia` global in your client HTML UI.
+- Use `HytopiaUI.connectArrow(source, target, options)` in UI code to render arrows per player.
+- Source should be the player's entity ID from `getPlayerEntityId()` (retry until available).
+- Target should be a server-sent entity ID (NPCs, stations) or a world position (mine entrance, blocks).
+- Store returned `arrowId` per tutorial step and call `disconnectArrow(arrowId)` when the step completes or the target changes.
+- Guard `disconnectArrow` calls (the client API throws if the ID does not exist).
+- Use `options.color` (r/g/b 0-255) and `textureUri` to brand arrows per phase.
+- Use `getEntityIdByName(name)` if you tag tutorial targets with unique entity names.
+- Keep at most one primary arrow active to avoid overwhelming players.
 
 #### Progress Tracking
 - Mining progress counter
@@ -179,7 +195,7 @@ Create a comprehensive tutorial system that guides new players through the core 
 - **Inventory System**: Tutorial item highlighting and management
 
 #### New Tutorial-Specific Components:
-- **TutorialArrow**: Directional arrow entities
+- **TutorialArrow**: Client arrow manager (tracks arrow IDs, handles create/update/remove)
 - **TutorialHighlight**: Block/entity highlighting system
 - **TutorialUI**: Dedicated tutorial interface components
 - **TutorialProgress**: Progress persistence and tracking
@@ -195,6 +211,17 @@ Create a comprehensive tutorial system that guides new players through the core 
 - Tutorial-specific events for phase transitions
 - UI update events for tutorial panel
 - Visual cue activation/deactivation events
+
+#### Server <-> UI Data Contract (Arrows)
+Example message shapes to keep the UI code simple and data-driven:
+
+```ts
+// Server -> UI
+{ type: 'TUTORIAL_ARROW', action: 'show', key: 'phase1-mine', targetEntityId?: number, targetPosition?: { x: number; y: number; z: number }, color?: { r: number; g: number; b: number }, textureUri?: string }
+{ type: 'TUTORIAL_ARROW', action: 'hide', key: 'phase1-mine' }
+```
+
+UI should map `key` to `arrowId`, call `connectArrow` on show, and `disconnectArrow` on hide.
 
 ## UI/UX Considerations
 
@@ -315,6 +342,6 @@ Create a comprehensive tutorial system that guides new players through the core 
 
 ### Analytics Integration
 - Player behavior tracking during tutorial
-- Conversion metrics (tutorial completion → retention)
+- Conversion metrics (tutorial completion -> retention)
 - A/B testing framework for tutorial variations
 - Continuous improvement based on data
