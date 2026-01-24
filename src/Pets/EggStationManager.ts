@@ -37,7 +37,7 @@ export class EggStationManager {
   private gameManager: GameManager;
   private proximityRadius: number;
   private trackedPlayers: Set<Player> = new Set();
-  private playerGroupMap: Map<Player, string | null> = new Map();
+  private playerGroupMap: Map<Player, { groupId: string | null; stationId: string | null }> = new Map();
   private interval?: NodeJS.Timeout;
   private stations: EggStationDefinition[];
   private stationGroups: StationGroup[];
@@ -128,7 +128,7 @@ export class EggStationManager {
       if (!playerEntities.length) continue;
 
       const pos = playerEntities[0].position;
-      let nearestGroup: { group: StationGroup; distance: number } | null = null;
+      let nearestMatch: { group: StationGroup; station: EggStationDefinition; distance: number } | null = null;
 
       // Check distance to any station in any group
       for (const group of this.stationGroups) {
@@ -138,25 +138,26 @@ export class EggStationManager {
           const distance = Math.sqrt(dx * dx + dz * dz);
 
           if (distance <= this.proximityRadius) {
-            if (!nearestGroup || distance < nearestGroup.distance) {
-              nearestGroup = { group, distance };
+            if (!nearestMatch || distance < nearestMatch.distance) {
+              nearestMatch = { group, station, distance };
             }
           }
         }
       }
 
-      const prevGroupId = this.playerGroupMap.get(player) ?? null;
-      const nextGroupId = nearestGroup?.group.id ?? null;
+      const prev = this.playerGroupMap.get(player) ?? { groupId: null, stationId: null };
+      const nextGroupId = nearestMatch?.group.id ?? null;
+      const nextStationId = nearestMatch?.station.id ?? null;
 
-      if (prevGroupId === nextGroupId) continue;
-      this.playerGroupMap.set(player, nextGroupId);
+      if (prev.groupId === nextGroupId && prev.stationId === nextStationId) continue;
+      this.playerGroupMap.set(player, { groupId: nextGroupId, stationId: nextStationId });
 
       if (!nextGroupId) {
         player.ui.sendData({ type: 'EGG_STATION_PROXIMITY', inProximity: false });
         continue;
       }
 
-      const group = nearestGroup!.group;
+      const group = nearestMatch!.group;
       const playerData = this.gameManager.getPlayerData(player);
       const gold = playerData?.gold ?? 0;
       const invCount = Array.isArray(playerData?.petInventory) ? playerData!.petInventory!.length : 0;
@@ -178,6 +179,7 @@ export class EggStationManager {
 
       // Sort by cost (cheapest first)
       stationsData.sort((a, b) => a.costGold - b.costGold);
+      const selectedStation = stationsData.find((station) => station.id === nextStationId) ?? stationsData[0];
 
       player.ui.sendData({
         type: 'EGG_STATION_PROXIMITY',
@@ -185,8 +187,9 @@ export class EggStationManager {
         groupId: group.id,
         groupName: group.name,
         stations: stationsData,
+        selectedStationId: selectedStation?.id ?? null,
         // First station is selected by default
-        station: stationsData[0],
+        station: selectedStation,
         player: {
           gold,
           petInventoryCount: ownedCount,
@@ -204,6 +207,7 @@ export class EggStationManager {
     name: string;
     rarity: string;
     chance: number;
+    imageUri?: string;
   }> {
     const table = getEggLootTable(eggType) || [];
     let totalWeight = 0;
@@ -219,6 +223,7 @@ export class EggStationManager {
         name: def?.name ?? entry.petId,
         rarity: def?.rarity ?? 'common',
         chance: (entry.weight / totalWeight) * 100,
+        imageUri: `ui/pets/${entry.petId}.png`,
       };
     });
   }

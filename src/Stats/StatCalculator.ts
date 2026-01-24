@@ -62,23 +62,32 @@ function calculateRock1PowerGain(rebirths: number): number {
  */
 function calculateRock2PowerGain(rebirths: number): number {
   const x = rebirths;
-  
+
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
-  if (x === 0) {
-    return 1;
-  }
-  
+  if (x === 0) return 2;
+
+  // Early game tuned to match your table (+3 power column)
   if (x >= 1 && x < 57) {
-    // For low rebirth counts, ensure minimum of 1 power gain
-    // Formula: floor(x / 5) but with minimum of 1 to ensure progression
-    return Math.max(1, Math.floor((x + 6) / 5));
-  } else if (x >= 57 && x < 2510) {
+    if (x <= 10) return 2;     // matches: 1->2, 6->2
+    if (x <= 20) return 3;     // matches: 11->3, 16->3
+    if (x <= 30) return 5;     // matches: 21->5, 26->5
+    if (x <= 40) return 6;     // matches: 31->6, 36->6
+    if (x <= 46) return 8;     // matches: 41->8
+
+    // 47..56: ramp up so it can naturally reach 11 at 57 (next bracket)
+    // 47-51 => 9 (matches 47->9)
+    // 52-56 => 10
+    return 9 + Math.floor((x - 47) / 5);
+  }
+
+  // Your existing mid/late game logic
+  if (x >= 57 && x < 2510) {
     return Math.floor(0.15 * x + 2.5);
   } else if (x >= 2510) {
     return Math.floor(0.15 * x + 2);
-  } else {
-    return 1; // x < 1 (shouldn't reach here, but return 1 as minimum)
   }
+
+  return 2;
 }
 
 /**

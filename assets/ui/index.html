@@ -587,6 +587,9 @@
 <!-- Included from: ./components/SetupAndEventHandlers.html -->
 
 <script>
+  // This file owns egg station UI behavior; disable legacy EggModal handlers.
+  window.__eggStationUIManaged = true;
+
   // Format number for popups - max 3 digits (including decimals) followed by letter suffix
   function formatPopupNumber(value) {
     if (value < 0) return '-' + formatPopupNumber(-value);
@@ -1274,7 +1277,7 @@
       {
         key: 'moreCoins',
         title: 'More Coins',
-        icon: '💰',
+        iconHtml: '<span class="coin-icon coin-icon--inline"></span>',
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -1322,7 +1325,11 @@
       iconContainer.className = 'gem-trader-ui__icon-container';
       const icon = document.createElement('div');
       icon.className = 'gem-trader-ui__icon';
-      icon.textContent = upgradeDef.icon;
+      if (upgradeDef.iconHtml) {
+        icon.innerHTML = upgradeDef.iconHtml;
+      } else {
+        icon.textContent = upgradeDef.icon;
+      }
       const arrowOverlay = document.createElement('div');
       arrowOverlay.className = 'gem-trader-ui__arrow-overlay';
       arrowOverlay.textContent = '↑';
@@ -1627,7 +1634,7 @@
     const eggAutoBtn = document.getElementById('egg-auto');
     const eggResultsListEl = document.getElementById('egg-results-list');
     const eggShopGridEl = document.getElementById('egg-shop-grid');
-    const eggTabsEl = document.getElementById('egg-tabs');
+    const eggTabsEl = document.getElementById('egg-tabs') || document.getElementById('egg-tabs-container');
     const eggStationIconEl = document.getElementById('egg-station-icon');
     const eggHatchOverlayEl = document.getElementById('egg-hatch-overlay');
     const eggHatchSlotsEl = document.getElementById('egg-hatch-slots');
@@ -1794,17 +1801,27 @@
     const EGG_HATCH_COOLDOWN_MS = 1000;
     let eggHatchInProgress = false;
     let currentEggHatch = null;
+    let confettiContainer = null;
+    let confettiHatchResetTimer = null;
 
     const resetEggHatchOverlay = () => {
       if (currentEggHatch?.cleanupTimer) {
         clearTimeout(currentEggHatch.cleanupTimer);
       }
+      if (currentEggHatch?.crackTimers) {
+        currentEggHatch.crackTimers.forEach((timer) => clearTimeout(timer));
+      }
       currentEggHatch = null;
       eggHatchInProgress = false;
       if (eggHatchOverlayEl) eggHatchOverlayEl.hidden = true;
       if (eggHatchSlotsEl) eggHatchSlotsEl.innerHTML = '';
-      if (eggModal && state.eggStation.inProximity) {
-        eggModal.classList.remove('hatch-hidden');
+      if (eggModal) {
+        if (state.eggStation.inProximity) {
+          eggModal.classList.remove('hatch-hidden');
+        } else {
+          eggModal.classList.remove('hatch-hidden');
+          hideModal(eggModal);
+        }
       }
     };
 
@@ -1880,6 +1897,387 @@
         } else {
           thumbEl.textContent = '🐾';
         }
+      });
+    };
+
+    const ensureConfettiContainer = () => {
+      if (confettiContainer) return confettiContainer;
+      confettiContainer = document.getElementById('confetti-overlay');
+      if (!confettiContainer) {
+        confettiContainer = document.createElement('div');
+        confettiContainer.id = 'confetti-overlay';
+        confettiContainer.className = 'confetti-overlay';
+        document.body.appendChild(confettiContainer);
+      }
+      return confettiContainer;
+    };
+
+    const spawnConfettiPiece = (container, config) => {
+      const {
+        x,
+        y,
+        variant,
+        color,
+        width,
+        height,
+        duration,
+        delay,
+        dx,
+        rot,
+        lift,
+        fall,
+        isStar,
+        starSize,
+      } = config;
+
+      const piece = document.createElement('div');
+      piece.className = `confetti-piece confetti-piece--${variant}${isStar ? ' confetti-star' : ''}`;
+      piece.style.left = `${x}px`;
+      piece.style.top = `${y}px`;
+      piece.style.setProperty('--confetti-duration', `${duration}ms`);
+      piece.style.setProperty('--confetti-delay', `${delay}ms`);
+      piece.style.setProperty('--confetti-dx', `${dx}px`);
+      piece.style.setProperty('--confetti-rot', `${rot}deg`);
+      if (lift !== null && lift !== undefined) {
+        piece.style.setProperty('--confetti-lift', `${lift}px`);
+      }
+      if (fall !== null && fall !== undefined) {
+        piece.style.setProperty('--confetti-fall', `${fall}px`);
+      }
+
+      if (isStar) {
+        piece.textContent = '★';
+        piece.style.setProperty('--confetti-color', color);
+        if (starSize) {
+          piece.style.fontSize = `${starSize}px`;
+        }
+      } else {
+        piece.style.width = `${width}px`;
+        piece.style.height = `${height}px`;
+        piece.style.background = color;
+      }
+
+      container.appendChild(piece);
+      setTimeout(() => {
+        piece.remove();
+      }, duration + delay + 220);
+    };
+
+    const getSellOreSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/SellOreSound.mp3` : 'audio/sfx/SellOreSound.mp3';
+    };
+
+    const playSellOreSfx = () => {
+      try {
+        const audio = new Audio(getSellOreSfxSrc());
+        audio.volume = 0.7;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const getTrainingSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/TrainingSFX.mp4` : 'audio/sfx/TrainingSFX.mp4';
+    };
+
+    const playTrainingSfx = () => {
+      try {
+        const audio = new Audio(getTrainingSfxSrc());
+        audio.volume = 0.75;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const getEggCrackSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/EggCrack.mp3` : 'audio/sfx/EggCrack.mp3';
+    };
+
+    const getEggOpenSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/EggOpenSFX.mp3` : 'audio/sfx/EggOpenSFX.mp3';
+    };
+
+    const playEggCrackSfx = () => {
+      try {
+        const audio = new Audio(getEggCrackSfxSrc());
+        audio.volume = 0.65;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const playEggOpenSfx = () => {
+      try {
+        const audio = new Audio(getEggOpenSfxSrc());
+        audio.volume = 0.8;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const getTeleportSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/TeleportSFX.mp4` : 'audio/sfx/TeleportSFX.mp4';
+    };
+
+    const playTeleportSfx = () => {
+      try {
+        const audio = new Audio(getTeleportSfxSrc());
+        audio.volume = 1;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const getMiningSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/MiningSFX.mp4` : 'audio/sfx/MiningSFX.mp4';
+    };
+
+    const getChestBreakSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/ChestBreakingSFX.mp3` : 'audio/sfx/ChestBreakingSFX.mp3';
+    };
+
+    let lastMiningHitAt = 0;
+    let lastMiningBreakAt = 0;
+    const playMiningHitSfx = () => {
+      const now = Date.now();
+      if (now - lastMiningHitAt < 90) return;
+      lastMiningHitAt = now;
+      try {
+        const audio = new Audio(getMiningSfxSrc());
+        audio.volume = 0.1;
+        audio.playbackRate = 0.85;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const playMiningBreakSfx = () => {
+      const now = Date.now();
+      if (now - lastMiningBreakAt < 120) return;
+      lastMiningBreakAt = now;
+      try {
+        const audio = new Audio(getMiningSfxSrc());
+        audio.volume = 0.1;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const playChestBreakSfx = () => {
+      const now = Date.now();
+      if (now - lastMiningBreakAt < 120) return;
+      lastMiningBreakAt = now;
+      try {
+        const audio = new Audio(getChestBreakSfxSrc());
+        audio.volume = 1;
+        audio.play().catch(() => {});
+        // Extra layer to simulate ~2x volume (browser volumes cap at 1.0)
+        const extra = new Audio(getChestBreakSfxSrc());
+        extra.volume = 1;
+        extra.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    let lastUpgradeSfxAt = 0;
+    const playUpgradePurchaseSfx = () => {
+      const now = Date.now();
+      if (now - lastUpgradeSfxAt < 120) return;
+      lastUpgradeSfxAt = now;
+      try {
+        const audio = new Audio(getChestBreakSfxSrc());
+        audio.volume = 1;
+        audio.play().catch(() => {});
+        // Extra layer to simulate ~2x volume (browser volumes cap at 1.0)
+        const extra = new Audio(getChestBreakSfxSrc());
+        extra.volume = 1;
+        extra.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const getUiPopSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/UIPopSFX.mp4` : 'audio/sfx/UIPopSFX.mp4';
+    };
+
+    let lastUiPopAt = 0;
+    const playUiPopSfx = () => {
+      const now = Date.now();
+      if (now - lastUiPopAt < 60) return;
+      lastUiPopAt = now;
+      try {
+        const audio = new Audio(getUiPopSfxSrc());
+        audio.volume = 0.6;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
+    const uiPopSelector = [
+      'button',
+      'a[href]',
+      'input',
+      'select',
+      'textarea',
+      '[role="button"]',
+      '.action-card',
+      '.egg-tab',
+      '.tab',
+      '.modal__close',
+      '.pickaxe-modal__close',
+      '.rebirth-modal__close',
+      '.maps-modal__close',
+      '.merchant-ui__close',
+      '.mine-reset-upgrade-ui__close',
+      '.gem-trader-ui__close',
+      '.pet-detail__close',
+    ].join(',');
+
+    let lastUiHoverEl = null;
+    document.addEventListener('pointerover', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const el = target.closest(uiPopSelector);
+      if (!el) return;
+      if (el instanceof HTMLButtonElement && el.disabled) return;
+      if (el.hasAttribute('disabled')) return;
+      if (el === lastUiHoverEl) return;
+      lastUiHoverEl = el;
+      playUiPopSfx();
+    }, true);
+
+    document.addEventListener('pointerout', (event) => {
+      if (!lastUiHoverEl) return;
+      const related = event.relatedTarget;
+      if (!(related instanceof Element) || !lastUiHoverEl.contains(related)) {
+        lastUiHoverEl = null;
+      }
+    }, true);
+
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const el = target.closest(uiPopSelector);
+      if (!el) return;
+      if (el instanceof HTMLButtonElement && el.disabled) return;
+      if (el.hasAttribute('disabled')) return;
+      playUiPopSfx();
+    }, true);
+
+    const elevateConfettiForHatch = () => {
+      const container = ensureConfettiContainer();
+      if (!container) return;
+      container.classList.add('confetti-overlay--hatch');
+      if (confettiHatchResetTimer) {
+        clearTimeout(confettiHatchResetTimer);
+      }
+      confettiHatchResetTimer = setTimeout(() => {
+        container.classList.remove('confetti-overlay--hatch');
+      }, 3000);
+    };
+
+    const spawnConfettiBurst = (count = 80) => {
+      const container = ensureConfettiContainer();
+      if (!container) return;
+      const colors = ['#fbbf24', '#f472b6', '#34d399', '#60a5fa', '#f97316', '#a78bfa'];
+      const width = window.innerWidth || 1280;
+      for (let i = 0; i < count; i++) {
+        const sizeW = 10 + Math.random() * 10;
+        const sizeH = 16 + Math.random() * 14;
+        const left = Math.random() * width;
+        const duration = 900 + Math.random() * 900;
+        const delay = Math.random() * 200;
+        const dx = (Math.random() - 0.5) * 240;
+        const rot = (Math.random() * 720) - 360;
+        spawnConfettiPiece(container, {
+          x: left,
+          y: -12,
+          variant: 'sell',
+          color: colors[i % colors.length],
+          width: sizeW,
+          height: sizeH,
+          duration,
+          delay,
+          dx,
+          rot,
+          lift: null,
+          fall: null,
+          isStar: Math.random() < 0.12,
+        });
+      }
+    };
+
+    const spawnConfettiBurstAt = (x, y, count = 120) => {
+      const container = ensureConfettiContainer();
+      if (!container) return;
+      elevateConfettiForHatch();
+      const colors = ['#fde047', '#fb7185', '#34d399', '#93c5fd', '#fda4af', '#f59e0b', '#a78bfa'];
+      const width = window.innerWidth || 1280;
+      for (let i = 0; i < count; i++) {
+        const sizeW = 12 + Math.random() * 12;
+        const sizeH = 20 + Math.random() * 16;
+        const duration = 1100 + Math.random() * 1300;
+        const delay = Math.random() * 120;
+        const r = Math.random();
+        const dx =
+          r < 0.2
+            ? (Math.random() - 0.5) * width * 0.08 // mostly upward
+            : r < 0.45
+              ? (Math.random() < 0.5 ? -1 : 1) * (width * (0.12 + Math.random() * 0.10)) // slight angle
+              : r < 0.7
+                ? (Math.random() < 0.5 ? -1 : 1) * (width * (0.22 + Math.random() * 0.16)) // mid angle
+                : r < 0.9
+                  ? (Math.random() < 0.5 ? -1 : 1) * (width * (0.35 + Math.random() * 0.18)) // wide angle
+                  : (Math.random() < 0.5 ? -1 : 1) * (width * (0.52 + Math.random() * 0.25)); // edge reach
+        const rot = (Math.random() * 900) - 450;
+        const lift = 180 + Math.random() * 200;
+        const fall = 520 + Math.random() * 420;
+        const isStar = Math.random() < 0.55;
+        spawnConfettiPiece(container, {
+          x,
+          y,
+          variant: 'hatch',
+          color: colors[i % colors.length],
+          width: sizeW,
+          height: sizeH,
+          duration,
+          delay,
+          dx,
+          rot,
+          lift,
+          fall,
+          isStar,
+          starSize: 20 + Math.random() * 12,
+        });
+      }
+    };
+
+    const spawnHatchConfettiFromSlots = (slots) => {
+      if (!slots || !slots.length) return;
+      slots.forEach((slot) => {
+        if (!slot?.getBoundingClientRect) return;
+        const rect = slot.getBoundingClientRect();
+        const originX = rect.left + rect.width / 2;
+        const originY = rect.top + rect.height * 0.35;
+        spawnConfettiBurstAt(originX, originY, 90);
       });
     };
 
@@ -1978,7 +2376,18 @@
         results: null,
         revealed: false,
         cleanupTimer: null,
+        confettiFired: false,
+        crackTimers: [],
       };
+
+      // Play crack SFX on every other rotation during the egg shake (single instance even for 3 eggs)
+      const crackBeats = [0.12, 0.4, 0.68, 0.96];
+      crackBeats.forEach((beat) => {
+        const timer = setTimeout(() => {
+          playEggCrackSfx();
+        }, beat * EGG_HATCH_SHAKE_MS);
+        currentEggHatch.crackTimers.push(timer);
+      });
 
       setTimeout(() => {
         if (!currentEggHatch) return;
@@ -1991,6 +2400,7 @@
         slots.forEach((slot) => slot.classList.add('is-revealed'));
         currentEggHatch.revealed = true;
         renderEggHatchResults(currentEggHatch.results);
+        playEggOpenSfx();
         maybeFinishEggHatch();
       }, EGG_HATCH_TOTAL_MS);
     };
@@ -2455,6 +2865,7 @@
             teleportBtn.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
+              teleportSfxPending = true;
               setLoadingScreenVisible(true);
               hytopia.sendData({ type: 'TELEPORT_TO_WORLD', worldId: world.id });
             });
@@ -2724,7 +3135,7 @@
           });
         } else if (pickaxe.availability === 'available') {
           // Next tier available - show buy button with cost, grey out if can't afford
-          actionButton.textContent = `🪙 ${formatNumber(pickaxe.cost)}`;
+          actionButton.innerHTML = `<span class="coin-icon coin-icon--inline"></span> ${formatNumber(pickaxe.cost)}`;
           actionButton.disabled = false;
           if (!pickaxe.purchasable) {
             actionButton.classList.add('disabled');
@@ -2799,7 +3210,7 @@
         if (!isEquipped && !isOwned) {
           const costEl = document.createElement('div');
           costEl.className = 'pickaxe-card__cost';
-          costEl.innerHTML = `<span>🪙</span> ${formatNumber(p.cost)}`;
+          costEl.innerHTML = `<span class="coin-icon coin-icon--inline"></span> ${formatNumber(p.cost)}`;
           card.appendChild(costEl);
         }
 
@@ -2947,7 +3358,7 @@
           });
         } else if (miner.availability === 'available') {
           // Next tier available - show buy button with cost, grey out if can't afford
-          actionButton.textContent = `🪙 ${formatNumber(miner.cost)}`;
+          actionButton.innerHTML = `<span class="coin-icon coin-icon--inline"></span> ${formatNumber(miner.cost)}`;
           actionButton.disabled = false;
           if (!miner.purchasable) {
             actionButton.classList.add('disabled');
@@ -3020,7 +3431,7 @@
         if (!isEquipped && !isOwned) {
           const costEl = document.createElement('div');
           costEl.className = 'pickaxe-card__cost';
-          costEl.innerHTML = `<span>🪙</span> ${formatNumber(m.cost)}`;
+          costEl.innerHTML = `<span class="coin-icon coin-icon--inline"></span> ${formatNumber(m.cost)}`;
           card.appendChild(costEl);
         }
 
@@ -3192,6 +3603,29 @@
       }, 900); // Total visible time ~1 second
     };
 
+    const getPowerHudTarget = () => {
+      const powerValue = document.getElementById('power-value');
+      if (!powerValue) return null;
+      const powerHud = powerValue.closest('.stat-hud');
+      const rect = powerValue.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        hudEl: powerHud,
+      };
+    };
+
+    const pulsePowerHud = (hudEl) => {
+      if (!hudEl || !hudEl.classList) return;
+      hudEl.classList.remove('stat-hud--pulse');
+      // Force reflow so the animation retriggers reliably
+      hudEl.offsetHeight;
+      hudEl.classList.add('stat-hud--pulse');
+      setTimeout(() => {
+        hudEl.classList.remove('stat-hud--pulse');
+      }, 400);
+    };
+
     const spawnPowerGain = (amount, rockPosition) => {
       console.log('[UI] spawnPowerGain called with amount:', amount, 'rockPosition:', rockPosition);
       if (!powerGainLayer) {
@@ -3264,10 +3698,24 @@
         popup.classList.add('active');
       });
       
+      const collectDelay = 650;
+      const collectDuration = 650;
+
       setTimeout(() => {
+        const target = getPowerHudTarget();
         popup.classList.remove('active');
-        setTimeout(() => popup.remove(), 600); // Wait for fade out animation
-      }, 1000); // Disappear after 1 second
+        if (target) {
+          popup.classList.add('collecting');
+          popup.style.left = `${target.x}px`;
+          popup.style.top = `${target.y}px`;
+          popup.style.transform = 'translate(-50%, -50%) scale(0.6)';
+          pulsePowerHud(target.hudEl);
+        }
+      }, collectDelay);
+
+      setTimeout(() => {
+        popup.remove();
+      }, collectDelay + collectDuration + 150);
     };
 
     const spawnDamagePopup = (damage) => {
@@ -3535,6 +3983,7 @@
       }
     }
 
+    let teleportSfxPending = false;
     function setLoadingScreenVisible(visible) {
       const loadingScreen = document.getElementById('loading-screen');
       if (loadingScreen) {
@@ -3542,6 +3991,10 @@
       }
       if (document.body) {
         document.body.classList.toggle('loading', Boolean(visible));
+      }
+      if (!visible && teleportSfxPending) {
+        teleportSfxPending = false;
+        playTeleportSfx();
       }
     }
 
@@ -3602,6 +4055,7 @@
           if (typeof data.amount === 'number' && data.amount > 0) {
             console.log('[UI] Spawning power gain popup:', data.amount, 'at rock position:', data.rockPosition);
             spawnPowerGain(data.amount, data.rockPosition);
+            playTrainingSfx();
           } else {
             console.warn('[UI] Invalid amount for popup:', data.amount);
           }
@@ -3701,18 +4155,28 @@
             state.eggStation.eggPets = [];
             state.eggStation.autoDeletePets = [];
             stopEggAuto();
-            if (eggModal) hideModal(eggModal);
+            if (eggModal) {
+              // Clear hatch-hidden so the modal can reopen later.
+              eggModal.classList.remove('hatch-hidden');
+              hideModal(eggModal);
+            }
             break;
           }
 
           state.eggStation.inProximity = true;
           state.eggStation.stations = Array.isArray(data.stations) ? data.stations : [];
-          state.eggStation.stationId = data.station?.id ?? null;
-          state.eggStation.stationName = data.station?.name ?? 'Egg Station';
-          state.eggStation.eggType = data.station?.eggType ?? 'stone';
-          state.eggStation.defaultOpenCount = data.station?.defaultOpenCount ?? 1;
-          state.eggStation.costGold = data.station?.costGold ?? 0;
-          state.eggStation.eggPets = data.station?.eggPets ?? [];
+          const selectedStationId = data.selectedStationId ?? data.station?.id ?? null;
+          const selectedStation =
+            state.eggStation.stations.find((station) => station.id === selectedStationId) ??
+            data.station ??
+            state.eggStation.stations[0] ??
+            null;
+          state.eggStation.stationId = selectedStation?.id ?? null;
+          state.eggStation.stationName = selectedStation?.name ?? 'Egg Station';
+          state.eggStation.eggType = selectedStation?.eggType ?? 'stone';
+          state.eggStation.defaultOpenCount = selectedStation?.defaultOpenCount ?? 1;
+          state.eggStation.costGold = selectedStation?.costGold ?? 0;
+          state.eggStation.eggPets = selectedStation?.eggPets ?? [];
           state.eggStation.autoDeletePets = data.player?.autoDeletePets ?? [];
 
           // Update gold + pet counts snapshot (for display)
@@ -3763,6 +4227,10 @@
           if (currentEggHatch) {
             currentEggHatch.results = data.results || [];
             maybeFinishEggHatch();
+            if (Array.isArray(currentEggHatch.slots) && !currentEggHatch.confettiFired) {
+              spawnHatchConfettiFromSlots(currentEggHatch.slots);
+              currentEggHatch.confettiFired = true;
+            }
           }
           if (typeof data.goldSpent === 'number') {
             // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
@@ -3793,6 +4261,9 @@
           console.log('[UI] Upgrade purchased:', data);
           state.gems = data.remainingGems ?? state.gems;
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
+          if (data.success) {
+            playUpgradePurchaseSfx();
+          }
           // Refresh the UI by requesting updated data (if UI is visible)
           const gemTraderUIVisible = document.getElementById('gem-trader-ui')?.classList.contains('visible');
           if (gemTraderUIVisible && data.success) {
@@ -3805,6 +4276,9 @@
           console.log('[UI] Mine Reset Upgrade purchase result:', data);
           state.gold = data.remainingGold ?? state.gold;
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          if (data.success) {
+            playUpgradePurchaseSfx();
+          }
           const upgradeUIVisible = document.getElementById('mine-reset-upgrade-ui')?.classList.contains('visible');
           if (upgradeUIVisible) {
             // Always update with the hasUpgrade flag from server
@@ -3825,6 +4299,8 @@
             if (data.goldEarned && data.goldEarned > 0) {
               // Show gold earned notification
               console.log(`[UI] Gold earned: ${data.goldEarned}`);
+              spawnConfettiBurst();
+              playSellOreSfx();
             }
           }
           break;
@@ -3843,12 +4319,18 @@
           // Spawn damage popup for each mining swing
           if (state.mining.damage > 0) {
             spawnDamagePopup(state.mining.damage);
+            playMiningHitSfx();
           }
 
           // Spawn ore mined popup when block is destroyed (like damage popups)
           if (data.oreMined && data.oreMinedColor) {
             console.log(`[UI] MINING_UPDATE received ore mined: ${data.oreMined}, spawning popup (damage: ${data.damage}, blockHP: ${data.blockHP})`);
             spawnMinedOrePopup(data.oreMined, data.oreMinedColor);
+          }
+          if (isChest && blockHP <= 0) {
+            playChestBreakSfx();
+          } else if (data.oreMined && data.oreMinedColor) {
+            playMiningBreakSfx();
           }
 
           // Update block health bar (bottom center, above progress bar)
@@ -3901,7 +4383,7 @@
               } else if (!displayInfo.isChest && displayInfo.sellValue !== null && displayInfo.sellValue > 0) {
                 // Display sell value for ores
                 const goldLabel = isMobile ? '' : ' Gold';
-                blockRewardDisplayEl.innerHTML = `<span style="color: #ffd700;">🪙</span> <span style="color: #ffd700; font-weight: 700;">${formatNumber(displayInfo.sellValue)}${goldLabel}</span>`;
+                blockRewardDisplayEl.innerHTML = `<span class="coin-icon coin-icon--inline"></span> <span style="color: #ffd700; font-weight: 700;">${formatNumber(displayInfo.sellValue)}${goldLabel}</span>`;
                 blockRewardDisplayEl.style.display = 'flex';
               } else {
                 blockRewardDisplayEl.style.display = 'none';
@@ -4089,8 +4571,14 @@
             if (mapsModal) hideModal(mapsModal);
             // Refresh worlds panel data
             hytopia.sendData({ type: 'OPEN_WORLDS_PANEL' });
+            teleportSfxPending = true;
+            if (!document.body?.classList.contains('loading')) {
+              teleportSfxPending = false;
+              playTeleportSfx();
+            }
           } else {
             console.warn('[UI] World teleport failed:', data.message);
+            teleportSfxPending = false;
             setLoadingScreenVisible(false);
             // Could show error message to user here
           }
@@ -4137,7 +4625,7 @@
   <!-- Money -->
   <div class="stat-hud stat-hud--money">
     <div class="stat-hud__value" id="money-value">0</div>
-    <div class="stat-hud__icon">💰</div>
+    <div class="stat-hud__icon"><span class="coin-icon coin-icon--hud"></span></div>
   </div>
 
   <!-- Gems -->
@@ -6520,7 +7008,7 @@
 <!-- Egg Station Modal -->
 <div
   id="egg-modal"
-  class="hud"
+  class="hud egg-modal"
   style="
     position: fixed;
     top: 0;
@@ -7302,6 +7790,9 @@
 
 <script>
   (function() {
+    if (window.__eggStationUIManaged) {
+      return;
+    }
     const eggOverlay = document.getElementById("egg-modal");
     const eggCloseBtn = document.getElementById("egg-close-btn");
     const eggTabsContainer = document.getElementById("egg-tabs-container");
@@ -7438,8 +7929,7 @@
             const rarity = (pet.rarity || "common").toLowerCase();
             const isAutoDelete = autoDeletePets.has(pet.id);
 
-            const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
-            const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
+            const iconPath = pet.icon ? `{{CDN_ASSETS_URL}}/${pet.icon}` : null;
 
             return `
               <div class="egg-pet-card egg-pet-card--${rarity} ${isAutoDelete ? 'is-auto-delete' : ''}" data-id="${pet.id}">
@@ -7612,11 +8102,13 @@
           // Cache the raw data for tab switching
           cachedStations = data.stations || [];
           cachedPlayerData = data.player || {};
-          const currentStation = data.station || cachedStations[0];
+      const currentStation = data.station || cachedStations[0];
 
-          // Auto-select first egg if none selected
-          if (!selectedEggId && cachedStations.length > 0) {
-            selectedEggId = cachedStations[0].id;
+          // Prefer the server-selected station (nearest), fallback to current/first
+          if (data.selectedStationId) {
+            selectedEggId = data.selectedStationId;
+          } else if (!selectedEggId && cachedStations.length > 0) {
+            selectedEggId = currentStation?.id ?? cachedStations[0].id;
           }
 
           // Open modal and render
@@ -7684,7 +8176,7 @@
           name: p.name,
           rarity: p.rarity,
           chance: Math.round(p.chance * 10) / 10,
-          icon: `ui/icons/pets/${p.petId}.png`
+          icon: p.imageUri || `ui/pets/${p.petId}.png`
         }))
       } : null;
 
@@ -9254,17 +9746,21 @@
           if (btn.disabled) return;
           const action = btn.dataset.action;
           const worldId = btn.dataset.id;
+          const loadingScreen = document.getElementById('loading-screen');
 
           if (action === "teleport") {
+            // Show loading immediately on click (server will hide when done)
+            if (loadingScreen) loadingScreen.classList.add('visible');
+            if (document.body) document.body.classList.add('loading');
             hytopia.sendData({
               type: "TELEPORT_TO_WORLD",
-              payload: { worldId }
+              worldId
             });
             closeMapsModal();
           } else if (action === "unlock") {
             hytopia.sendData({
               type: "UNLOCK_WORLD",
-              payload: { worldId }
+              worldId
             });
           }
         });
@@ -9645,6 +10141,25 @@
     justify-content: center;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
     margin-left: 12px;
+  }
+
+  .stat-hud--power.stat-hud--pulse {
+    animation: statHudPulse 0.35s ease-out;
+  }
+
+  @keyframes statHudPulse {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    60% {
+      transform: scale(1.06);
+      box-shadow: 0 6px 26px rgba(255, 82, 82, 0.45);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
   }
 
   /* Left-side action buttons */
@@ -11225,7 +11740,7 @@
     text-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.8);
-    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s, filter 0.6s;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s, filter 0.6s, left 0.7s ease, top 0.7s ease;
     pointer-events: none;
     z-index: 10000;
     white-space: nowrap;
@@ -11251,6 +11766,12 @@
     opacity: 1;
     transform: translate(-50%, -50%) scale(1.05);
     filter: drop-shadow(0 0 12px rgba(255, 99, 132, 0.9));
+  }
+
+  .power-gain.collecting {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(0.6);
+    filter: drop-shadow(0 0 6px rgba(255, 99, 132, 0.6));
   }
 
   /* Training prompt */
@@ -12244,12 +12765,30 @@
     margin-right: 15px;
   }
 
-  .merchant-ui__coin-icon {
+  .merchant-ui__coin-icon,
+  .coin-icon {
     width: 20px;
     height: 20px;
     background: #ffd700;
     border-radius: 50%;
     display: inline-block;
+  }
+
+  .coin-icon--inline {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .coin-icon--hud {
+    width: 28px;
+    height: 28px;
+  }
+
+  .gem-trader-ui__icon .coin-icon {
+    width: 34px;
+    height: 34px;
   }
 
   .merchant-ui__sell-button {
@@ -13923,6 +14462,70 @@
   transform: scale(1);
 }
 
+/* Confetti overlay for sell celebration */
+.confetti-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 500;
+  overflow: hidden;
+}
+
+.confetti-overlay--hatch {
+  z-index: 1300;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  opacity: 0.95;
+  transform: translate(0, 0) rotate(0deg);
+  animation: confetti-fall var(--confetti-duration, 1200ms) linear forwards;
+  animation-delay: var(--confetti-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+.confetti-piece--hatch {
+  animation: confetti-pop var(--confetti-duration, 1400ms) ease-out forwards;
+}
+
+.confetti-star {
+  background: transparent !important;
+  width: auto !important;
+  height: auto !important;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--confetti-color, #fff);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--confetti-dx, 0px), 110vh) rotate(var(--confetti-rot, 360deg));
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-pop {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(var(--confetti-dx, 0px), calc(var(--confetti-lift, 140px) * -1)) rotate(calc(var(--confetti-rot, 360deg) * 0.5));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--confetti-dx, 0px) * 1.2), var(--confetti-fall, 420px)) rotate(var(--confetti-rot, 360deg));
+    opacity: 0;
+  }
+}
+
 .egg-hatch-result__thumb {
   width: 120px;
   height: 120px;
@@ -14120,13 +14723,3 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
-
-<!-- Livereload - Development Only -->
-<script>
-  (function() {
-    const script = document.createElement('script');
-    script.src = 'http://localhost:35729/livereload.js?snipver=1';
-    script.async = true;
-    document.head.appendChild(script);
-  })();
-</script>

@@ -1690,8 +1690,11 @@ export class GameManager {
     }
 
     // Get upgrade cost based on world (use WorldManager if available, otherwise default)
-    // For now, use hardcoded values - island1: 2M, island2: 750B
-    const UPGRADE_COST = currentWorld === 'island2' ? 750_000_000_000 : 2_000_000;
+    // Hardcoded values: island1: 2M, island2: 750B, island3: 2Q
+    const UPGRADE_COST =
+      currentWorld === 'island2' ? 750_000_000_000 :
+      currentWorld === 'island3' ? 2_000_000_000_000_000 :
+      2_000_000;
     
     if (playerData.gold < UPGRADE_COST) {
       return {
@@ -2256,6 +2259,10 @@ export class GameManager {
    * @returns True if teleported successfully, false otherwise
    */
   teleportToWorld(player: Player, worldId: string): { success: boolean; message?: string } {
+    if (!worldId) {
+      return { success: false, message: 'World id missing' };
+    }
+
     const playerData = this.getPlayerData(player);
     if (!playerData) {
       return { success: false, message: 'Player data not found' };
@@ -2279,6 +2286,9 @@ export class GameManager {
 
     // Show loading screen and suppress input during world switch
     this.setPlayerLoading(player, true);
+
+    // Stop training if player is currently training (prevents training loop from snapping them back)
+    this.trainingController?.stopTraining(player);
 
     // Stop mining and block detection when leaving current mines
     this.miningController?.stopMiningLoop(player);
@@ -2308,21 +2318,28 @@ export class GameManager {
       depth: 0,
     });
 
-    // Update current world first so mine generation uses the correct world
-    playerData.currentWorld = worldId;
-    this.updatePlayerData(player, playerData);
+    try {
+      // Clear old mine while still in the current world (prevents orphaned mines)
+      this.miningController?.getMiningSystem().resetMineToLevel0(player);
 
-    // Generate mine for the new world before teleporting
-    this.initializePlayerMine(player);
+      // Update current world first so mine generation uses the correct world
+      playerData.currentWorld = worldId;
+      this.updatePlayerData(player, playerData);
 
-    // Teleport player to spawn point
-    const spawnPoint = worldConfig.spawnPoint;
-    this.teleportPlayer(player, spawnPoint);
+      // Generate mine for the new world before teleporting
+      this.initializePlayerMine(player);
 
-    // Allow time for mine generation/rendering before removing the loading screen
-    setTimeout(() => {
+      // Teleport player to spawn point
+      const spawnPoint = worldConfig.spawnPoint;
+      this.teleportPlayer(player, spawnPoint);
+
+      // Backend work is done; remove loading immediately
       this.setPlayerLoading(player, false);
-    }, 1500);
+    } catch (error) {
+      console.error('[GameManager] teleportToWorld failed:', error);
+      this.setPlayerLoading(player, false);
+      return { success: false, message: 'Teleport failed' };
+    }
 
     return { success: true };
   }

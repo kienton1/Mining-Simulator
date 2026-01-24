@@ -1,7 +1,7 @@
 <!-- Egg Station Modal -->
 <div
   id="egg-modal"
-  class="hud"
+  class="hud egg-modal"
   style="
     position: fixed;
     top: 0;
@@ -783,6 +783,9 @@
 
 <script>
   (function() {
+    if (window.__eggStationUIManaged) {
+      return;
+    }
     const eggOverlay = document.getElementById("egg-modal");
     const eggCloseBtn = document.getElementById("egg-close-btn");
     const eggTabsContainer = document.getElementById("egg-tabs-container");
@@ -919,8 +922,7 @@
             const rarity = (pet.rarity || "common").toLowerCase();
             const isAutoDelete = autoDeletePets.has(pet.id);
 
-            const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
-            const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
+            const iconPath = pet.icon ? `{{CDN_ASSETS_URL}}/${pet.icon}` : null;
 
             return `
               <div class="egg-pet-card egg-pet-card--${rarity} ${isAutoDelete ? 'is-auto-delete' : ''}" data-id="${pet.id}">
@@ -1093,11 +1095,13 @@
           // Cache the raw data for tab switching
           cachedStations = data.stations || [];
           cachedPlayerData = data.player || {};
-          const currentStation = data.station || cachedStations[0];
+      const currentStation = data.station || cachedStations[0];
 
-          // Auto-select first egg if none selected
-          if (!selectedEggId && cachedStations.length > 0) {
-            selectedEggId = cachedStations[0].id;
+          // Prefer the server-selected station (nearest), fallback to current/first
+          if (data.selectedStationId) {
+            selectedEggId = data.selectedStationId;
+          } else if (!selectedEggId && cachedStations.length > 0) {
+            selectedEggId = currentStation?.id ?? cachedStations[0].id;
           }
 
           // Open modal and render
@@ -1165,7 +1169,7 @@
           name: p.name,
           rarity: p.rarity,
           chance: Math.round(p.chance * 10) / 10,
-          icon: `ui/icons/pets/${p.petId}.png`
+          icon: p.imageUri || `ui/pets/${p.petId}.png`
         }))
       } : null;
 

@@ -459,6 +459,70 @@
   transform: scale(1);
 }
 
+/* Confetti overlay for sell celebration */
+.confetti-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 500;
+  overflow: hidden;
+}
+
+.confetti-overlay--hatch {
+  z-index: 1300;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  opacity: 0.95;
+  transform: translate(0, 0) rotate(0deg);
+  animation: confetti-fall var(--confetti-duration, 1200ms) linear forwards;
+  animation-delay: var(--confetti-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+.confetti-piece--hatch {
+  animation: confetti-pop var(--confetti-duration, 1400ms) ease-out forwards;
+}
+
+.confetti-star {
+  background: transparent !important;
+  width: auto !important;
+  height: auto !important;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--confetti-color, #fff);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--confetti-dx, 0px), 110vh) rotate(var(--confetti-rot, 360deg));
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-pop {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(var(--confetti-dx, 0px), calc(var(--confetti-lift, 140px) * -1)) rotate(calc(var(--confetti-rot, 360deg) * 0.5));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--confetti-dx, 0px) * 1.2), var(--confetti-fall, 420px)) rotate(var(--confetti-rot, 360deg));
+    opacity: 0;
+  }
+}
+
 .egg-hatch-result__thumb {
   width: 120px;
   height: 120px;
