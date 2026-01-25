@@ -8,6 +8,8 @@
  */
 
 import { OreType } from '../Mining/Ore/World1OreData';
+import type { TutorialProgress } from '../Tutorial/TutorialTypes';
+import { DEFAULT_TUTORIAL_PROGRESS } from '../Tutorial/TutorialTypes';
 
 /**
  * Player's persistent statistics
@@ -77,13 +79,23 @@ export interface PlayerData {
   currentWorld?: string;
   /** Array of unlocked world IDs (default: ['island1'] for original map) */
   unlockedWorlds?: string[];
+
+  /**
+   * Tutorial System
+   */
+  tutorial?: TutorialProgress;
+
+  /**
+   * Admin flag (optional, used for server-side commands)
+   */
+  isAdmin?: boolean;
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 5;
+export const CURRENT_DATA_VERSION = 7;
 
 /**
  * Inventory data structure
@@ -124,6 +136,8 @@ export function createDefaultPlayerData(): PlayerData {
     autoDeletePets: [],
     currentWorld: 'island1', // Default to original map
     unlockedWorlds: ['island1'], // Original map is always unlocked
+    tutorial: { ...DEFAULT_TUTORIAL_PROGRESS },
+    isAdmin: false,
   };
 }
 

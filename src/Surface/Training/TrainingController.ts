@@ -655,6 +655,7 @@ export class TrainingController {
         }
         
         const newTotal = this.gameManager.addPower(p, finalGain);
+        this.gameManager.getTutorialManager().onTrainingPowerGain(p);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
       },
       worldId,
@@ -1157,6 +1158,7 @@ export class TrainingController {
         }
 
         const newTotal = this.gameManager.addPower(p, finalGain);
+        this.gameManager.getTutorialManager().onTrainingPowerGain(p);
         this.sendPowerGainEvent(p, finalGain, newTotal, rockLocation.position);
       },
       worldId,

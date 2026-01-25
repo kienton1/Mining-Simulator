@@ -3353,6 +3353,196 @@
     right: -4px;
   }
 
+  /* Tutorial Panel */
+  .tutorial-panel {
+    position: fixed;
+    top: 16px;
+    right: 40px;
+    width: 280px;
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(12, 16, 28, 0.98));
+    border: 2px solid rgba(82, 196, 255, 0.35);
+    border-radius: 14px;
+    padding: 12px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1200;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+  }
+
+  .tutorial-panel.visible {
+    display: flex;
+  }
+
+  .tutorial-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .tutorial-panel__title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #f7d35c;
+  }
+
+  .tutorial-panel__skip {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(15, 20, 36, 0.6);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .tutorial-panel__content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tutorial-panel__step-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .tutorial-panel__text {
+    font-size: 13px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .tutorial-panel__progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tutorial-panel__progress-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+
+  .tutorial-panel__progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4be7f5, #2bd67f);
+    transition: width 0.3s ease;
+  }
+
+  .tutorial-panel__progress-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .tutorial-panel__cta {
+    font-size: 12px;
+    color: #4be7f5;
+    font-weight: 600;
+  }
+
+  .tutorial-panel__reward {
+    font-size: 12px;
+    color: #f7d35c;
+    font-weight: 600;
+  }
+
+  .tutorial-panel.completed {
+    border-color: rgba(43, 214, 127, 0.6);
+  }
+
+  /* Tutorial highlight for action cards */
+  .tutorial-highlight {
+    box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
+    animation: tutorial-pulse 1.5s ease-in-out infinite;
+  }
+
+  .action-card.tutorial-highlight {
+    box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
+    animation: tutorial-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes tutorial-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* SceneUI Tutorial Marker */
+  .scene-tutorial-marker {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .scene-tutorial-marker.visible {
+    display: flex;
+  }
+
+  .scene-tutorial-marker__arrow {
+    font-size: 22px;
+    color: #f7d35c;
+    text-shadow: 0 0 10px rgba(247, 211, 92, 0.6);
+    animation: tutorial-bounce 1.2s ease-in-out infinite;
+  }
+
+  .scene-tutorial-marker__label {
+    background: rgba(12, 16, 28, 0.9);
+    border: 2px solid rgba(82, 196, 255, 0.35);
+    border-radius: 10px;
+    padding: 6px 10px;
+    min-width: 120px;
+  }
+
+  .scene-tutorial-marker__title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8f3e6;
+  }
+
+  .scene-tutorial-marker__subtitle {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  @keyframes tutorial-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  body.mobile .tutorial-panel {
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
+    top: auto;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    width: auto;
+    border-radius: 12px;
+  }
+
+  body.mobile .tutorial-panel__title {
+    font-size: 12px;
+  }
+
+  body.mobile .tutorial-panel__step-title {
+    font-size: 14px;
+  }
+
+  body.mobile .tutorial-panel__text {
+    font-size: 12px;
+  }
+
   /* Stats HUD - mobile compact icon style (similar to Pets repo) */
   body.mobile .stats-hud-container {
     position: fixed;
@@ -3403,6 +3593,10 @@
   body.modal-open .mine-reset-timer,
   body.modal-open .mining-depth-counter {
     display: none !important;
+  }
+
+  body.modal-open .tutorial-panel {
+    opacity: 0.65;
   }
 
   /* Progress Bar (Depth) - mobile vertical style on right side */

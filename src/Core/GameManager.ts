@@ -26,6 +26,7 @@ import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
 import { WorldRegistry } from '../WorldRegistry';
+import { TutorialManager } from '../Tutorial/TutorialManager';
 
 /**
  * Game Manager class
@@ -73,6 +74,7 @@ export class GameManager {
   private pickaxeManager: PickaxeManager;
   private petManager: PetManager;
   private hatchingSystem: HatchingSystem;
+  private tutorialManager: TutorialManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
@@ -144,6 +146,9 @@ export class GameManager {
     this.trainingController = new TrainingController(world, this);
     // Initialize mining system
     this.miningController = new MiningController(world, this);
+
+    // Initialize tutorial system
+    this.tutorialManager = new TutorialManager(world, this);
     
     // Start periodic save mechanism
     this.startPeriodicSaves();
@@ -212,6 +217,7 @@ export class GameManager {
     });
     
     this.trainingController?.registerPlayer(player);
+    this.tutorialManager.registerPlayer(player);
     return playerData;
   }
 
@@ -453,6 +459,7 @@ export class GameManager {
    */
   addOreToInventory(player: Player, oreType: string, amount: number): void {
     this.inventoryManager.addOre(player, oreType as any, amount);
+    this.tutorialManager.onOreMined(player, amount);
   }
 
   /**
@@ -512,6 +519,13 @@ export class GameManager {
    */
   getHatchingSystem(): HatchingSystem {
     return this.hatchingSystem;
+  }
+
+  /**
+   * Gets the tutorial manager instance
+   */
+  getTutorialManager(): TutorialManager {
+    return this.tutorialManager;
   }
 
   /**
@@ -757,6 +771,7 @@ export class GameManager {
       },
     });
     this.sendPowerStatsToUI(player);
+    this.tutorialManager.onPlayerUILoaded(player);
   }
 
   /**
@@ -877,6 +892,7 @@ export class GameManager {
 
     // Mark player as in the mine (enables mining and raycasting)
     this.setPlayerInMine(player, true);
+    this.tutorialManager.onEnterMine(player);
 
     // Update UI to show player is in mine
     player.ui.sendData({
@@ -1564,6 +1580,7 @@ export class GameManager {
 
     // Mark player as in the mine (enables mining and raycasting)
     this.setPlayerInMine(player, true);
+    this.tutorialManager.onEnterMine(player);
 
     player.ui.sendData({
       type: 'MINING_STATE_UPDATE',
@@ -1932,6 +1949,7 @@ export class GameManager {
 
     this.trainingController?.cleanupPlayer(player);
     this.miningController?.cleanupPlayer(player);
+    this.tutorialManager.cleanupPlayer(player);
     this.playerDataMap.delete(player);
     this.playerAutoStates.delete(player);
     this.playerInMineStates.delete(player);
@@ -2325,6 +2343,7 @@ export class GameManager {
       // Update current world first so mine generation uses the correct world
       playerData.currentWorld = worldId;
       this.updatePlayerData(player, playerData);
+      this.tutorialManager.onWorldChanged(player);
 
       // Generate mine for the new world before teleporting
       this.initializePlayerMine(player);

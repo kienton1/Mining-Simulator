@@ -14,6 +14,7 @@ import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
 import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
 import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 import { stringToBigInt, bigIntToString } from './BigIntUtils';
+import { TutorialPhase } from '../Tutorial/TutorialTypes';
 
 /**
  * Validates player data structure
@@ -59,6 +60,20 @@ function validatePlayerData(data: any): data is PlayerData {
   // World system fields are optional for backward compatibility
   if (data.currentWorld !== undefined && typeof data.currentWorld !== 'string') return false;
   if (data.unlockedWorlds !== undefined && !Array.isArray(data.unlockedWorlds)) return false;
+
+  // Tutorial system fields are optional for backward compatibility
+  if (data.tutorial !== undefined) {
+    if (!data.tutorial || typeof data.tutorial !== 'object') return false;
+    if (data.tutorial.phase !== undefined && typeof data.tutorial.phase !== 'string') return false;
+    if (data.tutorial.miningCount !== undefined && (typeof data.tutorial.miningCount !== 'number' || isNaN(data.tutorial.miningCount))) return false;
+    if (data.tutorial.completed !== undefined && typeof data.tutorial.completed !== 'boolean') return false;
+    if (data.tutorial.skipped !== undefined && typeof data.tutorial.skipped !== 'boolean') return false;
+    if (data.tutorial.rewardGranted !== undefined && typeof data.tutorial.rewardGranted !== 'boolean') return false;
+    if (data.tutorial.rewardAmount !== undefined && (typeof data.tutorial.rewardAmount !== 'number' || isNaN(data.tutorial.rewardAmount))) return false;
+  }
+
+  // Admin flag is optional
+  if (data.isAdmin !== undefined && typeof data.isAdmin !== 'boolean') return false;
 
   return true;
 }
@@ -211,6 +226,37 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
       }
       return unique;
     })(),
+    tutorial: (() => {
+      const fallback = defaults.tutorial;
+      if (!savedData.tutorial || typeof savedData.tutorial !== 'object') {
+        return fallback;
+      }
+      const t = savedData.tutorial;
+      const phase =
+        typeof t.phase === 'string' && Object.values(TutorialPhase).includes(t.phase)
+          ? t.phase
+          : fallback?.phase;
+      const miningCount =
+        typeof t.miningCount === 'number' && !isNaN(t.miningCount)
+          ? Math.max(0, Math.floor(t.miningCount))
+          : (fallback?.miningCount ?? 0);
+      const completed = typeof t.completed === 'boolean' ? t.completed : Boolean(fallback?.completed);
+      const skipped = typeof t.skipped === 'boolean' ? t.skipped : Boolean(fallback?.skipped);
+      const rewardGranted = typeof t.rewardGranted === 'boolean' ? t.rewardGranted : Boolean(fallback?.rewardGranted);
+      const rewardAmount =
+        typeof t.rewardAmount === 'number' && !isNaN(t.rewardAmount)
+          ? t.rewardAmount
+          : (fallback?.rewardAmount ?? 0);
+      return {
+        phase,
+        miningCount,
+        completed,
+        skipped,
+        rewardGranted,
+        rewardAmount,
+      };
+    })(),
+    isAdmin: typeof savedData.isAdmin === 'boolean' ? savedData.isAdmin : (defaults.isAdmin ?? false),
   };
 
   // Sanitize inventory values (ensure they're numbers and non-negative)

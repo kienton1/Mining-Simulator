@@ -580,6 +580,64 @@
       return root;
     });
 
+    // Tutorial marker template (player-specific)
+    hytopia.registerSceneUITemplate('tutorial:marker', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-tutorial-marker';
+
+      const arrow = document.createElement('div');
+      arrow.className = 'scene-tutorial-marker__arrow';
+      arrow.textContent = '⬇';
+      root.appendChild(arrow);
+
+      const label = document.createElement('div');
+      label.className = 'scene-tutorial-marker__label';
+      root.appendChild(label);
+
+      const title = document.createElement('div');
+      title.className = 'scene-tutorial-marker__title';
+      title.textContent = 'Objective';
+      label.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-tutorial-marker__subtitle';
+      subtitle.textContent = '';
+      label.appendChild(subtitle);
+
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      onState(state => {
+        const data = state || {};
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+        const playerState = currentPlayerId ? playerStates[currentPlayerId] : null;
+
+        if (playerState?.visible) {
+          root.classList.add('visible');
+          root.style.display = 'flex';
+        } else {
+          root.classList.remove('visible');
+          root.style.display = 'none';
+        }
+
+        if (data.kind) {
+          root.classList.remove('scene-tutorial-marker--mine', 'scene-tutorial-marker--shop', 'scene-tutorial-marker--training', 'scene-tutorial-marker--egg');
+          root.classList.add(`scene-tutorial-marker--${data.kind}`);
+        }
+
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) {
+          subtitle.textContent = data.subtitle;
+          subtitle.style.display = data.subtitle ? 'block' : 'none';
+        }
+      });
+
+      return root;
+    });
+
   })();
 </script>
 
@@ -1729,6 +1787,15 @@
     });
     const rebirthOptionsEl = document.getElementById('rebirth-options');
     const rebirthBadge = document.getElementById('rebirth-badge');
+    const tutorialPanelEl = document.getElementById('tutorial-panel');
+    const tutorialSkipBtn = document.getElementById('tutorial-skip');
+    const tutorialStepTitleEl = document.getElementById('tutorial-step-title');
+    const tutorialStepTextEl = document.getElementById('tutorial-step-text');
+    const tutorialProgressEl = document.getElementById('tutorial-progress');
+    const tutorialProgressFillEl = document.getElementById('tutorial-progress-fill');
+    const tutorialProgressTextEl = document.getElementById('tutorial-progress-text');
+    const tutorialCtaEl = document.getElementById('tutorial-cta');
+    const tutorialRewardEl = document.getElementById('tutorial-reward');
 
     const state = {
       power: 0,
@@ -1793,6 +1860,11 @@
         autoArmed: false,
         autoCount: 1,
         stations: [], // All available stations in the current group
+      },
+      tutorial: {
+        visible: false,
+        phase: null,
+        highlightAction: null,
       },
     };
 
@@ -4003,6 +4075,39 @@
       setLoadingScreenVisible(true);
     });
 
+    function setupTutorialUI() {
+      if (!tutorialPanelEl) return;
+      if (tutorialSkipBtn && !tutorialSkipBtn.__tutorialBound) {
+        tutorialSkipBtn.__tutorialBound = true;
+        tutorialSkipBtn.addEventListener('click', () => {
+          hytopia.sendData({ type: 'TUTORIAL_SKIP' });
+        });
+      }
+    }
+    setupTutorialUI();
+
+    function applyTutorialHighlights() {
+      const petsButton = document.getElementById('pets-button');
+      const toSurfaceButton = document.getElementById('to-surface-button');
+      const merchantUI = document.getElementById('merchant-ui');
+      const sellAllButton = document.getElementById('merchant-ui-sell-all');
+      const merchantVisible = Boolean(merchantUI && merchantUI.classList.contains('visible'));
+      const effectiveHighlight =
+        state.tutorial.phase === 'sell_ores' && merchantVisible
+          ? 'sellall'
+          : state.tutorial.highlightAction;
+
+      if (petsButton) {
+        petsButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'pets');
+      }
+      if (toSurfaceButton) {
+        toSurfaceButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'surface');
+      }
+      if (sellAllButton) {
+        sellAllButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'sellall');
+      }
+    }
+
     hytopia.onData(data => {
       console.log('[UI] Received data:', data.type, data);
       switch (data.type) {
@@ -4042,6 +4147,73 @@
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           console.log('[UI] Updated rebirths stats:', state.rebirths);
           break;
+        case 'TUTORIAL_UPDATE': {
+          state.tutorial.visible = Boolean(data.visible);
+          state.tutorial.phase = data.phase ?? null;
+          state.tutorial.highlightAction = data.highlightAction ?? null;
+
+          if (tutorialPanelEl) {
+            if (state.tutorial.visible) {
+              tutorialPanelEl.hidden = false;
+              tutorialPanelEl.classList.add('visible');
+            } else {
+              tutorialPanelEl.classList.remove('visible');
+              tutorialPanelEl.hidden = true;
+            }
+            tutorialPanelEl.classList.toggle('completed', Boolean(data.completed));
+          }
+
+          if (tutorialStepTitleEl && typeof data.title === 'string') {
+            tutorialStepTitleEl.textContent = data.title;
+          }
+          if (tutorialStepTextEl && typeof data.body === 'string') {
+            tutorialStepTextEl.textContent = data.body;
+          }
+
+          const hasProgress =
+            data.phase === 'mine_ores' &&
+            typeof data.progressCurrent === 'number' &&
+            typeof data.progressTotal === 'number';
+          if (tutorialProgressEl) {
+            tutorialProgressEl.hidden = !hasProgress;
+            tutorialProgressEl.style.display = hasProgress ? 'flex' : 'none';
+          }
+          if (hasProgress) {
+            const total = Math.max(1, data.progressTotal || 1);
+            const current = Math.max(0, Math.min(total, data.progressCurrent || 0));
+            const pct = Math.round((current / total) * 100);
+            if (tutorialProgressFillEl) tutorialProgressFillEl.style.width = pct + '%';
+            if (tutorialProgressTextEl) tutorialProgressTextEl.textContent = `${current}/${total}`;
+          } else {
+            if (tutorialProgressFillEl) tutorialProgressFillEl.style.width = '0%';
+            if (tutorialProgressTextEl) tutorialProgressTextEl.textContent = '';
+          }
+
+          if (tutorialCtaEl) {
+            if (typeof data.cta === 'string' && data.cta.length > 0) {
+              tutorialCtaEl.hidden = false;
+              tutorialCtaEl.textContent = data.cta;
+            } else {
+              tutorialCtaEl.hidden = true;
+            }
+          }
+
+          if (tutorialRewardEl) {
+            if (typeof data.rewardText === 'string' && data.rewardText.length > 0) {
+              tutorialRewardEl.hidden = false;
+              tutorialRewardEl.textContent = data.rewardText;
+            } else {
+              tutorialRewardEl.hidden = true;
+            }
+          }
+
+          if (tutorialSkipBtn) {
+            tutorialSkipBtn.style.display = data.showSkip === false ? 'none' : 'inline-flex';
+          }
+
+          applyTutorialHighlights();
+          break;
+        }
         case 'POWER_GAIN':
           console.log('[UI] Processing POWER_GAIN:', data);
           state.power = data.totalPower ?? state.power + (data.amount ?? 0);
@@ -4101,6 +4273,7 @@
               }, 10);
             }
           }
+          applyTutorialHighlights();
           break;
         case 'MINE_RESET_UPGRADE_PROXIMITY':
           console.log('[UI] Mine Reset Upgrade proximity:', data.inProximity);
@@ -4610,6 +4783,28 @@
   <a id="mobile-jump-button" class="mobile-button">
     <img src="{{CDN_ASSETS_URL}}/icons/jump.png" />
   </a>
+</div>
+
+
+<!-- Included from: ./components/TutorialUI.html -->
+<!-- Tutorial Panel (mobile-first) -->
+<div id="tutorial-panel" class="tutorial-panel" hidden>
+  <div class="tutorial-panel__header">
+    <div class="tutorial-panel__title">Tutorial</div>
+    <button id="tutorial-skip" class="tutorial-panel__skip">Skip</button>
+  </div>
+  <div class="tutorial-panel__content">
+    <div id="tutorial-step-title" class="tutorial-panel__step-title">Welcome</div>
+    <div id="tutorial-step-text" class="tutorial-panel__text">Follow the steps to learn the game.</div>
+    <div id="tutorial-progress" class="tutorial-panel__progress" hidden>
+      <div class="tutorial-panel__progress-bar">
+        <div id="tutorial-progress-fill" class="tutorial-panel__progress-fill"></div>
+      </div>
+      <div id="tutorial-progress-text" class="tutorial-panel__progress-text">0/0</div>
+    </div>
+    <div id="tutorial-cta" class="tutorial-panel__cta" hidden></div>
+    <div id="tutorial-reward" class="tutorial-panel__reward" hidden></div>
+  </div>
 </div>
 
 
@@ -13340,6 +13535,196 @@
     right: -4px;
   }
 
+  /* Tutorial Panel */
+  .tutorial-panel {
+    position: fixed;
+    top: 16px;
+    right: 40px;
+    width: 280px;
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(12, 16, 28, 0.98));
+    border: 2px solid rgba(82, 196, 255, 0.35);
+    border-radius: 14px;
+    padding: 12px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1200;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+  }
+
+  .tutorial-panel.visible {
+    display: flex;
+  }
+
+  .tutorial-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .tutorial-panel__title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #f7d35c;
+  }
+
+  .tutorial-panel__skip {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(15, 20, 36, 0.6);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .tutorial-panel__content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tutorial-panel__step-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .tutorial-panel__text {
+    font-size: 13px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .tutorial-panel__progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tutorial-panel__progress-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+
+  .tutorial-panel__progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4be7f5, #2bd67f);
+    transition: width 0.3s ease;
+  }
+
+  .tutorial-panel__progress-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .tutorial-panel__cta {
+    font-size: 12px;
+    color: #4be7f5;
+    font-weight: 600;
+  }
+
+  .tutorial-panel__reward {
+    font-size: 12px;
+    color: #f7d35c;
+    font-weight: 600;
+  }
+
+  .tutorial-panel.completed {
+    border-color: rgba(43, 214, 127, 0.6);
+  }
+
+  /* Tutorial highlight for action cards */
+  .tutorial-highlight {
+    box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
+    animation: tutorial-pulse 1.5s ease-in-out infinite;
+  }
+
+  .action-card.tutorial-highlight {
+    box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
+    animation: tutorial-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes tutorial-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* SceneUI Tutorial Marker */
+  .scene-tutorial-marker {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .scene-tutorial-marker.visible {
+    display: flex;
+  }
+
+  .scene-tutorial-marker__arrow {
+    font-size: 22px;
+    color: #f7d35c;
+    text-shadow: 0 0 10px rgba(247, 211, 92, 0.6);
+    animation: tutorial-bounce 1.2s ease-in-out infinite;
+  }
+
+  .scene-tutorial-marker__label {
+    background: rgba(12, 16, 28, 0.9);
+    border: 2px solid rgba(82, 196, 255, 0.35);
+    border-radius: 10px;
+    padding: 6px 10px;
+    min-width: 120px;
+  }
+
+  .scene-tutorial-marker__title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8f3e6;
+  }
+
+  .scene-tutorial-marker__subtitle {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  @keyframes tutorial-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  body.mobile .tutorial-panel {
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
+    top: auto;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    width: auto;
+    border-radius: 12px;
+  }
+
+  body.mobile .tutorial-panel__title {
+    font-size: 12px;
+  }
+
+  body.mobile .tutorial-panel__step-title {
+    font-size: 14px;
+  }
+
+  body.mobile .tutorial-panel__text {
+    font-size: 12px;
+  }
+
   /* Stats HUD - mobile compact icon style (similar to Pets repo) */
   body.mobile .stats-hud-container {
     position: fixed;
@@ -13390,6 +13775,10 @@
   body.modal-open .mine-reset-timer,
   body.modal-open .mining-depth-counter {
     display: none !important;
+  }
+
+  body.modal-open .tutorial-panel {
+    opacity: 0.65;
   }
 
   /* Progress Bar (Depth) - mobile vertical style on right side */

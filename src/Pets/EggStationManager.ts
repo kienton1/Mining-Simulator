@@ -21,6 +21,8 @@ export interface EggStationDefinition {
   /** Which open-count should be the primary button (e.g. gem station highlights 3). */
   defaultOpenCount: 1 | 3;
   name: string;
+  /** Optional world identifier for grouping tutorial/UX logic. */
+  worldId?: string;
   position: { x: number; y: number; z: number };
 }
 

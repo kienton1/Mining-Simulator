@@ -231,5 +231,63 @@
       return root;
     });
 
+    // Tutorial marker template (player-specific)
+    hytopia.registerSceneUITemplate('tutorial:marker', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-tutorial-marker';
+
+      const arrow = document.createElement('div');
+      arrow.className = 'scene-tutorial-marker__arrow';
+      arrow.textContent = '⬇';
+      root.appendChild(arrow);
+
+      const label = document.createElement('div');
+      label.className = 'scene-tutorial-marker__label';
+      root.appendChild(label);
+
+      const title = document.createElement('div');
+      title.className = 'scene-tutorial-marker__title';
+      title.textContent = 'Objective';
+      label.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-tutorial-marker__subtitle';
+      subtitle.textContent = '';
+      label.appendChild(subtitle);
+
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      onState(state => {
+        const data = state || {};
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+        const playerState = currentPlayerId ? playerStates[currentPlayerId] : null;
+
+        if (playerState?.visible) {
+          root.classList.add('visible');
+          root.style.display = 'flex';
+        } else {
+          root.classList.remove('visible');
+          root.style.display = 'none';
+        }
+
+        if (data.kind) {
+          root.classList.remove('scene-tutorial-marker--mine', 'scene-tutorial-marker--shop', 'scene-tutorial-marker--training', 'scene-tutorial-marker--egg');
+          root.classList.add(`scene-tutorial-marker--${data.kind}`);
+        }
+
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) {
+          subtitle.textContent = data.subtitle;
+          subtitle.style.display = data.subtitle ? 'block' : 'none';
+        }
+      });
+
+      return root;
+    });
+
   })();
 </script>

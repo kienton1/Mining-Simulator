@@ -29,6 +29,7 @@ import {
   PlayerEvent,
   PlayerUIEvent,
   CollisionGroup,
+  PlayerManager,
 } from 'hytopia';
 import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
@@ -47,6 +48,7 @@ import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
+import { EGG_STATIONS } from './src/Pets/EggStationsConfig';
 import { WorldRegistry } from './src/WorldRegistry';
 import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
@@ -62,6 +64,13 @@ import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOU
  * 
  * Documentation: https://github.com/hytopiagg/sdk/blob/main/docs/server.startserver.md
  */
+
+const ADMIN_USERNAMES = new Set(
+  (process.env.ADMIN_USERNAMES ?? '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 startServer(world => {
   /**
@@ -99,6 +108,13 @@ startServer(world => {
    * This manages all player data and game state
    */
   const gameManager = new GameManager(world, pickaxeManager);
+
+  const isAdminPlayer = (player: { username: string; }): boolean => {
+    const data = gameManager.getPlayerData(player as any);
+    if (data?.isAdmin) return true;
+    if (ADMIN_USERNAMES.size === 0) return false;
+    return ADMIN_USERNAMES.has(player.username.toLowerCase());
+  };
 
   /**
    * Load our map.
@@ -199,85 +215,9 @@ startServer(world => {
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
-   * World 1 (Island 1) stations at positions -13, 2, Z
-   * World 2 (Island 2 / Beach World) stations at positions -300, 1.75, Z
+   * Shared config used across systems.
    */
-  const eggStations = [
-    // World 1 (Island 1) Egg Stations
-    {
-      id: 'egg-station-stone',
-      name: 'Stone Egg Station',
-      eggType: EggType.STONE,
-      defaultOpenCount: 1 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,9"
-      position: { x: -13, y: 2, z: 9 },
-    },
-    {
-      id: 'egg-station-gem',
-      name: 'Gem Egg Station',
-      eggType: EggType.GEM,
-      defaultOpenCount: 3 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,5"
-      position: { x: -13, y: 2, z: 5 },
-    },
-    {
-      id: 'egg-station-crystal',
-      name: 'Crystal Egg Station',
-      eggType: EggType.CRYSTAL,
-      defaultOpenCount: 1 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,1"
-      position: { x: -13, y: 2, z: 1 },
-    },
-    
-    // World 2 (Island 2 / Beach World) Egg Stations
-    {
-      id: 'egg-station-abyssal',
-      name: 'Abyssal Egg Station',
-      eggType: EggType.ABYSSAL,
-      defaultOpenCount: 1 as const,
-      // User-provided position for World 2 Abyssal Egg
-      position: { x: -299.97, y: 1.75, z: 9.95 },
-    },
-    {
-      id: 'egg-station-boardwalk',
-      name: 'Boardwalk Egg Station',
-      eggType: EggType.BOARDWALK,
-      defaultOpenCount: 3 as const,
-      // User-provided position for World 2 Boardwalk Egg
-      position: { x: -300.03, y: 1.75, z: 6.12 },
-    },
-    {
-      id: 'egg-station-shipwreck',
-      name: 'Shipwreck Egg Station',
-      eggType: EggType.SHIPWRECK,
-      defaultOpenCount: 1 as const,
-      // User-provided position for World 2 Shipwreck Egg
-      position: { x: -299.97, y: 1.75, z: 1.95 },
-    },
-
-    // World 3 (Island 3 / Volcanic World) Egg Stations
-    {
-      id: 'egg-station-sand',
-      name: 'Sand Egg Station',
-      eggType: EggType.SAND,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 12 },
-    },
-    {
-      id: 'egg-station-snow',
-      name: 'Snow Egg Station',
-      eggType: EggType.SNOW,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 8 },
-    },
-    {
-      id: 'egg-station-lava',
-      name: 'Lava Egg Station',
-      eggType: EggType.LAVA,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 4 },
-    },
-  ];
+  const eggStations = EGG_STATIONS;
 
   // Egg UI should pop when you're near the barrel (~3 blocks horizontal distance).
   const eggStationManager = new EggStationManager(world, gameManager, eggStations, 3.0);
@@ -633,6 +573,7 @@ startServer(world => {
         
         // Update with loaded data (this updates the in-memory playerDataMap)
         gameManager.updatePlayerData(player, loadedData);
+        gameManager.getTutorialManager().onPlayerDataLoaded(player);
         
         // Always restore pickaxe from saved data (ensures persistence works correctly)
         // Use a small delay to ensure entity is fully spawned before attaching pickaxe
@@ -671,6 +612,7 @@ startServer(world => {
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
         }, 100);
+        gameManager.getTutorialManager().onPlayerDataLoaded(player);
       }
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
@@ -681,6 +623,7 @@ startServer(world => {
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
       }, 100);
+      gameManager.getTutorialManager().onPlayerDataLoaded(player);
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
       tryFinishLoading();
@@ -691,12 +634,24 @@ startServer(world => {
     
     // Set up UI loaded handler - this will send initial stats
     // Note: If saved data loads after UI loads, it will update the UI automatically
-    player.ui.on(PlayerUIEvent.LOAD, () => {
+    let uiLoadHandled = false;
+    const handleUiLoaded = () => {
+      if (uiLoadHandled) return;
+      uiLoadHandled = true;
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
       loadingGate.uiLoaded = true;
       tryFinishLoading();
-    });
+    };
+
+    player.ui.on(PlayerUIEvent.LOAD, handleUiLoaded);
+
+    // Fallback in case UI LOAD event fires before handler is registered
+    setTimeout(() => {
+      if (!uiLoadHandled) {
+        handleUiLoaded();
+      }
+    }, 2000);
     
     // Set up per-player UI event handler (as per Hytopia SDK guide)
     // This listens for data sent from this specific player's UI
@@ -719,6 +674,9 @@ startServer(world => {
         case 'TELEPORT_TO_SURFACE':
 
           gameManager.teleportToSurface(player);
+          break;
+        case 'TUTORIAL_SKIP':
+          gameManager.getTutorialManager().skipTutorial(player);
           break;
         case 'SELL_ORE':
           const goldEarned = gameManager.getSellingSystem().sellOre(player, data.oreType, 1);
@@ -759,6 +717,9 @@ startServer(world => {
             gold: playerDataAfterSell?.gold || 0,
             goldEarned,
           });
+          if (goldEarned && goldEarned > 0) {
+            gameManager.getTutorialManager().onOresSold(player, goldEarned);
+          }
           break;
         case 'SELL_ALL':
           const totalGoldEarned = gameManager.getSellingSystem().sellAll(player);
@@ -799,6 +760,9 @@ startServer(world => {
             gold: playerDataAfterSellAll?.gold || 0,
             goldEarned: totalGoldEarned,
           });
+          if (totalGoldEarned && totalGoldEarned > 0) {
+            gameManager.getTutorialManager().onOresSold(player, totalGoldEarned);
+          }
           break;
         case 'CLOSE_MERCHANT_UI':
 
@@ -875,6 +839,9 @@ startServer(world => {
 
           if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
+            if (data.modalType === 'egg') {
+              gameManager.getTutorialManager().onEggModalOpened(player);
+            }
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
             if (miningController && miningController.isPlayerMining(player)) {
@@ -901,6 +868,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equip', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().onPetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP': {
@@ -915,6 +885,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipFromInventoryIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().onPetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP_INSTANCE': {
@@ -928,6 +901,9 @@ startServer(world => {
           const res = gameManager.getPetManager().equipBest(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipBest', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.getTutorialManager().onPetEquipped(player);
+          }
           break;
         }
         case 'PET_UNEQUIP_ALL': {
@@ -1013,6 +989,7 @@ startServer(world => {
             results,
           });
           sendPetState(player);
+          gameManager.getTutorialManager().onEggHatched(player);
           break;
         }
         case 'BUY_PICKAXE':
@@ -1516,6 +1493,39 @@ startServer(world => {
     } else {
       miningController.startMiningLoop(player);
       world.chatManager.sendPlayerMessage(player, 'Mining started!', '00FF00');
+    }
+  });
+
+  // Admin command: reset tutorial progress for a player (defaults to self)
+  world.chatManager.registerCommand('/tutorialreset', (player, args) => {
+    if (!isAdminPlayer(player)) {
+      world.chatManager.sendPlayerMessage(
+        player,
+        'You do not have permission to use /tutorialreset. Set ADMIN_USERNAMES env to enable.',
+        'FF5555'
+      );
+      return;
+    }
+
+    const identifier = (args[0] ?? '').trim();
+    let target = player;
+
+    if (identifier) {
+      const players = PlayerManager.instance.getConnectedPlayers();
+      const byId = players.find(p => String(p.id) === identifier);
+      const byName = PlayerManager.instance.getConnectedPlayerByUsername(identifier);
+      const found = byId ?? byName;
+      if (!found) {
+        world.chatManager.sendPlayerMessage(player, `Player not found: ${identifier}`, 'FF5555');
+        return;
+      }
+      target = found;
+    }
+
+    gameManager.getTutorialManager().resetTutorial(target);
+    world.chatManager.sendPlayerMessage(player, `Tutorial reset for ${target.username}.`, '00FF00');
+    if (target !== player) {
+      world.chatManager.sendPlayerMessage(target, 'Your tutorial has been reset by an admin.', 'FFFF00');
     }
   });
 

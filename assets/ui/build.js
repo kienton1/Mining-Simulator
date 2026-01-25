@@ -36,6 +36,9 @@ includeContent("./components/LoadingScreen.html");
 // Mobile controls
 includeContent("./components/MobileControls.html");
 
+// Tutorial panel
+includeContent("./components/TutorialUI.html");
+
 // Player HUD (stats display)
 includeContent("./components/StatsHUD.html");
 
