@@ -678,6 +678,14 @@ startServer(world => {
       }
 
       switch (data.type) {
+        case 'SCENE_UI_READY':
+          player.ui.sendData({
+            type: 'INIT',
+            payload: {
+              playerId: player.id,
+            },
+          });
+          break;
         case 'TOGGLE_AUTO_MINE':
 
           gameManager.toggleAutoMine(player);

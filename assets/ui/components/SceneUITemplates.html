@@ -54,8 +54,7 @@
           playerStates: JSON.stringify(playerStates),
         });
 
-        // If playerStates exists and we have a player ID, use player-specific visibility
-        if (currentPlayerId && Object.keys(playerStates).length > 0) {
+        if (currentPlayerId) {
           const playerState = playerStates[currentPlayerId];
           console.log('[TrainingUI] Player state for', currentPlayerId, ':', playerState);
 
@@ -109,9 +108,30 @@
                 </div>
               `;
             }
-          } else {
+          } else if (playerState && playerState.visible === false) {
             root.classList.remove('visible');
             root.style.display = 'none';
+          } else {
+            // Not close to the rock: show far-mode details
+            root.classList.add('visible');
+            root.style.display = 'flex';
+            root.classList.remove('locked');
+            root.classList.remove('mode-far', 'mode-close');
+            root.classList.add('mode-far');
+
+            const requirementText = data.requirementText || '0 Required';
+            const rebirthText = data.rebirthText || '0 Rebirths';
+            const powerGainText = data.powerGainText || '+1 Power';
+
+            content.innerHTML = `
+              <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
+              <div class="scene-training-prompt__copy">
+                <div class="scene-training-prompt__requirement">${requirementText}</div>
+                <div class="scene-training-prompt__or">OR</div>
+                <div class="scene-training-prompt__rebirth">${rebirthText}</div>
+                <div class="scene-training-prompt__power-gain">${powerGainText}</div>
+              </div>
+            `;
           }
         } else {
           // Fallback: use global visible flag if no playerStates (backwards compatibility)
