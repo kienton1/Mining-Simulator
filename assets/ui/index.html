@@ -580,64 +580,6 @@
       return root;
     });
 
-    // Tutorial marker template (player-specific)
-    hytopia.registerSceneUITemplate('tutorial:marker', (_id, onState) => {
-      const root = document.createElement('div');
-      root.className = 'scene-tutorial-marker';
-
-      const arrow = document.createElement('div');
-      arrow.className = 'scene-tutorial-marker__arrow';
-      arrow.textContent = '⬇';
-      root.appendChild(arrow);
-
-      const label = document.createElement('div');
-      label.className = 'scene-tutorial-marker__label';
-      root.appendChild(label);
-
-      const title = document.createElement('div');
-      title.className = 'scene-tutorial-marker__title';
-      title.textContent = 'Objective';
-      label.appendChild(title);
-
-      const subtitle = document.createElement('div');
-      subtitle.className = 'scene-tutorial-marker__subtitle';
-      subtitle.textContent = '';
-      label.appendChild(subtitle);
-
-      function getCurrentPlayerId() {
-        const playerIdElement = document.getElementById('playerId');
-        return playerIdElement?.dataset?.playerId;
-      }
-
-      onState(state => {
-        const data = state || {};
-        const currentPlayerId = getCurrentPlayerId();
-        const playerStates = data.playerStates || {};
-        const playerState = currentPlayerId ? playerStates[currentPlayerId] : null;
-
-        if (playerState?.visible) {
-          root.classList.add('visible');
-          root.style.display = 'flex';
-        } else {
-          root.classList.remove('visible');
-          root.style.display = 'none';
-        }
-
-        if (data.kind) {
-          root.classList.remove('scene-tutorial-marker--mine', 'scene-tutorial-marker--shop', 'scene-tutorial-marker--training', 'scene-tutorial-marker--egg');
-          root.classList.add(`scene-tutorial-marker--${data.kind}`);
-        }
-
-        if (data.title !== undefined) title.textContent = data.title;
-        if (data.subtitle !== undefined) {
-          subtitle.textContent = data.subtitle;
-          subtitle.style.display = data.subtitle ? 'block' : 'none';
-        }
-      });
-
-      return root;
-    });
-
   })();
 </script>
 
@@ -1865,6 +1807,8 @@
         visible: false,
         phase: null,
         highlightAction: null,
+        arrowId: null,
+        arrowTarget: null,
       },
     };
 
@@ -2110,6 +2054,21 @@
       }
     };
 
+    const getWinningSfxSrc = () => {
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/audio/sfx/WinningSFX.mp3` : 'audio/sfx/WinningSFX.mp3';
+    };
+
+    const playWinningSfx = () => {
+      try {
+        const audio = new Audio(getWinningSfxSrc());
+        audio.volume = 0.9;
+        audio.play().catch(() => {});
+      } catch {
+        // ignore audio errors
+      }
+    };
+
     const getMiningSfxSrc = () => {
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
       return cdn ? `${cdn}/audio/sfx/MiningSFX.mp4` : 'audio/sfx/MiningSFX.mp4';
@@ -2295,6 +2254,16 @@
           isStar: Math.random() < 0.12,
         });
       }
+    };
+
+    let lastWinCelebrationAt = 0;
+    const triggerWinCelebration = () => {
+      const now = Date.now();
+      if (now - lastWinCelebrationAt < 1500) return;
+      lastWinCelebrationAt = now;
+      spawnConfettiBurst(180);
+      setTimeout(() => spawnConfettiBurst(120), 250);
+      playWinningSfx();
     };
 
     const spawnConfettiBurstAt = (x, y, count = 120) => {
@@ -4056,6 +4025,7 @@
     }
 
     let teleportSfxPending = false;
+    let loadingFailsafeTimer = null;
     function setLoadingScreenVisible(visible) {
       const loadingScreen = document.getElementById('loading-screen');
       if (loadingScreen) {
@@ -4067,6 +4037,17 @@
       if (!visible && teleportSfxPending) {
         teleportSfxPending = false;
         playTeleportSfx();
+      }
+      if (visible) {
+        if (loadingFailsafeTimer) {
+          clearTimeout(loadingFailsafeTimer);
+        }
+        loadingFailsafeTimer = setTimeout(() => {
+          setLoadingScreenVisible(false);
+        }, 7000);
+      } else if (loadingFailsafeTimer) {
+        clearTimeout(loadingFailsafeTimer);
+        loadingFailsafeTimer = null;
       }
     }
 
@@ -4088,6 +4069,7 @@
 
     function applyTutorialHighlights() {
       const petsButton = document.getElementById('pets-button');
+      const pickaxeButton = document.getElementById('pickaxe-button');
       const toSurfaceButton = document.getElementById('to-surface-button');
       const merchantUI = document.getElementById('merchant-ui');
       const sellAllButton = document.getElementById('merchant-ui-sell-all');
@@ -4100,12 +4082,111 @@
       if (petsButton) {
         petsButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'pets');
       }
+      if (pickaxeButton) {
+        pickaxeButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'pickaxe');
+      }
       if (toSurfaceButton) {
         toSurfaceButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'surface');
       }
       if (sellAllButton) {
         sellAllButton.classList.toggle('tutorial-highlight', effectiveHighlight === 'sellall');
       }
+    }
+
+    function spawnTutorialGoldReward(amount) {
+      if (!amount || amount <= 0) return;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'tutorial-gold-overlay';
+      document.body.appendChild(overlay);
+
+      const count = 8;
+      const startX = window.innerWidth / 2;
+      const startY = window.innerHeight / 2;
+      const moneyHud = document.querySelector('.stat-hud--money');
+      const rect = moneyHud ? moneyHud.getBoundingClientRect() : null;
+      const targetX = rect ? rect.left + rect.width / 2 : startX;
+      const targetY = rect ? rect.top + rect.height / 2 : startY;
+      const dx = targetX - startX;
+      const dy = targetY - startY;
+
+      if (moneyHud) {
+        moneyHud.classList.add('tutorial-gold-pulse');
+        setTimeout(() => {
+          moneyHud.classList.remove('tutorial-gold-pulse');
+        }, 800);
+      }
+
+      for (let i = 0; i < count; i++) {
+        const coin = document.createElement('span');
+        coin.className = 'tutorial-gold-coin coin-icon';
+        coin.style.left = `${startX}px`;
+        coin.style.top = `${startY}px`;
+        const scatterX = (Math.random() - 0.5) * 80;
+        const scatterY = (Math.random() - 0.5) * 60;
+        coin.style.transform = `translate(${scatterX}px, ${scatterY}px) scale(1)`;
+        overlay.appendChild(coin);
+
+        const delay = 50 + i * 40;
+        setTimeout(() => {
+          coin.style.transform = `translate(${dx}px, ${dy}px) scale(0.3)`;
+          coin.style.opacity = '0';
+        }, delay);
+      }
+
+      setTimeout(() => {
+        overlay.remove();
+      }, 1200);
+    }
+
+    function updateTutorialArrow(target) {
+      if (typeof hytopia === 'undefined' || typeof hytopia.connectArrow !== 'function') return;
+
+      if (!target || !target.x && target.x !== 0) {
+        if (state.tutorial.arrowId) {
+          try {
+            hytopia.disconnectArrow(state.tutorial.arrowId);
+          } catch (err) {
+            // ignore missing arrow
+          }
+          state.tutorial.arrowId = null;
+          state.tutorial.arrowTarget = null;
+        }
+        return;
+      }
+
+      const playerEntityId = typeof hytopia.getPlayerEntityId === 'function'
+        ? hytopia.getPlayerEntityId()
+        : undefined;
+
+      if (!playerEntityId) {
+        setTimeout(() => updateTutorialArrow(target), 250);
+        return;
+      }
+
+      const prev = state.tutorial.arrowTarget;
+      if (
+        prev &&
+        prev.x === target.x &&
+        prev.y === target.y &&
+        prev.z === target.z &&
+        state.tutorial.arrowId
+      ) {
+        return;
+      }
+
+      if (state.tutorial.arrowId) {
+        try {
+          hytopia.disconnectArrow(state.tutorial.arrowId);
+        } catch (err) {
+          // ignore missing arrow
+        }
+      }
+
+      state.tutorial.arrowId = hytopia.connectArrow(playerEntityId, target, {
+        color: { r: 255, g: 255, b: 0 },
+      });
+      state.tutorial.arrowTarget = target;
     }
 
     hytopia.onData(data => {
@@ -4151,6 +4232,7 @@
           state.tutorial.visible = Boolean(data.visible);
           state.tutorial.phase = data.phase ?? null;
           state.tutorial.highlightAction = data.highlightAction ?? null;
+          updateTutorialArrow(data.arrowTarget ?? null);
 
           if (tutorialPanelEl) {
             if (state.tutorial.visible) {
@@ -4214,6 +4296,9 @@
           applyTutorialHighlights();
           break;
         }
+        case 'TUTORIAL_GOLD_REWARD':
+          spawnTutorialGoldReward(Number(data.amount ?? 0));
+          break;
         case 'POWER_GAIN':
           console.log('[UI] Processing POWER_GAIN:', data);
           state.power = data.totalPower ?? state.power + (data.amount ?? 0);
@@ -4253,6 +4338,9 @@
               miningHudEl.classList.remove('visible');
             }
           }
+          break;
+        case 'WIN_CONDITION_TRIGGERED':
+          triggerWinCelebration();
           break;
         case 'MERCHANT_PROXIMITY':
           console.log('[UI] Merchant proximity:', data.inProximity);
@@ -13642,6 +13730,35 @@
     border-color: rgba(43, 214, 127, 0.6);
   }
 
+  /* Tutorial gold reward animation */
+  .tutorial-gold-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2000;
+  }
+
+  .tutorial-gold-coin {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+    transition: transform 0.8s ease-in, opacity 0.8s ease-in;
+    will-change: transform, opacity;
+  }
+
+  .stat-hud--money.tutorial-gold-pulse {
+    animation: tutorial-gold-pulse 0.8s ease;
+  }
+
+  @keyframes tutorial-gold-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+    40% { transform: scale(1.08); box-shadow: 0 0 18px rgba(255, 215, 0, 0.6); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+  }
+
   /* Tutorial highlight for action cards */
   .tutorial-highlight {
     box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
@@ -13657,51 +13774,6 @@
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
-  }
-
-  /* SceneUI Tutorial Marker */
-  .scene-tutorial-marker {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    text-align: center;
-    pointer-events: none;
-  }
-
-  .scene-tutorial-marker.visible {
-    display: flex;
-  }
-
-  .scene-tutorial-marker__arrow {
-    font-size: 22px;
-    color: #f7d35c;
-    text-shadow: 0 0 10px rgba(247, 211, 92, 0.6);
-    animation: tutorial-bounce 1.2s ease-in-out infinite;
-  }
-
-  .scene-tutorial-marker__label {
-    background: rgba(12, 16, 28, 0.9);
-    border: 2px solid rgba(82, 196, 255, 0.35);
-    border-radius: 10px;
-    padding: 6px 10px;
-    min-width: 120px;
-  }
-
-  .scene-tutorial-marker__title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #f8f3e6;
-  }
-
-  .scene-tutorial-marker__subtitle {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.75);
-  }
-
-  @keyframes tutorial-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
   }
 
   body.mobile .tutorial-panel {

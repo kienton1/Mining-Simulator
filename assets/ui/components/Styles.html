@@ -3460,6 +3460,35 @@
     border-color: rgba(43, 214, 127, 0.6);
   }
 
+  /* Tutorial gold reward animation */
+  .tutorial-gold-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2000;
+  }
+
+  .tutorial-gold-coin {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+    transition: transform 0.8s ease-in, opacity 0.8s ease-in;
+    will-change: transform, opacity;
+  }
+
+  .stat-hud--money.tutorial-gold-pulse {
+    animation: tutorial-gold-pulse 0.8s ease;
+  }
+
+  @keyframes tutorial-gold-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+    40% { transform: scale(1.08); box-shadow: 0 0 18px rgba(255, 215, 0, 0.6); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+  }
+
   /* Tutorial highlight for action cards */
   .tutorial-highlight {
     box-shadow: 0 0 0 3px rgba(247, 211, 92, 0.7), 0 0 18px rgba(247, 211, 92, 0.45);
@@ -3475,51 +3504,6 @@
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
-  }
-
-  /* SceneUI Tutorial Marker */
-  .scene-tutorial-marker {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    text-align: center;
-    pointer-events: none;
-  }
-
-  .scene-tutorial-marker.visible {
-    display: flex;
-  }
-
-  .scene-tutorial-marker__arrow {
-    font-size: 22px;
-    color: #f7d35c;
-    text-shadow: 0 0 10px rgba(247, 211, 92, 0.6);
-    animation: tutorial-bounce 1.2s ease-in-out infinite;
-  }
-
-  .scene-tutorial-marker__label {
-    background: rgba(12, 16, 28, 0.9);
-    border: 2px solid rgba(82, 196, 255, 0.35);
-    border-radius: 10px;
-    padding: 6px 10px;
-    min-width: 120px;
-  }
-
-  .scene-tutorial-marker__title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #f8f3e6;
-  }
-
-  .scene-tutorial-marker__subtitle {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.75);
-  }
-
-  @keyframes tutorial-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
   }
 
   body.mobile .tutorial-panel {

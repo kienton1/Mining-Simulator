@@ -70,6 +70,9 @@ function validatePlayerData(data: any): data is PlayerData {
     if (data.tutorial.skipped !== undefined && typeof data.tutorial.skipped !== 'boolean') return false;
     if (data.tutorial.rewardGranted !== undefined && typeof data.tutorial.rewardGranted !== 'boolean') return false;
     if (data.tutorial.rewardAmount !== undefined && (typeof data.tutorial.rewardAmount !== 'number' || isNaN(data.tutorial.rewardAmount))) return false;
+    if (data.tutorial.pickaxeRewardGranted !== undefined && typeof data.tutorial.pickaxeRewardGranted !== 'boolean') return false;
+    if (data.tutorial.pickaxeRewardAmount !== undefined && (typeof data.tutorial.pickaxeRewardAmount !== 'number' || isNaN(data.tutorial.pickaxeRewardAmount))) return false;
+    if (data.tutorial.completionShown !== undefined && typeof data.tutorial.completionShown !== 'boolean') return false;
   }
 
   // Admin flag is optional
@@ -247,6 +250,20 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
         typeof t.rewardAmount === 'number' && !isNaN(t.rewardAmount)
           ? t.rewardAmount
           : (fallback?.rewardAmount ?? 0);
+      const pickaxeRewardGranted =
+        typeof t.pickaxeRewardGranted === 'boolean'
+          ? t.pickaxeRewardGranted
+          : (fallback?.pickaxeRewardGranted ?? false);
+      const pickaxeRewardAmount =
+        typeof t.pickaxeRewardAmount === 'number' && !isNaN(t.pickaxeRewardAmount)
+          ? t.pickaxeRewardAmount
+          : (fallback?.pickaxeRewardAmount ?? 0);
+      const completionShown =
+        typeof t.completionShown === 'boolean'
+          ? t.completionShown
+          : (typeof t.completed === 'boolean' && t.completed)
+            ? true
+            : (fallback?.completionShown ?? false);
       return {
         phase,
         miningCount,
@@ -254,6 +271,9 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
         skipped,
         rewardGranted,
         rewardAmount,
+        pickaxeRewardGranted,
+        pickaxeRewardAmount,
+        completionShown,
       };
     })(),
     isAdmin: typeof savedData.isAdmin === 'boolean' ? savedData.isAdmin : (defaults.isAdmin ?? false),

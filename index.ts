@@ -469,6 +469,21 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
+    // Wrap UI sendData to avoid errors when connections are closing (e.g., during world switches).
+    const uiAny = player.ui as any;
+    if (!uiAny.__safeSendWrapped) {
+      const unsafeSend = player.ui.sendData.bind(player.ui);
+      uiAny.__unsafeSendData = unsafeSend;
+      uiAny.__safeSendWrapped = true;
+      player.ui.sendData = ((data: any) => {
+        try {
+          unsafeSend(data);
+        } catch (err) {
+          console.warn(`[UI] sendData failed for ${player.username}:`, err);
+        }
+      }) as any;
+    }
+
     // Add player to merchant tracking
     merchantEntities.forEach(entity => entity.addPlayer(player));
     // Add player to mine reset upgrade NPC tracking
@@ -1006,6 +1021,7 @@ startServer(world => {
             });
             // Also send updated power stats to update gold display
             gameManager.sendPowerStatsToUI(player);
+            gameManager.getTutorialManager().onPickaxePurchased(player);
           } else {
             player.ui.sendData({
               type: 'PICKAXE_PURCHASED',
@@ -1652,6 +1668,21 @@ startServer(world => {
    * Without this handler, the UI would not reload for these players.
    */
   world.on(PlayerEvent.RECONNECTED_WORLD, ({ player }) => {
+    // Re-apply safe send wrapper (UI instance may have been recreated).
+    const uiAny = player.ui as any;
+    if (!uiAny.__safeSendWrapped) {
+      const unsafeSend = player.ui.sendData.bind(player.ui);
+      uiAny.__unsafeSendData = unsafeSend;
+      uiAny.__safeSendWrapped = true;
+      player.ui.sendData = ((data: any) => {
+        try {
+          unsafeSend(data);
+        } catch (err) {
+          console.warn(`[UI] sendData failed for ${player.username}:`, err);
+        }
+      }) as any;
+    }
+
     // Reload the UI
     player.ui.load('ui/index.html');
 
@@ -1663,6 +1694,8 @@ startServer(world => {
 
     // Re-send initial UI data after UI loads
     player.ui.on(PlayerUIEvent.LOAD, () => {
+      // Ensure loading screen is cleared after UI reload
+      gameManager.setPlayerLoading(player, false);
       gameManager.onPlayerUILoaded(player);
 
       // Re-add to proximity tracking systems

@@ -94,6 +94,14 @@ export class GameManager {
   private periodicSaveInterval?: NodeJS.Timeout;
   private readonly PERIODIC_SAVE_MS = 30000; // Save all players every 30 seconds
 
+  private safeSendUI(player: Player, data: object): void {
+    try {
+      player.ui.sendData(data);
+    } catch (error) {
+      console.warn('[GameManager] Failed to send UI data:', error);
+    }
+  }
+
   /**
    * Creates a new GameManager instance
    * 
@@ -148,7 +156,7 @@ export class GameManager {
     this.miningController = new MiningController(world, this);
 
     // Initialize tutorial system
-    this.tutorialManager = new TutorialManager(world, this);
+    this.tutorialManager = new TutorialManager(this);
     
     // Start periodic save mechanism
     this.startPeriodicSaves();
@@ -780,7 +788,7 @@ export class GameManager {
    */
   setPlayerLoading(player: Player, isLoading: boolean): void {
     this.playerLoadingStates.set(player, isLoading);
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'LOADING_SCREEN',
       visible: isLoading,
     });
@@ -1181,13 +1189,10 @@ export class GameManager {
       return;
     }
 
-    // Increment wins based on current world (island1=1, island2=100, island3=1000)
-    let winMultiplier = 1;
-    if (playerData.currentWorld === 'island2') {
-      winMultiplier = 100;
-    } else if (playerData.currentWorld === 'island3') {
-      winMultiplier = 1000;
-    }
+    // Increment wins ("trophies") based on current world's trophy multiplier
+    const worldId = playerData.currentWorld || 'island1';
+    const worldConfig = WorldRegistry.getWorldConfig(worldId);
+    const winMultiplier = worldConfig?.trophyMultiplier ?? 1;
     playerData.wins += winMultiplier;
     this.updatePlayerData(player, playerData);
 
@@ -1216,8 +1221,6 @@ export class GameManager {
     this.miningController?.stopBlockDetection(player);
 
     // Teleport to the surface of the world the player was mining in
-    const worldId = playerData.currentWorld || 'island1';
-    const worldConfig = WorldRegistry.getWorldConfig(worldId);
     const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
     this.teleportPlayer(player, spawnPoint);
 
@@ -1234,7 +1237,7 @@ export class GameManager {
     this.stopMineResetTimer(player);
 
     // Update UI
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINING_STATE_UPDATE',
       isInMine: false,
     });
@@ -2325,13 +2328,13 @@ export class GameManager {
     this.stopMineResetTimer(player);
 
     // Hide timer and depth HUD when changing worlds (timer hasn't started yet)
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINE_RESET_TIMER',
       timeRemaining: null, // This will hide the timer UI
     });
     
     // Reset depth counter display (will show again when player enters mines)
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINING_DEPTH_COUNTER',
       depth: 0,
     });

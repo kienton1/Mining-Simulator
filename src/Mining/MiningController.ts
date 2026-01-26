@@ -269,8 +269,8 @@ export class MiningController {
         return;
       }
 
-      // Check if this is the unminable gold block - trigger win automatically
-      if (blockInfo.chestType === 'Unminable Gold Block') {
+      // Check if this is the win block - trigger win automatically
+      if (blockInfo.chestType === 'Congratulations') {
         const miningState = this.miningSystem.getMiningState(player);
         if (miningState && !miningState.winTriggered) {
           // Trigger win condition automatically when reaching the gold block
@@ -309,10 +309,11 @@ export class MiningController {
         );
       } else {
         const oreData = this.getOreData(blockInfo.oreType);
+        const displayName = blockInfo.chestType === 'Congratulations' ? 'Congratulations' : (oreData?.name || null);
         this.sendMiningUpdateEvent(
           player,
           0, // No damage, just detection
-          oreData?.name || null,
+          displayName,
           blockInfo.blockHP,
           blockInfo.maxHP,
           false,

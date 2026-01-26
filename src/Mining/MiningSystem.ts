@@ -191,6 +191,12 @@ export class MiningSystem {
   /** Maximum mining distance */
   private readonly MAX_MINING_DISTANCE = 250;
 
+  /** Initial mine levels to generate when (re)building a mine */
+  private readonly INITIAL_MINE_LEVELS = 40;
+
+  /** Mine levels to clear on reset (keeps deeper levels for perf) */
+  private readonly RESET_CLEAR_MINE_LEVELS = 80;
+
   /** Whether to spawn manual debug markers for raycasts */
   private readonly DEBUG_RAYCAST_MARKERS_ENABLED = false; // Disabled - causes collision issues
   private readonly DEBUG_RAYCAST_MARKER_SEGMENTS = 12;
@@ -428,7 +434,7 @@ export class MiningSystem {
       this.ensureLevelsAheadOfPlayer(player, state, currentPickaxe);
     }
 
-    // Check if this mine level has a chest, unminable gold block, or a normal ore block
+    // Check if this mine level has a chest, win block, or a normal ore block
     // Use mine level for the key so all 3 Y coordinates share the same block
     const hitMineLevel = this.yCoordinateToMineLevel(hitDepth);
     const chestKey = `chest_level_${hitMineLevel}`;
@@ -439,7 +445,7 @@ export class MiningSystem {
     const unminableGoldBlock = state.blockMap.get(unminableGoldKey);
 
     if (unminableGoldBlock) {
-      // This is the unminable gold block at depth 1000
+      // This is the win block at depth 1000
       // Win condition is now triggered automatically by block detection, not by mining
       state.currentTargetBlock = unminableGoldKey;
 
@@ -447,7 +453,7 @@ export class MiningSystem {
       player.ui.sendData({
         type: 'MINING_UPDATE',
         damage: 0,
-        currentOreName: 'Unminable Gold Block',
+        currentOreName: 'Congratulations',
         blockHP: unminableGoldBlock.currentHP,
         maxHP: unminableGoldBlock.maxHP,
         isChest: false,
@@ -878,10 +884,9 @@ export class MiningSystem {
 
     const startTime = Date.now();
 
-    // Clear all mining blocks (walls stay permanent)
-    // Clear from mine level 0 down to level 333 (334 mine levels, approximately 1000 Y coordinates)
-    const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-    const maxMineLevelToClear = 333;
+      // Clear mining blocks near the surface (walls stay permanent)
+      const miningPositions = this.getMiningAreaPositionsForPlayer(player);
+      const maxMineLevelToClear = this.RESET_CLEAR_MINE_LEVELS;
     for (let mineLevel = 0; mineLevel <= maxMineLevelToClear; mineLevel++) {
       const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
       for (const yCoord of levelYCoords) {
@@ -996,11 +1001,11 @@ export class MiningSystem {
     const unminableGoldBlock = state.blockMap.get(unminableGoldKey);
 
     if (unminableGoldBlock) {
-      // This is the unminable gold block at depth 1000
+      // This is the win block at depth 1000
       return {
         oreType: null, // Not a regular ore
         isChest: false,
-        chestType: 'Unminable Gold Block', // Special type for UI
+        chestType: 'Congratulations', // Special type for UI
         blockHP: unminableGoldBlock.currentHP,
         maxHP: unminableGoldBlock.maxHP,
         gemReward: null,
@@ -1377,9 +1382,9 @@ export class MiningSystem {
       state.ceilingBuilt = true;
     }
 
-    // Generate all 1000 mine levels upfront (level 0 to 999)
-    // Each mine level is 3 blocks tall, so 1000 levels = 3000 blocks deep
-    const levelsToGenerate = 1000;
+    // Generate a limited number of levels upfront for performance
+    // Remaining levels are generated on-demand via ensureLevelsAheadOfPlayer.
+    const levelsToGenerate = this.INITIAL_MINE_LEVELS;
     for (let mineLevel = 0; mineLevel < levelsToGenerate; mineLevel++) {
       const topY = this.mineLevelToTopY(mineLevel); // Top Y coordinate of this mine level
       const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel); // All 3 Y coordinates
@@ -1392,10 +1397,10 @@ export class MiningSystem {
 
       // Check if this is the win level (mine level 999 = depth 1000)
       if (mineLevel === 999) {
-        // Generate unminable gold block instead of normal ore/chest
+        // Generate win block instead of normal ore/chest
         const miningAreaKey = `unminable_gold_level_${mineLevel}`;
 
-        // Create an unminable gold block (infinite HP, no damage taken)
+        // Create a win block (infinite HP, no damage taken)
         // Use appropriate gold ore type based on world
         const goldOreType = worldId === 'island2' ? 'sunstonite' : OreType.GOLD;
         const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER); // Infinite HP
@@ -1547,10 +1552,10 @@ export class MiningSystem {
     const currentDeepestMineLevel = this.yCoordinateToMineLevel(state.deepestGeneratedDepth);
     const startMineLevel = currentDeepestMineLevel + 1; // Next level to generate
 
-    for (let mineLevel = startMineLevel; mineLevel <= targetMineLevel; mineLevel++) {
-      const topY = this.mineLevelToTopY(mineLevel);
-      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
-      const absoluteDepth = mineLevel + 1; // For ore generation (1-based)
+      for (let mineLevel = startMineLevel; mineLevel <= targetMineLevel; mineLevel++) {
+        const topY = this.mineLevelToTopY(mineLevel);
+        const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
+        const absoluteDepth = mineLevel + 1; // For ore generation (1-based)
       
       // Check if this mine level was already generated (check if top Y is in generatedDepths)
       if (state.generatedDepths.has(topY)) {
@@ -1562,8 +1567,41 @@ export class MiningSystem {
         state.generatedDepths.add(yCoord);
       }
       
-      // Check if a chest should spawn at this mine level
-      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+        // Win block at depth 1000
+        if (mineLevel === 999) {
+          const miningAreaKey = `unminable_gold_level_${mineLevel}`;
+          const goldOreType = worldId === 'island2' ? 'sunstonite' : OreType.GOLD;
+          const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER);
+          state.blockMap.set(miningAreaKey, goldBlock);
+
+          const middleY = levelYCoords[1];
+          const miningPositions = this.getMiningAreaPositionsForPlayer(player);
+          for (const basePosition of miningPositions) {
+            const blockPosition = {
+              x: basePosition.x + state.offset.x,
+              y: middleY,
+              z: basePosition.z + state.offset.z,
+            };
+            try {
+              this.world.chunkLattice.setBlock(blockPosition, this.UNMINABLE_GOLD_BLOCK_TYPE_ID);
+            } catch (error) {
+              // Silently fail - chunk might not be loaded yet
+            }
+          }
+
+          for (const yCoord of levelYCoords) {
+            this.generateMineShaftWalls(yCoord, state.offset, worldId);
+          }
+
+          const bottomY = levelYCoords[levelYCoords.length - 1];
+          if (bottomY < state.deepestGeneratedDepth) {
+            state.deepestGeneratedDepth = bottomY;
+          }
+          continue;
+        }
+
+        // Check if a chest should spawn at this mine level
+        const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
       
       if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
         // Spawn a chest instead of an ore block

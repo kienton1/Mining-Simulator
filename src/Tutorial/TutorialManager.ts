@@ -1,4 +1,4 @@
-import { Player, SceneUI, World } from 'hytopia';
+import { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
 import { WorldRegistry } from '../WorldRegistry';
 import {
@@ -10,6 +10,8 @@ import { EGG_STATIONS } from '../Pets/EggStationsConfig';
 import type { EggStationDefinition } from '../Pets/EggStationManager';
 import type { TrainingController } from '../Surface/Training/TrainingController';
 import type { HatchingSystem } from '../Pets/HatchingSystem';
+import type { PickaxeShop } from '../Shop/PickaxeShop';
+import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import {
   DEFAULT_TUTORIAL_PROGRESS,
   TutorialPhase,
@@ -23,6 +25,7 @@ type TutorialGameContext = {
   addGold(player: Player, amount: number): void;
   getTrainingController(): TrainingController | undefined;
   getHatchingSystem(): HatchingSystem;
+  getPickaxeShop(): PickaxeShop;
 };
 
 type TutorialUIUpdate = {
@@ -35,6 +38,7 @@ type TutorialUIUpdate = {
   cta?: string;
   rewardText?: string;
   highlightAction?: string;
+  arrowTarget?: { x: number; y: number; z: number } | null;
   completed?: boolean;
   showSkip?: boolean;
 };
@@ -47,15 +51,13 @@ type MarkerTarget = {
 };
 
 export class TutorialManager {
-  private world: World;
   private game: TutorialGameContext;
   private playerProgress: Map<Player, TutorialProgress> = new Map();
   private uiReady: Map<Player, boolean> = new Map();
   private pendingUI: Map<Player, TutorialUIUpdate> = new Map();
-  private playerMarkers: Map<Player, SceneUI> = new Map();
+  private pendingGoldRewards: Map<Player, number> = new Map();
 
-  constructor(world: World, game: TutorialGameContext) {
-    this.world = world;
+  constructor(game: TutorialGameContext) {
     this.game = game;
   }
 
@@ -71,7 +73,6 @@ export class TutorialManager {
     this.playerProgress.set(player, resolved);
     this.persistProgress(player);
     this.pushUpdate(player);
-    this.updateMarker(player);
   }
 
   onPlayerUILoaded(player: Player): void {
@@ -83,18 +84,18 @@ export class TutorialManager {
     } else {
       this.pushUpdate(player, true);
     }
-    this.updateMarker(player);
+    const pendingGold = this.pendingGoldRewards.get(player);
+    if (pendingGold) {
+      this.pendingGoldRewards.delete(player);
+      this.sendGoldRewardUI(player, pendingGold);
+    }
   }
 
   cleanupPlayer(player: Player): void {
     this.uiReady.delete(player);
     this.pendingUI.delete(player);
     this.playerProgress.delete(player);
-    const marker = this.playerMarkers.get(player);
-    if (marker) {
-      marker.unload();
-      this.playerMarkers.delete(player);
-    }
+    this.pendingGoldRewards.delete(player);
   }
 
   skipTutorial(player: Player): void {
@@ -170,12 +171,19 @@ export class TutorialManager {
     const progress = this.getProgress(player);
     if (!progress || progress.completed) return;
     if (progress.phase === TutorialPhase.EQUIP_PET) {
+      this.advanceTo(player, TutorialPhase.BUY_PICKAXE);
+    }
+  }
+
+  onPickaxePurchased(player: Player): void {
+    const progress = this.getProgress(player);
+    if (!progress || progress.completed) return;
+    if (progress.phase === TutorialPhase.BUY_PICKAXE) {
       this.advanceTo(player, TutorialPhase.COMPLETE);
     }
   }
 
   onWorldChanged(player: Player): void {
-    this.updateMarker(player);
     this.pushUpdate(player, true);
   }
 
@@ -199,6 +207,12 @@ export class TutorialManager {
         skipped: Boolean(saved.skipped),
         rewardGranted: Boolean(saved.rewardGranted),
         rewardAmount: typeof saved.rewardAmount === 'number' ? saved.rewardAmount : 0,
+        pickaxeRewardGranted: Boolean(saved.pickaxeRewardGranted),
+        pickaxeRewardAmount: typeof saved.pickaxeRewardAmount === 'number' ? saved.pickaxeRewardAmount : 0,
+        completionShown:
+          typeof (saved as TutorialProgress).completionShown === 'boolean'
+            ? Boolean((saved as TutorialProgress).completionShown)
+            : Boolean(saved.completed),
       };
     }
 
@@ -211,6 +225,7 @@ export class TutorialManager {
       phase: TutorialPhase.COMPLETE,
       completed: true,
       skipped: true,
+      completionShown: true,
     };
   }
 
@@ -237,6 +252,9 @@ export class TutorialManager {
     if (nextPhase === TutorialPhase.PET_SHOP) {
       this.maybeGrantPetReward(player, progress);
     }
+    if (nextPhase === TutorialPhase.BUY_PICKAXE) {
+      this.maybeGrantPickaxeReward(player, progress);
+    }
 
     if (nextPhase === TutorialPhase.COMPLETE) {
       progress.completed = true;
@@ -245,9 +263,14 @@ export class TutorialManager {
     this.setProgress(player, progress);
 
     if (nextPhase === TutorialPhase.COMPLETE) {
-      setTimeout(() => {
-        this.sendUI(player, { visible: false, phase: TutorialPhase.COMPLETE, title: '', body: '' });
-      }, 4000);
+      if (!progress.completionShown) {
+        setTimeout(() => {
+          const latest = this.getProgress(player);
+          if (!latest) return;
+          latest.completionShown = true;
+          this.setProgress(player, latest);
+        }, 4000);
+      }
     }
   }
 
@@ -255,7 +278,6 @@ export class TutorialManager {
     this.playerProgress.set(player, { ...progress });
     this.persistProgress(player);
     this.pushUpdate(player);
-    this.updateMarker(player);
   }
 
   private persistProgress(player: Player): void {
@@ -269,6 +291,7 @@ export class TutorialManager {
     const progress = this.getProgress(player);
     if (!progress) return;
     const ui = this.buildUIUpdate(progress);
+    ui.arrowTarget = this.getArrowTarget(player, progress.phase);
     if (!this.uiReady.get(player)) {
       this.pendingUI.set(player, ui);
       return;
@@ -306,6 +329,16 @@ export class TutorialManager {
     }
 
     if (progress.completed || progress.phase === TutorialPhase.COMPLETE) {
+      if (progress.completionShown) {
+        return {
+          visible: false,
+          phase: TutorialPhase.COMPLETE,
+          title: '',
+          body: '',
+          completed: true,
+          showSkip: false,
+        };
+      }
       return {
         visible: true,
         phase: TutorialPhase.COMPLETE,
@@ -317,7 +350,7 @@ export class TutorialManager {
     }
 
     const phaseIndex = this.getPhaseIndex(progress.phase);
-    const totalPhases = 7;
+    const totalPhases = 8;
     const base = {
       visible: true,
       phase: progress.phase,
@@ -363,12 +396,39 @@ export class TutorialManager {
         base.cta = 'Tap Pets';
         base.highlightAction = 'pets';
         break;
+      case TutorialPhase.BUY_PICKAXE:
+        base.body = 'Use the Pickaxe shop to buy your first pickaxe.';
+        base.cta = 'Open Pickaxe';
+        base.highlightAction = 'pickaxe';
+        if ((progress.pickaxeRewardAmount ?? 0) > 0) {
+          base.rewardText = `Tutorial Reward: +${progress.pickaxeRewardAmount} Gold`;
+        }
+        break;
       default:
         base.body = 'Keep going!';
         break;
     }
 
     return base;
+  }
+
+  private getArrowTarget(player: Player, phase: TutorialPhase): { x: number; y: number; z: number } | null {
+    if (!this.shouldShowArrow(phase)) return null;
+    const target = this.getMarkerTarget(player, phase);
+    return target ? { x: target.position.x, y: 1, z: target.position.z } : null;
+  }
+
+  private shouldShowArrow(phase: TutorialPhase): boolean {
+    switch (phase) {
+      case TutorialPhase.GET_TO_MINES:
+      case TutorialPhase.SELL_ORES:
+      case TutorialPhase.TRAINING:
+      case TutorialPhase.PET_SHOP:
+      case TutorialPhase.HATCH_PET:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private getPhaseIndex(phase: TutorialPhase): number {
@@ -380,6 +440,7 @@ export class TutorialManager {
       TutorialPhase.PET_SHOP,
       TutorialPhase.HATCH_PET,
       TutorialPhase.EQUIP_PET,
+      TutorialPhase.BUY_PICKAXE,
     ];
     const idx = order.indexOf(phase);
     return idx >= 0 ? idx + 1 : 1;
@@ -403,20 +464,42 @@ export class TutorialManager {
     progress.rewardAmount = needed;
   }
 
-  private updateMarker(player: Player): void {
-    const progress = this.getProgress(player);
-    if (!progress || progress.completed || progress.phase === TutorialPhase.COMPLETE) {
-      this.hideMarker(player);
+  private maybeGrantPickaxeReward(player: Player, progress: TutorialProgress): void {
+    if (progress.pickaxeRewardGranted) return;
+
+    const playerData = this.game.getPlayerData(player);
+    if (!playerData) return;
+
+    const shop = this.game.getPickaxeShop();
+    const nextTier = shop.getNextAvailableTier(player);
+    if (nextTier === null) {
+      progress.pickaxeRewardGranted = true;
+      progress.pickaxeRewardAmount = 0;
       return;
     }
 
-    const target = this.getMarkerTarget(player, progress.phase);
-    if (!target) {
-      this.hideMarker(player);
-      return;
+    const pickaxe = getPickaxeByTier(nextTier);
+    const cost = pickaxe?.cost ?? 0;
+    const currentGold = playerData.gold || 0;
+    const needed = Math.max(0, cost - currentGold);
+    const reward = Math.max(50, needed);
+
+    if (reward > 0) {
+      this.game.addGold(player, reward);
+      this.sendGoldRewardUI(player, reward);
     }
 
-    this.showMarker(player, target);
+    progress.pickaxeRewardGranted = true;
+    progress.pickaxeRewardAmount = reward;
+  }
+
+  private sendGoldRewardUI(player: Player, amount: number): void {
+    if (!amount || amount <= 0) return;
+    if (!this.uiReady.get(player)) {
+      this.pendingGoldRewards.set(player, amount);
+      return;
+    }
+    player.ui.sendData({ type: 'TUTORIAL_GOLD_REWARD', amount });
   }
 
   private getMarkerTarget(player: Player, phase: TutorialPhase): MarkerTarget | null {
@@ -497,48 +580,5 @@ export class TutorialManager {
       }
     }
     return cheapest;
-  }
-
-  private showMarker(player: Player, target: MarkerTarget): void {
-    const playerId = player.id;
-    let marker = this.playerMarkers.get(player);
-    if (!marker) {
-      marker = new SceneUI({
-        templateId: 'tutorial:marker',
-        viewDistance: 96,
-        position: target.position,
-        state: {
-          title: target.title,
-          subtitle: target.subtitle,
-          kind: target.kind,
-          playerStates: {
-            [playerId]: { visible: true },
-          },
-        },
-      });
-      marker.load(this.world);
-      this.playerMarkers.set(player, marker);
-      return;
-    }
-
-    marker.setPosition(target.position);
-    marker.setState({
-      title: target.title,
-      subtitle: target.subtitle,
-      kind: target.kind,
-      playerStates: {
-        [playerId]: { visible: true },
-      },
-    });
-  }
-
-  private hideMarker(player: Player): void {
-    const marker = this.playerMarkers.get(player);
-    if (!marker) return;
-    marker.setState({
-      playerStates: {
-        [player.id]: { visible: false },
-      },
-    });
   }
 }
