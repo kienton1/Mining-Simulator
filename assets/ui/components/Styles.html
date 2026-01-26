@@ -3507,12 +3507,15 @@
   }
 
   body.mobile .tutorial-panel {
-    left: calc(12px + env(safe-area-inset-left));
-    right: calc(12px + env(safe-area-inset-right));
-    top: auto;
-    bottom: calc(96px + env(safe-area-inset-bottom));
-    width: auto;
-    border-radius: 12px;
+    left: calc(96px + env(safe-area-inset-left));
+    right: auto;
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
+    width: min(220px, 70vw);
+    max-height: 36vh;
+    padding: 10px;
+    gap: 6px;
+    border-radius: 10px;
   }
 
   body.mobile .tutorial-panel__title {
@@ -3525,6 +3528,24 @@
 
   body.mobile .tutorial-panel__text {
     font-size: 12px;
+  }
+
+  body.mobile .tutorial-panel__skip {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  body.mobile .tutorial-panel__content {
+    gap: 6px;
+  }
+
+  body.mobile .tutorial-panel__progress-bar {
+    height: 6px;
+  }
+
+  body.mobile .tutorial-panel__progress-text {
+    min-width: 32px;
+    font-size: 11px;
   }
 
   /* Stats HUD - mobile compact icon style (similar to Pets repo) */
