@@ -20,24 +20,30 @@ import type { PlayerData } from '../../Core/PlayerData';
 interface TrainingState {
   /** Whether player is currently training */
   isTraining: boolean;
-  
+
   /** The training rock being used */
   rock: TrainingRockData | null;
-  
+
   /** Player's pickaxe at training start */
   pickaxe: PickaxeData | null;
-  
+
   /** Player entity for animation playback */
   playerEntity: Entity | null;
-  
+
   /** Last hit timestamp (for rate limiting) */
   lastHitTime: number;
-  
+
   /** Training interval ID (for cleanup) */
   intervalId?: NodeJS.Timeout;
-  
+
   /** Whether an animation is currently playing */
   animationPlaying: boolean;
+
+  /** Rest rotation of the pickaxe captured once at training start */
+  pickaxeRestRotation: { x: number; y: number; z: number; w: number };
+
+  /** Unique session ID to detect stale animations */
+  sessionId: number;
 }
 
 /**
@@ -47,6 +53,7 @@ interface TrainingState {
 export class TrainingSystem {
   private trainingStates: Map<Player, TrainingState> = new Map();
   private world: World | null = null;
+  private nextSessionId: number = 0;
 
   /**
    * Sets the world instance for accessing pickaxe entities
@@ -100,6 +107,24 @@ export class TrainingSystem {
     // ensure power gain won't be invalid (should return 0, but prevent Infinity/NaN)
     // Players can still train via power requirement, but power gain will be 0 if rebirths = 0
 
+    // Capture the pickaxe rest rotation BEFORE any animation starts
+    let pickaxeRestRotation = { x: 0, y: 0.707, z: 0, w: 0.707 };
+    if (this.world) {
+      const allEntities = this.world.entityManager.getAllEntities();
+      for (const entity of allEntities) {
+        if (entity.tag === 'pickaxe') {
+          const entityAny = entity as any;
+          if (entityAny.parent === playerEntity || entityAny.getParent?.() === playerEntity) {
+            const rot = entity.rotation || pickaxeRestRotation;
+            pickaxeRestRotation = { x: rot.x, y: rot.y, z: rot.z, w: rot.w };
+            break;
+          }
+        }
+      }
+    }
+
+    const sessionId = this.nextSessionId++;
+
     const state: TrainingState = {
       isTraining: true,
       rock,
@@ -107,6 +132,8 @@ export class TrainingSystem {
       playerEntity,
       lastHitTime: Date.now(),
       animationPlaying: false,
+      pickaxeRestRotation,
+      sessionId,
     };
 
     this.trainingStates.set(player, state);
@@ -168,7 +195,7 @@ export class TrainingSystem {
       currentState.lastHitTime = Date.now();
 
       // Play animation in parallel (non-blocking)
-      this.playPickaxeSwingAnimation(currentState.playerEntity).then(() => {
+      this.playPickaxeSwingAnimation(currentState.playerEntity, currentState.pickaxeRestRotation, player, currentState.sessionId).then(() => {
         const currentStateAfterAnim = this.trainingStates.get(player);
         if (currentStateAfterAnim) {
           currentStateAfterAnim.animationPlaying = false;
@@ -192,15 +219,29 @@ export class TrainingSystem {
 
   /**
    * Plays pickaxe swing animation on player entity
-   * 
+   *
    * @param playerEntity - Player entity to animate
+   * @param restRotation - The correct rest rotation captured at training start
+   * @param player - The player (used to look up current session for cancellation)
+   * @param sessionId - Session ID at the time this animation was started
    * @returns Promise that resolves when animation completes
    */
-  private async playPickaxeSwingAnimation(playerEntity: Entity | null): Promise<void> {
+  private async playPickaxeSwingAnimation(
+    playerEntity: Entity | null,
+    restRotation: { x: number; y: number; z: number; w: number },
+    player: Player,
+    sessionId: number
+  ): Promise<void> {
     if (!playerEntity) {
       await new Promise(resolve => setTimeout(resolve, 400));
       return;
     }
+
+    // Helper to check if this animation's session is still active
+    const isSessionStale = (): boolean => {
+      const currentState = this.trainingStates.get(player);
+      return !currentState || currentState.sessionId !== sessionId;
+    };
 
     // Simple placeholder animation: rotate pickaxe entity back and forth
     try {
@@ -221,14 +262,18 @@ export class TrainingSystem {
       }
 
       if (pickaxeEntity) {
-        // Animate pickaxe rotation (swing motion) - shortened for accurate timing
-        const startRotation = pickaxeEntity.rotation || { x: 0, y: 0.707, z: 0, w: 0.707 };
+        // Use the rest rotation passed in (captured once at training start)
+        const startRotation = restRotation;
         const swingDuration = 200; // milliseconds (shortened to fit in hit interval)
         const steps = 5; // Fewer steps for faster animation
         const stepDelay = swingDuration / steps;
-        
+
         // Quick swing forward (rotate around X axis)
         for (let i = 0; i <= steps; i++) {
+          if (isSessionStale()) {
+            try { pickaxeEntity.setRotation(restRotation); } catch (e) { /* ignore */ }
+            return;
+          }
           const progress = i / steps;
           const angle = progress * Math.PI * 0.25; // 25 degree swing (smaller for speed)
           const newRotation = {
@@ -244,9 +289,13 @@ export class TrainingSystem {
           }
           await new Promise(resolve => setTimeout(resolve, stepDelay));
         }
-        
+
         // Quick swing back
         for (let i = steps; i >= 0; i--) {
+          if (isSessionStale()) {
+            try { pickaxeEntity.setRotation(restRotation); } catch (e) { /* ignore */ }
+            return;
+          }
           const progress = i / steps;
           const angle = progress * Math.PI * 0.25;
           const newRotation = {
@@ -262,7 +311,7 @@ export class TrainingSystem {
           }
           await new Promise(resolve => setTimeout(resolve, stepDelay));
         }
-        
+
         // Reset to original rotation
         try {
           pickaxeEntity.setRotation(startRotation);
@@ -294,11 +343,29 @@ export class TrainingSystem {
 
     state.isTraining = false;
     state.animationPlaying = false;
-    
+
     // Clear interval/timeout if it exists
     if (state.intervalId) {
       clearTimeout(state.intervalId);
       state.intervalId = undefined;
+    }
+
+    // Explicitly reset pickaxe rotation to the rest value captured at training start
+    if (this.world && state.playerEntity) {
+      const allEntities = this.world.entityManager.getAllEntities();
+      for (const entity of allEntities) {
+        if (entity.tag === 'pickaxe') {
+          const entityAny = entity as any;
+          if (entityAny.parent === state.playerEntity || entityAny.getParent?.() === state.playerEntity) {
+            try {
+              entity.setRotation(state.pickaxeRestRotation);
+            } catch (e) {
+              // Ignore if rotation can't be set
+            }
+            break;
+          }
+        }
+      }
     }
 
     this.trainingStates.delete(player);

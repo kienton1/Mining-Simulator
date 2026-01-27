@@ -87,8 +87,9 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
   private applyStandardAnimations(): void {
     if (!this.controller) return;
     this.playerController.idleLoopedAnimations = ['idle-upper', 'idle-lower'];
-    this.playerController.walkLoopedAnimations = ['walk-upper', 'walk-lower'];
+    this.playerController.walkLoopedAnimations = ['run-upper', 'run-lower'];
     this.playerController.runLoopedAnimations = ['run-upper', 'run-lower'];
+    this.playerController.walkVelocity = 8;
   }
 
   /**
@@ -100,7 +101,7 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
     try {
       // Use mining-loop for upper body while allowing normal leg movement
       this.playerController.idleLoopedAnimations = ['mining-loop', 'idle-lower'];
-      this.playerController.walkLoopedAnimations = ['mining-loop', 'walk-lower'];
+      this.playerController.walkLoopedAnimations = ['mining-loop', 'run-lower'];
       this.playerController.runLoopedAnimations = ['mining-loop', 'run-lower'];
 
       // Clear interact oneshot animations to prevent the SDK from restarting
