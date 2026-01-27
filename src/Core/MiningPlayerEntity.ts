@@ -157,6 +157,7 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
     this.canMineCallback = callback;
   }
 
+
   /**
    * Enables/disables all player input handling.
    * Used for loading screens or other forced pauses.

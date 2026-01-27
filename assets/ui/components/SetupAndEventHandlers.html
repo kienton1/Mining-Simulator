@@ -224,6 +224,7 @@
     console.log('[UI] DOMContentLoaded, setting up UI');
     setupMobileButtons();
     setupRightClickCamera();
+    setupArrowKeyInput();
     setupPowerHud();
     setupMerchantUI();
     setupMineResetUpgradeUI();
@@ -240,6 +241,7 @@
     console.log('[UI] DOM already loaded, setting up UI immediately');
     setupMobileButtons();
     setupRightClickCamera();
+    setupArrowKeyInput();
     setupPowerHud();
     setupMerchantUI();
     setupMineResetUpgradeUI();
@@ -429,9 +431,9 @@
     // Trackpad two-finger swipe camera state
     let trackpadUnlockTimer = null;
     let pointerLockActiveForTrackpad = false;
-    const TRACKPAD_SENSITIVITY = 0.5;
+    const TRACKPAD_SENSITIVITY = 1;
     const TRACKPAD_MAX_DELTA = 50;
-    const TRACKPAD_UNLOCK_DELAY = 100;
+    const TRACKPAD_UNLOCK_DELAY = 50;
 
     const lockPointerSafe = (lock) => {
       if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
@@ -586,6 +588,115 @@
       if (!rightMouseHeld) return;
       rightMouseHeld = false;
       lockPointerSafe(false);
+    });
+  }
+
+
+  /**
+   * Setup Arrow Key Input
+   * Up/Down arrows move the player (via pressInput w/s)
+   * Left/Right arrows rotate the camera via synthetic mouse events (same approach as trackpad)
+   */
+  function setupArrowKeyInput() {
+    const arrowState = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+    let arrowCameraAnimFrame = null;
+    let arrowPointerLocked = false;
+    const ARROW_CAMERA_SPEED = 8; // pixels of synthetic mouse movement per frame
+
+    const lockPointerForArrows = (lock) => {
+      if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
+      try {
+        hytopia.lockPointer(lock, true);
+      } catch (err) {
+        console.warn('[ArrowKeys] lockPointer failed', err);
+      }
+    };
+
+    function dispatchSyntheticMouseMove(movementX) {
+      const syntheticEvent = new MouseEvent('mousemove', {
+        bubbles: true,
+        cancelable: true,
+        movementX: movementX,
+        movementY: 0,
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight / 2,
+      });
+      try {
+        window.parent.document.dispatchEvent(syntheticEvent);
+      } catch (e) { /* cross-origin fallback */ }
+      document.dispatchEvent(syntheticEvent);
+    }
+
+    function startArrowCameraLoop() {
+      if (arrowCameraAnimFrame !== null) return;
+
+      if (!arrowPointerLocked) {
+        arrowPointerLocked = true;
+        lockPointerForArrows(true);
+      }
+
+      function tick() {
+        if (!arrowState.ArrowLeft && !arrowState.ArrowRight) {
+          arrowCameraAnimFrame = null;
+          if (arrowPointerLocked) {
+            arrowPointerLocked = false;
+            lockPointerForArrows(false);
+          }
+          return;
+        }
+
+        let movementX = 0;
+        if (arrowState.ArrowLeft) movementX -= ARROW_CAMERA_SPEED;
+        if (arrowState.ArrowRight) movementX += ARROW_CAMERA_SPEED;
+
+        dispatchSyntheticMouseMove(movementX);
+        arrowCameraAnimFrame = requestAnimationFrame(tick);
+      }
+
+      arrowCameraAnimFrame = requestAnimationFrame(tick);
+    }
+
+    function stopArrowCameraLoop() {
+      if (!arrowState.ArrowLeft && !arrowState.ArrowRight) {
+        if (arrowCameraAnimFrame !== null) {
+          cancelAnimationFrame(arrowCameraAnimFrame);
+          arrowCameraAnimFrame = null;
+        }
+        if (arrowPointerLocked) {
+          arrowPointerLocked = false;
+          lockPointerForArrows(false);
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!(e.code in arrowState) || e.repeat) return;
+      if (document.body.classList.contains('modal-open')) return;
+
+      e.preventDefault();
+      arrowState[e.code] = true;
+
+      if (e.code === 'ArrowUp') hytopia.pressInput('w', true);
+      else if (e.code === 'ArrowDown') hytopia.pressInput('s', true);
+      else startArrowCameraLoop();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (!(e.code in arrowState)) return;
+      arrowState[e.code] = false;
+
+      if (e.code === 'ArrowUp') hytopia.pressInput('w', false);
+      else if (e.code === 'ArrowDown') hytopia.pressInput('s', false);
+      else stopArrowCameraLoop();
+    });
+
+    // Release all on window blur to prevent stuck keys
+    window.addEventListener('blur', () => {
+      if (arrowState.ArrowUp)   { arrowState.ArrowUp = false;   hytopia.pressInput('w', false); }
+      if (arrowState.ArrowDown) { arrowState.ArrowDown = false; hytopia.pressInput('s', false); }
+      arrowState.ArrowLeft = false;
+      arrowState.ArrowRight = false;
+      stopArrowCameraLoop();
     });
   }
 
