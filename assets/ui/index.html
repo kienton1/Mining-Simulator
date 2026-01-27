@@ -1038,6 +1038,13 @@
   function setupRightClickCamera() {
     let rightMouseHeld = false;
 
+    // Trackpad two-finger swipe camera state
+    let trackpadUnlockTimer = null;
+    let pointerLockActiveForTrackpad = false;
+    const TRACKPAD_SENSITIVITY = 0.5;
+    const TRACKPAD_MAX_DELTA = 50;
+    const TRACKPAD_UNLOCK_DELAY = 100;
+
     const lockPointerSafe = (lock) => {
       if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
       try {
@@ -1088,17 +1095,86 @@
       const scrollable = target instanceof HTMLElement ? getScrollableAncestor(target) : null;
       const isFormElement = target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
 
-      if (!scrollable && !isFormElement) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        return false;
+      // Allow scrolling in scrollable containers and form elements
+      if (scrollable || isFormElement) return;
+
+      // Always prevent default (blocks zoom)
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Skip on mobile
+      if ('ontouchstart' in window && navigator.maxTouchPoints > 1) return;
+
+      // Skip if right-click drag is active (already rotating via mouse)
+      if (rightMouseHeld) return;
+
+      // Skip if a modal is open
+      if (window.isAnyModalOpen && window.isAnyModalOpen()) return;
+
+      // Only handle pixel-based deltas (trackpad/Magic Mouse), not line-based (scroll wheel)
+      if (e.deltaMode !== 0) return;
+
+      // Convert wheel deltas to camera movement
+      const movementX = Math.max(-TRACKPAD_MAX_DELTA, Math.min(TRACKPAD_MAX_DELTA, -e.deltaX * TRACKPAD_SENSITIVITY));
+      const movementY = Math.max(-TRACKPAD_MAX_DELTA, Math.min(TRACKPAD_MAX_DELTA, -e.deltaY * TRACKPAD_SENSITIVITY));
+
+      // Ignore very small movements
+      if (Math.abs(movementX) < 0.5 && Math.abs(movementY) < 0.5) return;
+
+      // Lock pointer to activate SDK camera mode
+      if (!pointerLockActiveForTrackpad) {
+        pointerLockActiveForTrackpad = true;
+        lockPointerSafe(true);
+        console.log('[Trackpad Camera] Pointer locked for trackpad gesture');
       }
+
+      // Clear any pending unlock timer
+      if (trackpadUnlockTimer) {
+        clearTimeout(trackpadUnlockTimer);
+        trackpadUnlockTimer = null;
+      }
+
+      // Dispatch synthetic mousemove with movementX/movementY
+      const syntheticEvent = new MouseEvent('mousemove', {
+        bubbles: true,
+        cancelable: true,
+        movementX: movementX,
+        movementY: movementY,
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight / 2,
+      });
+
+      // Try dispatching to parent document (where SDK canvas lives)
+      try {
+        window.parent.document.dispatchEvent(syntheticEvent);
+      } catch (crossOriginErr) {
+        console.log('[Trackpad Camera] Cross-origin dispatch failed, using local document');
+      }
+
+      // Also dispatch locally as fallback
+      document.dispatchEvent(syntheticEvent);
+
+      // Debounce unlock — wait for gesture to end
+      trackpadUnlockTimer = setTimeout(() => {
+        if (pointerLockActiveForTrackpad && !rightMouseHeld) {
+          pointerLockActiveForTrackpad = false;
+          lockPointerSafe(false);
+          console.log('[Trackpad Camera] Pointer unlocked after trackpad gesture ended');
+        }
+        trackpadUnlockTimer = null;
+      }, TRACKPAD_UNLOCK_DELAY);
     }, { passive: false, capture: true });
 
     window.addEventListener('mousedown', e => {
       if (e.button !== 2) return;
       e.preventDefault();
+      // Cancel any pending trackpad unlock
+      if (trackpadUnlockTimer) {
+        clearTimeout(trackpadUnlockTimer);
+        trackpadUnlockTimer = null;
+      }
+      pointerLockActiveForTrackpad = false;
       rightMouseHeld = true;
       lockPointerSafe(true);
     });
@@ -1111,6 +1187,14 @@
 
     // Safety: release pointer if focus is lost
     window.addEventListener('blur', () => {
+      if (trackpadUnlockTimer) {
+        clearTimeout(trackpadUnlockTimer);
+        trackpadUnlockTimer = null;
+      }
+      if (pointerLockActiveForTrackpad) {
+        pointerLockActiveForTrackpad = false;
+        lockPointerSafe(false);
+      }
       if (!rightMouseHeld) return;
       rightMouseHeld = false;
       lockPointerSafe(false);
@@ -15385,3 +15469,13 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
+
+<!-- Livereload - Development Only -->
+<script>
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'http://localhost:35729/livereload.js?snipver=1';
+    script.async = true;
+    document.head.appendChild(script);
+  })();
+</script>
