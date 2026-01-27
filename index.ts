@@ -794,6 +794,15 @@ startServer(world => {
             inProximity: false,
           });
           break;
+        case 'CLOSE_EGG_STATION_UI':
+          // Mirror the Ore Seller close behavior: force-hide the egg station UI
+          // while the player remains in proximity. The EggStationManager will not
+          // immediately re-open it unless the player changes stations / leaves & re-enters.
+          player.ui.sendData({
+            type: 'EGG_STATION_PROXIMITY',
+            inProximity: false,
+          });
+          break;
         case 'OPEN_MINER_SHOP':
           gameManager.setModalState(player, 'miner', true);
           const minerShopData = gameManager.getMinerShop().getShopData(player);

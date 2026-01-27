@@ -251,6 +251,8 @@ const FAR_RANGE = 12;  // Maximum distance for "far" mode (shows rock info)
 interface PlayerTrainingState {
   intervalId: NodeJS.Timeout;
   nearbyRockId?: string;
+  // Full unique ID (includes world prefix) for reliable cleanup on teleports/world changes
+  nearbyRockUniqueId?: string;
   promptVisible: boolean;
   promptCanTrain?: boolean;
   interactHeld: boolean;
@@ -281,7 +283,10 @@ export class TrainingController {
   private readonly PROXIMITY_CHECK_INTERVAL = 200; // ms
   // Track player visibility states per rock for player-specific Scene UI
   // Includes mode (far/close) for two-mode display
-  private rockPlayerVisibility: Map<string, Map<string, { visible: boolean; canTrain: boolean; mode?: string }>> = new Map();
+  private rockPlayerVisibility: Map<
+    string,
+    Map<string, { visible: boolean; canTrain: boolean; mode: 'far' | 'close' }>
+  > = new Map();
 
   /**
    * Creates a new TrainingController instance
@@ -578,6 +583,9 @@ export class TrainingController {
       state.trainingStartPosition = standPosition;
       // Store original position separately for restoration
       state.originalPosition = originalPosition;
+      // Keep the last nearby rock unique id in sync so teleport cleanup can always hide it.
+      state.nearbyRockId = targetRock.rockData.id;
+      state.nearbyRockUniqueId = uniqueId;
     }
 
     // Start velocity monitoring to detect movement (including jumping)
@@ -715,6 +723,16 @@ export class TrainingController {
       type: 'TRAINING_STATE',
       isTraining: false,
     });
+
+    // Always clear this player's SceneUI state for the training rock they were using.
+    // This prevents the "close" prompt from sticking after teleports (e.g., auto-mine).
+    if (state?.trainingRockLocation) {
+      const trainingRockId = state.trainingRockLocation.worldId
+        ? `${state.trainingRockLocation.worldId}:${state.trainingRockLocation.rockData.id}`
+        : state.trainingRockLocation.rockData.id;
+      this.hideRockSceneUIForPlayer(player, trainingRockId);
+    }
+
     // Show prompt again if still in area
     if (state?.trainingRockLocation) {
       const currentNearbyRock = this.getNearbyTrainingRock(player);
@@ -1184,7 +1202,12 @@ export class TrainingController {
     if (!playerEntity) {
       if (state.promptVisible) this.hideInteractPrompt(player);
       if (this.trainingSystem.isPlayerTraining(player)) this.stopTraining(player);
+      // If the player entity disappeared (teleport/world switch), force-hide any lingering SceneUI state.
+      if (state.nearbyRockUniqueId) {
+        this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
+      }
       state.nearbyRockId = undefined;
+      state.nearbyRockUniqueId = undefined;
       return;
     }
 
@@ -1197,16 +1220,13 @@ export class TrainingController {
     } else {
       if (state.promptVisible) {
         this.hideInteractPrompt(player);
-        // Hide the SceneUI for this player when they leave proximity
-        if (state.nearbyRockId) {
-          // Get the world ID from player data to build the unique rock ID
-          const playerData = this.gameManager.getPlayerData(player);
-          const worldId = playerData?.currentWorld || 'island1';
-          const uniqueId = `${worldId}:${state.nearbyRockId}`;
-          this.hideRockSceneUIForPlayer(player, uniqueId);
-        }
+      }
+      // Always hide the SceneUI when leaving proximity, even if promptVisible drifted.
+      if (state.nearbyRockUniqueId) {
+        this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
       }
       state.nearbyRockId = undefined;
+      state.nearbyRockUniqueId = undefined;
       state.promptCanTrain = undefined;
       if (this.trainingSystem.isPlayerTraining(player)) {
         this.stopTraining(player);
@@ -1225,12 +1245,22 @@ export class TrainingController {
       return;
     }
 
+    const nextRockUniqueId = rockLocation.worldId
+      ? `${rockLocation.worldId}:${rockLocation.rockData.id}`
+      : rockLocation.rockData.id;
+
+    // If we switched rocks, clear the previous rock's SceneUI state for this player.
+    if (state.nearbyRockUniqueId && state.nearbyRockUniqueId !== nextRockUniqueId) {
+      this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
+    }
+
     this.showInteractPrompt(player, rockLocation, access);
 
     // Update SceneUI with player-specific visibility
     this.updateRockSceneUIForPlayer(player, rockLocation, access);
     state.promptVisible = true;
     state.nearbyRockId = rockLocation.rockData.id;
+    state.nearbyRockUniqueId = nextRockUniqueId;
     state.promptCanTrain = access.canTrain;
   }
 
@@ -1323,7 +1353,10 @@ export class TrainingController {
 
     // Build playerStates object for the SceneUI
     // Each player's mode is now stored in the visibility map, so all players keep their correct mode
-    const playerStates: Record<string, { visible: boolean; canTrain: boolean; mode: string; rockName?: string; powerGain?: string }> = {};
+    const playerStates: Record<
+      string,
+      { visible: boolean; canTrain: boolean; mode: 'far' | 'close'; rockName?: string; powerGain?: string }
+    > = {};
     for (const [playerId, state] of playerVisibility.entries()) {
       playerStates[playerId] = {
         ...state,
@@ -1367,7 +1400,7 @@ export class TrainingController {
     playerVisibility.delete(player.id);
 
     // Build playerStates object for the SceneUI
-    const playerStates: Record<string, { visible: boolean; canTrain: boolean; mode: string }> = {};
+    const playerStates: Record<string, { visible: boolean; canTrain: boolean; mode: 'far' | 'close' }> = {};
     for (const [playerId, state] of playerVisibility.entries()) {
       playerStates[playerId] = state;
     }

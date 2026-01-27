@@ -80,9 +80,13 @@ export class GameManager {
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
   
   // Mine reset timer system (per-player)
-  private mineResetTimers: Map<Player, NodeJS.Timeout> = new Map();
-  private mineResetTimerIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineResetStartTimes: Map<Player, number> = new Map();
+  private mineResetDurations: Map<Player, number> = new Map();
+  private mineResetTickInterval?: NodeJS.Timeout;
+  private mineResetQueue: Player[] = [];
+  private mineResetQueued: Set<Player> = new Set();
+  private readonly MINE_RESET_TICK_MS = 1000;
+  private readonly MINE_RESET_RESET_BATCH = 2;
   private readonly MINE_RESET_DURATION_MS = 120000; // 2 minutes
   private readonly MINE_RESET_DURATION_UPGRADED_MS = 300000; // 5 minutes (upgraded)
   
@@ -788,10 +792,6 @@ export class GameManager {
    */
   setPlayerLoading(player: Player, isLoading: boolean): void {
     this.playerLoadingStates.set(player, isLoading);
-    this.safeSendUI(player, {
-      type: 'LOADING_SCREEN',
-      visible: isLoading,
-    });
 
     player.setInteractEnabled(!isLoading);
     if (isLoading) {
@@ -1311,6 +1311,12 @@ export class GameManager {
       return;
     }
 
+    // If player is already training on a lower-tier rock, stop it before auto-train takes over.
+    // This prevents velocity monitoring from disabling auto-train after the teleport.
+    if (this.trainingController?.isPlayerTraining(player)) {
+      this.trainingController.stopTraining(player);
+    }
+
     // First, teleport player to a position within the training rock bounds
     // This is required because startTraining checks proximity before teleporting
     // Calculate a position within the bounds (center of the bounds area)
@@ -1560,7 +1566,7 @@ export class GameManager {
 
     // Ensure timer UI is still visible if timer is running
     // This ensures the timer stays visible when returning to surface
-    if (this.mineResetTimers.has(player)) {
+    if (this.hasActiveMineResetTimer(player)) {
       this.updateMineResetTimerUI(player);
     }
   }
@@ -1592,7 +1598,7 @@ export class GameManager {
 
     // Ensure timer UI is visible if timer is running
     // This ensures the timer stays visible when re-entering the mine
-    if (this.mineResetTimers.has(player)) {
+    if (this.hasActiveMineResetTimer(player)) {
       this.updateMineResetTimerUI(player);
     }
 
@@ -1613,54 +1619,65 @@ export class GameManager {
    * 
    * @param player - Player who mined their first block
    */
-  startMineResetTimer(player: Player): void {
-    // Don't start if timer already running
-    if (this.mineResetTimers.has(player)) {
-      return;
-    }
-
-    // Check if player has the upgrade for the current world
-    const playerData = this.getPlayerData(player);
-    const currentWorld = playerData?.currentWorld || 'island1';
-    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
-
-    const startTime = Date.now();
-    this.mineResetStartTimes.set(player, startTime);
-
-    // Update UI immediately
-    this.updateMineResetTimerUI(player);
-
-    // Update timer display every second
-    const updateInterval = setInterval(() => {
-      this.updateMineResetTimerUI(player);
-    }, 1000);
-    this.mineResetTimerIntervals.set(player, updateInterval);
-
-    // Set expiration timer
-    const expirationTimer = setTimeout(() => {
-      this.onMineResetTimerExpired(player);
-    }, duration);
-    this.mineResetTimers.set(player, expirationTimer);
+  private hasActiveMineResetTimer(player: Player): boolean {
+    return this.mineResetStartTimes.has(player) || this.mineResetQueued.has(player);
   }
 
-  /**
-   * Updates the mine reset timer UI for a player
-   * 
-   * @param player - Player to update UI for
-   */
-  private updateMineResetTimerUI(player: Player): void {
-    const startTime = this.mineResetStartTimes.get(player);
-    if (!startTime) return;
+  private ensureMineResetTickRunning(): void {
+    if (this.mineResetTickInterval) return;
+    this.mineResetTickInterval = setInterval(() => {
+      this.tickMineResetTimers();
+    }, this.MINE_RESET_TICK_MS);
+  }
 
-    // Get the correct duration based on upgrade for current world
-    const playerData = this.getPlayerData(player);
-    const currentWorld = playerData?.currentWorld || 'island1';
-    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
+  private stopMineResetTickIfIdle(): void {
+    if (this.mineResetTickInterval && this.mineResetStartTimes.size === 0 && this.mineResetQueue.length === 0) {
+      clearInterval(this.mineResetTickInterval);
+      this.mineResetTickInterval = undefined;
+    }
+  }
 
-    const elapsed = Date.now() - startTime;
-    const remaining = Math.max(0, duration - elapsed);
+  private queueMineReset(player: Player): void {
+    if (this.mineResetQueued.has(player)) return;
+    this.mineResetQueued.add(player);
+    this.mineResetQueue.push(player);
+  }
+
+  private processMineResetQueue(): void {
+    if (!this.mineResetQueue.length) return;
+
+    const batchSize = Math.min(this.MINE_RESET_RESET_BATCH, this.mineResetQueue.length);
+    for (let i = 0; i < batchSize; i += 1) {
+      const player = this.mineResetQueue.shift();
+      if (!player) break;
+      this.mineResetQueued.delete(player);
+      this.onMineResetTimerExpired(player);
+    }
+  }
+
+  private tickMineResetTimers(): void {
+    const now = Date.now();
+    for (const [player, startTime] of this.mineResetStartTimes.entries()) {
+      const duration = this.mineResetDurations.get(player) ?? this.MINE_RESET_DURATION_MS;
+      const remaining = duration - (now - startTime);
+
+      if (remaining <= 0) {
+        this.queueMineReset(player);
+        this.mineResetStartTimes.delete(player);
+        this.mineResetDurations.delete(player);
+        this.sendMineResetTimerUI(player, 0);
+        continue;
+      }
+
+      this.sendMineResetTimerUI(player, remaining);
+    }
+
+    this.processMineResetQueue();
+    this.stopMineResetTickIfIdle();
+  }
+
+  private sendMineResetTimerUI(player: Player, remainingMs: number): void {
+    const remaining = Math.max(0, remainingMs);
     const seconds = Math.ceil(remaining / 1000);
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -1672,6 +1689,42 @@ export class GameManager {
       timeRemaining: timeString,
       secondsRemaining: seconds,
     });
+  }
+
+  startMineResetTimer(player: Player): void {
+    // Don't start if timer already running
+    if (this.hasActiveMineResetTimer(player)) {
+      return;
+    }
+
+    // Check if player has the upgrade for the current world
+    const playerData = this.getPlayerData(player);
+    const currentWorld = playerData?.currentWorld || 'island1';
+    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
+    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
+
+    const startTime = Date.now();
+    this.mineResetStartTimes.set(player, startTime);
+    this.mineResetDurations.set(player, duration);
+
+    // Update UI immediately
+    this.updateMineResetTimerUI(player);
+    this.ensureMineResetTickRunning();
+  }
+
+  /**
+   * Updates the mine reset timer UI for a player
+   * 
+   * @param player - Player to update UI for
+   */
+  private updateMineResetTimerUI(player: Player): void {
+    const startTime = this.mineResetStartTimes.get(player);
+    if (!startTime) return;
+
+    const duration = this.mineResetDurations.get(player) ?? this.MINE_RESET_DURATION_MS;
+    const elapsed = Date.now() - startTime;
+    const remaining = Math.max(0, duration - elapsed);
+    this.sendMineResetTimerUI(player, remaining);
   }
 
   /**
@@ -1833,19 +1886,15 @@ export class GameManager {
    * @param player - Player to stop timer for
    */
   stopMineResetTimer(player: Player): void {
-    const timer = this.mineResetTimers.get(player);
-    if (timer) {
-      clearTimeout(timer);
-      this.mineResetTimers.delete(player);
-    }
-
-    const interval = this.mineResetTimerIntervals.get(player);
-    if (interval) {
-      clearInterval(interval);
-      this.mineResetTimerIntervals.delete(player);
-    }
-
     this.mineResetStartTimes.delete(player);
+    this.mineResetDurations.delete(player);
+
+    if (this.mineResetQueued.has(player)) {
+      this.mineResetQueued.delete(player);
+      this.mineResetQueue = this.mineResetQueue.filter((queuedPlayer) => queuedPlayer !== player);
+    }
+
+    this.stopMineResetTickIfIdle();
   }
 
   /**
@@ -1972,6 +2021,11 @@ export class GameManager {
     if (this.periodicSaveInterval) {
       clearInterval(this.periodicSaveInterval);
       this.periodicSaveInterval = undefined;
+    }
+
+    if (this.mineResetTickInterval) {
+      clearInterval(this.mineResetTickInterval);
+      this.mineResetTickInterval = undefined;
     }
     
     // Clear all save timers

@@ -363,6 +363,8 @@
   body.mobile .rebirth-container {
     border-width: 2px;
     border-radius: 12px;
+    /* Constrain modal height so the options list can scroll */
+    max-height: 80vh;
   }
 
   body.mobile .rebirth-title-container {
@@ -387,6 +389,10 @@
   body.mobile .rebirth-content {
     padding: 16px 12px 12px;
     gap: 8px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0; /* allow children to scroll */
   }
 
   body.mobile .rebirth-explanation {
@@ -422,8 +428,20 @@
 
   body.mobile .rebirth-options-grid {
     gap: 6px;
-    max-height: 140px;
+    /* Make the list the scroll container on mobile */
+    flex: 1;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
+    overflow-x: hidden;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain;
+  }
+
+  /* Ensure touch scroll works when dragging on child elements */
+  body.mobile .rebirth-options-grid * {
+    touch-action: pan-y !important;
   }
 
   body.mobile .rebirth-option {

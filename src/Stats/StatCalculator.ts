@@ -39,7 +39,8 @@ function calculateRock1PowerGain(rebirths: number): number {
   if (x >= 1 && x <= 36) {
     return Math.floor((x + 4) / 5);
   } else if (x > 36 && x <= 457) {
-    return Math.floor((x + 7) / 6);
+    // Clamp to avoid a drop at the 36->37 boundary.
+    return Math.max(Math.floor((x + 7) / 6), 8);
   } else if (x >= 2510) {
     return Math.floor(x / 10 + 0.5);
   } else {
@@ -102,15 +103,17 @@ function calculateRock3PowerGain(rebirths: number): number {
   
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
   if (x === 0) {
-    return 1;
+    return 8;
   }
   
   if (x >= 1 && x <= 47) {
-    return Math.floor(0.8 * x + 7);
+    return Math.floor(0.8 * x + 8);
   } else if (x > 47 && x < 2510) {
-    return Math.floor(0.75 * x + 8);
+    return Math.floor(0.75 * x + 9);
   } else if (x >= 2510) {
-    return Math.floor(0.75 * x);
+    // Clamp to avoid a drop at the 2509->2510 boundary.
+    const minAt2510 = Math.floor(0.75 * 2509 + 9);
+    return Math.max(Math.floor(0.75 * x), minAt2510);
   } else {
     return 0; // x < 1 (shouldn't reach here due to x=0 check above)
   }
@@ -138,7 +141,7 @@ function calculateRock4PowerGain(rebirths: number): number {
   
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
   if (x === 0) {
-    return 1;
+    return 23;
   }
   
   if (x <= 457) {
@@ -214,7 +217,7 @@ function calculateRock5PowerGain(rebirths: number): number {
 const ROCK6_KNOTS: Array<[number, number]> = [
   [1, 620], [6, 650], [11, 680], [16, 710], [21, 740], [26, 770], [31, 800],
   [36, 830], [41, 860], [47, 900], [57, 970], [77, 1120], [97, 1270], [117, 1420],
-  [137, 1570], [157, 1720], [207, 2000], [257, 2150], [307, 1849], [357, 2141],
+  [137, 1570], [157, 1720], [207, 2000], [257, 2150], [307, 2150], [357, 2150],
   [457, 2724], [2510, 14683], [3760, 21980], [6260, 36564], [12760, 74480],
   [20260, 118200], [59040, 344400], [79040, 461100], [119040, 694400],
   [129040, 752800], [209040, 1200000], [400040, 2300000],
@@ -230,7 +233,7 @@ const ROCK6_KNOTS: Array<[number, number]> = [
 function calculateRock6PowerGain(rebirths: number): number {
   const x = rebirths;
   
-  if (x < 1) return 620; // Minimum value
+  if (x < 1) return 50; // Minimum value
   if (x >= 400040) {
     return 5.75 * x - 100230;
   }

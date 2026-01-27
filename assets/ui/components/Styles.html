@@ -3817,8 +3817,9 @@
   /* Pickaxe/Miner grid - mobile */
   body.mobile .pickaxe-grid-container {
     flex: 1;
-    min-height: 150px;
-    max-height: 40vh;
+    /* Fill the modal panel height (avoid dead/black space) */
+    min-height: 0;
+    height: 100%;
   }
 
   body.mobile .pickaxe-grid {
@@ -3971,7 +3972,10 @@
 
   /* Pets grid - mobile */
   body.mobile .pets-grid-container {
-    max-height: 35vh;
+    /* Fill the modal panel height (avoid dead/black space) */
+    flex: 1;
+    min-height: 0;
+    height: 100%;
   }
 
   body.mobile .pets-grid {
@@ -4052,6 +4056,15 @@
     padding: 10px;
   }
 
+  body.mobile .egg-shop-grid {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 14px;
+  }
+
+  body.mobile .egg-shop-card {
+    padding: 12px 10px 14px;
+  }
+
   body.mobile .egg-card {
     padding: 10px;
   }
@@ -4067,6 +4080,19 @@
 
   body.mobile .egg-card__price {
     font-size: 13px;
+  }
+
+  body.mobile .egg-shop-card__thumb {
+    width: 62px;
+    height: 62px;
+    aspect-ratio: 1;
+  }
+
+  body.mobile .egg-shop-card__thumb img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
   }
 
   /* Merchant/Gem trader modal - mobile sizing */

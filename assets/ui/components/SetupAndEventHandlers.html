@@ -354,6 +354,68 @@
         hytopia.pressInput(' ', false);
       });
     }
+
+    // Mobile hold-to-mine on the right side of the screen.
+    const miningTouchIds = new Set();
+    let miningInputActive = false;
+
+    const isMobileDevice = () => {
+      return document.body?.classList.contains('mobile') || Boolean(hytopia?.isMobile);
+    };
+
+    const shouldIgnoreMiningTouchTarget = (target) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(target.closest(
+        'button, a, input, textarea, select, [role="button"],' +
+        '.modal, .merchant-ui, .pickaxe-modal__container, .miner-modal__container,' +
+        '.rebirth-modal__container, .pets-modal__container, .egg-modal__container,' +
+        '.maps-modal__container, .gem-trader-ui, .mine-reset-upgrade-ui,' +
+        '.tutorial-panel, .mobile-controls, .left-actions, .auto-controls,' +
+        '.mining-controls, .stats-hud-container'
+      ));
+    };
+
+    const setMiningInput = (pressed) => {
+      if (typeof hytopia?.pressInput !== 'function') return;
+      if (pressed === miningInputActive) return;
+      miningInputActive = pressed;
+      hytopia.pressInput('ml', pressed);
+    };
+
+    const handleMiningTouchStart = (event) => {
+      if (!isMobileDevice()) return;
+      if (document.body?.classList.contains('modal-open')) return;
+
+      const target = event.target;
+      if (shouldIgnoreMiningTouchTarget(target)) return;
+
+      const screenWidth = window.innerWidth || 0;
+      const miningStartX = screenWidth * 0.6; // right 60% (camera side per HYTOPIA mobile controls)
+
+      for (const touch of event.changedTouches) {
+        if (touch.clientX >= miningStartX) {
+          miningTouchIds.add(touch.identifier);
+        }
+      }
+
+      if (miningTouchIds.size > 0) {
+        setMiningInput(true);
+      }
+    };
+
+    const handleMiningTouchEnd = (event) => {
+      if (!miningTouchIds.size) return;
+      for (const touch of event.changedTouches) {
+        miningTouchIds.delete(touch.identifier);
+      }
+      if (miningTouchIds.size === 0) {
+        setMiningInput(false);
+      }
+    };
+
+    document.addEventListener('touchstart', handleMiningTouchStart, { passive: true });
+    document.addEventListener('touchend', handleMiningTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', handleMiningTouchEnd, { passive: true });
   }
 
   /**
@@ -598,7 +660,7 @@
    */
   function setupEggStationUI() {
     const eggModal = document.getElementById('egg-modal');
-    const eggModalClose = eggModal?.querySelector('[data-close="egg-modal"]');
+    const eggModalClose = eggModal?.querySelector('#egg-close-btn, .egg-close-btn');
 
     if (!eggModal) {
       console.warn('[UI] Egg Station UI elements not found');
@@ -607,16 +669,18 @@
 
     // Close button handler
     if (eggModalClose) {
-      eggModalClose.addEventListener('click', () => {
-        console.log('[UI] Egg Station UI close clicked');
-        eggModal.classList.remove('visible');
-        hytopia.sendData({ type: 'CLOSE_EGG_MODAL' });
-        setTimeout(() => {
-          if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
-            if (window.setModalOpen) window.setModalOpen(false);
-          }
-        }, 10);
-      });
+      // Remove any existing listeners first
+      const newButton = eggModalClose.cloneNode(true);
+      eggModalClose.parentNode?.replaceChild(newButton, eggModalClose);
+      const freshButton = eggModal.querySelector('#egg-close-btn, .egg-close-btn');
+      
+      if (freshButton) {
+        freshButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeEggStationModal();
+        });
+      }
     }
 
     // Open 1 egg button
@@ -1817,6 +1881,27 @@
       if (!eggHatchOverlayEl || !eggHatchSlotsEl) return;
       if (eggHatchInProgress) return;
 
+      // Guard: don't start hatch visuals if the hatch would fail (insufficient gold / storage full)
+      const unitCost = Number(state.eggStation.costGold || 0);
+      const totalCost = unitCost * Number(count || 0);
+      const gold = Number(state.gold || 0);
+      const owned = Number(state.pets.ownedCount || 0);
+      const cap = Number(state.pets.ownedCap || 0);
+
+      // Storage check (each hatch yields 1 pet)
+      if (cap > 0 && owned + count > cap) {
+        if (state.eggStation.autoEnabled) stopEggAuto();
+        if (eggStationStatusEl) eggStationStatusEl.textContent = 'Pet storage is full!';
+        return;
+      }
+
+      // Gold check
+      if (totalCost > 0 && gold < totalCost) {
+        if (state.eggStation.autoEnabled) stopEggAuto();
+        if (eggStationStatusEl) eggStationStatusEl.textContent = `Need ${formatNumber(totalCost - gold)} more gold`;
+        return;
+      }
+
       eggHatchInProgress = true;
       if (eggModal) {
         eggModal.classList.add('hatch-hidden');
@@ -1860,13 +1945,24 @@
     };
 
     // Egg station local auto-open loop (client-side)
-    const stopEggAuto = () => {
+    function stopEggAuto() {
       state.eggStation.autoEnabled = false;
       state.eggStation.autoArmed = false;
       if (eggAutoBtn) {
         eggAutoBtn.textContent = 'Auto';
       }
-    };
+    }
+
+    function closeEggStationModal() {
+      if (!eggModal) return;
+      stopEggAuto();
+      // Mirror Ore Seller close behavior: tell server to hide proximity UI.
+      // This prevents the egg UI from immediately re-opening while still near an egg.
+      hytopia.sendData({ type: 'CLOSE_EGG_STATION_UI' });
+      hideModal(eggModal);
+    }
+
+    window.__closeEggStationModal = closeEggStationModal;
 
     const startEggAuto = (count) => {
       stopEggAuto();
@@ -1949,7 +2045,18 @@
       if (eggStationGoldEl) eggStationGoldEl.textContent = formatNumber(state.gold || 0);
       if (eggStationInvEl) eggStationInvEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
       if (eggStationStatusEl) {
-        if (state.eggStation.autoArmed && !state.eggStation.autoEnabled) {
+        const unitCost = Number(state.eggStation.costGold || 0);
+        const gold = Number(state.gold || 0);
+        const owned = Number(state.pets.ownedCount || 0);
+        const cap = Number(state.pets.ownedCap || 0);
+        const petsFullForOne = cap > 0 && owned + 1 > cap;
+        const canAffordOne = unitCost <= 0 || gold >= unitCost;
+
+        if (petsFullForOne) {
+          eggStationStatusEl.textContent = 'Pet storage is full!';
+        } else if (!canAffordOne) {
+          eggStationStatusEl.textContent = `Need ${formatNumber(unitCost - gold)} more gold`;
+        } else if (state.eggStation.autoArmed && !state.eggStation.autoEnabled) {
           eggStationStatusEl.textContent = 'Choose Open 1 or Open 3';
         } else if (state.eggStation.autoEnabled) {
           eggStationStatusEl.textContent = `Auto Opening ${state.eggStation.autoCount}...`;
@@ -1961,10 +2068,20 @@
       if (eggOpen1Btn) {
         const c = state.eggStation.costGold || 0;
         eggOpen1Btn.textContent = `Open 1 (${formatNumber(c)})`;
+        const unitCost = Number(c || 0);
+        const gold = Number(state.gold || 0);
+        const owned = Number(state.pets.ownedCount || 0);
+        const cap = Number(state.pets.ownedCap || 0);
+        eggOpen1Btn.disabled = (cap > 0 && owned + 1 > cap) || (unitCost > 0 && gold < unitCost);
       }
       if (eggOpen3Btn) {
         const c = (state.eggStation.costGold || 0) * 3;
         eggOpen3Btn.textContent = `Open 3 (${formatNumber(c)})`;
+        const totalCost = Number(c || 0);
+        const gold = Number(state.gold || 0);
+        const owned = Number(state.pets.ownedCount || 0);
+        const cap = Number(state.pets.ownedCap || 0);
+        eggOpen3Btn.disabled = (cap > 0 && owned + 3 > cap) || (totalCost > 0 && gold < totalCost);
       }
 
       if (eggResultsListEl) {
@@ -2397,6 +2514,10 @@
       });
 
       el.classList.add('visible');
+      // Egg modal needs inline display: flex to override the default display: none
+      if (el.id === 'egg-modal') {
+        el.style.display = 'flex';
+      }
 
       // Set body.modal-open to hide HUD elements
       if (window.setModalOpen) window.setModalOpen(true);
@@ -2478,8 +2599,10 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
       } else if (el.id === 'egg-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'egg' });
+        // Egg modal uses inline display styles, so we need to explicitly set display: none
+        el.style.display = 'none';
       }
-
+      
       // Check if any modals are still open, if not, remove body.modal-open
       setTimeout(() => {
         if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
@@ -2487,6 +2610,9 @@
         }
       }, 10);
     };
+
+    // Allow EggModal.html to close using the same modal logic.
+    window.__closeEggStationModal = closeEggStationModal;
 
     const renderPickaxeDetails = () => {
       // Show selected pickaxe, or equipped if none selected
@@ -3438,35 +3564,21 @@
     }
 
     let teleportSfxPending = false;
-    let loadingFailsafeTimer = null;
-    function setLoadingScreenVisible(visible) {
+    function setLoadingScreenVisible(_visible) {
+      // Loading screen removed: keep element hidden and don't add body.loading
       const loadingScreen = document.getElementById('loading-screen');
-      if (loadingScreen) {
-        loadingScreen.classList.toggle('visible', Boolean(visible));
-      }
-      if (document.body) {
-        document.body.classList.toggle('loading', Boolean(visible));
-      }
-      if (!visible && teleportSfxPending) {
+      if (loadingScreen) loadingScreen.classList.remove('visible');
+      if (document.body) document.body.classList.remove('loading');
+      // Preserve the teleport SFX cue (it used to play when the loading screen hid)
+      if (teleportSfxPending) {
         teleportSfxPending = false;
         playTeleportSfx();
-      }
-      if (visible) {
-        if (loadingFailsafeTimer) {
-          clearTimeout(loadingFailsafeTimer);
-        }
-        loadingFailsafeTimer = setTimeout(() => {
-          setLoadingScreenVisible(false);
-        }, 7000);
-      } else if (loadingFailsafeTimer) {
-        clearTimeout(loadingFailsafeTimer);
-        loadingFailsafeTimer = null;
       }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Default to visible until the server tells us to hide it.
-      setLoadingScreenVisible(true);
+      // Loading screen removed; ensure hidden on boot.
+      setLoadingScreenVisible(false);
     });
 
     function setupTutorialUI() {
@@ -3875,6 +3987,22 @@
           if (eggModal && !eggModal.classList.contains('visible')) {
             hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'egg' });
             showModal(eggModal);
+            // Re-attach close button handler in case it wasn't attached during setup
+            const closeBtnAfterShow = eggModal.querySelector('#egg-close-btn, .egg-close-btn');
+            if (closeBtnAfterShow) {
+              // Clone to remove old listeners
+              const newCloseBtn = closeBtnAfterShow.cloneNode(true);
+              closeBtnAfterShow.parentNode?.replaceChild(newCloseBtn, closeBtnAfterShow);
+              const freshCloseBtn = eggModal.querySelector('#egg-close-btn, .egg-close-btn');
+              
+              if (freshCloseBtn) {
+                freshCloseBtn.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeEggStationModal();
+                });
+              }
+            }
             // Refresh pets immediately so inventory/equipped counts are accurate
             hytopia.sendData({ type: 'REQUEST_PET_STATE' });
           }

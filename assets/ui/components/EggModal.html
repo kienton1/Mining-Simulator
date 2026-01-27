@@ -472,6 +472,7 @@
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.25);
     padding: 6px;
+    box-sizing: border-box;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
@@ -531,6 +532,7 @@
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -756,28 +758,30 @@
   }
 
   body.mobile .egg-pets-grid {
-    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
-    gap: 4px;
+    /* Bigger min card width to prevent squishing on mobile */
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    gap: 8px;
   }
 
   body.mobile .egg-pet-card {
-    padding: 3px;
+    padding: 8px;
+    min-height: 100px;
   }
 
   body.mobile .egg-pet-card__thumb {
-    width: 26px;
-    height: 26px;
-    margin: 6px auto 2px;
-    font-size: 14px;
+    width: 46px;
+    height: 46px;
+    margin: 12px auto 6px;
+    font-size: 20px;
   }
 
   body.mobile .egg-pet-card__name {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   body.mobile .egg-pet-card__chance {
-    font-size: 6px;
-    padding: 1px 3px;
+    font-size: 8px;
+    padding: 2px 6px;
   }
 </style>
 
@@ -827,6 +831,11 @@
     }
 
     function closeEggModal() {
+      if (typeof window.__closeEggStationModal === "function") {
+        window.__closeEggStationModal();
+        return;
+      }
+
       stopAutoMode();
       const wrapper = document.querySelector(".egg-wrapper");
       wrapper.classList.add("closing");
@@ -837,8 +846,12 @@
         wrapper.classList.remove("closing");
       }, 400);
 
-      hytopia.lockPointer(true);
-      if (window.setModalOpen) window.setModalOpen(false);
+      hytopia.sendData({ type: "MODAL_CLOSED", modalType: "egg" });
+      setTimeout(() => {
+        if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
+          if (window.setModalOpen) window.setModalOpen(false);
+        }
+      }, 10);
     }
 
     function renderEggShop(data) {

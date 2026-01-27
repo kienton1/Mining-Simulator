@@ -493,12 +493,9 @@
           if (btn.disabled) return;
           const action = btn.dataset.action;
           const worldId = btn.dataset.id;
-          const loadingScreen = document.getElementById('loading-screen');
 
           if (action === "teleport") {
-            // Show loading immediately on click (server will hide when done)
-            if (loadingScreen) loadingScreen.classList.add('visible');
-            if (document.body) document.body.classList.add('loading');
+            // Loading screen removed: no overlay changes on teleport
             hytopia.sendData({
               type: "TELEPORT_TO_WORLD",
               worldId
