@@ -4363,6 +4363,18 @@
         progressBarFillEl.style.height = '100%';
         progressBarMarkerEl.style.left = `${progress}%`;
         progressBarMarkerEl.style.bottom = 'auto';
+
+        // Position depth counter above the marker on desktop
+        if (miningDepthCounterEl) {
+          const outlineEl = progressBarEl.querySelector('.progress-bar__outline');
+          if (outlineEl) {
+            const rect = outlineEl.getBoundingClientRect();
+            const markerX = rect.left + (progress / 100) * rect.width;
+            miningDepthCounterEl.style.left = markerX + 'px';
+            miningDepthCounterEl.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+            miningDepthCounterEl.style.transform = 'translateX(-50%)';
+          }
+        }
       }
     }
 
@@ -5142,12 +5154,13 @@
           }
           break;
         case 'MINING_DEPTH_COUNTER':
-          // Update mining depth counter display (shows depth / maxDepth)
+          // Update mining depth counter display
           if (miningDepthCounterEl && miningDepthCounterTextEl) {
             const depth = data.depth ?? 0;
             const maxDepth = data.maxDepth ?? 1000;
             if (data.visible !== false) {
-              miningDepthCounterTextEl.textContent = `${depth} / ${maxDepth}`;
+              const isMobileCounter = document.body.classList.contains('mobile');
+              miningDepthCounterTextEl.textContent = isMobileCounter ? `${depth} / ${maxDepth}` : `${depth}`;
               miningDepthCounterEl.classList.add('visible');
             } else {
               miningDepthCounterEl.classList.remove('visible');
@@ -12988,6 +13001,13 @@
     font-size: 12px;
   }
 
+  /* Desktop: move mine timer to top right */
+  body:not(.mobile) .mine-reset-timer {
+    top: 20px;
+    bottom: auto;
+    right: 20px;
+  }
+
   /* Mining Depth Counter (Right side, above progress bar) */
   .mining-depth-counter {
     position: fixed;
@@ -13019,6 +13039,39 @@
       1px 1px 0 #000;
     text-align: center;
     white-space: nowrap;
+  }
+
+  /* Desktop: smaller progress bar height */
+  body:not(.mobile) .progress-bar {
+    padding: 12px 40px;
+  }
+
+  body:not(.mobile) .progress-bar__outline {
+    height: 20px;
+    border-radius: 6px;
+  }
+
+  body:not(.mobile) .progress-bar__marker {
+    height: 32px;
+    width: 16px;
+    top: -6px;
+    border-radius: 8px;
+    border-width: 2px;
+  }
+
+  /* Desktop: depth counter tracks above the marker */
+  body:not(.mobile) .mining-depth-counter {
+    right: auto;
+    top: auto;
+    transition: left 0.3s ease, opacity 0.3s ease;
+  }
+
+  body:not(.mobile) .mining-depth-counter__text {
+    padding: 2px 6px;
+    font-size: 11px;
+    border: none;
+    background: transparent;
+    border-radius: 0;
   }
 
   /* Block Health Bar (Bottom Center) */
@@ -13286,6 +13339,12 @@
 
   .auto-control-button:active {
     transform: scale(0.98);
+  }
+
+  /* Desktop: move auto controls to bottom right */
+  body:not(.mobile) .auto-controls {
+    bottom: 20px;
+    right: 40px;
   }
 
   /* Green when inactive (off) */
@@ -15570,3 +15629,13 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
+
+<!-- Livereload - Development Only -->
+<script>
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'http://localhost:35729/livereload.js?snipver=1';
+    script.async = true;
+    document.head.appendChild(script);
+  })();
+</script>

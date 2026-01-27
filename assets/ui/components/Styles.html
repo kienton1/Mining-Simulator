@@ -2312,6 +2312,13 @@
     font-size: 12px;
   }
 
+  /* Desktop: move mine timer to top right */
+  body:not(.mobile) .mine-reset-timer {
+    top: 20px;
+    bottom: auto;
+    right: 20px;
+  }
+
   /* Mining Depth Counter (Right side, above progress bar) */
   .mining-depth-counter {
     position: fixed;
@@ -2343,6 +2350,39 @@
       1px 1px 0 #000;
     text-align: center;
     white-space: nowrap;
+  }
+
+  /* Desktop: smaller progress bar height */
+  body:not(.mobile) .progress-bar {
+    padding: 12px 40px;
+  }
+
+  body:not(.mobile) .progress-bar__outline {
+    height: 20px;
+    border-radius: 6px;
+  }
+
+  body:not(.mobile) .progress-bar__marker {
+    height: 32px;
+    width: 16px;
+    top: -6px;
+    border-radius: 8px;
+    border-width: 2px;
+  }
+
+  /* Desktop: depth counter tracks above the marker */
+  body:not(.mobile) .mining-depth-counter {
+    right: auto;
+    top: auto;
+    transition: left 0.3s ease, opacity 0.3s ease;
+  }
+
+  body:not(.mobile) .mining-depth-counter__text {
+    padding: 2px 6px;
+    font-size: 11px;
+    border: none;
+    background: transparent;
+    border-radius: 0;
   }
 
   /* Block Health Bar (Bottom Center) */
@@ -2610,6 +2650,12 @@
 
   .auto-control-button:active {
     transform: scale(0.98);
+  }
+
+  /* Desktop: move auto controls to bottom right */
+  body:not(.mobile) .auto-controls {
+    bottom: 20px;
+    right: 40px;
   }
 
   /* Green when inactive (off) */

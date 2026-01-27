@@ -3751,6 +3751,18 @@
         progressBarFillEl.style.height = '100%';
         progressBarMarkerEl.style.left = `${progress}%`;
         progressBarMarkerEl.style.bottom = 'auto';
+
+        // Position depth counter above the marker on desktop
+        if (miningDepthCounterEl) {
+          const outlineEl = progressBarEl.querySelector('.progress-bar__outline');
+          if (outlineEl) {
+            const rect = outlineEl.getBoundingClientRect();
+            const markerX = rect.left + (progress / 100) * rect.width;
+            miningDepthCounterEl.style.left = markerX + 'px';
+            miningDepthCounterEl.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+            miningDepthCounterEl.style.transform = 'translateX(-50%)';
+          }
+        }
       }
     }
 
@@ -4530,12 +4542,13 @@
           }
           break;
         case 'MINING_DEPTH_COUNTER':
-          // Update mining depth counter display (shows depth / maxDepth)
+          // Update mining depth counter display
           if (miningDepthCounterEl && miningDepthCounterTextEl) {
             const depth = data.depth ?? 0;
             const maxDepth = data.maxDepth ?? 1000;
             if (data.visible !== false) {
-              miningDepthCounterTextEl.textContent = `${depth} / ${maxDepth}`;
+              const isMobileCounter = document.body.classList.contains('mobile');
+              miningDepthCounterTextEl.textContent = isMobileCounter ? `${depth} / ${maxDepth}` : `${depth}`;
               miningDepthCounterEl.classList.add('visible');
             } else {
               miningDepthCounterEl.classList.remove('visible');
