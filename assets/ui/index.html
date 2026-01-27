@@ -2433,22 +2433,13 @@
         const petId = pet?.petId || pet?.id;
         if (!petId) return;
 
-        const card = document.createElement('button');
-        card.type = 'button';
+        const card = document.createElement('div');
         card.className = `egg-shop-card egg-shop-card--${pet?.rarity || 'common'}`;
         card.dataset.petId = petId;
-
-        if (autoDelete.has(petId)) {
-          card.classList.add('is-auto-delete');
-        }
 
         const chance = document.createElement('div');
         chance.className = 'egg-shop-card__chance';
         chance.textContent = formatEggChance(pet?.chance ?? 0);
-
-        const autoMark = document.createElement('div');
-        autoMark.className = 'egg-shop-card__auto';
-        autoMark.textContent = 'X';
 
         const thumb = document.createElement('div');
         thumb.className = 'egg-shop-card__thumb';
@@ -2465,7 +2456,6 @@
         name.textContent = pet?.name || petId;
 
         card.appendChild(chance);
-        card.appendChild(autoMark);
         card.appendChild(thumb);
         card.appendChild(name);
         eggShopGridEl.appendChild(card);
@@ -3095,16 +3085,7 @@
         renderEggStation();
       });
     }
-    if (eggShopGridEl) {
-      eggShopGridEl.addEventListener('click', (e) => {
-        const target = e.target?.closest ? e.target.closest('.egg-shop-card') : null;
-        if (!target) return;
-        const petId = target.dataset.petId;
-        if (!petId) return;
-        const enabled = !target.classList.contains('is-auto-delete');
-        hytopia.sendData({ type: 'EGG_AUTO_DELETE_TOGGLE', petId, enabled });
-      });
-    }
+    // Pet cards are display-only, no click handlers
 
     // Store background click handlers and container click handlers for cleanup
     const modalBackgroundHandlers = new Map();
@@ -7523,7 +7504,7 @@
         <div class="egg-right-panel">
           <div class="egg-pets-header">
             <span class="egg-section-title">POSSIBLE PETS</span>
-            <span class="egg-pets-hint">Tap = auto-delete</span>
+            <span class="egg-pets-hint"></span>
           </div>
           <div class="egg-pets-grid-container">
             <div id="egg-shop-grid" class="egg-pets-grid">
@@ -7929,14 +7910,9 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 6px;
     box-sizing: border-box;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    cursor: default;
+    pointer-events: none;
     text-align: center;
-  }
-
-  .egg-pet-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   .egg-pet-card--common { border-color: rgba(148, 163, 184, 0.5); }
@@ -8389,14 +8365,12 @@
         if (currentEgg.possiblePets && currentEgg.possiblePets.length > 0) {
           eggShopGrid.innerHTML = currentEgg.possiblePets.map(pet => {
             const rarity = (pet.rarity || "common").toLowerCase();
-            const isAutoDelete = autoDeletePets.has(pet.id);
 
             const iconPath = pet.icon ? `{{CDN_ASSETS_URL}}/${pet.icon}` : null;
 
             return `
-              <div class="egg-pet-card egg-pet-card--${rarity} ${isAutoDelete ? 'is-auto-delete' : ''}" data-id="${pet.id}">
+              <div class="egg-pet-card egg-pet-card--${rarity}" data-id="${pet.id}">
                 <div class="egg-pet-card__chance">${pet.chance || '?'}%</div>
-                <div class="egg-pet-card__auto">X</div>
                 <div class="egg-pet-card__thumb">
                   ${iconPath
                     ? `<img src="${iconPath}" alt="${pet.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='&#x1F43E;';" />`
@@ -8408,22 +8382,7 @@
             `;
           }).join('');
 
-          // Add click handlers for auto-delete toggle
-          eggShopGrid.querySelectorAll('.egg-pet-card').forEach(card => {
-            if (typeof window.attachClickSounds === "function") {
-              window.attachClickSounds(card);
-            }
-
-            card.addEventListener('click', () => {
-              const id = card.dataset.id;
-              if (autoDeletePets.has(id)) {
-                autoDeletePets.delete(id);
-              } else {
-                autoDeletePets.add(id);
-              }
-              renderEggShop(eggData);
-            });
-          });
+          // Pet cards are display-only, no click handlers
         } else {
           eggShopGrid.innerHTML = '<div class="egg-empty">No pet data available</div>';
         }
@@ -10778,19 +10737,9 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 8px 6px 10px;
     position: relative;
-    cursor: pointer;
+    cursor: default;
+    pointer-events: none;
     color: rgba(255, 255, 255, 0.92);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-  }
-
-  .egg-shop-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
-  }
-
-  .egg-shop-card.is-auto-delete {
-    border-color: rgba(239, 68, 68, 0.7);
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
   }
 
   .egg-shop-card__chance {
@@ -15407,3 +15356,13 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
+
+<!-- Livereload - Development Only -->
+<script>
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'http://localhost:35729/livereload.js?snipver=1';
+    script.async = true;
+    document.head.appendChild(script);
+  })();
+</script>

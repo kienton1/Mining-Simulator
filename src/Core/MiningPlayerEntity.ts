@@ -93,14 +93,18 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
 
   /**
    * Starts mining animation (swinging pickaxe)
+   * @param animationSpeed - Playback rate multiplier (1.0 = normal, 2.0 = 2x speed, etc.)
    */
-  startMiningAnimation(): void {
+  startMiningAnimation(animationSpeed: number = 1.0): void {
     if (!this.isSpawned || !this.controller) return;
     try {
       // Use mining-loop for upper body while allowing normal leg movement
       this.playerController.idleLoopedAnimations = ['mining-loop', 'idle-lower'];
       this.playerController.walkLoopedAnimations = ['mining-loop', 'walk-lower'];
       this.playerController.runLoopedAnimations = ['mining-loop', 'run-lower'];
+
+      // Scale animation playback speed based on pickaxe mining speed
+      this.setModelAnimationsPlaybackRate(animationSpeed);
     } catch (error) {
       console.error('[MiningPlayerEntity] Error starting mining animation:', error);
     }
@@ -114,6 +118,9 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
     try {
       // Return to standard animations
       this.applyStandardAnimations();
+
+      // Reset animation playback speed to normal
+      this.setModelAnimationsPlaybackRate(1.0);
     } catch (error) {
       console.error('[MiningPlayerEntity] Error stopping mining animation:', error);
     }

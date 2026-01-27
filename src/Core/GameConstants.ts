@@ -47,6 +47,13 @@ export const BLOCKS_PER_MINE_LEVEL = 3; // Each mine level is 3 blocks tall (7x3
 export const BASE_SWING_RATE = 1 / 0.5; // 2.0 swings per second (1 hit per 0.5 seconds)
 
 /**
+ * Maximum mining animation speed multiplier
+ * Caps how fast the mining animation can play regardless of pickaxe speed.
+ * At 20x, the animation is visibly fast but still somewhat readable.
+ */
+export const MAX_MINING_ANIMATION_SPEED = 20.0;
+
+/**
  * DEPRECATED: Old depth-based HP scaling constants
  * 
  * NEW SYSTEM (Linear Scaling): Ores now have firstHealth and lastHealth properties

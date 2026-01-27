@@ -14,6 +14,7 @@ import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
+import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
 
 /**
  * Mining Controller class
@@ -335,10 +336,14 @@ export class MiningController {
   startMiningLoop(player: Player): void {
     console.log('[MiningController] startMiningLoop called for player:', player.username);
 
-    // Start mining animation on player entity (Hyground style)
+    // Start mining animation on player entity with speed scaled to pickaxe
     const playerEntity = this.gameManager.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
-      (playerEntity as any).startMiningAnimation();
+      const pickaxeForAnim = this.gameManager.getPlayerPickaxe(player);
+      const animSpeedMultiplier = pickaxeForAnim
+        ? Math.min(1 + (pickaxeForAnim.miningSpeed / 100), MAX_MINING_ANIMATION_SPEED)
+        : 1.0;
+      (playerEntity as any).startMiningAnimation(animSpeedMultiplier);
     }
 
     // First check if player is in the mine - if not, do nothing

@@ -67,7 +67,7 @@
         <div class="egg-right-panel">
           <div class="egg-pets-header">
             <span class="egg-section-title">POSSIBLE PETS</span>
-            <span class="egg-pets-hint">Tap = auto-delete</span>
+            <span class="egg-pets-hint"></span>
           </div>
           <div class="egg-pets-grid-container">
             <div id="egg-shop-grid" class="egg-pets-grid">
@@ -473,14 +473,9 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 6px;
     box-sizing: border-box;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    cursor: default;
+    pointer-events: none;
     text-align: center;
-  }
-
-  .egg-pet-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   .egg-pet-card--common { border-color: rgba(148, 163, 184, 0.5); }
@@ -933,14 +928,12 @@
         if (currentEgg.possiblePets && currentEgg.possiblePets.length > 0) {
           eggShopGrid.innerHTML = currentEgg.possiblePets.map(pet => {
             const rarity = (pet.rarity || "common").toLowerCase();
-            const isAutoDelete = autoDeletePets.has(pet.id);
 
             const iconPath = pet.icon ? `{{CDN_ASSETS_URL}}/${pet.icon}` : null;
 
             return `
-              <div class="egg-pet-card egg-pet-card--${rarity} ${isAutoDelete ? 'is-auto-delete' : ''}" data-id="${pet.id}">
+              <div class="egg-pet-card egg-pet-card--${rarity}" data-id="${pet.id}">
                 <div class="egg-pet-card__chance">${pet.chance || '?'}%</div>
-                <div class="egg-pet-card__auto">X</div>
                 <div class="egg-pet-card__thumb">
                   ${iconPath
                     ? `<img src="${iconPath}" alt="${pet.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='&#x1F43E;';" />`
@@ -952,22 +945,7 @@
             `;
           }).join('');
 
-          // Add click handlers for auto-delete toggle
-          eggShopGrid.querySelectorAll('.egg-pet-card').forEach(card => {
-            if (typeof window.attachClickSounds === "function") {
-              window.attachClickSounds(card);
-            }
-
-            card.addEventListener('click', () => {
-              const id = card.dataset.id;
-              if (autoDeletePets.has(id)) {
-                autoDeletePets.delete(id);
-              } else {
-                autoDeletePets.add(id);
-              }
-              renderEggShop(eggData);
-            });
-          });
+          // Pet cards are display-only, no click handlers
         } else {
           eggShopGrid.innerHTML = '<div class="egg-empty">No pet data available</div>';
         }

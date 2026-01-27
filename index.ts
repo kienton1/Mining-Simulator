@@ -1751,7 +1751,7 @@ startServer(world => {
    */
   
   new Audio({
-    uri: 'audio/music/hytopia-main-theme.mp3',
+    uri: 'audio/music/alt-music-3.mp3',
     loop: true,
     volume: 0.1,
   }).play(world);

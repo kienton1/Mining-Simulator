@@ -332,19 +332,9 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 8px 6px 10px;
     position: relative;
-    cursor: pointer;
+    cursor: default;
+    pointer-events: none;
     color: rgba(255, 255, 255, 0.92);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-  }
-
-  .egg-shop-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
-  }
-
-  .egg-shop-card.is-auto-delete {
-    border-color: rgba(239, 68, 68, 0.7);
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
   }
 
   .egg-shop-card__chance {

@@ -1826,22 +1826,13 @@
         const petId = pet?.petId || pet?.id;
         if (!petId) return;
 
-        const card = document.createElement('button');
-        card.type = 'button';
+        const card = document.createElement('div');
         card.className = `egg-shop-card egg-shop-card--${pet?.rarity || 'common'}`;
         card.dataset.petId = petId;
-
-        if (autoDelete.has(petId)) {
-          card.classList.add('is-auto-delete');
-        }
 
         const chance = document.createElement('div');
         chance.className = 'egg-shop-card__chance';
         chance.textContent = formatEggChance(pet?.chance ?? 0);
-
-        const autoMark = document.createElement('div');
-        autoMark.className = 'egg-shop-card__auto';
-        autoMark.textContent = 'X';
 
         const thumb = document.createElement('div');
         thumb.className = 'egg-shop-card__thumb';
@@ -1858,7 +1849,6 @@
         name.textContent = pet?.name || petId;
 
         card.appendChild(chance);
-        card.appendChild(autoMark);
         card.appendChild(thumb);
         card.appendChild(name);
         eggShopGridEl.appendChild(card);
@@ -2488,16 +2478,7 @@
         renderEggStation();
       });
     }
-    if (eggShopGridEl) {
-      eggShopGridEl.addEventListener('click', (e) => {
-        const target = e.target?.closest ? e.target.closest('.egg-shop-card') : null;
-        if (!target) return;
-        const petId = target.dataset.petId;
-        if (!petId) return;
-        const enabled = !target.classList.contains('is-auto-delete');
-        hytopia.sendData({ type: 'EGG_AUTO_DELETE_TOGGLE', petId, enabled });
-      });
-    }
+    // Pet cards are display-only, no click handlers
 
     // Store background click handlers and container click handlers for cleanup
     const modalBackgroundHandlers = new Map();

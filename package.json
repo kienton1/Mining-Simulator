@@ -22,10 +22,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "hytopia": "^0.14.42"
+    "hytopia": "^0.14.46"
   },
   "optionalDependencies": {
-    "@hytopia.com/assets": "^0.4.6"
+    "@hytopia.com/assets": "^0.4.11"
   },
   "repository": {
     "type": "git",
