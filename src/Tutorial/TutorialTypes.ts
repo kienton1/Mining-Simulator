@@ -3,10 +3,9 @@ export enum TutorialPhase {
   MINE_ORES = 'mine_ores',
   SELL_ORES = 'sell_ores',
   TRAINING = 'training',
-  PET_SHOP = 'pet_shop',
-  HATCH_PET = 'hatch_pet',
-  BUY_PICKAXE = 'buy_pickaxe',
+  BUY_PET = 'buy_pet',
   EQUIP_PET = 'equip_pet',
+  BUY_PICKAXE = 'buy_pickaxe',
   COMPLETE = 'complete',
 }
 

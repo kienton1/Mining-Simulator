@@ -103,6 +103,11 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       this.playerController.walkLoopedAnimations = ['mining-loop', 'walk-lower'];
       this.playerController.runLoopedAnimations = ['mining-loop', 'run-lower'];
 
+      // Clear interact oneshot animations to prevent the SDK from restarting
+      // "simple-interact" every tick while ml is held (autoCancelMouseLeftClick = false).
+      // Without this, the oneshot restarts from frame 0 each tick, causing jitter.
+      this.playerController.interactOneshotAnimations = [];
+
       // Scale animation playback speed based on pickaxe mining speed
       this.setModelAnimationsPlaybackRate(animationSpeed);
     } catch (error) {
@@ -118,6 +123,9 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
     try {
       // Return to standard animations
       this.applyStandardAnimations();
+
+      // Restore default interact oneshot animations
+      this.playerController.interactOneshotAnimations = ['simple-interact'];
 
       // Reset animation playback speed to normal
       this.setModelAnimationsPlaybackRate(1.0);

@@ -2772,9 +2772,9 @@
   .coin-icon {
     width: 20px;
     height: 20px;
-    background: #ffd700;
-    border-radius: 50%;
+    object-fit: contain;
     display: inline-block;
+    vertical-align: middle;
   }
 
   .coin-icon--inline {
@@ -3322,132 +3322,95 @@
     left: calc(12px + env(safe-area-inset-left));
     top: 50%;
     transform: translateY(-50%);
-    gap: 8px;
+    gap: 6px;
   }
 
   body.mobile .action-card {
-    width: 56px;
-    height: 56px;
-    border-radius: 10px;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    border-width: 2px;
   }
 
   body.mobile .action-card__icon {
-    font-size: 26px;
+    font-size: 21px;
   }
 
   body.mobile .action-card__badge {
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
-    top: -4px;
-    right: -4px;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    top: -3px;
+    right: -3px;
+    border-width: 1.5px;
   }
 
-  /* Tutorial Panel */
-  .tutorial-panel {
+  /* Tutorial Progressive Text */
+  #tutorial-text-container {
     position: fixed;
-    top: 16px;
-    right: 40px;
-    width: 280px;
-    background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(12, 16, 28, 0.98));
-    border: 2px solid rgba(82, 196, 255, 0.35);
-    border-radius: 14px;
-    padding: 12px;
-    display: none;
-    flex-direction: column;
-    gap: 10px;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1200;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    pointer-events: auto;
+    text-align: center;
+    pointer-events: none;
+    animation: tutorial-text-fadein 0.3s ease;
   }
 
-  .tutorial-panel.visible {
-    display: flex;
-  }
-
-  .tutorial-panel__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .tutorial-panel__title {
-    font-size: 14px;
+  #tutorial-text {
+    font-family: "Fredoka", sans-serif;
+    font-size: 32px;
     font-weight: 700;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: #f7d35c;
+    color: #fff;
+    white-space: nowrap;
+    text-shadow:
+      -2px -2px 0 #000,
+      -2px -1px 0 #000,
+      -2px  0px 0 #000,
+      -2px  1px 0 #000,
+      -2px  2px 0 #000,
+      -1px -2px 0 #000,
+      -1px -1px 0 #000,
+      -1px  0px 0 #000,
+      -1px  1px 0 #000,
+      -1px  2px 0 #000,
+       0px -2px 0 #000,
+       0px -1px 0 #000,
+       0px  1px 0 #000,
+       0px  2px 0 #000,
+       1px -2px 0 #000,
+       1px -1px 0 #000,
+       1px  0px 0 #000,
+       1px  1px 0 #000,
+       1px  2px 0 #000,
+       2px -2px 0 #000,
+       2px -1px 0 #000,
+       2px  0px 0 #000,
+       2px  1px 0 #000,
+       2px  2px 0 #000,
+       0  3px 6px rgba(0, 0, 0, 0.5);
   }
 
-  .tutorial-panel__skip {
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(15, 20, 36, 0.6);
-    color: rgba(255, 255, 255, 0.9);
+  @keyframes tutorial-text-fadein {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  .tutorial-panel__content {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  /* Tutorial Bouncing Pointer */
+  #tutorial-pointer {
+    position: fixed;
+    z-index: 15000;
+    pointer-events: none;
   }
 
-  .tutorial-panel__step-title {
-    font-size: 16px;
-    font-weight: 700;
+  .tutorial-pointer-emoji {
+    font-size: 40px;
+    animation: tutorial-pointer-bounce 0.7s ease-in-out infinite;
   }
 
-  .tutorial-panel__text {
-    font-size: 13px;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .tutorial-panel__progress {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .tutorial-panel__progress-bar {
-    flex: 1;
-    height: 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-  }
-
-  .tutorial-panel__progress-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #4be7f5, #2bd67f);
-    transition: width 0.3s ease;
-  }
-
-  .tutorial-panel__progress-text {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
-    min-width: 40px;
-    text-align: right;
-  }
-
-  .tutorial-panel__cta {
-    font-size: 12px;
-    color: #4be7f5;
-    font-weight: 600;
-  }
-
-  .tutorial-panel__reward {
-    font-size: 12px;
-    color: #f7d35c;
-    font-weight: 600;
-  }
-
-  .tutorial-panel.completed {
-    border-color: rgba(43, 214, 127, 0.6);
+  @keyframes tutorial-pointer-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
   }
 
   /* Tutorial gold reward animation */
@@ -3462,8 +3425,7 @@
     position: absolute;
     width: 18px;
     height: 18px;
-    border-radius: 50%;
-    background: #ffd700;
+    object-fit: contain;
     box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
     transition: transform 0.8s ease-in, opacity 0.8s ease-in;
     will-change: transform, opacity;
@@ -3496,46 +3458,27 @@
     100% { transform: scale(1); }
   }
 
-  body.mobile .tutorial-panel {
-    left: calc(96px + env(safe-area-inset-left));
-    right: auto;
-    top: calc(12px + env(safe-area-inset-top));
-    bottom: auto;
-    width: min(220px, 70vw);
-    max-height: 36vh;
-    padding: 10px;
-    gap: 6px;
-    border-radius: 10px;
+  #to-surface-button.tutorial-highlight {
+    animation: tutorial-pulse-centered 1.5s ease-in-out infinite;
   }
 
-  body.mobile .tutorial-panel__title {
-    font-size: 12px;
+  @keyframes tutorial-pulse-centered {
+    0% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.05); }
+    100% { transform: translateX(-50%) scale(1); }
   }
 
-  body.mobile .tutorial-panel__step-title {
-    font-size: 14px;
+  /* Tutorial Progressive Text - mobile */
+  body.mobile #tutorial-text-container {
+    top: 80px;
   }
 
-  body.mobile .tutorial-panel__text {
-    font-size: 12px;
+  body.mobile #tutorial-text {
+    font-size: 22px;
   }
 
-  body.mobile .tutorial-panel__skip {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
-  body.mobile .tutorial-panel__content {
-    gap: 6px;
-  }
-
-  body.mobile .tutorial-panel__progress-bar {
-    height: 6px;
-  }
-
-  body.mobile .tutorial-panel__progress-text {
-    min-width: 32px;
-    font-size: 11px;
+  body.mobile .tutorial-pointer-emoji {
+    font-size: 30px;
   }
 
   /* Stats HUD - mobile compact icon style (similar to Pets repo) */
@@ -3590,7 +3533,7 @@
     display: none !important;
   }
 
-  body.modal-open .tutorial-panel {
+  body.modal-open #tutorial-text-container {
     opacity: 0.65;
   }
 

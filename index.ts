@@ -871,9 +871,6 @@ startServer(world => {
 
           if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
-            if (data.modalType === 'egg') {
-              gameManager.getTutorialManager().onEggModalOpened(player);
-            }
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
             if (miningController && miningController.isPlayerMining(player)) {

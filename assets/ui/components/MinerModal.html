@@ -678,7 +678,7 @@
               }
             </div>
             <div class="miner-card__name">${miner.name}</div>
-            <div class="miner-card__cost">${isOwned ? 'Owned' : `${formatNumber(miner.cost)} Gold`}</div>
+            <div class="miner-card__cost">${isOwned ? 'Owned' : `${window.coinIconHtml('coin-icon--inline')} ${formatNumber(miner.cost)}`}</div>
           </div>
         `;
       }).join('');
@@ -746,7 +746,7 @@
         statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Power Bonus</span><span class="miner-stat-row__value miner-stat-row__value--power">+${formatNumber(miner.powerBonus)}</span></div>`;
       }
       if (!miner.owned) {
-        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Cost</span><span class="miner-stat-row__value miner-stat-row__value--cost">${formatNumber(miner.cost)} Gold</span></div>`;
+        statsHtml += `<div class="miner-stat-row"><span class="miner-stat-row__label">Cost</span><span class="miner-stat-row__value miner-stat-row__value--cost">${window.coinIconHtml('coin-icon--inline')} ${formatNumber(miner.cost)}</span></div>`;
       }
 
       minerDetailStats.innerHTML = statsHtml;
@@ -765,11 +765,11 @@
         minerActionBtn.disabled = false;
         minerActionBtn.className = "miner-details__action-btn";
       } else if (canAfford) {
-        minerActionBtn.textContent = `Buy for ${formatNumber(miner.cost)} Gold`;
+        minerActionBtn.innerHTML = `Buy for ${window.coinIconHtml('coin-icon--inline')} ${formatNumber(miner.cost)}`;
         minerActionBtn.disabled = false;
         minerActionBtn.className = "miner-details__action-btn";
       } else {
-        minerActionBtn.textContent = `Need ${formatNumber(miner.cost - playerGold)} more Gold`;
+        minerActionBtn.innerHTML = `Need ${formatNumber(miner.cost - playerGold)} more ${window.coinIconHtml('coin-icon--inline')}`;
         minerActionBtn.disabled = true;
         minerActionBtn.className = "miner-details__action-btn";
       }

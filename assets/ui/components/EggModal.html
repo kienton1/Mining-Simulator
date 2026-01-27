@@ -32,7 +32,7 @@
           <!-- Stats bar -->
           <div class="egg-stats-bar">
             <div class="egg-stat-pill">
-              <span class="egg-stat-icon">&#x1F4B0;</span>
+              <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="{{CDN_ASSETS_URL}}/animations/gameplay/coin.webm"></video>
               <span id="egg-header-gold">0</span>
             </div>
             <div class="egg-stat-pill">
@@ -47,7 +47,7 @@
             <div class="egg-selected-info">
               <div id="egg-station-name" class="egg-selected-name">Stone Egg</div>
               <div class="egg-selected-cost">
-                <span id="egg-station-cost">10</span> gold
+                <span id="egg-station-cost">10</span> <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="{{CDN_ASSETS_URL}}/animations/gameplay/coin.webm"></video>
               </div>
             </div>
           </div>
@@ -917,7 +917,7 @@
           eggStationStatus.textContent = "Pet storage is full!";
           eggStationStatus.style.color = "#ff6b6b";
         } else if (!canAfford1) {
-          eggStationStatus.textContent = `Need ${formatNumber(currentEgg.cost - gold)} more gold`;
+          eggStationStatus.innerHTML = `Need ${formatNumber(currentEgg.cost - gold)} more ${window.coinIconHtml('coin-icon--inline')}`;
           eggStationStatus.style.color = "#ffd700";
         } else {
           eggStationStatus.textContent = "Ready to hatch!";

@@ -681,7 +681,7 @@
               }
             </div>
             <div class="pickaxe-card__name">${pickaxe.name}</div>
-            <div class="pickaxe-card__cost">${isOwned ? 'Owned' : `${formatNumber(pickaxe.cost)} Gold`}</div>
+            <div class="pickaxe-card__cost">${isOwned ? 'Owned' : `${window.coinIconHtml('coin-icon--inline')} ${formatNumber(pickaxe.cost)}`}</div>
           </div>
         `;
       }).join('');
@@ -755,7 +755,7 @@
         statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Sell Bonus</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--sell">x${pickaxe.sellMultiplier}</span></div>`;
       }
       if (!pickaxe.owned) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Cost</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--cost">${formatNumber(pickaxe.cost)} Gold</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Cost</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--cost">${window.coinIconHtml('coin-icon--inline')} ${formatNumber(pickaxe.cost)}</span></div>`;
       }
 
       pickaxeDetailStats.innerHTML = statsHtml;
@@ -774,11 +774,11 @@
         pickaxeActionBtn.disabled = false;
         pickaxeActionBtn.className = "pickaxe-details__action-btn";
       } else if (canAfford) {
-        pickaxeActionBtn.textContent = `Buy for ${formatNumber(pickaxe.cost)} Gold`;
+        pickaxeActionBtn.innerHTML = `Buy for ${window.coinIconHtml('coin-icon--inline')} ${formatNumber(pickaxe.cost)}`;
         pickaxeActionBtn.disabled = false;
         pickaxeActionBtn.className = "pickaxe-details__action-btn";
       } else {
-        pickaxeActionBtn.textContent = `Need ${formatNumber(pickaxe.cost - playerGold)} more Gold`;
+        pickaxeActionBtn.innerHTML = `Need ${formatNumber(pickaxe.cost - playerGold)} more ${window.coinIconHtml('coin-icon--inline')}`;
         pickaxeActionBtn.disabled = true;
         pickaxeActionBtn.className = "pickaxe-details__action-btn";
       }

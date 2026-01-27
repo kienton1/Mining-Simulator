@@ -31,16 +31,11 @@ type TutorialGameContext = {
 type TutorialUIUpdate = {
   visible: boolean;
   phase: TutorialPhase | null;
-  title: string;
-  body: string;
-  progressCurrent?: number;
-  progressTotal?: number;
-  cta?: string;
-  rewardText?: string;
-  highlightAction?: string;
+  text: string;
+  progressText?: string;
+  pointerTarget?: string | null;
   arrowTarget?: { x: number; y: number; z: number } | null;
   completed?: boolean;
-  showSkip?: boolean;
 };
 
 type MarkerTarget = {
@@ -105,7 +100,7 @@ export class TutorialManager {
     progress.completed = true;
     progress.skipped = true;
     this.setProgress(player, progress);
-    this.sendUI(player, { visible: false, phase: TutorialPhase.COMPLETE, title: '', body: '' });
+    this.sendUI(player, { visible: false, phase: TutorialPhase.COMPLETE, text: '' });
   }
 
   resetTutorial(player: Player): void {
@@ -147,22 +142,14 @@ export class TutorialManager {
     const progress = this.getProgress(player);
     if (!progress || progress.completed) return;
     if (progress.phase === TutorialPhase.TRAINING) {
-      this.advanceTo(player, TutorialPhase.PET_SHOP);
-    }
-  }
-
-  onEggModalOpened(player: Player): void {
-    const progress = this.getProgress(player);
-    if (!progress || progress.completed) return;
-    if (progress.phase === TutorialPhase.PET_SHOP) {
-      this.advanceTo(player, TutorialPhase.HATCH_PET);
+      this.advanceTo(player, TutorialPhase.BUY_PET);
     }
   }
 
   onEggHatched(player: Player): void {
     const progress = this.getProgress(player);
     if (!progress || progress.completed) return;
-    if (progress.phase === TutorialPhase.HATCH_PET) {
+    if (progress.phase === TutorialPhase.BUY_PET) {
       this.advanceTo(player, TutorialPhase.EQUIP_PET);
     }
   }
@@ -198,9 +185,16 @@ export class TutorialManager {
 
     if (data.tutorial && typeof data.tutorial === 'object') {
       const saved = data.tutorial as TutorialProgress;
+
+      // Migrate old pet_shop / hatch_pet phases to buy_pet
+      let phase = saved.phase as string;
+      if (phase === 'pet_shop' || phase === 'hatch_pet') {
+        phase = TutorialPhase.BUY_PET;
+      }
+
       return {
-        phase: Object.values(TutorialPhase).includes(saved.phase)
-          ? saved.phase
+        phase: Object.values(TutorialPhase).includes(phase as TutorialPhase)
+          ? (phase as TutorialPhase)
           : DEFAULT_TUTORIAL_PROGRESS.phase,
         miningCount: typeof saved.miningCount === 'number' ? Math.max(0, saved.miningCount) : 0,
         completed: Boolean(saved.completed),
@@ -249,7 +243,7 @@ export class TutorialManager {
 
     progress.phase = nextPhase;
 
-    if (nextPhase === TutorialPhase.PET_SHOP) {
+    if (nextPhase === TutorialPhase.BUY_PET) {
       this.maybeGrantPetReward(player, progress);
     }
     if (nextPhase === TutorialPhase.BUY_PICKAXE) {
@@ -321,95 +315,79 @@ export class TutorialManager {
       return {
         visible: false,
         phase: TutorialPhase.COMPLETE,
-        title: '',
-        body: '',
+        text: '',
         completed: true,
-        showSkip: false,
       };
     }
 
     if (progress.completed || progress.phase === TutorialPhase.COMPLETE) {
-      if (progress.completionShown) {
-        return {
-          visible: false,
-          phase: TutorialPhase.COMPLETE,
-          title: '',
-          body: '',
-          completed: true,
-          showSkip: false,
-        };
-      }
       return {
-        visible: true,
+        visible: false,
         phase: TutorialPhase.COMPLETE,
-        title: 'Tutorial Complete!',
-        body: 'You are all set. Good luck in the mines!',
+        text: '',
         completed: true,
-        showSkip: false,
       };
     }
 
-    const phaseIndex = this.getPhaseIndex(progress.phase);
-    const totalPhases = 8;
-    const base = {
-      visible: true,
-      phase: progress.phase,
-      title: `Tutorial ${phaseIndex}/${totalPhases}`,
-      body: '',
-      showSkip: true,
-    } as TutorialUIUpdate;
-
     switch (progress.phase) {
       case TutorialPhase.GET_TO_MINES:
-        base.body = 'Head to the mine entrance and drop in.';
-        base.cta = 'Follow the marker';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Go to the mine!',
+          pointerTarget: null,
+        };
       case TutorialPhase.MINE_ORES:
-        base.body = 'Mine 5 ores to fill your bag.';
-        base.progressCurrent = progress.miningCount;
-        base.progressTotal = TUTORIAL_MINING_TARGET;
-        base.cta = 'Tap/click to mine';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: `Mine 5 ore! (${progress.miningCount}/${TUTORIAL_MINING_TARGET})`,
+          progressText: `${progress.miningCount}/${TUTORIAL_MINING_TARGET}`,
+          pointerTarget: null,
+        };
       case TutorialPhase.SELL_ORES:
-        base.body = 'Find the Ore Seller and sell at least 1 ore.';
-        base.cta = 'Sell an ore';
-        base.highlightAction = 'surface';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Sell your ore!',
+          pointerTarget: 'to-surface-button',
+        };
       case TutorialPhase.TRAINING:
-        base.body = 'Train at a rock to gain Power.';
-        base.cta = 'Hold E / tap to train';
-        break;
-      case TutorialPhase.PET_SHOP: {
-        base.body = 'Go to the Egg Station to open pets.';
-        base.cta = 'Open the Egg Station';
-        if ((progress.rewardAmount ?? 0) > 0) {
-          base.rewardText = `Tutorial Reward: +${progress.rewardAmount} Gold`;
-        }
-        break;
-      }
-      case TutorialPhase.HATCH_PET:
-        base.body = 'Hatch your first pet by opening 1 egg.';
-        base.cta = 'Open 1 egg';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Improve your power!',
+          pointerTarget: null,
+        };
+      case TutorialPhase.BUY_PET:
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Buy a pet!',
+          pointerTarget: null,
+        };
       case TutorialPhase.EQUIP_PET:
-        base.body = 'Open the Pets menu and equip your new pet.';
-        base.cta = 'Tap Pets';
-        base.highlightAction = 'pets';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Equip your pet!',
+          pointerTarget: 'pets-button',
+        };
       case TutorialPhase.BUY_PICKAXE:
-        base.body = 'Use the Pickaxe shop to buy your first pickaxe.';
-        base.cta = 'Open Pickaxe';
-        base.highlightAction = 'pickaxe';
-        if ((progress.pickaxeRewardAmount ?? 0) > 0) {
-          base.rewardText = `Tutorial Reward: +${progress.pickaxeRewardAmount} Gold`;
-        }
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Upgrade your pickaxe!',
+          pointerTarget: 'pickaxe-button',
+        };
       default:
-        base.body = 'Keep going!';
-        break;
+        return {
+          visible: true,
+          phase: progress.phase,
+          text: 'Keep going!',
+          pointerTarget: null,
+        };
     }
-
-    return base;
   }
 
   private getArrowTarget(player: Player, phase: TutorialPhase): { x: number; y: number; z: number } | null {
@@ -423,8 +401,7 @@ export class TutorialManager {
       case TutorialPhase.GET_TO_MINES:
       case TutorialPhase.SELL_ORES:
       case TutorialPhase.TRAINING:
-      case TutorialPhase.PET_SHOP:
-      case TutorialPhase.HATCH_PET:
+      case TutorialPhase.BUY_PET:
         return true;
       default:
         return false;
@@ -437,8 +414,7 @@ export class TutorialManager {
       TutorialPhase.MINE_ORES,
       TutorialPhase.SELL_ORES,
       TutorialPhase.TRAINING,
-      TutorialPhase.PET_SHOP,
-      TutorialPhase.HATCH_PET,
+      TutorialPhase.BUY_PET,
       TutorialPhase.EQUIP_PET,
       TutorialPhase.BUY_PICKAXE,
     ];
@@ -538,8 +514,7 @@ export class TutorialManager {
           kind: 'training',
         };
       }
-      case TutorialPhase.PET_SHOP:
-      case TutorialPhase.HATCH_PET: {
+      case TutorialPhase.BUY_PET: {
         const station = this.getCheapestEggStation(worldId);
         if (!station) return null;
         return {

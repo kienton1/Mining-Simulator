@@ -199,7 +199,9 @@
 
       const cost = document.createElement('div');
       cost.className = 'scene-egg-prompt__cost';
-      cost.textContent = '0 gold';
+      const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      const coinSrc = cdnBase ? `${cdnBase}/animations/gameplay/coin.webm` : 'animations/gameplay/coin.webm';
+      cost.innerHTML = `0 <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="${coinSrc}"></video>`;
       copy.appendChild(cost);
 
       onState(state => {
@@ -210,7 +212,10 @@
           // Hide subtitle if empty so this looks like the reference (name + cost only).
           subtitle.style.display = data.subtitle ? 'block' : 'none';
         }
-        if (data.costText !== undefined) cost.textContent = data.costText;
+        if (data.costText !== undefined) {
+          const costLabel = data.costText.replace(/\s*[Gg]old\s*$/, '');
+          cost.innerHTML = `${costLabel} <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="${coinSrc}"></video>`;
+        }
 
         if (data.visible === false) root.classList.remove('visible');
         else root.classList.add('visible');
