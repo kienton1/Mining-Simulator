@@ -1882,6 +1882,8 @@
       'textarea',
       '[role="button"]',
       '.action-card',
+      '.egg-pet-card',
+      '.egg-shop-card',
       '.egg-tab',
       '.tab',
       '.modal__close',
@@ -2095,6 +2097,10 @@
         card.appendChild(thumb);
         card.appendChild(name);
         eggShopGridEl.appendChild(card);
+
+        if (typeof window.attachClickSounds === 'function') {
+          window.attachClickSounds(card);
+        }
 
         card.addEventListener('click', () => {
           const isEnabled = autoDelete.has(petId);

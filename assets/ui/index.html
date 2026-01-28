@@ -2494,6 +2494,8 @@
       'textarea',
       '[role="button"]',
       '.action-card',
+      '.egg-pet-card',
+      '.egg-shop-card',
       '.egg-tab',
       '.tab',
       '.modal__close',
@@ -2707,6 +2709,10 @@
         card.appendChild(thumb);
         card.appendChild(name);
         eggShopGridEl.appendChild(card);
+
+        if (typeof window.attachClickSounds === 'function') {
+          window.attachClickSounds(card);
+        }
 
         card.addEventListener('click', () => {
           const isEnabled = autoDelete.has(petId);
@@ -8282,9 +8288,20 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 6px;
     box-sizing: border-box;
-    cursor: default;
-    pointer-events: none;
+    cursor: pointer;
+    pointer-events: auto;
     text-align: center;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .egg-pet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .egg-pet-card:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   }
 
   .egg-pet-card--common { border-color: rgba(148, 163, 184, 0.5); }
@@ -11126,7 +11143,18 @@
   cursor: pointer;
   pointer-events: auto;
   color: rgba(255, 255, 255, 0.92);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
+  .egg-shop-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .egg-shop-card:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  }
 
   .egg-shop-card__chance {
     position: absolute;
@@ -15753,6 +15781,12 @@
     document.head.appendChild(script);
   })();
 </script>
+
+
+
+
+
+
 
 
 

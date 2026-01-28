@@ -353,6 +353,17 @@
     cursor: pointer;
     pointer-events: auto;
     color: rgba(255, 255, 255, 0.92);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .egg-shop-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .egg-shop-card:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   }
 
   .egg-shop-card__chance {
