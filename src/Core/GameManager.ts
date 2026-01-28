@@ -1816,12 +1816,12 @@ export class GameManager {
 
     // Stop auto modes and mining (but not if player is training)
     const autoState = this.playerAutoStates.get(player);
+    const wasAutoMineEnabled = Boolean(autoState?.autoMineEnabled);
     console.log('[GameManager] onMineResetTimerExpired - isTraining:', isTraining, 'autoTrainEnabled:', autoState?.autoTrainEnabled, 'isInMine:', isInMine);
     if (autoState) {
       if (autoState.autoMineEnabled) {
+        // Stop the current loop, but keep auto-mine enabled so we can resume after reset.
         this.stopAutoMine(player);
-        autoState.autoMineEnabled = false;
-        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
       }
       // Don't stop auto-train if player is currently training
       if (autoState.autoTrainEnabled && !isTraining) {
@@ -1877,6 +1877,15 @@ export class GameManager {
         type: 'MINING_STATE_UPDATE',
         isInMine: false,
       });
+    }
+
+    // If auto-mine was enabled, resume it after the reset so idle mining continues.
+    if (wasAutoMineEnabled && !isTraining) {
+      setTimeout(() => {
+        const stateNow = this.playerAutoStates.get(player);
+        if (!stateNow?.autoMineEnabled) return;
+        this.startAutoMine(player);
+      }, 1200);
     }
   }
 
