@@ -1285,12 +1285,15 @@
     const petsDeleteTextEl = document.getElementById('pets-delete-text');
     const petsDeleteConfirmBtn = document.getElementById('pets-delete-confirm');
     const petsDeleteCancelBtn = document.getElementById('pets-delete-cancel');
-    const petDetailPanelEl = document.getElementById('pet-detail-panel');
+    const petDetailPanelEl = document.getElementById('pet-detail-panel') || document.querySelector('.pets-details');
     const petDetailCloseEl = document.getElementById('pet-detail-close');
     const petDetailNameEl = document.getElementById('pet-detail-name');
     const petDetailImageEl = document.getElementById('pet-detail-image');
+    const petDetailImgEl = document.getElementById('pet-detail-img-el');
+    const petDetailEmojiEl = document.getElementById('pet-detail-emoji');
     const petDetailMultEl = document.getElementById('pet-detail-mult');
     const petDetailRarityEl = document.getElementById('pet-detail-rarity');
+    const petDetailStatsEl = document.getElementById('pet-detail-stats');
     const petDetailActionEl = document.getElementById('pet-detail-action');
 
     // Egg station UI elements
@@ -2061,10 +2064,17 @@
         const card = document.createElement('div');
         card.className = `egg-shop-card egg-shop-card--${pet?.rarity || 'common'}`;
         card.dataset.petId = petId;
+        if (autoDelete.has(petId)) {
+          card.classList.add('is-auto-delete');
+        }
 
         const chance = document.createElement('div');
         chance.className = 'egg-shop-card__chance';
         chance.textContent = formatEggChance(pet?.chance ?? 0);
+
+        const auto = document.createElement('div');
+        auto.className = 'egg-shop-card__auto';
+        auto.textContent = 'X';
 
         const thumb = document.createElement('div');
         thumb.className = 'egg-shop-card__thumb';
@@ -2081,9 +2091,24 @@
         name.textContent = pet?.name || petId;
 
         card.appendChild(chance);
+        card.appendChild(auto);
         card.appendChild(thumb);
         card.appendChild(name);
         eggShopGridEl.appendChild(card);
+
+        card.addEventListener('click', () => {
+          const isEnabled = autoDelete.has(petId);
+          const nextEnabled = !isEnabled;
+          if (nextEnabled) {
+            autoDelete.add(petId);
+            card.classList.add('is-auto-delete');
+          } else {
+            autoDelete.delete(petId);
+            card.classList.remove('is-auto-delete');
+          }
+          state.eggStation.autoDeletePets = Array.from(autoDelete);
+          hytopia.sendData({ type: 'EGG_AUTO_DELETE_TOGGLE', petId, enabled: nextEnabled });
+        });
       });
     };
 
@@ -2410,22 +2435,61 @@
       };
 
       const renderPetDetail = (pet) => {
-        if (!petDetailPanelEl) return;
         if (!pet) {
-          petDetailPanelEl.hidden = true;
+          if (petDetailPanelEl) petDetailPanelEl.hidden = false;
+          if (petDetailNameEl) petDetailNameEl.textContent = 'No Pet Selected';
+          if (petDetailMultEl) petDetailMultEl.textContent = '';
+          if (petDetailRarityEl) petDetailRarityEl.textContent = '';
+          if (petDetailStatsEl) {
+            petDetailStatsEl.innerHTML = '<div class="pets-stat-row" style="justify-content: center; color: #7a8ba3;">Select a pet</div>';
+          }
+          if (petDetailImgEl) {
+            petDetailImgEl.style.display = 'none';
+          }
+          if (petDetailEmojiEl) {
+            petDetailEmojiEl.style.display = 'block';
+            petDetailEmojiEl.textContent = '🐾';
+          } else if (petDetailImageEl) {
+            petDetailImageEl.textContent = '🐾';
+          }
+          if (petDetailActionEl) {
+            petDetailActionEl.textContent = '—';
+            petDetailActionEl.disabled = true;
+            petDetailActionEl.classList.remove('pet-detail__action--equip', 'pet-detail__action--unequip', 'pets-details__action-btn--unequip');
+          }
           return;
         }
-        petDetailPanelEl.hidden = false;
+
+        if (petDetailPanelEl) petDetailPanelEl.hidden = false;
 
         if (petDetailNameEl) petDetailNameEl.textContent = pet.name || pet.id || 'Pet';
         if (petDetailMultEl) petDetailMultEl.textContent = formatMultiplier(pet.multiplier ?? 0);
         if (petDetailRarityEl) petDetailRarityEl.textContent = (pet.rarity || '').toUpperCase();
 
-        if (petDetailImageEl) {
+        if (petDetailStatsEl) {
+          const rarityLabel = (pet.rarity || '').toLowerCase();
+          const rarityText = rarityLabel ? rarityLabel.charAt(0).toUpperCase() + rarityLabel.slice(1) : 'Common';
+          petDetailStatsEl.innerHTML =
+            `<div class="pets-stat-row"><span class="pets-stat-row__label">Multiplier</span><span class="pets-stat-row__value pets-stat-row__value--mult">x${formatMultiplier(pet.multiplier ?? 0)}</span></div>` +
+            `<div class="pets-stat-row"><span class="pets-stat-row__label">Rarity</span><span class="pets-stat-row__value pets-stat-row__value--rarity">${rarityText}</span></div>`;
+        }
+
+        const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+        if (petDetailImgEl) {
+          petDetailImgEl.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
+          petDetailImgEl.style.display = 'block';
+          if (petDetailEmojiEl) petDetailEmojiEl.style.display = 'none';
+          petDetailImgEl.onerror = () => {
+            petDetailImgEl.style.display = 'none';
+            if (petDetailEmojiEl) {
+              petDetailEmojiEl.style.display = 'block';
+              petDetailEmojiEl.textContent = '🐾';
+            }
+          };
+        } else if (petDetailImageEl) {
           petDetailImageEl.innerHTML = '';
           const img = document.createElement('img');
           img.alt = pet.name || pet.petId || 'Pet';
-          const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
           img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           img.className = 'pet-detail__img-el';
           img.onerror = () => {
@@ -2437,8 +2501,10 @@
         if (petDetailActionEl) {
           const isEquipped = Boolean(pet.equipped);
           petDetailActionEl.textContent = isEquipped ? 'Unequip' : 'Equip';
+          petDetailActionEl.disabled = false;
           petDetailActionEl.classList.toggle('pet-detail__action--equip', !isEquipped);
           petDetailActionEl.classList.toggle('pet-detail__action--unequip', isEquipped);
+          petDetailActionEl.classList.toggle('pets-details__action-btn--unequip', isEquipped);
         }
       };
 

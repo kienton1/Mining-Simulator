@@ -332,8 +332,8 @@
     background: rgba(0, 0, 0, 0.25);
     padding: 8px 6px 10px;
     position: relative;
-    cursor: default;
-    pointer-events: none;
+    cursor: pointer;
+    pointer-events: auto;
     color: rgba(255, 255, 255, 0.92);
   }
 
@@ -352,12 +352,16 @@
     position: absolute;
     top: 6px;
     right: 6px;
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 6px;
-    background: rgba(239, 68, 68, 0.9);
+    background: rgba(239, 68, 68, 0.95);
+    border: 2px solid rgba(0, 0, 0, 0.6);
     color: #fff;
     font-weight: 900;
+    font-size: 16px;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px rgba(0, 0, 0, 0.6);
     display: none;
     align-items: center;
     justify-content: center;
