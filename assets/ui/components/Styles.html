@@ -118,7 +118,9 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: var(--stat-hud-bg);
+    background:
+      var(--stat-hud-bg),
+      linear-gradient(180deg, rgba(16, 20, 32, 0.98), rgba(10, 14, 24, 0.96));
     filter: saturate(0.25);
     pointer-events: none;
     z-index: 0;
@@ -417,21 +419,18 @@
 
   .egg-shop-card__auto {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    background: rgba(239, 68, 68, 0.95);
-    border: 2px solid rgba(0, 0, 0, 0.6);
-    color: #fff;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(0, 0, 0, 0.15);
+    color: rgba(255, 0, 0, 0.9);
     font-weight: 900;
-    font-size: 16px;
+    font-size: 48px;
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
     display: none;
     align-items: center;
     justify-content: center;
+    pointer-events: none;
   }
 
   .egg-shop-card.is-auto-delete .egg-shop-card__auto {
