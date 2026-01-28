@@ -1511,16 +1511,46 @@
       }
     };
 
-    const buildEggHatchSlots = (count) => {
+    const getEggHatchImagePath = (eggType) => {
+      const eggIconMap = {
+        stone: 'moss-egg.png',
+        gem: 'ore-egg.png',
+        crystal: 'aether-egg.png',
+        abyssal: 'aquatus-egg.png',
+        boardwalk: "king-arthur's-sword-egg.png",
+        shipwreck: 'wave-egg.png',
+        sand: 'ornament-egg.png',
+        snow: 'snowman-egg.png',
+        lava: 'fire-egg.png',
+      };
+
+      const fileName = eggIconMap[eggType];
+      if (!fileName) return null;
+      const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      return cdn ? `${cdn}/icons/EggsIcons/${fileName}` : `icons/EggsIcons/${fileName}`;
+    };
+
+    const buildEggHatchSlots = (count, eggType) => {
       if (!eggHatchSlotsEl) return [];
       eggHatchSlotsEl.innerHTML = '';
       const slots = [];
+      const eggImageSrc = getEggHatchImagePath(eggType);
       for (let i = 0; i < count; i++) {
         const slot = document.createElement('div');
         slot.className = 'egg-hatch-slot';
 
-        const egg = document.createElement('div');
-        egg.className = 'egg-hatch-egg';
+        let egg;
+        if (eggImageSrc) {
+          const img = document.createElement('img');
+          img.className = 'egg-hatch-egg egg-hatch-egg--image';
+          img.src = eggImageSrc;
+          img.alt = 'Egg';
+          egg = img;
+        } else {
+          const fallback = document.createElement('div');
+          fallback.className = 'egg-hatch-egg';
+          egg = fallback;
+        }
 
         const particles = document.createElement('div');
         particles.className = 'egg-hatch-particles';
@@ -2148,7 +2178,7 @@
       }
       eggHatchOverlayEl.hidden = false;
 
-      const slots = buildEggHatchSlots(count);
+      const slots = buildEggHatchSlots(count, state.eggStation.eggType);
       currentEggHatch = {
         count,
         slots,
