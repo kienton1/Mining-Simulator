@@ -1656,38 +1656,25 @@
 
     const getCoinWebmPath = () => {
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
-      return cdn ? `${cdn}/animations/gameplay/coin.webm` : 'animations/gameplay/coin.webm';
+      return cdn ? `${cdn}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
     };
 
     const getCoinPngPath = () => {
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
-      return cdn ? `${cdn}/icons/coin.png` : 'icons/coin.png';
+      return cdn ? `${cdn}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
     };
 
-    const createCoinIconElement = (className, useStatic) => {
-      if (useStatic) {
-        const img = document.createElement('img');
-        img.className = `coin-icon ${className || ''}`.trim();
-        img.src = getCoinPngPath();
-        img.alt = 'coin';
-        return img;
-      }
-      const video = document.createElement('video');
-      video.className = `coin-icon ${className || ''}`.trim();
-      video.autoplay = true;
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.src = getCoinWebmPath();
-      return video;
+    const createCoinIconElement = (className) => {
+      const img = document.createElement('img');
+      img.className = `coin-icon ${className || ''}`.trim();
+      img.src = getCoinPngPath();
+      img.alt = 'coin';
+      return img;
     };
 
-    const coinIconHtml = (extraClass, useStatic) => {
+    const coinIconHtml = (extraClass) => {
       const cls = `coin-icon ${extraClass || ''}`.trim();
-      if (useStatic) {
-        return `<img class="${cls}" src="${getCoinPngPath()}" alt="coin">`;
-      }
-      return `<video class="${cls}" autoplay loop muted playsinline src="${getCoinWebmPath()}"></video>`;
+      return `<img class="${cls}" src="${getCoinPngPath()}" alt="coin">`;
     };
 
     // Expose coin helpers globally so other script blocks can use them

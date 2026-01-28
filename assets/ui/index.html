@@ -549,8 +549,8 @@
       const cost = document.createElement('div');
       cost.className = 'scene-egg-prompt__cost';
       const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
-      const coinSrc = cdnBase ? `${cdnBase}/animations/gameplay/coin.webm` : 'animations/gameplay/coin.webm';
-      cost.innerHTML = `0 <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="${coinSrc}"></video>`;
+      const coinSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
+      cost.innerHTML = `0 <img class="coin-icon coin-icon--inline" src="${coinSrc}" alt="coin">`;
       copy.appendChild(cost);
 
       onState(state => {
@@ -563,7 +563,7 @@
         }
         if (data.costText !== undefined) {
           const costLabel = data.costText.replace(/\s*[Gg]old\s*$/, '');
-          cost.innerHTML = `${costLabel} <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="${coinSrc}"></video>`;
+          cost.innerHTML = `${costLabel} <img class="coin-icon coin-icon--inline" src="${coinSrc}" alt="coin">`;
         }
 
         if (data.visible === false) root.classList.remove('visible');
@@ -2268,38 +2268,25 @@
 
     const getCoinWebmPath = () => {
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
-      return cdn ? `${cdn}/animations/gameplay/coin.webm` : 'animations/gameplay/coin.webm';
+      return cdn ? `${cdn}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
     };
 
     const getCoinPngPath = () => {
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
-      return cdn ? `${cdn}/icons/coin.png` : 'icons/coin.png';
+      return cdn ? `${cdn}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
     };
 
-    const createCoinIconElement = (className, useStatic) => {
-      if (useStatic) {
-        const img = document.createElement('img');
-        img.className = `coin-icon ${className || ''}`.trim();
-        img.src = getCoinPngPath();
-        img.alt = 'coin';
-        return img;
-      }
-      const video = document.createElement('video');
-      video.className = `coin-icon ${className || ''}`.trim();
-      video.autoplay = true;
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.src = getCoinWebmPath();
-      return video;
+    const createCoinIconElement = (className) => {
+      const img = document.createElement('img');
+      img.className = `coin-icon ${className || ''}`.trim();
+      img.src = getCoinPngPath();
+      img.alt = 'coin';
+      return img;
     };
 
-    const coinIconHtml = (extraClass, useStatic) => {
+    const coinIconHtml = (extraClass) => {
       const cls = `coin-icon ${extraClass || ''}`.trim();
-      if (useStatic) {
-        return `<img class="${cls}" src="${getCoinPngPath()}" alt="coin">`;
-      }
-      return `<video class="${cls}" autoplay loop muted playsinline src="${getCoinWebmPath()}"></video>`;
+      return `<img class="${cls}" src="${getCoinPngPath()}" alt="coin">`;
     };
 
     // Expose coin helpers globally so other script blocks can use them
@@ -3066,12 +3053,12 @@
           }
           if (petDetailEmojiEl) {
             petDetailEmojiEl.style.display = 'block';
-            petDetailEmojiEl.textContent = '??';
+            petDetailEmojiEl.textContent = '🐾';
           } else if (petDetailImageEl) {
-            petDetailImageEl.textContent = '??';
+            petDetailImageEl.textContent = '🐾';
           }
           if (petDetailActionEl) {
-            petDetailActionEl.textContent = '�';
+            petDetailActionEl.textContent = '—';
             petDetailActionEl.disabled = true;
             petDetailActionEl.classList.remove('pet-detail__action--equip', 'pet-detail__action--unequip', 'pets-details__action-btn--unequip');
           }
@@ -3101,7 +3088,7 @@
             petDetailImgEl.style.display = 'none';
             if (petDetailEmojiEl) {
               petDetailEmojiEl.style.display = 'block';
-              petDetailEmojiEl.textContent = '??';
+              petDetailEmojiEl.textContent = '🐾';
             }
           };
         } else if (petDetailImageEl) {
@@ -3111,7 +3098,7 @@
           img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           img.className = 'pet-detail__img-el';
           img.onerror = () => {
-            petDetailImageEl.textContent = '??';
+            petDetailImageEl.textContent = '🐾';
           };
           petDetailImageEl.appendChild(img);
         }
@@ -5405,7 +5392,7 @@
   <!-- Money -->
   <div class="stat-hud stat-hud--money">
     <div class="stat-hud__value" id="money-value">0</div>
-    <div class="stat-hud__icon"><video class="coin-icon coin-icon--hud" autoplay loop muted playsinline src="{{CDN_ASSETS_URL}}/animations/gameplay/coin.webm"></video></div>
+    <div class="stat-hud__icon"><img class="coin-icon coin-icon--hud" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/CoinIcon.png" alt="coin" /></div>
   </div>
 
   <!-- Gems -->
@@ -7847,7 +7834,7 @@
           <!-- Stats bar -->
           <div class="egg-stats-bar">
             <div class="egg-stat-pill">
-              <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="{{CDN_ASSETS_URL}}/animations/gameplay/coin.webm"></video>
+              <img class="coin-icon coin-icon--inline" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/CoinIcon.png" alt="coin" />
               <span id="egg-header-gold">0</span>
             </div>
             <div class="egg-stat-pill">
@@ -7862,7 +7849,7 @@
             <div class="egg-selected-info">
               <div id="egg-station-name" class="egg-selected-name">Stone Egg</div>
               <div class="egg-selected-cost">
-                <span id="egg-station-cost">10</span> <video class="coin-icon coin-icon--inline" autoplay loop muted playsinline src="{{CDN_ASSETS_URL}}/animations/gameplay/coin.webm"></video>
+                <span id="egg-station-cost">10</span> <img class="coin-icon coin-icon--inline" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/CoinIcon.png" alt="coin" />
               </div>
             </div>
           </div>
@@ -10895,15 +10882,37 @@
     min-width: 180px;
     border-radius: 12px;
     border: 3px solid #1a3a5c;
-    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/200% auto no-repeat;
+    background: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-hud::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--stat-hud-bg);
+    filter: saturate(0.25);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stat-hud > * {
+    position: relative;
+    z-index: 1;
   }
 
   .stat-hud__value {
     font-size: 24px;
     font-weight: 700;
     color: #ffd700;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px 10px;
+    border-radius: 8px;
     text-shadow: 
       0 0 8px rgba(255, 215, 0, 0.6),
       0 2px 4px rgba(0, 0, 0, 0.8),
@@ -10991,7 +11000,8 @@
     height: 72px;
     border-radius: 12px;
     border: 3px solid #1a3a5c;
-    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    --action-card-bg: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/200% auto no-repeat;
+    background: none;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
@@ -11000,6 +11010,22 @@
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
     pointer-events: auto;
+  }
+
+  .action-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--action-card-bg);
+    filter: saturate(0.25);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .action-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .action-card:hover {
@@ -11047,7 +11073,6 @@
   /* Pets action button accent */
   .action-card--pets {
     border-color: #2d6a4f;
-    background: linear-gradient(180deg, rgba(45, 106, 79, 0.95), rgba(26, 77, 56, 0.98));
   }
 
   /* Egg + Pets UI helpers (use existing modal styles as the base) */
@@ -11135,16 +11160,16 @@
   }
 
   .egg-shop-card {
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 8px 6px 10px;
-  position: relative;
-  cursor: pointer;
-  pointer-events: auto;
-  color: rgba(255, 255, 255, 0.92);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 8px 6px 10px;
+    position: relative;
+    cursor: pointer;
+    pointer-events: auto;
+    color: rgba(255, 255, 255, 0.92);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
 
   .egg-shop-card:hover {
     transform: translateY(-2px);
@@ -11168,27 +11193,27 @@
   }
 
   .egg-shop-card__auto {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.95);
-  border: 2px solid rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-weight: 900;
-  font-size: 16px;
-  line-height: 1;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px rgba(0, 0, 0, 0.6);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.95);
+    border: 2px solid rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-weight: 900;
+    font-size: 16px;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
 
   .egg-shop-card.is-auto-delete .egg-shop-card__auto {
-  display: flex;
-}
+    display: flex;
+  }
 
   .egg-shop-card__thumb {
     width: 64px;
@@ -13411,9 +13436,9 @@
   .mining-control-button {
     padding: 12px 24px;
     border-radius: 12px;
-    border: 3px solid rgba(255, 255, 255, 0.9);
-    background: rgba(21, 26, 60, 0.92);
-    color: #fff;
+    border: 2px solid var(--od-border, #2a3350);
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+    color: #ffffff;
     font-size: 16px;
     font-weight: 700;
     text-transform: uppercase;
@@ -13422,6 +13447,7 @@
     pointer-events: auto;
     transition: all 0.2s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
   }
 
   .mining-control-button:hover {
@@ -13434,8 +13460,10 @@
   }
 
   .mining-control-button--surface {
-    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
-    border-color: #4caf50;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Auto Controls (Right Side) */
@@ -13453,9 +13481,9 @@
   .auto-control-button {
     padding: 14px 20px;
     border-radius: 12px;
-    border: 3px solid rgba(255, 255, 255, 0.9);
-    background: rgba(21, 26, 60, 0.92);
-    color: #fff;
+    border: 2px solid rgba(55, 214, 232, 0.6);
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+    color: #ffffff;
     font-size: 16px;
     font-weight: 700;
     text-transform: uppercase;
@@ -13464,6 +13492,7 @@
     transition: all 0.2s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     min-width: 140px;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
   }
 
   .auto-control-button:hover {
@@ -13483,14 +13512,18 @@
 
   /* Green when inactive (off) */
   .auto-control-button.inactive {
-    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
-    border-color: #4caf50;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Red when active (on) */
   .auto-control-button.active {
-    background: linear-gradient(180deg, rgba(244, 67, 54, 0.9), rgba(183, 28, 28, 0.95));
-    border-color: #f44336;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Merchant Selling UI */
@@ -13639,28 +13672,28 @@
 
   .merchant-ui__coin-icon,
   .coin-icon {
-    width: 20px;
-    height: 20px;
+    width: 50px;
+    height: 50px;
     object-fit: contain;
     display: inline-block;
     vertical-align: middle;
   }
 
   .coin-icon--inline {
-    width: 14px;
-    height: 14px;
+    width: 35px;
+    height: 35px;
     margin-right: 6px;
     vertical-align: middle;
   }
 
   .coin-icon--hud {
-    width: 28px;
-    height: 28px;
+    width: 70px;
+    height: 70px;
   }
 
   .gem-trader-ui__icon .coin-icon {
-    width: 34px;
-    height: 34px;
+    width: 85px;
+    height: 85px;
   }
 
   .merchant-ui__sell-button {
@@ -14869,15 +14902,8 @@
   }
 
   body.mobile .egg-shop-card {
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 8px 6px 10px;
-  position: relative;
-  cursor: pointer;
-  pointer-events: auto;
-  color: rgba(255, 255, 255, 0.92);
-}
+    padding: 12px 10px 14px;
+  }
 
   body.mobile .egg-card {
     padding: 10px;
@@ -15050,6 +15076,10 @@
     margin-top: 0;
     gap: 4px;
   }
+
+
+<!-- Included from: ./components/ThemeStyles.html -->
+
   body.mobile .training-prompt__title {
     font-size: 14px;
   }
@@ -15132,7 +15162,8 @@
 
 /* Stat HUD */
 .stat-hud {
-  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/220% auto no-repeat;
+  background: none;
   border: 2px solid var(--od-border);
   box-shadow: var(--od-shadow);
 }
@@ -15166,7 +15197,8 @@
 
 /* Action cards */
 .action-card {
-  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(13, 17, 30, 0.98));
+  --action-card-bg: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/220% auto no-repeat;
+  background: none;
   border: 2px solid var(--od-border);
   box-shadow: var(--od-shadow-soft);
 }
@@ -15254,27 +15286,36 @@
 .mining-control-button {
   background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
   border: 2px solid rgba(55, 214, 232, 0.6);
-  text-shadow: 0 0 8px rgba(55, 214, 232, 0.4);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 .mining-control-button--surface {
-  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
-  border-color: rgba(43, 214, 127, 0.8);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .auto-control-button {
   background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
   border: 2px solid rgba(244, 196, 78, 0.5);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 .auto-control-button.inactive {
-  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
-  border-color: rgba(43, 214, 127, 0.8);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .auto-control-button.active {
-  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
-  border-color: rgba(239, 68, 68, 0.9);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /* Modals */
@@ -15771,23 +15812,3 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
-
-<!-- Livereload - Development Only -->
-<script>
-  (function() {
-    const script = document.createElement('script');
-    script.src = 'http://localhost:35729/livereload.js?snipver=1';
-    script.async = true;
-    document.head.appendChild(script);
-  })();
-</script>
-
-
-
-
-
-
-
-
-
-

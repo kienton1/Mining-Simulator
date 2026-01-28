@@ -81,7 +81,8 @@
 
 /* Stat HUD */
 .stat-hud {
-  background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+  --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/220% auto no-repeat;
+  background: none;
   border: 2px solid var(--od-border);
   box-shadow: var(--od-shadow);
 }
@@ -115,7 +116,8 @@
 
 /* Action cards */
 .action-card {
-  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(13, 17, 30, 0.98));
+  --action-card-bg: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/220% auto no-repeat;
+  background: none;
   border: 2px solid var(--od-border);
   box-shadow: var(--od-shadow-soft);
 }
@@ -203,27 +205,36 @@
 .mining-control-button {
   background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
   border: 2px solid rgba(55, 214, 232, 0.6);
-  text-shadow: 0 0 8px rgba(55, 214, 232, 0.4);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 .mining-control-button--surface {
-  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
-  border-color: rgba(43, 214, 127, 0.8);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .auto-control-button {
   background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
   border: 2px solid rgba(244, 196, 78, 0.5);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 .auto-control-button.inactive {
-  background: linear-gradient(180deg, var(--od-accent), #1f9f62);
-  border-color: rgba(43, 214, 127, 0.8);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .auto-control-button.active {
-  background: linear-gradient(180deg, var(--od-danger), #b91c1c);
-  border-color: rgba(239, 68, 68, 0.9);
+  background: #DCB14F;
+  border-color: #DCB14F;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /* Modals */

@@ -105,15 +105,37 @@
     min-width: 180px;
     border-radius: 12px;
     border: 3px solid #1a3a5c;
-    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/200% auto no-repeat;
+    background: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-hud::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--stat-hud-bg);
+    filter: saturate(0.25);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stat-hud > * {
+    position: relative;
+    z-index: 1;
   }
 
   .stat-hud__value {
     font-size: 24px;
     font-weight: 700;
     color: #ffd700;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px 10px;
+    border-radius: 8px;
     text-shadow: 
       0 0 8px rgba(255, 215, 0, 0.6),
       0 2px 4px rgba(0, 0, 0, 0.8),
@@ -201,7 +223,8 @@
     height: 72px;
     border-radius: 12px;
     border: 3px solid #1a3a5c;
-    background: linear-gradient(180deg, rgba(30, 60, 100, 0.95), rgba(20, 40, 70, 0.98));
+    --action-card-bg: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/200% auto no-repeat;
+    background: none;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
@@ -210,6 +233,22 @@
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
     pointer-events: auto;
+  }
+
+  .action-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--action-card-bg);
+    filter: saturate(0.25);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .action-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .action-card:hover {
@@ -257,7 +296,6 @@
   /* Pets action button accent */
   .action-card--pets {
     border-color: #2d6a4f;
-    background: linear-gradient(180deg, rgba(45, 106, 79, 0.95), rgba(26, 77, 56, 0.98));
   }
 
   /* Egg + Pets UI helpers (use existing modal styles as the base) */
@@ -2621,9 +2659,9 @@
   .mining-control-button {
     padding: 12px 24px;
     border-radius: 12px;
-    border: 3px solid rgba(255, 255, 255, 0.9);
-    background: rgba(21, 26, 60, 0.92);
-    color: #fff;
+    border: 2px solid var(--od-border, #2a3350);
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+    color: #ffffff;
     font-size: 16px;
     font-weight: 700;
     text-transform: uppercase;
@@ -2632,6 +2670,7 @@
     pointer-events: auto;
     transition: all 0.2s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
   }
 
   .mining-control-button:hover {
@@ -2644,8 +2683,10 @@
   }
 
   .mining-control-button--surface {
-    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
-    border-color: #4caf50;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Auto Controls (Right Side) */
@@ -2663,9 +2704,9 @@
   .auto-control-button {
     padding: 14px 20px;
     border-radius: 12px;
-    border: 3px solid rgba(255, 255, 255, 0.9);
-    background: rgba(21, 26, 60, 0.92);
-    color: #fff;
+    border: 2px solid rgba(55, 214, 232, 0.6);
+    background: linear-gradient(180deg, rgba(20, 26, 42, 0.98), rgba(12, 16, 28, 0.95));
+    color: #ffffff;
     font-size: 16px;
     font-weight: 700;
     text-transform: uppercase;
@@ -2674,6 +2715,7 @@
     transition: all 0.2s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     min-width: 140px;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
   }
 
   .auto-control-button:hover {
@@ -2693,14 +2735,18 @@
 
   /* Green when inactive (off) */
   .auto-control-button.inactive {
-    background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(46, 125, 50, 0.95));
-    border-color: #4caf50;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Red when active (on) */
   .auto-control-button.active {
-    background: linear-gradient(180deg, rgba(244, 67, 54, 0.9), rgba(183, 28, 28, 0.95));
-    border-color: #f44336;
+    background: #DCB14F;
+    border-color: #DCB14F;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
   /* Merchant Selling UI */
@@ -2849,28 +2895,28 @@
 
   .merchant-ui__coin-icon,
   .coin-icon {
-    width: 20px;
-    height: 20px;
+    width: 50px;
+    height: 50px;
     object-fit: contain;
     display: inline-block;
     vertical-align: middle;
   }
 
   .coin-icon--inline {
-    width: 14px;
-    height: 14px;
+    width: 35px;
+    height: 35px;
     margin-right: 6px;
     vertical-align: middle;
   }
 
   .coin-icon--hud {
-    width: 28px;
-    height: 28px;
+    width: 70px;
+    height: 70px;
   }
 
   .gem-trader-ui__icon .coin-icon {
-    width: 34px;
-    height: 34px;
+    width: 85px;
+    height: 85px;
   }
 
   .merchant-ui__sell-button {
