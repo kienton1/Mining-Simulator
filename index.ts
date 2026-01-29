@@ -620,12 +620,15 @@ startServer(world => {
         // This ensures the UI is fully loaded before we send the update
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
-
+          // Sync equipped pets to spawn pet entities that follow the player
+          gameManager.syncEquippedPets(player);
         }, 150);
       } else if (currentData) {
         // Even if no saved data, ensure UI is updated with current data
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
+          // Sync equipped pets to spawn pet entities that follow the player
+          gameManager.syncEquippedPets(player);
         }, 100);
         gameManager.getTutorialManager().onPlayerDataLoaded(player);
       }
@@ -899,6 +902,7 @@ startServer(world => {
           sendPetState(player);
           if (res.success) {
             gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -907,6 +911,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequip', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_EQUIP_INSTANCE': {
@@ -916,6 +923,7 @@ startServer(world => {
           sendPetState(player);
           if (res.success) {
             gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -924,6 +932,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipFromEquippedIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_EQUIP_BEST': {
@@ -932,6 +943,7 @@ startServer(world => {
           sendPetState(player);
           if (res.success) {
             gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -939,6 +951,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipAll(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipAll', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_DELETE_INV': {

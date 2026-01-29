@@ -25,6 +25,7 @@ import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
+import { PetVisualManager } from '../Pets/PetVisualManager';
 import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
 
@@ -74,6 +75,7 @@ export class GameManager {
   private pickaxeManager: PickaxeManager;
   private petManager: PetManager;
   private hatchingSystem: HatchingSystem;
+  private petVisualManager: PetVisualManager;
   private tutorialManager: TutorialManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
@@ -126,7 +128,8 @@ export class GameManager {
     // Pet system
     this.petManager = new PetManager();
     this.hatchingSystem = new HatchingSystem(this.petManager);
-    
+    this.petVisualManager = new PetVisualManager(world);
+
     // Set up callbacks for inventory and shop systems
     this.inventoryManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.inventoryManager.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
@@ -531,6 +534,24 @@ export class GameManager {
    */
   getHatchingSystem(): HatchingSystem {
     return this.hatchingSystem;
+  }
+
+  /**
+   * Gets the pet visual manager instance
+   */
+  getPetVisualManager(): PetVisualManager {
+    return this.petVisualManager;
+  }
+
+  /**
+   * Syncs the equipped pets for a player (spawns pet entities that follow the player)
+   */
+  syncEquippedPets(player: Player): void {
+    const playerData = this.getPlayerData(player);
+    if (!playerData) return;
+
+    const equippedPets = Array.isArray(playerData.equippedPets) ? playerData.equippedPets : [];
+    this.petVisualManager.syncEquippedPets(player, equippedPets);
   }
 
   /**
@@ -2010,6 +2031,7 @@ export class GameManager {
 
     this.trainingController?.cleanupPlayer(player);
     this.miningController?.cleanupPlayer(player);
+    this.petVisualManager.cleanupPlayer(player);
     this.tutorialManager.cleanupPlayer(player);
     this.playerDataMap.delete(player);
     this.playerAutoStates.delete(player);
@@ -2045,6 +2067,7 @@ export class GameManager {
     
     this.trainingController?.cleanup();
     this.miningController?.cleanup();
+    this.petVisualManager.cleanup();
   }
 
   /**

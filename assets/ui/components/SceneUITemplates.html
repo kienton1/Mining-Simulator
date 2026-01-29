@@ -251,5 +251,35 @@
       return root;
     });
 
+    // Pet label template - shows name and rarity above pets
+    hytopia.registerSceneUITemplate('pet-label', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'pet-label-container';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'pet-name';
+      nameEl.textContent = 'Pet';
+      root.appendChild(nameEl);
+
+      const rarityEl = document.createElement('div');
+      rarityEl.className = 'pet-rarity rarity-common';
+      rarityEl.textContent = 'Common';
+      root.appendChild(rarityEl);
+
+      onState(state => {
+        const data = state || {};
+        if (data.name !== undefined) {
+          nameEl.textContent = data.name;
+        }
+        if (data.rarity !== undefined) {
+          const rarityLower = String(data.rarity).toLowerCase();
+          rarityEl.textContent = data.rarity.charAt(0).toUpperCase() + data.rarity.slice(1);
+          rarityEl.className = 'pet-rarity rarity-' + rarityLower;
+        }
+      });
+
+      return root;
+    });
+
   })();
 </script>

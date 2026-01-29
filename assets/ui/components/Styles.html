@@ -4331,3 +4331,58 @@
     margin-top: 0;
     gap: 4px;
   }
+
+  /* ===========================
+   * Pet Labels (SceneUI)
+   * Matches egg-prompt styling
+   * =========================== */
+  .pet-label-container {
+    font-family: "Fredoka", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+    pointer-events: none;
+    transform: scale(0.9);
+  }
+
+  .pet-name {
+    font-size: 18px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  .pet-rarity {
+    font-size: 14px;
+    font-weight: 900;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  /* Rarity Colors */
+  .rarity-common {
+    color: #55ff55; /* Green */
+  }
+
+  .rarity-rare {
+    color: #55ffff; /* Cyan */
+  }
+
+  .rarity-epic {
+    color: #ff55ff; /* Magenta */
+  }
+
+  .rarity-legendary {
+    color: #ffaa00; /* Orange/Gold */
+  }

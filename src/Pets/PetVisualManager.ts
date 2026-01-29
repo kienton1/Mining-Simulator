@@ -1,27 +1,27 @@
 /**
  * Pet Visual Manager
  *
- * Spawns and attaches equipped pet models to follow the player.
+ * Spawns and manages equipped pet entities that follow the player dynamically.
+ * Uses MiningPetEntity for realistic walking behavior instead of parenting.
  */
 
-import { World, Player, Entity, RigidBodyType, ModelRegistry } from 'hytopia';
+import { World, Player, WorldEvent } from 'hytopia';
 import type { PetId } from './PetData';
-import { getPetModelUri, getPetTextureUri } from './PetVisuals';
-
-const PET_MODEL_SCALE = 0.35;
-const PET_FOLLOW_HEIGHT = -.73;
-const PET_FOLLOW_DISTANCE = 1.4;
-const PET_ROW_SPACING = 0.75;
-const PET_COL_SPACING = 0.55;
+import { MiningPetEntity } from './MiningPetEntity';
 
 export class PetVisualManager {
   private world: World;
-  private playerPetEntities: Map<Player, Entity[]> = new Map();
+  private playerPetEntities: Map<Player, MiningPetEntity[]> = new Map();
+  private tickHandler: ((payload: { tickDeltaMs: number }) => void) | null = null;
 
   constructor(world: World) {
     this.world = world;
   }
 
+  /**
+   * Sync the equipped pets for a player
+   * Despawns old pets and spawns new ones based on the equipped pet list
+   */
   syncEquippedPets(player: Player, petIds: PetId[]): void {
     this.clearPlayerPets(player);
 
@@ -34,108 +34,88 @@ export class PetVisualManager {
       return;
     }
     const playerEntity = playerEntities[0];
+    const totalPets = petIds.length;
 
-    const offsets = this.getFormationOffsets(petIds.length);
-    const spawned: Entity[] = [];
+    const spawned: MiningPetEntity[] = [];
 
     petIds.forEach((petId, idx) => {
-      const modelUri = getPetModelUri(petId);
-      if (!modelUri) {
-        return;
-      }
-
-      const textureUri = getPetTextureUri(petId);
-      const entityOptions: any = {
-        name: `Pet ${petId}`,
-        modelUri,
-        modelScale: PET_MODEL_SCALE,
-        tag: 'pet',
-        rigidBodyOptions: {
-          type: RigidBodyType.KINEMATIC_VELOCITY,
-        },
-      };
-
       try {
-        const animationNames = ModelRegistry.instance.getAnimationNames(modelUri);
-        if (Array.isArray(animationNames) && animationNames.length > 0) {
-          entityOptions.modelLoopedAnimations = [animationNames[0]];
-        }
+        const petEntity = new MiningPetEntity({
+          petId,
+          ownerId: player.id,
+          slotIndex: idx,
+          totalPets,
+        });
+
+        // Spawn pet near the player
+        const spawnPosition = {
+          x: playerEntity.position.x + 1 + idx * 0.5,
+          y: playerEntity.position.y + 0.5,
+          z: playerEntity.position.z + 2,
+        };
+
+        petEntity.spawn(this.world, spawnPosition);
+        spawned.push(petEntity);
       } catch (err) {
-        // Ignore animation lookup errors and spawn without looping animations.
+        console.warn(`[PetVisualManager] Failed to spawn pet ${petId}:`, err);
       }
-
-      if (textureUri) {
-        entityOptions.modelTextureUri = textureUri;
-      }
-
-      const entity = new Entity(entityOptions);
-      const fallbackPosition = {
-        x: playerEntity.position.x + 1,
-        y: playerEntity.position.y + 1,
-        z: playerEntity.position.z + 1,
-      };
-      entity.spawn(this.world, fallbackPosition);
-      spawned.push(entity);
-
-      const offset = offsets[idx] || { x: 0, y: PET_FOLLOW_HEIGHT, z: PET_FOLLOW_DISTANCE };
-
-      setTimeout(() => {
-        try {
-          entity.setParent(
-            playerEntity,
-            undefined,
-            offset,
-            { x: 0, y: 0, z: 0, w: 1 }
-          );
-        } catch (err) {
-          // If parenting fails, leave entity at its spawned location.
-        }
-      }, 50);
     });
 
     this.playerPetEntities.set(player, spawned);
   }
 
+  /**
+   * Clean up pets for a disconnecting player
+   */
   cleanupPlayer(player: Player): void {
     this.clearPlayerPets(player);
   }
 
+  /**
+   * Clear all pets for a player
+   */
   private clearPlayerPets(player: Player): void {
     const existing = this.playerPetEntities.get(player);
     if (existing) {
-      existing.forEach(entity => entity.despawn());
+      existing.forEach(entity => {
+        try {
+          if (entity.isSpawned) {
+            entity.despawn();
+          }
+        } catch (err) {
+          // Ignore despawn errors
+        }
+      });
       this.playerPetEntities.delete(player);
     }
   }
 
-  private getFormationOffsets(count: number): Array<{ x: number; y: number; z: number }> {
-    const offsets: Array<{ x: number; y: number; z: number }> = [];
-    if (count <= 0) return offsets;
+  /**
+   * Get all pet entities for a player
+   */
+  getPlayerPets(player: Player): MiningPetEntity[] {
+    return this.playerPetEntities.get(player) || [];
+  }
 
-    if (count === 1) {
-      return [{ x: 0, y: PET_FOLLOW_HEIGHT, z: PET_FOLLOW_DISTANCE }];
+  /**
+   * Update formation for all pets when a pet is added/removed
+   */
+  private updateFormation(player: Player): void {
+    const pets = this.playerPetEntities.get(player);
+    if (!pets) return;
+
+    const totalPets = pets.length;
+    pets.forEach((pet, idx) => {
+      pet.updateFormation(idx, totalPets);
+    });
+  }
+
+  /**
+   * Cleanup all pets (for shutdown)
+   */
+  cleanup(): void {
+    for (const player of this.playerPetEntities.keys()) {
+      this.clearPlayerPets(player);
     }
-
-    const frontCount = Math.max(1, Math.floor(count / 2));
-    const backCount = count - frontCount;
-
-    const addRow = (rowCount: number, rowIndex: number) => {
-      if (rowCount <= 0) return;
-      const center = (rowCount - 1) / 2;
-      for (let i = 0; i < rowCount; i++) {
-        const offsetX = (i - center) * PET_COL_SPACING;
-        offsets.push({
-          x: offsetX,
-          y: PET_FOLLOW_HEIGHT,
-          z: PET_FOLLOW_DISTANCE + (rowIndex * PET_ROW_SPACING),
-        });
-      }
-    };
-
-    // Two rows max: front row (closer), back row (farther).
-    addRow(frontCount, 0);
-    addRow(backCount, 1);
-
-    return offsets;
   }
 }

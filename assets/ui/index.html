@@ -600,6 +600,36 @@
       return root;
     });
 
+    // Pet label template - shows name and rarity above pets
+    hytopia.registerSceneUITemplate('pet-label', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'pet-label-container';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'pet-name';
+      nameEl.textContent = 'Pet';
+      root.appendChild(nameEl);
+
+      const rarityEl = document.createElement('div');
+      rarityEl.className = 'pet-rarity rarity-common';
+      rarityEl.textContent = 'Common';
+      root.appendChild(rarityEl);
+
+      onState(state => {
+        const data = state || {};
+        if (data.name !== undefined) {
+          nameEl.textContent = data.name;
+        }
+        if (data.rarity !== undefined) {
+          const rarityLower = String(data.rarity).toLowerCase();
+          rarityEl.textContent = data.rarity.charAt(0).toUpperCase() + data.rarity.slice(1);
+          rarityEl.className = 'pet-rarity rarity-' + rarityLower;
+        }
+      });
+
+      return root;
+    });
+
   })();
 </script>
 
@@ -1529,13 +1559,12 @@
       return `<img class="gem-trader-ui__icon-img" src="${src}" alt="${altText}">`;
     };
 
-
     // Upgrade definitions
     const upgradeDefs = [
       {
         key: 'moreGems',
         title: 'More Gems',
-          iconHtml: hudIconHtml('GemIcon.png', 'gems'),
+        iconHtml: hudIconHtml('GemIcon.png', 'gems'),
         getEffect: (level) => {
           // UI shows level, backend is level + 1 (always 1 ahead)
           const displayLevel = level;
@@ -1551,7 +1580,7 @@
       {
         key: 'moreRebirths',
         title: 'More Rebirths',
-          iconHtml: hudIconHtml('RebirthIcon.png', 'rebirths'),
+        iconHtml: hudIconHtml('RebirthIcon.png', 'rebirths'),
         getEffect: (level) => {
           return `${level} -> ${level + 1}`;
         },
@@ -1563,7 +1592,7 @@
       {
         key: 'moreCoins',
         title: 'More Coins',
-          iconHtml: hudIconHtml('CoinIcon.png', 'coins'),
+        iconHtml: hudIconHtml('CoinIcon.png', 'coins'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -1579,7 +1608,7 @@
       {
         key: 'moreDamage',
         title: 'More Damage',
-          iconHtml: hudIconHtml('PickaxeIcon.png', 'damage'),
+        iconHtml: hudIconHtml('PickaxeIcon.png', 'damage'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -10919,7 +10948,7 @@
     min-width: 180px;
     border-radius: 12px;
     border: 3px solid #1a3a5c;
-    --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/300% auto no-repeat;
+    --stat-hud-bg: url("{{CDN_ASSETS_URL}}/icons/LargerThumbnailBackground.png") center/200% auto no-repeat;
     background: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
@@ -10930,14 +10959,12 @@
   .stat-hud::before {
     content: "";
     position: absolute;
-    /* Overscan by 1px to avoid tiny corner seams between the bg layer and rounded border */
-    inset: -1px;
+    inset: 0;
     border-radius: inherit;
     background:
       var(--stat-hud-bg),
       linear-gradient(180deg, rgba(16, 20, 32, 0.98), rgba(10, 14, 24, 0.96));
     filter: saturate(0.25);
-    transform: translateZ(0);
     pointer-events: none;
     z-index: 0;
   }
@@ -12947,7 +12974,7 @@
       pointer-events: none;
       transform: scale(0.9);
       min-width: auto;
-    }
+  }
 
   .scene-egg-prompt:not(.visible) {
     opacity: 0;
@@ -15148,7 +15175,63 @@
     gap: 4px;
   }
 
-  /* Included from: ./components/ThemeStyles.html */
+  /* ===========================
+   * Pet Labels (SceneUI)
+   * Matches egg-prompt styling
+   * =========================== */
+  .pet-label-container {
+    font-family: "Fredoka", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+    pointer-events: none;
+    transform: scale(0.9);
+  }
+
+  .pet-name {
+    font-size: 18px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  .pet-rarity {
+    font-size: 14px;
+    font-weight: 900;
+    text-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.65),
+      -2px -2px 0 rgba(0, 0, 0, 0.65),
+      2px -2px 0 rgba(0, 0, 0, 0.65),
+      -2px 2px 0 rgba(0, 0, 0, 0.65),
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  /* Rarity Colors */
+  .rarity-common {
+    color: #55ff55; /* Green */
+  }
+
+  .rarity-rare {
+    color: #55ffff; /* Cyan */
+  }
+
+  .rarity-epic {
+    color: #ff55ff; /* Magenta */
+  }
+
+  .rarity-legendary {
+    color: #ffaa00; /* Orange/Gold */
+  }
+
+
+<!-- Included from: ./components/ThemeStyles.html -->
 
   body.mobile .training-prompt__title {
     font-size: 14px;
@@ -15901,3 +15984,13 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
+
+<!-- Livereload - Development Only -->
+<script>
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'http://localhost:35729/livereload.js?snipver=1';
+    script.async = true;
+    document.head.appendChild(script);
+  })();
+</script>
