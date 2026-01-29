@@ -38,10 +38,8 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       name: 'Player',
     });
 
-    // Set up controller setup after a brief delay to ensure it's initialized
-    setTimeout(() => {
-      this.setupMiningController();
-    }, 100);
+    // Set up controller immediately - the method has retry logic if controller isn't ready yet
+    this.setupMiningController();
   }
 
   /**
@@ -61,6 +59,13 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       // Use standard idle animations
       this.applyStandardAnimations();
 
+      // Set up movement control callbacks - these are checked by the SDK BEFORE processing movement
+      // This is the proper way to disable movement (not zeroing input keys in event handler)
+      this.playerController.canWalk = () => !this.inputSuppressed;
+      this.playerController.canRun = () => !this.inputSuppressed;
+      this.playerController.canJump = () => !this.inputSuppressed;
+      this.playerController.canSwim = () => !this.inputSuppressed;
+
       // Setup input handler for mining
       this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
 
@@ -71,6 +76,10 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
           if (this.controller) {
             this.playerController.autoCancelMouseLeftClick = false;
             this.applyStandardAnimations();
+            this.playerController.canWalk = () => !this.inputSuppressed;
+            this.playerController.canRun = () => !this.inputSuppressed;
+            this.playerController.canJump = () => !this.inputSuppressed;
+            this.playerController.canSwim = () => !this.inputSuppressed;
             this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
           }
         } catch (retryError) {

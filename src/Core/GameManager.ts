@@ -26,6 +26,7 @@ import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
 import { PetVisualManager } from '../Pets/PetVisualManager';
+import { EggDisplayAnimator } from '../Pets/EggDisplayAnimator';
 import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
 
@@ -76,6 +77,7 @@ export class GameManager {
   private petManager: PetManager;
   private hatchingSystem: HatchingSystem;
   private petVisualManager: PetVisualManager;
+  private eggDisplayAnimator: EggDisplayAnimator;
   private tutorialManager: TutorialManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
@@ -129,6 +131,7 @@ export class GameManager {
     this.petManager = new PetManager();
     this.hatchingSystem = new HatchingSystem(this.petManager);
     this.petVisualManager = new PetVisualManager(world);
+    this.eggDisplayAnimator = new EggDisplayAnimator(world);
 
     // Set up callbacks for inventory and shop systems
     this.inventoryManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
@@ -170,6 +173,14 @@ export class GameManager {
     
     // Note: UI event handlers are now set up per-player in index.ts
     // This follows the Hytopia SDK pattern of using player.ui.on() instead of world.on()
+  }
+
+  /**
+   * Starts the egg display animator.
+   * Should be called after world.loadMap() so entities are available.
+   */
+  startEggDisplayAnimator(): void {
+    this.eggDisplayAnimator.start();
   }
 
   /**

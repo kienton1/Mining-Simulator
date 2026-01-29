@@ -124,6 +124,10 @@ startServer(world => {
    * See Planning/mapStructure.md for details
    */
   world.loadMap(worldMap);
+
+  // Start egg display animations (must be after loadMap so entities exist)
+  gameManager.startEggDisplayAnimator();
+
   // Carve shared mine shaft (10-block drop) for all players - Island 1 (Original)
   gameManager.buildSharedMineShaft();
   // Carve shared mine shaft for Island 2 (Beach World) with beach ores
