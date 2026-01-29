@@ -128,7 +128,7 @@ export class EggStationLabelManager {
     // Position the UI above the egg station
     const uiPos = {
       x: station.position.x,
-      y: station.position.y + 2.8, // Float above the egg station
+      y: station.position.y + 1.8, // Float above the egg station
       z: station.position.z,
     };
 
@@ -156,7 +156,7 @@ export class EggStationLabelManager {
     // Update position directly like the working training system
     const uiPos = {
       x: station.position.x,
-      y: station.position.y + 2.8, // Float above the egg station
+      y: station.position.y + 1.8, // Float above the egg station
       z: station.position.z,
     };
     ui.setPosition(uiPos);

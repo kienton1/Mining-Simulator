@@ -383,6 +383,27 @@
       content.className = 'scene-training-prompt__content';
       root.appendChild(content);
 
+      const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      const powerIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/PowerIcon.png` : 'icons/HUDIcons/PowerIcon.png';
+      const rebirthIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/RebirthIcon.png` : 'icons/HUDIcons/RebirthIcon.png';
+
+      const getStatValue = text => String(text || '').trim().split(/\s+/)[0] || '0';
+
+      const renderFarMode = (requirementText, rebirthText, powerGainText) => `
+        <div class="scene-training-prompt__copy">
+          <div class="scene-training-prompt__requirement">
+            <span class="scene-training-prompt__stat-value">${getStatValue(requirementText || '0 Required')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${powerIconSrc}" alt="power">
+          </div>
+          <div class="scene-training-prompt__or">OR</div>
+          <div class="scene-training-prompt__rebirth">
+            <span class="scene-training-prompt__stat-value">${getStatValue(rebirthText || '0 Rebirths')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${rebirthIconSrc}" alt="rebirth">
+          </div>
+          <div class="scene-training-prompt__power-gain">${powerGainText || '+1 Power'}</div>
+        </div>
+      `;
+
       // Helper to get current player ID from DOM (set by PlayerId.html component)
       function getCurrentPlayerId() {
         const playerIdElement = document.getElementById('playerId');
@@ -438,29 +459,19 @@
                   <div class="scene-training-prompt__action">Train</div>
                 </div>
               `;
-            } else {
-              console.log('[TrainingUI] Rendering FAR mode content');
-              // Far mode - show rock info (icon, requirements, power gain)
-              const rockName = playerState.rockName || data.rockName || 'Training Rock';
-              const powerGain = playerState.powerGain || data.powerGainText || '+1 Power';
-              const requirementText = data.requirementText || '0 Required';
-              const rebirthText = data.rebirthText || '0 Rebirths';
-              const powerGainText = data.powerGainText || '+1 Power';
+              } else {
+                console.log('[TrainingUI] Rendering FAR mode content');
+                // Far mode - show rock info (icon, requirements, power gain)
+                const requirementText = data.requirementText || '0 Required';
+                const rebirthText = data.rebirthText || '0 Rebirths';
+                const powerGainText = data.powerGainText || '+1 Power';
 
-              content.innerHTML = `
-                <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-                <div class="scene-training-prompt__copy">
-                  <div class="scene-training-prompt__requirement">${requirementText}</div>
-                  <div class="scene-training-prompt__or">OR</div>
-                  <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                  <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-                </div>
-              `;
-            }
-          } else if (playerState && playerState.visible === false) {
-            root.classList.remove('visible');
-            root.style.display = 'none';
-          } else {
+                content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+              }
+            } else if (playerState && playerState.visible === false) {
+              root.classList.remove('visible');
+              root.style.display = 'none';
+            } else {
             // Not close to the rock: show far-mode details
             root.classList.add('visible');
             root.style.display = 'flex';
@@ -468,24 +479,16 @@
             root.classList.remove('mode-far', 'mode-close');
             root.classList.add('mode-far');
 
-            const requirementText = data.requirementText || '0 Required';
-            const rebirthText = data.rebirthText || '0 Rebirths';
-            const powerGainText = data.powerGainText || '+1 Power';
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
 
-            content.innerHTML = `
-              <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-              <div class="scene-training-prompt__copy">
-                <div class="scene-training-prompt__requirement">${requirementText}</div>
-                <div class="scene-training-prompt__or">OR</div>
-                <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-              </div>
-            `;
-          }
-        } else {
-          // Fallback: use global visible flag if no playerStates (backwards compatibility)
-          if (data.visible === false) {
-            root.classList.remove('visible');
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
+          } else {
+            // Fallback: use global visible flag if no playerStates (backwards compatibility)
+            if (data.visible === false) {
+              root.classList.remove('visible');
             root.style.display = 'none';
           } else {
             root.classList.add('visible');
@@ -495,20 +498,12 @@
             root.classList.remove('mode-far', 'mode-close');
             root.classList.add('mode-far');
 
-            const requirementText = data.requirementText || '0 Required';
-            const rebirthText = data.rebirthText || '0 Rebirths';
-            const powerGainText = data.powerGainText || '+1 Power';
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
 
-            content.innerHTML = `
-              <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-              <div class="scene-training-prompt__copy">
-                <div class="scene-training-prompt__requirement">${requirementText}</div>
-                <div class="scene-training-prompt__or">OR</div>
-                <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-              </div>
-            `;
-          }
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
 
           // Toggle locked state
           if (data.canTrain === false) {
@@ -1528,12 +1523,19 @@
     // Clear existing items
     gemTraderUIContent.innerHTML = '';
 
+    const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+    const hudIconHtml = (fileName, altText) => {
+      const src = cdnBase ? `${cdnBase}/icons/HUDIcons/${fileName}` : `icons/HUDIcons/${fileName}`;
+      return `<img class="gem-trader-ui__icon-img" src="${src}" alt="${altText}">`;
+    };
+
+
     // Upgrade definitions
     const upgradeDefs = [
       {
         key: 'moreGems',
         title: 'More Gems',
-        icon: '💎',
+          iconHtml: hudIconHtml('GemIcon.png', 'gems'),
         getEffect: (level) => {
           // UI shows level, backend is level + 1 (always 1 ahead)
           const displayLevel = level;
@@ -1549,7 +1551,7 @@
       {
         key: 'moreRebirths',
         title: 'More Rebirths',
-        icon: '🔄',
+          iconHtml: hudIconHtml('RebirthIcon.png', 'rebirths'),
         getEffect: (level) => {
           return `${level} -> ${level + 1}`;
         },
@@ -1561,7 +1563,7 @@
       {
         key: 'moreCoins',
         title: 'More Coins',
-        iconHtml: coinIconHtml('coin-icon--inline'),
+          iconHtml: hudIconHtml('CoinIcon.png', 'coins'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -1577,7 +1579,7 @@
       {
         key: 'moreDamage',
         title: 'More Damage',
-        icon: '⛏️',
+          iconHtml: hudIconHtml('PickaxeIcon.png', 'damage'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -4333,6 +4335,7 @@
     });
     
     autoMineButton.classList.add('inactive');
+    updateAutoMineButton(false);
     
     // Set up click handler
     autoMineButton.addEventListener('click', (e) => {
@@ -4376,6 +4379,7 @@
       });
       
       autoTrainButton.classList.add('inactive');
+      updateAutoTrainButton(false);
       
       // Set up click handler
       autoTrainButton.addEventListener('click', (e) => {
@@ -7899,7 +7903,7 @@
         <div class="egg-right-panel">
           <div class="egg-pets-header">
             <span class="egg-section-title">POSSIBLE PETS</span>
-            <span class="egg-pets-hint"></span>
+            <span class="egg-pets-hint">Click on Pet to auto delete!</span>
           </div>
           <div class="egg-pets-grid-container">
             <div id="egg-shop-grid" class="egg-pets-grid">
@@ -8280,9 +8284,12 @@
   }
 
   .egg-pets-hint {
-    font-size: 10px;
-    color: #a6b7d3;
-    font-weight: 600;
+    font-size: 12px;
+    color: #ff4d4d;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
   }
 
   .egg-pets-grid-container {
@@ -8592,7 +8599,7 @@
   }
 
   body.mobile .egg-pets-hint {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   body.mobile .egg-pets-grid {
@@ -12745,26 +12752,32 @@
   }
 
   .scene-training-prompt__icon {
-    font-size: 22px;
-    line-height: 1;
-    margin-bottom: 2px;
-  }
+      font-size: 44px;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
 
   .scene-training-prompt__copy {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    width: 100%;
-  }
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      width: 100%;
+    }
 
   .scene-training-prompt__requirement {
-    font-size: 13px;
-    font-weight: 800;
-    color: #fff;
-    text-shadow:
-      0 0 8px rgba(255, 255, 255, 0.8),
-      0 1px 3px rgba(0, 0, 0, 0.8),
+      font-size: 26px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      line-height: 1;
+      margin: 0;
+      color: #fff;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.8),
+        0 1px 3px rgba(0, 0, 0, 0.8),
       -1px -1px 0 rgba(0, 0, 0, 0.5),
       1px -1px 0 rgba(0, 0, 0, 0.5),
       -1px 1px 0 rgba(0, 0, 0, 0.5),
@@ -12773,9 +12786,11 @@
   }
 
   .scene-training-prompt__or {
-    font-size: 10px;
-    font-weight: 700;
-    color: #4a9eff;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+      margin: 0;
+      color: #4a9eff;
     text-shadow:
       0 0 6px rgba(74, 158, 255, 0.6),
       0 1px 3px rgba(0, 0, 0, 0.8);
@@ -12783,23 +12798,40 @@
   }
 
   .scene-training-prompt__rebirth {
-    font-size: 13px;
-    font-weight: 800;
-    color: #4caf50;
-    text-shadow:
-      0 0 8px rgba(76, 175, 80, 0.8),
-      0 1px 3px rgba(0, 0, 0, 0.8),
-      -1px -1px 0 rgba(0, 0, 0, 0.5),
-      1px -1px 0 rgba(0, 0, 0, 0.5),
-      -1px 1px 0 rgba(0, 0, 0, 0.5),
-      1px 1px 0 rgba(0, 0, 0, 0.5);
-    letter-spacing: 0.3px;
-  }
+      font-size: 26px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      line-height: 1;
+      margin: 0;
+      color: #4caf50;
+      text-shadow:
+        0 0 8px rgba(76, 175, 80, 0.8),
+        0 1px 3px rgba(0, 0, 0, 0.8),
+        -1px -1px 0 rgba(0, 0, 0, 0.5),
+        1px -1px 0 rgba(0, 0, 0, 0.5),
+        -1px 1px 0 rgba(0, 0, 0, 0.5),
+        1px 1px 0 rgba(0, 0, 0, 0.5);
+      letter-spacing: 0.3px;
+    }
+
+    .scene-training-prompt__stat-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+      object-fit: contain;
+      transform: scale(5);
+      transform-origin: center;
+    }
 
   .scene-training-prompt__power-gain {
-    font-size: 13px;
-    font-weight: 800;
-    color: #ff5252;
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1;
+      margin: 0;
+      color: #ff5252;
     text-shadow:
       0 0 8px rgba(255, 82, 82, 0.8),
       0 1px 3px rgba(0, 0, 0, 0.8),
@@ -12808,8 +12840,8 @@
       -1px 1px 0 rgba(0, 0, 0, 0.5),
       1px 1px 0 rgba(0, 0, 0, 0.5);
     letter-spacing: 0.3px;
-    margin-top: 1px;
-  }
+      margin-top: 0;
+    }
 
   /* ========== Training Rock Two-Mode Display ========== */
 
@@ -12840,27 +12872,27 @@
   }
 
   .scene-training-prompt__key {
-    width: 50px;
-    height: 50px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
-    border: 3px solid #333;
-    color: #333;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
+      width: 100px;
+      height: 100px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+      border: 6px solid #333;
+      color: #333;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
 
   .scene-training-prompt__action {
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-    -webkit-text-stroke: 2px #000;
-    paint-order: stroke fill;
-  }
+      font-size: 32px;
+      font-weight: 600;
+      color: #fff;
+      -webkit-text-stroke: 4px #000;
+      paint-order: stroke fill;
+    }
 
   /* Hide far mode content in close mode */
   .scene-training-prompt.mode-close .scene-training-prompt__icon,
@@ -12889,33 +12921,33 @@
 
   /* Mobile: Show TAP instead of E key */
   body.mobile .scene-training-prompt.mode-close .scene-training-prompt__key {
-    font-size: 0; /* Hide the "E" */
-    width: auto;
-    padding: 0 12px;
-  }
+      font-size: 0; /* Hide the "E" */
+      width: auto;
+      padding: 0 24px;
+    }
 
   body.mobile .scene-training-prompt.mode-close .scene-training-prompt__key::before {
-    content: "TAP";
-    font-size: 14px;
-  }
+      content: "TAP";
+      font-size: 28px;
+    }
 
   /* Scene UI: Egg labels (name + cost, like the reference image) */
   .scene-egg-prompt {
-    font-family: "Fredoka", sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 4px 8px;
-    border-radius: 14px;
-    background: rgba(0, 0, 0, 0); /* floating text only */
-    color: #fff;
-    opacity: 1;
-    transition: opacity 0.15s ease;
-    pointer-events: none;
-    transform: scale(0.9);
-    min-width: 140px;
-  }
+      font-family: "Fredoka", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent; /* floating text only */
+      color: #fff;
+      opacity: 1;
+      transition: opacity 0.15s ease;
+      pointer-events: none;
+      transform: scale(0.9);
+      min-width: auto;
+    }
 
   .scene-egg-prompt:not(.visible) {
     opacity: 0;
@@ -12933,9 +12965,9 @@
   }
 
   .scene-egg-prompt__title {
-    font-size: 28px;
-    font-weight: 900;
-    color: #ffffff;
+      font-size: 20px;
+      font-weight: 900;
+      color: #ffffff;
     text-shadow:
       0 3px 0 rgba(0, 0, 0, 0.65),
       -2px -2px 0 rgba(0, 0, 0, 0.65),
@@ -12945,9 +12977,9 @@
   }
 
   .scene-egg-prompt__cost {
-    font-size: 20px;
-    font-weight: 900;
-    color: #ffcc00;
+      font-size: 14px;
+      font-weight: 900;
+      color: #ffcc00;
     text-shadow:
       0 3px 0 rgba(0, 0, 0, 0.65),
       -2px -2px 0 rgba(0, 0, 0, 0.65),
@@ -13551,11 +13583,11 @@
 
   /* Red when active (on) */
   .auto-control-button.active {
-    background: #DCB14F;
-    border-color: #DCB14F;
-    color: #ffffff;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-  }
+      background: #e53935;
+      border-color: #e53935;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    }
 
   /* Merchant Selling UI */
   .merchant-ui {
@@ -13723,9 +13755,16 @@
   }
 
   .gem-trader-ui__icon .coin-icon {
-    width: 85px;
-    height: 85px;
-  }
+      width: 128px;
+      height: 128px;
+    }
+
+    .gem-trader-ui__icon-img {
+      width: 128px;
+      height: 128px;
+      object-fit: contain;
+      display: block;
+    }
 
   .merchant-ui__sell-button {
     padding: 8px 16px;
@@ -14088,34 +14127,35 @@
     border: 2px solid rgba(76, 175, 80, 0.3);
   }
 
-  .gem-trader-ui__icon-container {
-    position: relative;
-    width: 64px;
-    height: 64px;
-    flex-shrink: 0;
-  }
+    .gem-trader-ui__icon-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: auto;
+      height: 128px;
+      flex-shrink: 0;
+    }
 
   .gem-trader-ui__icon {
-    font-size: 48px;
-    width: 64px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+      font-size: 96px;
+      width: 128px;
+      height: 128px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  .gem-trader-ui__arrow-overlay {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    font-size: 16px;
-    color: #ff9800;
-    font-weight: 700;
-    text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.8),
-      1px -1px 0 rgba(0, 0, 0, 0.8),
-      -1px 1px 0 rgba(0, 0, 0, 0.8),
-      1px 1px 0 rgba(0, 0, 0, 0.8);
-  }
+    .gem-trader-ui__arrow-overlay {
+      position: static;
+      font-size: 48px;
+      color: #ff9800;
+      font-weight: 700;
+      text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.8),
+        1px -1px 0 rgba(0, 0, 0, 0.8),
+        -1px 1px 0 rgba(0, 0, 0, 0.8),
+        1px 1px 0 rgba(0, 0, 0, 0.8);
+      transform: translate(-40px, -5px);
+    }
 
   .gem-trader-ui__details {
     flex: 1;
@@ -14170,13 +14210,13 @@
   }
 
   .gem-trader-ui__upgrade-button {
-    width: 48px;
-    height: 48px;
-    border: none;
-    border-radius: 8px;
-    font-size: 28px;
-    font-weight: 700;
-    color: #fff;
+      width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: 8px;
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -14252,11 +14292,11 @@
 
   /* Left actions - mobile positioning with safe area */
   body.mobile .left-actions {
-    left: calc(12px + env(safe-area-inset-left));
-    top: 50%;
-    transform: translateY(-50%);
-    gap: 6px;
-  }
+      left: calc(28px + env(safe-area-inset-left));
+      top: 50%;
+      transform: translateY(-50%);
+      gap: 6px;
+    }
 
   body.mobile .action-card {
     width: 46px;
@@ -15015,9 +15055,9 @@
 
   body.mobile .merchant-ui__sell-button,
   body.mobile .gem-trader-ui__upgrade-button {
-    padding: 8px 14px;
-    font-size: 12px;
-  }
+      padding: 8px 14px;
+      font-size: 12px;
+    }
 
   /* ============================================
    * MOBILE TOUCH SCROLLING SUPPORT
@@ -15342,11 +15382,11 @@
 }
 
 .auto-control-button.active {
-  background: #DCB14F;
-  border-color: #DCB14F;
-  color: #ffffff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-}
+    background: #e53935;
+    border-color: #e53935;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  }
 
 /* Modals */
 .modal {
@@ -15759,11 +15799,14 @@
 /* Scene UI prompts */
 .scene-training-prompt,
 .scene-egg-prompt {
-  background: rgba(18, 24, 38, 0.92);
-  border: 2px solid var(--od-border);
-  box-shadow: var(--od-shadow-soft);
-  font-family: "Fredoka", sans-serif;
-}
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-family: "Fredoka", sans-serif;
+    padding: 0;
+    min-width: auto;
+    border-radius: 0;
+  }
 
 .scene-training-prompt__requirement,
 .scene-training-prompt__rebirth,

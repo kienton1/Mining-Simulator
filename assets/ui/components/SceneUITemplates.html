@@ -34,6 +34,27 @@
       content.className = 'scene-training-prompt__content';
       root.appendChild(content);
 
+      const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      const powerIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/PowerIcon.png` : 'icons/HUDIcons/PowerIcon.png';
+      const rebirthIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/RebirthIcon.png` : 'icons/HUDIcons/RebirthIcon.png';
+
+      const getStatValue = text => String(text || '').trim().split(/\s+/)[0] || '0';
+
+      const renderFarMode = (requirementText, rebirthText, powerGainText) => `
+        <div class="scene-training-prompt__copy">
+          <div class="scene-training-prompt__requirement">
+            <span class="scene-training-prompt__stat-value">${getStatValue(requirementText || '0 Required')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${powerIconSrc}" alt="power">
+          </div>
+          <div class="scene-training-prompt__or">OR</div>
+          <div class="scene-training-prompt__rebirth">
+            <span class="scene-training-prompt__stat-value">${getStatValue(rebirthText || '0 Rebirths')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${rebirthIconSrc}" alt="rebirth">
+          </div>
+          <div class="scene-training-prompt__power-gain">${powerGainText || '+1 Power'}</div>
+        </div>
+      `;
+
       // Helper to get current player ID from DOM (set by PlayerId.html component)
       function getCurrentPlayerId() {
         const playerIdElement = document.getElementById('playerId');
@@ -89,29 +110,19 @@
                   <div class="scene-training-prompt__action">Train</div>
                 </div>
               `;
-            } else {
-              console.log('[TrainingUI] Rendering FAR mode content');
-              // Far mode - show rock info (icon, requirements, power gain)
-              const rockName = playerState.rockName || data.rockName || 'Training Rock';
-              const powerGain = playerState.powerGain || data.powerGainText || '+1 Power';
-              const requirementText = data.requirementText || '0 Required';
-              const rebirthText = data.rebirthText || '0 Rebirths';
-              const powerGainText = data.powerGainText || '+1 Power';
+              } else {
+                console.log('[TrainingUI] Rendering FAR mode content');
+                // Far mode - show rock info (icon, requirements, power gain)
+                const requirementText = data.requirementText || '0 Required';
+                const rebirthText = data.rebirthText || '0 Rebirths';
+                const powerGainText = data.powerGainText || '+1 Power';
 
-              content.innerHTML = `
-                <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-                <div class="scene-training-prompt__copy">
-                  <div class="scene-training-prompt__requirement">${requirementText}</div>
-                  <div class="scene-training-prompt__or">OR</div>
-                  <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                  <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-                </div>
-              `;
-            }
-          } else if (playerState && playerState.visible === false) {
-            root.classList.remove('visible');
-            root.style.display = 'none';
-          } else {
+                content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+              }
+            } else if (playerState && playerState.visible === false) {
+              root.classList.remove('visible');
+              root.style.display = 'none';
+            } else {
             // Not close to the rock: show far-mode details
             root.classList.add('visible');
             root.style.display = 'flex';
@@ -119,24 +130,16 @@
             root.classList.remove('mode-far', 'mode-close');
             root.classList.add('mode-far');
 
-            const requirementText = data.requirementText || '0 Required';
-            const rebirthText = data.rebirthText || '0 Rebirths';
-            const powerGainText = data.powerGainText || '+1 Power';
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
 
-            content.innerHTML = `
-              <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-              <div class="scene-training-prompt__copy">
-                <div class="scene-training-prompt__requirement">${requirementText}</div>
-                <div class="scene-training-prompt__or">OR</div>
-                <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-              </div>
-            `;
-          }
-        } else {
-          // Fallback: use global visible flag if no playerStates (backwards compatibility)
-          if (data.visible === false) {
-            root.classList.remove('visible');
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
+          } else {
+            // Fallback: use global visible flag if no playerStates (backwards compatibility)
+            if (data.visible === false) {
+              root.classList.remove('visible');
             root.style.display = 'none';
           } else {
             root.classList.add('visible');
@@ -146,20 +149,12 @@
             root.classList.remove('mode-far', 'mode-close');
             root.classList.add('mode-far');
 
-            const requirementText = data.requirementText || '0 Required';
-            const rebirthText = data.rebirthText || '0 Rebirths';
-            const powerGainText = data.powerGainText || '+1 Power';
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
 
-            content.innerHTML = `
-              <div class="scene-training-prompt__icon">\uD83D\uDCA5</div>
-              <div class="scene-training-prompt__copy">
-                <div class="scene-training-prompt__requirement">${requirementText}</div>
-                <div class="scene-training-prompt__or">OR</div>
-                <div class="scene-training-prompt__rebirth">${rebirthText}</div>
-                <div class="scene-training-prompt__power-gain">${powerGainText}</div>
-              </div>
-            `;
-          }
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
 
           // Toggle locked state
           if (data.canTrain === false) {

@@ -231,11 +231,11 @@
 }
 
 .auto-control-button.active {
-  background: #DCB14F;
-  border-color: #DCB14F;
-  color: #ffffff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-}
+    background: #e53935;
+    border-color: #e53935;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  }
 
 /* Modals */
 .modal {
@@ -648,11 +648,14 @@
 /* Scene UI prompts */
 .scene-training-prompt,
 .scene-egg-prompt {
-  background: rgba(18, 24, 38, 0.92);
-  border: 2px solid var(--od-border);
-  box-shadow: var(--od-shadow-soft);
-  font-family: "Fredoka", sans-serif;
-}
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-family: "Fredoka", sans-serif;
+    padding: 0;
+    min-width: auto;
+    border-radius: 0;
+  }
 
 .scene-training-prompt__requirement,
 .scene-training-prompt__rebirth,

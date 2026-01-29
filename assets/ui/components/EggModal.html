@@ -67,7 +67,7 @@
         <div class="egg-right-panel">
           <div class="egg-pets-header">
             <span class="egg-section-title">POSSIBLE PETS</span>
-            <span class="egg-pets-hint"></span>
+            <span class="egg-pets-hint">Click on Pet to auto delete!</span>
           </div>
           <div class="egg-pets-grid-container">
             <div id="egg-shop-grid" class="egg-pets-grid">
@@ -448,9 +448,12 @@
   }
 
   .egg-pets-hint {
-    font-size: 10px;
-    color: #a6b7d3;
-    font-weight: 600;
+    font-size: 12px;
+    color: #ff4d4d;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
   }
 
   .egg-pets-grid-container {
@@ -760,7 +763,7 @@
   }
 
   body.mobile .egg-pets-hint {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   body.mobile .egg-pets-grid {

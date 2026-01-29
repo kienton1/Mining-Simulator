@@ -916,12 +916,18 @@
     // Clear existing items
     gemTraderUIContent.innerHTML = '';
 
+    const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+    const hudIconHtml = (fileName, altText) => {
+      const src = cdnBase ? `${cdnBase}/icons/HUDIcons/${fileName}` : `icons/HUDIcons/${fileName}`;
+      return `<img class="gem-trader-ui__icon-img" src="${src}" alt="${altText}">`;
+    };
+
     // Upgrade definitions
     const upgradeDefs = [
       {
         key: 'moreGems',
         title: 'More Gems',
-        icon: '💎',
+        iconHtml: hudIconHtml('GemIcon.png', 'gems'),
         getEffect: (level) => {
           // UI shows level, backend is level + 1 (always 1 ahead)
           const displayLevel = level;
@@ -937,7 +943,7 @@
       {
         key: 'moreRebirths',
         title: 'More Rebirths',
-        icon: '🔄',
+        iconHtml: hudIconHtml('RebirthIcon.png', 'rebirths'),
         getEffect: (level) => {
           return `${level} -> ${level + 1}`;
         },
@@ -949,7 +955,7 @@
       {
         key: 'moreCoins',
         title: 'More Coins',
-        iconHtml: coinIconHtml('coin-icon--inline'),
+        iconHtml: hudIconHtml('CoinIcon.png', 'coins'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -965,7 +971,7 @@
       {
         key: 'moreDamage',
         title: 'More Damage',
-        icon: '⛏️',
+        iconHtml: hudIconHtml('PickaxeIcon.png', 'damage'),
         getEffect: (level) => {
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
@@ -3721,6 +3727,7 @@
     });
     
     autoMineButton.classList.add('inactive');
+    updateAutoMineButton(false);
     
     // Set up click handler
     autoMineButton.addEventListener('click', (e) => {
@@ -3764,6 +3771,7 @@
       });
       
       autoTrainButton.classList.add('inactive');
+      updateAutoTrainButton(false);
       
       // Set up click handler
       autoTrainButton.addEventListener('click', (e) => {
