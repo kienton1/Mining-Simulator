@@ -7,11 +7,13 @@
  * Reference: Planning/gameOverview.txt section 6.1, 6.2
  */
 
-import { World, Player, Entity, RigidBodyType } from 'hytopia';
+import { World, Player, Entity, RigidBodyType, ParticleEmitter } from 'hytopia';
 import { calculateMiningDamage, getSwingsPerSecond } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
+import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
@@ -690,10 +692,11 @@ export class MiningSystem {
         y: middleY + 0.5, // Center of the middle block
       };
       // Skip debris during auto mining to keep SPS consistent under load.
+      console.log('[MiningSystem] Floor broken! isAutoMining:', isAutoMining, 'minedOre:', minedOre);
       if (!isAutoMining) {
         this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
       }
-      
+
       // Remove shared block from map
       state.blockMap.delete(miningAreaKey);
       state.currentTargetBlock = null;
@@ -733,7 +736,10 @@ export class MiningSystem {
         y: nextTopY + 1, // Position player on top of next level
         z: center.z,
       };
-      
+
+      // Spawn floor break particle effect
+      this.spawnFloorBreakEffect(player, minedOre, nextTopY);
+
       // Use setPosition on the rigid body to move the player
       const rigidBody = (playerEntity as any).rawRigidBody;
       if (rigidBody && rigidBody.setPosition) {
@@ -2223,6 +2229,58 @@ export class MiningSystem {
     
     // No chest spawns
     return { shouldSpawn: false, chestType: null };
+  }
+
+  /**
+   * Spawns a burst particle effect when the player breaks through a floor
+   * Effect spreads ±4 blocks on X and Z axes from the mine center
+   */
+  private spawnFloorBreakEffect(player: Player, oreType: string, newFloorY: number): void {
+    const center = this.getMineCenter(player);
+
+    // Get ore color from appropriate database
+    const oreData = ORE_DATABASE[oreType as OreType] ||
+                    ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE] ||
+                    ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+    const hexColor = oreData?.color || '#808080';
+    const color = this.hexToRgb(hexColor);
+
+    console.log('[MiningSystem] Spawning floor break effect at', center.x, newFloorY + 1.5, center.z, 'color:', hexColor);
+
+    const emitter = new ParticleEmitter({
+      position: { x: center.x, y: newFloorY + 1.5, z: center.z },
+      textureUri: 'particles/smoke_04.png',
+      colorStart: color,
+      colorEnd: color,
+      colorIntensityStart: 1.5,
+      colorIntensityEnd: 0.8,
+      sizeStart: 1.2,
+      sizeEnd: 0.4,
+      opacityStart: 1.0,
+      opacityEnd: 0,
+      positionVariance: { x: 3, y: 0.5, z: 3 },
+      velocity: { x: 0, y: 2.0, z: 0 },
+      velocityVariance: { x: 1.5, y: 1.0, z: 1.5 },
+      lifetime: 0.6,
+      lifetimeVariance: 0.15,
+      rate: 40,
+      maxParticles: 80,
+    });
+
+    emitter.spawn(this.world);
+    setTimeout(() => emitter.despawn(), 800);
+  }
+
+  /**
+   * Converts a hex color string to RGB object
+   */
+  private hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 128, g: 128, b: 128 };
   }
 }
 
