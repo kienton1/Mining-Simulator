@@ -51,6 +51,7 @@ includeContent("./components/PickaxeModal.html");
 includeContent("./components/RebirthModal.html");
 includeContent("./components/EggModal.html");
 includeContent("./components/RewardModal.html");
+includeContent("./components/DailyRewardModal.html");
 includeContent("./components/PetsModal.html");
 includeContent("./components/MapsModal.html");
 
