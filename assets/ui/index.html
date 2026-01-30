@@ -601,6 +601,65 @@
       return root;
     });
 
+    // Daily chest prompt template - shows "Daily Reward" + countdown/Ready!
+    hytopia.registerSceneUITemplate('daily-chest:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-daily-chest-prompt visible';
+
+      const title = document.createElement('div');
+      title.className = 'scene-daily-chest-prompt__title';
+      title.textContent = 'Daily Reward';
+      root.appendChild(title);
+
+      const timer = document.createElement('div');
+      timer.className = 'scene-daily-chest-prompt__timer';
+      timer.textContent = 'Ready!';
+      root.appendChild(timer);
+
+      // Helper to get current player ID from DOM
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      onState(state => {
+        const data = state || {};
+
+        if (data.title !== undefined) title.textContent = data.title;
+
+        // Check player-specific state
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+
+        if (currentPlayerId && playerStates[currentPlayerId]) {
+          const playerState = playerStates[currentPlayerId];
+          timer.textContent = playerState.timerText || 'Ready!';
+
+          if (playerState.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        } else if (data.timerText !== undefined) {
+          timer.textContent = data.timerText;
+          if (data.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
     // Pet label template - shows name and rarity above pets
     hytopia.registerSceneUITemplate('pet-label', (_id, onState) => {
       const root = document.createElement('div');
@@ -2082,6 +2141,29 @@
       });
     }
 
+    // Setup daily reward claim button handler
+    const dailyRewardClaimButton = document.getElementById('daily-reward-claim-button');
+    if (dailyRewardClaimButton) {
+      dailyRewardClaimButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!state.dailyReward?.canClaim) return;
+        dailyRewardClaimButton.disabled = true;
+        stopDailyRewardAnimation();
+        hytopia.sendData({ type: 'DAILY_REWARD_CLAIM' });
+      });
+    }
+
+    // Setup daily reward close button handler
+    const dailyRewardCloseBtn = document.getElementById('daily-reward-close-btn');
+    if (dailyRewardCloseBtn) {
+      dailyRewardCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDailyRewardModal();
+      });
+    }
+
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
@@ -2844,10 +2926,10 @@
         mult.className = 'reward-pet-card__mult';
         mult.textContent = `x${formatNumber(pet?.multiplier ?? 0)}`;
 
-        card.appendChild(chance);
+        thumb.appendChild(chance);
+        thumb.appendChild(mult);
         card.appendChild(thumb);
         card.appendChild(name);
-        card.appendChild(mult);
         rewardPetsGridEl.appendChild(card);
       });
     };
@@ -2887,6 +2969,169 @@
       if (rewardMessageEl) {
         const defaultMessage = 'Play 15 minutes in-game for a reward!';
         rewardMessageEl.textContent = state.reward.message || defaultMessage;
+      }
+    };
+
+    // ========== DAILY REWARD FUNCTIONS ==========
+    let dailyRewardAnimationInterval = null;
+    let dailyRewardHighlightIndex = 0;
+
+    const formatDailyRewardTime = (ms) => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    };
+
+    const renderDailyRewardModal = () => {
+      const dailyRewardCardsGrid = document.getElementById('daily-reward-cards-grid');
+      const dailyRewardMessage = document.getElementById('daily-reward-message');
+      const dailyRewardTimerText = document.getElementById('daily-reward-timer-text');
+      const dailyRewardClaimButton = document.getElementById('daily-reward-claim-button');
+
+      if (!state.dailyReward) {
+        state.dailyReward = { canClaim: false, remainingMs: 0, possibleRewards: [] };
+      }
+
+      const canClaim = state.dailyReward.canClaim;
+      const remainingMs = state.dailyReward.remainingMs;
+      const possibleRewards = state.dailyReward.possibleRewards || [];
+
+      // Update timer display
+      if (dailyRewardTimerText) {
+        if (canClaim) {
+          dailyRewardTimerText.textContent = 'Ready!';
+          dailyRewardTimerText.classList.remove('daily-reward-timer__text--waiting');
+        } else {
+          dailyRewardTimerText.textContent = formatDailyRewardTime(remainingMs);
+          dailyRewardTimerText.classList.add('daily-reward-timer__text--waiting');
+        }
+      }
+
+      // Update message
+      if (dailyRewardMessage) {
+        if (canClaim) {
+          dailyRewardMessage.textContent = 'Your daily reward is ready!';
+          dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+        } else {
+          dailyRewardMessage.textContent = 'Come back later for your reward!';
+          dailyRewardMessage.classList.add('daily-reward-modal__message--waiting');
+        }
+      }
+
+      // Update claim button
+      if (dailyRewardClaimButton) {
+        dailyRewardClaimButton.disabled = !canClaim;
+      }
+
+      // Render reward cards
+      if (dailyRewardCardsGrid) {
+        dailyRewardCardsGrid.innerHTML = '';
+
+        possibleRewards.forEach((reward, index) => {
+          const card = document.createElement('div');
+          card.className = 'daily-reward-card';
+          card.dataset.rewardIndex = index;
+
+          const thumb = document.createElement('div');
+          thumb.className = 'daily-reward-card__thumb';
+          const img = document.createElement('img');
+          img.alt = reward.displayName || 'Reward';
+          img.src = `{{CDN_ASSETS_URL}}/${reward.iconUri}`;
+          img.onerror = () => { thumb.textContent = '?'; };
+          thumb.appendChild(img);
+
+          const name = document.createElement('div');
+          name.className = 'daily-reward-card__name';
+          name.textContent = reward.displayName || 'Reward';
+
+          const desc = document.createElement('div');
+          desc.className = 'daily-reward-card__desc';
+          desc.textContent = reward.description || '';
+
+          card.appendChild(thumb);
+          card.appendChild(name);
+          card.appendChild(desc);
+          dailyRewardCardsGrid.appendChild(card);
+        });
+
+        // Start animation if can claim and haven't started
+        if (canClaim && !state.dailyReward.animationComplete && possibleRewards.length > 0) {
+          startDailyRewardAnimation();
+        }
+      }
+    };
+
+    const startDailyRewardAnimation = () => {
+      if (dailyRewardAnimationInterval) {
+        clearInterval(dailyRewardAnimationInterval);
+      }
+
+      dailyRewardHighlightIndex = 0;
+      const cards = document.querySelectorAll('.daily-reward-card');
+
+      dailyRewardAnimationInterval = setInterval(() => {
+        // Remove highlight from all cards
+        cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
+
+        // Highlight current card
+        if (cards[dailyRewardHighlightIndex]) {
+          cards[dailyRewardHighlightIndex].classList.add('daily-reward-card--highlight');
+        }
+
+        dailyRewardHighlightIndex = (dailyRewardHighlightIndex + 1) % cards.length;
+      }, 300);
+    };
+
+    const stopDailyRewardAnimation = () => {
+      if (dailyRewardAnimationInterval) {
+        clearInterval(dailyRewardAnimationInterval);
+        dailyRewardAnimationInterval = null;
+      }
+      const cards = document.querySelectorAll('.daily-reward-card');
+      cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
+    };
+
+    const showDailyRewardWinner = (result) => {
+      stopDailyRewardAnimation();
+
+      const cards = document.querySelectorAll('.daily-reward-card');
+      const possibleRewards = state.dailyReward?.possibleRewards || [];
+
+      // Find the winning card by type
+      let winnerIndex = possibleRewards.findIndex((r) => r.type === result.type);
+      if (winnerIndex < 0) winnerIndex = 0;
+
+      if (cards[winnerIndex]) {
+        cards[winnerIndex].classList.add('daily-reward-card--winner');
+
+        // Update the card to show the actual result
+        const nameEl = cards[winnerIndex].querySelector('.daily-reward-card__name');
+        if (nameEl) nameEl.textContent = result.displayName;
+      }
+
+      // Update message
+      const dailyRewardMessage = document.getElementById('daily-reward-message');
+      if (dailyRewardMessage) {
+        dailyRewardMessage.textContent = `You received: ${result.displayName}!`;
+        dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+      }
+    };
+
+    // Daily reward close handler
+    const closeDailyRewardModal = () => {
+      const dailyRewardModal = document.getElementById('daily-reward-modal');
+      if (dailyRewardModal) {
+        hideModal(dailyRewardModal);
+        stopDailyRewardAnimation();
+        hytopia.sendData({ type: 'DAILY_REWARD_MODAL_CLOSED' });
+        // Reset animation state for next open
+        if (state.dailyReward) {
+          state.dailyReward.animationComplete = false;
+          state.dailyReward.lastResult = null;
+        }
       }
     };
 
@@ -5358,6 +5603,42 @@
           }
           state.reward.message = '';
           renderRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_STATE': {
+          state.dailyReward = state.dailyReward || {};
+          state.dailyReward.canClaim = data.canClaim ?? false;
+          state.dailyReward.remainingMs = data.remainingMs ?? 0;
+          state.dailyReward.possibleRewards = data.possibleRewards ?? [];
+          renderDailyRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_OPEN': {
+          const dailyRewardModal = document.getElementById('daily-reward-modal');
+          if (dailyRewardModal) {
+            showModal(dailyRewardModal);
+            hytopia.sendData({ type: 'REQUEST_DAILY_REWARD_STATE' });
+          }
+          break;
+        }
+        case 'DAILY_REWARD_CLOSE': {
+          closeDailyRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_RESULT': {
+          state.dailyReward = state.dailyReward || {};
+          if (data.success && data.result) {
+            state.dailyReward.lastResult = data.result;
+            state.dailyReward.canClaim = false;
+            state.dailyReward.animationComplete = true;
+            // Show winner effect
+            showDailyRewardWinner(data.result);
+            spawnConfettiBurst();
+            playUpgradePurchaseSfx();
+          } else {
+            state.dailyReward.message = data.message || 'Failed to claim reward.';
+          }
+          renderDailyRewardModal();
           break;
         }
         case 'PET_STATE':
@@ -9468,8 +9749,8 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 100;
-    background: linear-gradient(135deg, rgba(38, 110, 190, 0.95), rgba(16, 58, 110, 0.95));
-    border: 3px solid rgba(72, 164, 255, 0.9);
+    background: linear-gradient(135deg, rgba(70, 70, 70, 0.95), rgba(26, 26, 26, 0.95));
+    border: 3px solid rgba(100, 100, 100, 0.9);
     border-radius: 12px;
     padding: 8px 24px;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
@@ -9478,10 +9759,27 @@
   .reward-title {
     font-size: 24px;
     font-weight: 900;
-    color: #fff;
     margin: 0;
-    -webkit-text-stroke: 2px #000;
-    paint-order: stroke fill;
+    /* Animated gradient text */
+    background: linear-gradient(
+      90deg,
+      #b36bff 0%,
+      #ff6b9d 25%,
+      #ffd700 50%,
+      #ff6b9d 75%,
+      #b36bff 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rewardTitleGradientShift 3s ease-in-out infinite;
+    filter: drop-shadow(2px 2px 0 #000) drop-shadow(-1px -1px 0 #000);
+  }
+
+  @keyframes rewardTitleGradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   /* Floating close button - top right corner */
@@ -9506,8 +9804,8 @@
   .reward-modal__container {
     width: 100%;
     max-height: 75vh;
-    background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
-    border: 3px solid rgba(72, 164, 255, 0.9);
+    background: linear-gradient(135deg, rgba(70, 70, 70, 0.96), rgba(26, 26, 26, 0.96));
+    border: 3px solid rgba(100, 100, 100, 0.9);
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     padding: 18px 18px 20px;
@@ -9525,24 +9823,18 @@
 
   .reward-pets-grid {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 16px;
-    background: rgba(10, 18, 35, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    overflow-x: auto;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    margin-top: 12px;
+    flex-wrap: nowrap;
   }
 
   .reward-pet-card {
     position: relative;
-    width: 120px;
-    min-width: 120px;
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: 12px;
-    padding: 10px 8px 8px;
-    border: 2px solid rgba(255, 255, 255, 0.12);
+    flex: 1;
+    max-width: 120px;
+    padding: 10px 4px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -9552,16 +9844,22 @@
 
   .reward-pet-card__chance {
     position: absolute;
-    top: 6px;
-    left: 8px;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
     font-weight: 900;
-    font-size: 14px;
+    font-size: 11px;
     color: #ff5dd2;
-    -webkit-text-stroke: 1px #000;
-    paint-order: stroke fill;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #ff5dd2;
+    border-radius: 10px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    z-index: 1;
   }
 
   .reward-pet-card__thumb {
+    position: relative;
     width: 70px;
     height: 70px;
     border-radius: 12px;
@@ -9569,6 +9867,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+  }
+
+  .reward-pet-card__thumb::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent
+    );
+    animation: thumbShimmer 2.5s ease-in-out infinite;
+  }
+
+  @keyframes thumbShimmer {
+    0% { left: -100%; }
+    50%, 100% { left: 150%; }
   }
 
   .reward-pet-card__thumb img {
@@ -9582,16 +9902,24 @@
   }
 
   .reward-pet-card__mult {
-    font-size: 12px;
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    font-size: 11px;
     font-weight: 800;
     color: #ffd66b;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #ffd66b;
+    border-radius: 10px;
+    padding: 2px 6px;
+    white-space: nowrap;
   }
 
   .reward-modal__message {
     text-align: center;
     font-size: 18px;
     font-weight: 900;
-    color: #ff3b3b;
+    color: #ffffff;
     -webkit-text-stroke: 1.5px #000;
     paint-order: stroke fill;
   }
@@ -9664,7 +9992,6 @@
 
   body.mobile .reward-title {
     font-size: 18px;
-    -webkit-text-stroke: 1.5px #000;
   }
 
   body.mobile .reward-close-btn {
@@ -9685,37 +10012,37 @@
   }
 
   body.mobile .reward-pets-grid {
-    gap: 8px;
-    padding: 8px;
-    touch-action: pan-x !important;
-    -webkit-overflow-scrolling: touch !important;
+    gap: 2px;
+    padding: 0;
   }
 
   body.mobile .reward-pet-card {
-    width: 70px;
-    min-width: 70px;
-    padding: 6px 4px 4px;
-    gap: 4px;
+    max-width: 90px;
+    padding: 8px 4px 6px;
+    gap: 5px;
   }
 
   body.mobile .reward-pet-card__chance {
-    font-size: 10px;
-    top: 4px;
-    left: 4px;
+    font-size: 9px;
+    top: -6px;
+    padding: 2px 5px;
   }
 
   body.mobile .reward-pet-card__thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
   }
 
   body.mobile .reward-pet-card__name {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   body.mobile .reward-pet-card__mult {
     font-size: 9px;
+    padding: 2px 5px;
+    bottom: -5px;
+    right: -5px;
   }
 
   body.mobile .reward-modal__message {
@@ -16784,6 +17111,56 @@
 
 .scene-shop-prompt--upgrades {
   border-color: rgba(168, 85, 247, 0.7);
+}
+
+/* Scene UI: Daily Chest labels */
+.scene-daily-chest-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Fredoka", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: opacity 0.2s ease;
+}
+
+.scene-daily-chest-prompt:not(.visible) {
+  opacity: 0;
+}
+
+.scene-daily-chest-prompt__title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd700;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+}
+
+.scene-daily-chest-prompt__timer {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7cfc00;
+}
+
+.scene-daily-chest-prompt__timer.waiting {
+  color: #ff6b6b;
+}
+
+.scene-daily-chest-prompt__timer.ready {
+  color: #7cfc00;
+  animation: ready-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ready-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* Scrollable panels: enable wheel + touch drag */

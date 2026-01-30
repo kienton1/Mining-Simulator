@@ -69,8 +69,8 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 100;
-    background: linear-gradient(135deg, rgba(38, 110, 190, 0.95), rgba(16, 58, 110, 0.95));
-    border: 3px solid rgba(72, 164, 255, 0.9);
+    background: linear-gradient(135deg, rgba(70, 70, 70, 0.95), rgba(26, 26, 26, 0.95));
+    border: 3px solid rgba(100, 100, 100, 0.9);
     border-radius: 12px;
     padding: 8px 24px;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
@@ -79,10 +79,27 @@
   .reward-title {
     font-size: 24px;
     font-weight: 900;
-    color: #fff;
     margin: 0;
-    -webkit-text-stroke: 2px #000;
-    paint-order: stroke fill;
+    /* Animated gradient text */
+    background: linear-gradient(
+      90deg,
+      #b36bff 0%,
+      #ff6b9d 25%,
+      #ffd700 50%,
+      #ff6b9d 75%,
+      #b36bff 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rewardTitleGradientShift 3s ease-in-out infinite;
+    filter: drop-shadow(2px 2px 0 #000) drop-shadow(-1px -1px 0 #000);
+  }
+
+  @keyframes rewardTitleGradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   /* Floating close button - top right corner */
@@ -107,8 +124,8 @@
   .reward-modal__container {
     width: 100%;
     max-height: 75vh;
-    background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
-    border: 3px solid rgba(72, 164, 255, 0.9);
+    background: linear-gradient(135deg, rgba(70, 70, 70, 0.96), rgba(26, 26, 26, 0.96));
+    border: 3px solid rgba(100, 100, 100, 0.9);
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     padding: 18px 18px 20px;
@@ -126,24 +143,18 @@
 
   .reward-pets-grid {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 16px;
-    background: rgba(10, 18, 35, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    overflow-x: auto;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    margin-top: 12px;
+    flex-wrap: nowrap;
   }
 
   .reward-pet-card {
     position: relative;
-    width: 120px;
-    min-width: 120px;
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: 12px;
-    padding: 10px 8px 8px;
-    border: 2px solid rgba(255, 255, 255, 0.12);
+    flex: 1;
+    max-width: 120px;
+    padding: 10px 4px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -153,16 +164,22 @@
 
   .reward-pet-card__chance {
     position: absolute;
-    top: 6px;
-    left: 8px;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
     font-weight: 900;
-    font-size: 14px;
+    font-size: 11px;
     color: #ff5dd2;
-    -webkit-text-stroke: 1px #000;
-    paint-order: stroke fill;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #ff5dd2;
+    border-radius: 10px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    z-index: 1;
   }
 
   .reward-pet-card__thumb {
+    position: relative;
     width: 70px;
     height: 70px;
     border-radius: 12px;
@@ -170,6 +187,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+  }
+
+  .reward-pet-card__thumb::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent
+    );
+    animation: thumbShimmer 2.5s ease-in-out infinite;
+  }
+
+  @keyframes thumbShimmer {
+    0% { left: -100%; }
+    50%, 100% { left: 150%; }
   }
 
   .reward-pet-card__thumb img {
@@ -183,16 +222,24 @@
   }
 
   .reward-pet-card__mult {
-    font-size: 12px;
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    font-size: 11px;
     font-weight: 800;
     color: #ffd66b;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #ffd66b;
+    border-radius: 10px;
+    padding: 2px 6px;
+    white-space: nowrap;
   }
 
   .reward-modal__message {
     text-align: center;
     font-size: 18px;
     font-weight: 900;
-    color: #ff3b3b;
+    color: #ffffff;
     -webkit-text-stroke: 1.5px #000;
     paint-order: stroke fill;
   }
@@ -265,7 +312,6 @@
 
   body.mobile .reward-title {
     font-size: 18px;
-    -webkit-text-stroke: 1.5px #000;
   }
 
   body.mobile .reward-close-btn {
@@ -286,37 +332,37 @@
   }
 
   body.mobile .reward-pets-grid {
-    gap: 8px;
-    padding: 8px;
-    touch-action: pan-x !important;
-    -webkit-overflow-scrolling: touch !important;
+    gap: 2px;
+    padding: 0;
   }
 
   body.mobile .reward-pet-card {
-    width: 70px;
-    min-width: 70px;
-    padding: 6px 4px 4px;
-    gap: 4px;
+    max-width: 90px;
+    padding: 8px 4px 6px;
+    gap: 5px;
   }
 
   body.mobile .reward-pet-card__chance {
-    font-size: 10px;
-    top: 4px;
-    left: 4px;
+    font-size: 9px;
+    top: -6px;
+    padding: 2px 5px;
   }
 
   body.mobile .reward-pet-card__thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
   }
 
   body.mobile .reward-pet-card__name {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   body.mobile .reward-pet-card__mult {
     font-size: 9px;
+    padding: 2px 5px;
+    bottom: -5px;
+    right: -5px;
   }
 
   body.mobile .reward-modal__message {

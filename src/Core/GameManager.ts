@@ -31,6 +31,7 @@ import { PetVisualManager } from '../Pets/PetVisualManager';
 import { EggDisplayAnimator } from '../Pets/EggDisplayAnimator';
 import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
+import { DailyRewardSystem } from '../DailyReward/DailyRewardSystem';
 
 /**
  * Game Manager class
@@ -87,6 +88,7 @@ export class GameManager {
   private petVisualManager: PetVisualManager;
   private eggDisplayAnimator: EggDisplayAnimator;
   private tutorialManager: TutorialManager;
+  private dailyRewardSystem: DailyRewardSystem;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
@@ -113,7 +115,7 @@ export class GameManager {
     multiplier: number;
   }>;
   private readonly REWARD_TICK_MS = 1000;
-  private readonly REWARD_DURATION_MS = 10 * 1000; // 10 seconds (debug)
+  private readonly REWARD_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
   // Debounced save timers per player
   private saveTimers: Map<Player, NodeJS.Timeout> = new Map();
@@ -188,7 +190,12 @@ export class GameManager {
 
     // Initialize tutorial system
     this.tutorialManager = new TutorialManager(this);
-    
+
+    // Initialize daily reward system
+    this.dailyRewardSystem = new DailyRewardSystem();
+    this.dailyRewardSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.dailyRewardSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+
     // Start periodic save mechanism
     this.startPeriodicSaves();
     
@@ -430,7 +437,7 @@ export class GameManager {
 
   /**
    * Adds gold to player
-   * 
+   *
    * @param player - Player to add gold to
    * @param amount - Amount of gold to add
    */
@@ -439,6 +446,8 @@ export class GameManager {
     if (data) {
       data.gold += amount;
       this.updatePlayerData(player, data);
+      // Track max gold for daily reward
+      this.dailyRewardSystem.updateMaxCurrencyIfNeeded(player, data.gold, data.gems);
       // Send gold update to UI
       player.ui.sendData({
         type: 'GOLD_STATS',
@@ -449,7 +458,7 @@ export class GameManager {
 
   /**
    * Adds gems to player
-   * 
+   *
    * @param player - Player to add gems to
    * @param amount - Amount of gems to add
    */
@@ -458,6 +467,8 @@ export class GameManager {
     if (data) {
       data.gems += amount;
       this.updatePlayerData(player, data);
+      // Track max gems for daily reward
+      this.dailyRewardSystem.updateMaxCurrencyIfNeeded(player, data.gold, data.gems);
       // Send gems update to UI
       player.ui.sendData({
         type: 'GEMS_STATS',
@@ -592,6 +603,13 @@ export class GameManager {
    */
   getTutorialManager(): TutorialManager {
     return this.tutorialManager;
+  }
+
+  /**
+   * Gets the daily reward system instance
+   */
+  getDailyRewardSystem(): DailyRewardSystem {
+    return this.dailyRewardSystem;
   }
 
   /**

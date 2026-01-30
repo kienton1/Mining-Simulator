@@ -251,6 +251,65 @@
       return root;
     });
 
+    // Daily chest prompt template - shows "Daily Reward" + countdown/Ready!
+    hytopia.registerSceneUITemplate('daily-chest:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-daily-chest-prompt visible';
+
+      const title = document.createElement('div');
+      title.className = 'scene-daily-chest-prompt__title';
+      title.textContent = 'Daily Reward';
+      root.appendChild(title);
+
+      const timer = document.createElement('div');
+      timer.className = 'scene-daily-chest-prompt__timer';
+      timer.textContent = 'Ready!';
+      root.appendChild(timer);
+
+      // Helper to get current player ID from DOM
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      onState(state => {
+        const data = state || {};
+
+        if (data.title !== undefined) title.textContent = data.title;
+
+        // Check player-specific state
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+
+        if (currentPlayerId && playerStates[currentPlayerId]) {
+          const playerState = playerStates[currentPlayerId];
+          timer.textContent = playerState.timerText || 'Ready!';
+
+          if (playerState.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        } else if (data.timerText !== undefined) {
+          timer.textContent = data.timerText;
+          if (data.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
     // Pet label template - shows name and rarity above pets
     hytopia.registerSceneUITemplate('pet-label', (_id, onState) => {
       const root = document.createElement('div');

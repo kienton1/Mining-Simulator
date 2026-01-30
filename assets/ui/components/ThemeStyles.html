@@ -731,6 +731,56 @@
   border-color: rgba(168, 85, 247, 0.7);
 }
 
+/* Scene UI: Daily Chest labels */
+.scene-daily-chest-prompt {
+  background: rgba(18, 24, 38, 0.92);
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  box-shadow: var(--od-shadow-soft);
+  font-family: "Fredoka", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: opacity 0.2s ease;
+}
+
+.scene-daily-chest-prompt:not(.visible) {
+  opacity: 0;
+}
+
+.scene-daily-chest-prompt__title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd700;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+}
+
+.scene-daily-chest-prompt__timer {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7cfc00;
+}
+
+.scene-daily-chest-prompt__timer.waiting {
+  color: #ff6b6b;
+}
+
+.scene-daily-chest-prompt__timer.ready {
+  color: #7cfc00;
+  animation: ready-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ready-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 /* Scrollable panels: enable wheel + touch drag */
 .merchant-ui__content,
 .gem-trader-ui__content,

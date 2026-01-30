@@ -1,0 +1,348 @@
+<!-- Daily Reward Modal -->
+<div
+  id="daily-reward-modal"
+  class="hud daily-reward-modal"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="daily-reward-wrapper">
+    <!-- Title floating above container -->
+    <div class="daily-reward-title-container">
+      <h2 class="daily-reward-title">DAILY REWARD</h2>
+    </div>
+    <!-- Close button floating at top-right -->
+    <button id="daily-reward-close-btn" class="daily-reward-close-btn" data-close="daily-reward-modal">X</button>
+
+    <div class="daily-reward-modal__container">
+      <div class="daily-reward-modal__body">
+        <div id="daily-reward-cards-grid" class="daily-reward-cards-grid">
+          <!-- Reward cards injected by JS -->
+        </div>
+
+        <div id="daily-reward-message" class="daily-reward-modal__message">
+          Walk near a treasure chest to claim!
+        </div>
+
+        <div class="daily-reward-modal__timer">
+          <div class="daily-reward-timer">
+            <div id="daily-reward-timer-text" class="daily-reward-timer__text">Ready!</div>
+          </div>
+        </div>
+
+        <button id="daily-reward-claim-button" class="daily-reward-claim-button" disabled>
+          Claim
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #daily-reward-modal.visible {
+    display: flex !important;
+  }
+
+  /* Wrapper for positioning title and close button */
+  .daily-reward-wrapper {
+    position: relative;
+    width: 700px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  /* Floating title container - centered above the modal */
+  .daily-reward-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(38, 110, 190, 0.95), rgba(16, 58, 110, 0.95));
+    border: 3px solid rgba(72, 164, 255, 0.9);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .daily-reward-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  /* Floating close button - top right corner */
+  .daily-reward-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .daily-reward-modal__container {
+    width: 100%;
+    max-height: 75vh;
+    background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
+    border: 3px solid rgba(72, 164, 255, 0.9);
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    padding: 18px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .daily-reward-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .daily-reward-cards-grid {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    overflow-x: auto;
+  }
+
+  .daily-reward-card {
+    position: relative;
+    width: 120px;
+    min-width: 120px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    padding: 10px 8px 8px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .daily-reward-card--highlight {
+    transform: scale(1.08);
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  }
+
+  .daily-reward-card--winner {
+    transform: scale(1.15);
+    border-color: #00ff00;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+    animation: winner-glow 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes winner-glow {
+    from {
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    }
+    to {
+      box-shadow: 0 0 40px rgba(0, 255, 0, 1);
+    }
+  }
+
+  .daily-reward-card__thumb {
+    width: 70px;
+    height: 70px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .daily-reward-card__thumb img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .daily-reward-card__name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
+  }
+
+  .daily-reward-card__desc {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffd66b;
+  }
+
+  .daily-reward-modal__message {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: #7cfc00;
+    -webkit-text-stroke: 1.5px #000;
+    paint-order: stroke fill;
+  }
+
+  .daily-reward-modal__message--waiting {
+    color: #ff3b3b;
+  }
+
+  .daily-reward-modal__timer {
+    padding: 0 10px;
+  }
+
+  .daily-reward-timer {
+    position: relative;
+    height: 34px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .daily-reward-timer__text {
+    font-size: 18px;
+    font-weight: 900;
+    -webkit-text-stroke: 1.5px #000;
+    paint-order: stroke fill;
+    color: #7cfc00;
+  }
+
+  .daily-reward-timer__text--waiting {
+    color: #ff3b3b;
+  }
+
+  .daily-reward-claim-button {
+    align-self: center;
+    min-width: 220px;
+    padding: 12px 20px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(180deg, #4bd350, #2cad2f);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .daily-reward-claim-button:disabled {
+    background: linear-gradient(180deg, #444, #333);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  /* ========== MOBILE STYLES ========== */
+  body.mobile .daily-reward-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .daily-reward-title-container {
+    padding: 6px 16px;
+  }
+
+  body.mobile .daily-reward-title {
+    font-size: 18px;
+    -webkit-text-stroke: 1.5px #000;
+  }
+
+  body.mobile .daily-reward-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  body.mobile .daily-reward-modal__container {
+    width: 100%;
+    padding: 12px;
+    max-height: 75vh;
+    overflow-y: auto;
+  }
+
+  body.mobile .daily-reward-modal__body {
+    gap: 10px;
+  }
+
+  body.mobile .daily-reward-cards-grid {
+    gap: 8px;
+    padding: 8px;
+    touch-action: pan-x !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  body.mobile .daily-reward-card {
+    width: 70px;
+    min-width: 70px;
+    padding: 6px 4px 4px;
+    gap: 4px;
+  }
+
+  body.mobile .daily-reward-card__thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+  }
+
+  body.mobile .daily-reward-card__name {
+    font-size: 10px;
+  }
+
+  body.mobile .daily-reward-card__desc {
+    font-size: 9px;
+  }
+
+  body.mobile .daily-reward-modal__message {
+    font-size: 14px;
+  }
+
+  body.mobile .daily-reward-modal__timer {
+    padding: 0 6px;
+  }
+
+  body.mobile .daily-reward-timer {
+    height: 26px;
+    border-radius: 12px;
+  }
+
+  body.mobile .daily-reward-timer__text {
+    font-size: 14px;
+  }
+
+  body.mobile .daily-reward-claim-button {
+    min-width: 160px;
+    padding: 10px 16px;
+    font-size: 16px;
+    border-radius: 10px;
+  }
+</style>

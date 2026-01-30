@@ -89,13 +89,23 @@ export interface PlayerData {
    * Admin flag (optional, used for server-side commands)
    */
   isAdmin?: boolean;
+
+  /**
+   * Daily Reward System
+   */
+  /** Unix timestamp of last daily reward claim */
+  lastDailyRewardClaim?: number;
+  /** Maximum gold the player has ever held (for daily reward) */
+  maxGoldEverHeld?: number;
+  /** Maximum gems the player has ever held (for daily reward) */
+  maxGemsEverHeld?: number;
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 9;
+export const CURRENT_DATA_VERSION = 10;
 
 /**
  * Inventory data structure
@@ -138,6 +148,9 @@ export function createDefaultPlayerData(): PlayerData {
     unlockedWorlds: ['island1'], // Original map is always unlocked
     tutorial: { ...DEFAULT_TUTORIAL_PROGRESS },
     isAdmin: false,
+    lastDailyRewardClaim: 0,
+    maxGoldEverHeld: 0,
+    maxGemsEverHeld: 0,
   };
 }
 

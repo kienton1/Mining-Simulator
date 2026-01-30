@@ -302,9 +302,9 @@ export class TrainingController {
     this.trainingSystem.setWorld(world); // Pass world to training system for pickaxe access
     this.rockManager = new TrainingRockManager(world);
 
-    // Detect Island 1 training rocks from map.json
-    const island1Spawns = detectTrainingRockPlacements(undefined, 'island1');
-    const island1Placements = island1Spawns.length ? island1Spawns : FALLBACK_TRAINING_ROCKS.map(rock => ({
+    // Use exact positions for Island 1 training rocks
+    // Auto-detection from map.json was finding incorrect cobblestone blocks after map updates
+    const island1Placements = FALLBACK_TRAINING_ROCKS.map(rock => ({
       ...rock,
       worldId: 'island1' as const,
     }));
@@ -343,9 +343,11 @@ export class TrainingController {
    */
   private initializeAllRockSceneUIs(): void {
     const allRocks = this.rockManager.getAllTrainingRocks();
+    console.log(`[TrainingController] Initializing ${allRocks.length} rock SceneUIs`);
     for (const rock of allRocks) {
       // Use unique ID that includes world ID to prevent conflicts between worlds
       const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
+      console.log(`[TrainingController] Rock ${uniqueId}: position=${JSON.stringify(rock.position)}, tier=${rock.rockData.tier}, worldId=${rock.worldId}`);
       const sceneUI = this.ensureRockSceneUI(uniqueId, rock);
 
       // Format power requirement with proper letter abbreviations (K, M, B, T, etc.)
@@ -415,6 +417,7 @@ export class TrainingController {
         y: y + 1.8, // float above rock (lowered for better visibility)
         z: z + zOffset,
       };
+      console.log(`[TrainingController] Updating SceneUI for ${rockId}: rockPos=${JSON.stringify(rockLocation.position)}, uiPos=${JSON.stringify(uiPos)}, worldId=${rockLocation.worldId}, tier=${rockLocation.rockData.tier}`);
       sceneUI.setPosition(uiPos);
       return sceneUI;
     }
@@ -427,6 +430,7 @@ export class TrainingController {
       y: y + 1.8, // float above rock (lowered for better visibility)
       z: z + zOffset,
     };
+    console.log(`[TrainingController] Creating SceneUI for ${rockId}: rockPos=${JSON.stringify(rockLocation.position)}, uiPos=${JSON.stringify(uiPos)}, worldId=${rockLocation.worldId}, tier=${rockLocation.rockData.tier}`);
 
     sceneUI = new SceneUI({
       templateId: 'training:prompt',

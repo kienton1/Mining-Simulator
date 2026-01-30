@@ -54,6 +54,9 @@ import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
 import { ISLAND3_CONFIG } from './src/worldData/Island3Config';
 import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from './src/Core/GameConstants';
+import { DailyChestEntity } from './src/DailyReward/DailyChestEntity';
+import { DailyChestLabelManager } from './src/DailyReward/DailyChestLabelManager';
+import { DailyChestController } from './src/DailyReward/DailyChestController';
 
 /**
  * startServer is always the entry point for our game.
@@ -263,6 +266,51 @@ startServer(world => {
   });
   const shopLabelManager = new ShopLabelManager(world, shopLabels);
   setTimeout(() => shopLabelManager.start(), 1000);
+
+  /**
+   * Daily Reward Chest System
+   * Spawn treasure chests near each gem upgrade store with sparkle particles
+   */
+  const dailyChestOffset = { x: 0, y: 0, z: -9 };
+  const dailyChestEntities: DailyChestEntity[] = [];
+  const dailyChestPositions: { id: string; position: { x: number; y: number; z: number } }[] = [];
+
+  (['island1', 'island2', 'island3'] as const).forEach((worldId) => {
+    const upgradePos = getShopPosition(worldId, 'upgrades');
+    const chestPos = {
+      x: upgradePos.x + dailyChestOffset.x,
+      y: upgradePos.y + dailyChestOffset.y,
+      z: upgradePos.z + dailyChestOffset.z,
+    };
+
+    const chest = new DailyChestEntity(world, chestPos);
+    chest.spawn();
+    dailyChestEntities.push(chest);
+
+    dailyChestPositions.push({
+      id: `${worldId}-daily-chest`,
+      position: chestPos,
+    });
+  });
+
+  // Daily chest label manager (SceneUI with countdown/Ready!)
+  const dailyChestLabelManager = new DailyChestLabelManager(
+    world,
+    dailyChestPositions,
+    gameManager.getDailyRewardSystem()
+  );
+  dailyChestLabelManager.setGetConnectedPlayersCallback(() =>
+    PlayerManager.instance.getConnectedPlayers()
+  );
+  setTimeout(() => dailyChestLabelManager.start(), 1000);
+
+  // Daily chest proximity controller (auto-opens modal when player is near and reward ready)
+  const dailyChestController = new DailyChestController(
+    world,
+    dailyChestEntities,
+    gameManager.getDailyRewardSystem()
+  );
+  dailyChestController.start();
 
   function sendPetState(player: any) {
     const playerData = gameManager.getPlayerData(player);
@@ -496,6 +544,8 @@ startServer(world => {
     gemTraderEntities.forEach(entity => entity.addPlayer(player));
     // Add player to egg station tracking
     eggStationManager.addPlayer(player);
+    // Add player to daily chest tracking
+    dailyChestController.addPlayer(player);
     
     // Initialize player data with defaults first (synchronous)
     // This ensures entity can spawn immediately for proper camera setup
@@ -903,6 +953,47 @@ startServer(world => {
           gameManager.sendRewardConfigUI(player);
           gameManager.updateRewardTimerUI(player);
           break;
+        case 'REQUEST_DAILY_REWARD_STATE': {
+          const dailyRewardSystem = gameManager.getDailyRewardSystem();
+          const canClaim = dailyRewardSystem.canClaim(player);
+          const remainingMs = dailyRewardSystem.getRemainingMs(player);
+          const possibleRewards = dailyRewardSystem.getPossibleRewards(player);
+          player.ui.sendData({
+            type: 'DAILY_REWARD_STATE',
+            canClaim,
+            remainingMs,
+            possibleRewards,
+          });
+          break;
+        }
+        case 'DAILY_REWARD_CLAIM': {
+          const dailyRewardSystem = gameManager.getDailyRewardSystem();
+          const claimResult = dailyRewardSystem.claimReward(player);
+          if (claimResult.success && claimResult.result) {
+            player.ui.sendData({
+              type: 'DAILY_REWARD_RESULT',
+              success: true,
+              result: claimResult.result,
+            });
+            // Update UI with new stats
+            gameManager.sendPowerStatsToUI(player);
+            sendPetState(player);
+          } else {
+            player.ui.sendData({
+              type: 'DAILY_REWARD_RESULT',
+              success: false,
+              message: claimResult.message,
+            });
+          }
+          // Reset the modal triggered state so player can re-open if they walk away and back
+          dailyChestController.resetModalTriggered(player);
+          break;
+        }
+        case 'DAILY_REWARD_MODAL_CLOSED': {
+          // Reset the modal triggered state when modal is closed
+          dailyChestController.resetModalTriggered(player);
+          break;
+        }
         case 'PET_EQUIP': {
           const petId = String(data.petId ?? '');
           const res = gameManager.getPetManager().equipPet(player, petId);
@@ -1698,6 +1789,8 @@ startServer(world => {
     gemTraderEntities.forEach(entity => entity.removePlayer(player));
     // Remove player from egg station tracking
     eggStationManager.removePlayer(player);
+    // Remove player from daily chest tracking
+    dailyChestController.removePlayer(player);
     
     // Clean up mining input interval
     const miningInputInterval = (player as any).__miningInputInterval;
@@ -1778,6 +1871,7 @@ startServer(world => {
       mineResetUpgradeNPCs.forEach(npc => npc.addPlayer(player));
       gemTraderEntities.forEach(entity => entity.addPlayer(player));
       eggStationManager.addPlayer(player);
+      dailyChestController.addPlayer(player);
 
       // Re-send mining state if in mine
       if (gameManager.isPlayerInMine(player)) {

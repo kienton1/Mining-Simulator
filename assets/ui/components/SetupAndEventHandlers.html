@@ -1444,6 +1444,29 @@
       });
     }
 
+    // Setup daily reward claim button handler
+    const dailyRewardClaimButton = document.getElementById('daily-reward-claim-button');
+    if (dailyRewardClaimButton) {
+      dailyRewardClaimButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!state.dailyReward?.canClaim) return;
+        dailyRewardClaimButton.disabled = true;
+        stopDailyRewardAnimation();
+        hytopia.sendData({ type: 'DAILY_REWARD_CLAIM' });
+      });
+    }
+
+    // Setup daily reward close button handler
+    const dailyRewardCloseBtn = document.getElementById('daily-reward-close-btn');
+    if (dailyRewardCloseBtn) {
+      dailyRewardCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDailyRewardModal();
+      });
+    }
+
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
@@ -2206,10 +2229,10 @@
         mult.className = 'reward-pet-card__mult';
         mult.textContent = `x${formatNumber(pet?.multiplier ?? 0)}`;
 
-        card.appendChild(chance);
+        thumb.appendChild(chance);
+        thumb.appendChild(mult);
         card.appendChild(thumb);
         card.appendChild(name);
-        card.appendChild(mult);
         rewardPetsGridEl.appendChild(card);
       });
     };
@@ -2249,6 +2272,169 @@
       if (rewardMessageEl) {
         const defaultMessage = 'Play 15 minutes in-game for a reward!';
         rewardMessageEl.textContent = state.reward.message || defaultMessage;
+      }
+    };
+
+    // ========== DAILY REWARD FUNCTIONS ==========
+    let dailyRewardAnimationInterval = null;
+    let dailyRewardHighlightIndex = 0;
+
+    const formatDailyRewardTime = (ms) => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    };
+
+    const renderDailyRewardModal = () => {
+      const dailyRewardCardsGrid = document.getElementById('daily-reward-cards-grid');
+      const dailyRewardMessage = document.getElementById('daily-reward-message');
+      const dailyRewardTimerText = document.getElementById('daily-reward-timer-text');
+      const dailyRewardClaimButton = document.getElementById('daily-reward-claim-button');
+
+      if (!state.dailyReward) {
+        state.dailyReward = { canClaim: false, remainingMs: 0, possibleRewards: [] };
+      }
+
+      const canClaim = state.dailyReward.canClaim;
+      const remainingMs = state.dailyReward.remainingMs;
+      const possibleRewards = state.dailyReward.possibleRewards || [];
+
+      // Update timer display
+      if (dailyRewardTimerText) {
+        if (canClaim) {
+          dailyRewardTimerText.textContent = 'Ready!';
+          dailyRewardTimerText.classList.remove('daily-reward-timer__text--waiting');
+        } else {
+          dailyRewardTimerText.textContent = formatDailyRewardTime(remainingMs);
+          dailyRewardTimerText.classList.add('daily-reward-timer__text--waiting');
+        }
+      }
+
+      // Update message
+      if (dailyRewardMessage) {
+        if (canClaim) {
+          dailyRewardMessage.textContent = 'Your daily reward is ready!';
+          dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+        } else {
+          dailyRewardMessage.textContent = 'Come back later for your reward!';
+          dailyRewardMessage.classList.add('daily-reward-modal__message--waiting');
+        }
+      }
+
+      // Update claim button
+      if (dailyRewardClaimButton) {
+        dailyRewardClaimButton.disabled = !canClaim;
+      }
+
+      // Render reward cards
+      if (dailyRewardCardsGrid) {
+        dailyRewardCardsGrid.innerHTML = '';
+
+        possibleRewards.forEach((reward, index) => {
+          const card = document.createElement('div');
+          card.className = 'daily-reward-card';
+          card.dataset.rewardIndex = index;
+
+          const thumb = document.createElement('div');
+          thumb.className = 'daily-reward-card__thumb';
+          const img = document.createElement('img');
+          img.alt = reward.displayName || 'Reward';
+          img.src = `{{CDN_ASSETS_URL}}/${reward.iconUri}`;
+          img.onerror = () => { thumb.textContent = '?'; };
+          thumb.appendChild(img);
+
+          const name = document.createElement('div');
+          name.className = 'daily-reward-card__name';
+          name.textContent = reward.displayName || 'Reward';
+
+          const desc = document.createElement('div');
+          desc.className = 'daily-reward-card__desc';
+          desc.textContent = reward.description || '';
+
+          card.appendChild(thumb);
+          card.appendChild(name);
+          card.appendChild(desc);
+          dailyRewardCardsGrid.appendChild(card);
+        });
+
+        // Start animation if can claim and haven't started
+        if (canClaim && !state.dailyReward.animationComplete && possibleRewards.length > 0) {
+          startDailyRewardAnimation();
+        }
+      }
+    };
+
+    const startDailyRewardAnimation = () => {
+      if (dailyRewardAnimationInterval) {
+        clearInterval(dailyRewardAnimationInterval);
+      }
+
+      dailyRewardHighlightIndex = 0;
+      const cards = document.querySelectorAll('.daily-reward-card');
+
+      dailyRewardAnimationInterval = setInterval(() => {
+        // Remove highlight from all cards
+        cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
+
+        // Highlight current card
+        if (cards[dailyRewardHighlightIndex]) {
+          cards[dailyRewardHighlightIndex].classList.add('daily-reward-card--highlight');
+        }
+
+        dailyRewardHighlightIndex = (dailyRewardHighlightIndex + 1) % cards.length;
+      }, 300);
+    };
+
+    const stopDailyRewardAnimation = () => {
+      if (dailyRewardAnimationInterval) {
+        clearInterval(dailyRewardAnimationInterval);
+        dailyRewardAnimationInterval = null;
+      }
+      const cards = document.querySelectorAll('.daily-reward-card');
+      cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
+    };
+
+    const showDailyRewardWinner = (result) => {
+      stopDailyRewardAnimation();
+
+      const cards = document.querySelectorAll('.daily-reward-card');
+      const possibleRewards = state.dailyReward?.possibleRewards || [];
+
+      // Find the winning card by type
+      let winnerIndex = possibleRewards.findIndex((r) => r.type === result.type);
+      if (winnerIndex < 0) winnerIndex = 0;
+
+      if (cards[winnerIndex]) {
+        cards[winnerIndex].classList.add('daily-reward-card--winner');
+
+        // Update the card to show the actual result
+        const nameEl = cards[winnerIndex].querySelector('.daily-reward-card__name');
+        if (nameEl) nameEl.textContent = result.displayName;
+      }
+
+      // Update message
+      const dailyRewardMessage = document.getElementById('daily-reward-message');
+      if (dailyRewardMessage) {
+        dailyRewardMessage.textContent = `You received: ${result.displayName}!`;
+        dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+      }
+    };
+
+    // Daily reward close handler
+    const closeDailyRewardModal = () => {
+      const dailyRewardModal = document.getElementById('daily-reward-modal');
+      if (dailyRewardModal) {
+        hideModal(dailyRewardModal);
+        stopDailyRewardAnimation();
+        hytopia.sendData({ type: 'DAILY_REWARD_MODAL_CLOSED' });
+        // Reset animation state for next open
+        if (state.dailyReward) {
+          state.dailyReward.animationComplete = false;
+          state.dailyReward.lastResult = null;
+        }
       }
     };
 
@@ -4720,6 +4906,42 @@
           }
           state.reward.message = '';
           renderRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_STATE': {
+          state.dailyReward = state.dailyReward || {};
+          state.dailyReward.canClaim = data.canClaim ?? false;
+          state.dailyReward.remainingMs = data.remainingMs ?? 0;
+          state.dailyReward.possibleRewards = data.possibleRewards ?? [];
+          renderDailyRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_OPEN': {
+          const dailyRewardModal = document.getElementById('daily-reward-modal');
+          if (dailyRewardModal) {
+            showModal(dailyRewardModal);
+            hytopia.sendData({ type: 'REQUEST_DAILY_REWARD_STATE' });
+          }
+          break;
+        }
+        case 'DAILY_REWARD_CLOSE': {
+          closeDailyRewardModal();
+          break;
+        }
+        case 'DAILY_REWARD_RESULT': {
+          state.dailyReward = state.dailyReward || {};
+          if (data.success && data.result) {
+            state.dailyReward.lastResult = data.result;
+            state.dailyReward.canClaim = false;
+            state.dailyReward.animationComplete = true;
+            // Show winner effect
+            showDailyRewardWinner(data.result);
+            spawnConfettiBurst();
+            playUpgradePurchaseSfx();
+          } else {
+            state.dailyReward.message = data.message || 'Failed to claim reward.';
+          }
+          renderDailyRewardModal();
           break;
         }
         case 'PET_STATE':

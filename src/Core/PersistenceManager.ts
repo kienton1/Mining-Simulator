@@ -78,6 +78,11 @@ function validatePlayerData(data: any): data is PlayerData {
   // Admin flag is optional
   if (data.isAdmin !== undefined && typeof data.isAdmin !== 'boolean') return false;
 
+  // Daily reward fields are optional for backward compatibility
+  if (data.lastDailyRewardClaim !== undefined && (typeof data.lastDailyRewardClaim !== 'number' || isNaN(data.lastDailyRewardClaim) || data.lastDailyRewardClaim < 0)) return false;
+  if (data.maxGoldEverHeld !== undefined && (typeof data.maxGoldEverHeld !== 'number' || isNaN(data.maxGoldEverHeld) || data.maxGoldEverHeld < 0)) return false;
+  if (data.maxGemsEverHeld !== undefined && (typeof data.maxGemsEverHeld !== 'number' || isNaN(data.maxGemsEverHeld) || data.maxGemsEverHeld < 0)) return false;
+
   return true;
 }
 
@@ -277,6 +282,16 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
       };
     })(),
     isAdmin: typeof savedData.isAdmin === 'boolean' ? savedData.isAdmin : (defaults.isAdmin ?? false),
+    // Daily reward fields
+    lastDailyRewardClaim: typeof savedData.lastDailyRewardClaim === 'number' && !isNaN(savedData.lastDailyRewardClaim) && savedData.lastDailyRewardClaim >= 0
+      ? savedData.lastDailyRewardClaim
+      : (defaults.lastDailyRewardClaim ?? 0),
+    maxGoldEverHeld: typeof savedData.maxGoldEverHeld === 'number' && !isNaN(savedData.maxGoldEverHeld) && savedData.maxGoldEverHeld >= 0
+      ? savedData.maxGoldEverHeld
+      : (defaults.maxGoldEverHeld ?? 0),
+    maxGemsEverHeld: typeof savedData.maxGemsEverHeld === 'number' && !isNaN(savedData.maxGemsEverHeld) && savedData.maxGemsEverHeld >= 0
+      ? savedData.maxGemsEverHeld
+      : (defaults.maxGemsEverHeld ?? 0),
   };
 
   // Sanitize inventory values (ensure they're numbers and non-negative)
