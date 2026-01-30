@@ -2046,6 +2046,8 @@
     });
     const rebirthOptionsEl = document.getElementById('rebirth-options');
     const rebirthBadge = document.getElementById('rebirth-badge');
+    const rebirthCurrentCountEl = document.getElementById('rebirth-current-count');
+    const rebirthPowerBonusEl = document.getElementById('rebirth-power-bonus');
     const tutorialTextContainer = document.getElementById('tutorial-text-container');
     const tutorialTextEl = document.getElementById('tutorial-text');
     const tutorialPointer = document.getElementById('tutorial-pointer');
@@ -4050,7 +4052,8 @@
           card.classList.add('unavailable');
         }
         btn.addEventListener('click', () => {
-          if (!affordable) return;
+          // Re-check affordability at click-time since power can change while the modal is open (e.g., training).
+          if (state.power < opt.cost) return;
           console.log(`[UI] Performing rebirth: ${opt.count}`);
           hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: opt.count });
         });
@@ -4066,9 +4069,20 @@
       state.rebirths = data.currentRebirths ?? state.rebirths;
       state.rebirth.options = data.options || [];
       state.rebirth.maxRebirths = data.maxRebirths ?? 0;
+      // Update the stats shown inside the modal, if present.
+      if (rebirthCurrentCountEl) rebirthCurrentCountEl.textContent = formatNumber(state.rebirths || 0);
+      if (rebirthPowerBonusEl) rebirthPowerBonusEl.textContent = `+${(state.rebirths || 0) * 10}%`;
       renderRebirthOptions();
       showModal(rebirthModal);
       if (rebirthBadge) rebirthBadge.hidden = !(data.canRebirth);
+    };
+
+    const refreshRebirthModalIfOpen = () => {
+      if (!rebirthModal || !rebirthModal.classList.contains('visible')) return;
+      // Re-render so costs + disabled states reflect the latest power without requiring reopen.
+      renderRebirthOptions();
+      if (rebirthCurrentCountEl) rebirthCurrentCountEl.textContent = formatNumber(state.rebirths || 0);
+      if (rebirthPowerBonusEl) rebirthPowerBonusEl.textContent = `+${(state.rebirths || 0) * 10}%`;
     };
 
     const spawnMinedOrePopup = (oreName, oreColor) => {
@@ -4793,6 +4807,7 @@
           if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          refreshRebirthModalIfOpen();
           break;
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
@@ -4853,6 +4868,7 @@
           } else {
             console.warn('[UI] Invalid amount for popup:', data.amount);
           }
+          refreshRebirthModalIfOpen();
           break;
         case 'TRAINING_PROMPT':
           // Show or hide the training prompt based on visibility
@@ -5046,11 +5062,9 @@
               currentEggHatch.confettiFired = true;
             }
           }
-          if (typeof data.goldSpent === 'number') {
-            // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
-            state.gold = Math.max(0, state.gold - data.goldSpent);
-            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
-          }
+          // NOTE: Don't optimistically subtract gold here.
+          // The server already sends an authoritative GOLD_STATS update as part of hatching.
+          // Depending on event ordering, subtracting here can temporarily double-decrement the HUD.
           renderEggStation();
           break;
         }
@@ -15230,8 +15244,7 @@
     color: #ffaa00; /* Orange/Gold */
   }
 
-
-<!-- Included from: ./components/ThemeStyles.html -->
+  /* Included from: ./components/ThemeStyles.html */
 
   body.mobile .training-prompt__title {
     font-size: 14px;

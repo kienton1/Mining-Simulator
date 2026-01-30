@@ -4,3 +4,5 @@ dev/persistence
 CLAUDE.md
 index.mjs
 package-lock.json
+.tmp-ore-dash-ui
+.tmp-sdk-examples

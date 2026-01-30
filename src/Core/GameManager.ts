@@ -1391,7 +1391,7 @@ export class GameManager {
 
       // Now use the same function as holding E - this will teleport to exact position and start training
       // startTraining will teleport to: x: rock.position.x, y: 1.75, z: -9.27
-      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
       
       if (!trainingStarted) {
 
@@ -1400,11 +1400,35 @@ export class GameManager {
 
       // Store position to detect if player leaves training area
       // Use the same teleport position that startTraining uses
-      const standPosition = {
-        x: bestRockLocation.position.x, // Same X as the ore block
-        y: 1.75, // Fixed Y position
-        z: -9.27, // Fixed Z position (forward of the ore blocks)
-      };
+      const worldId = playerData.currentWorld || 'island1';
+      const standPosition = worldId === 'island2'
+        ? {
+            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+            y: 1.75,
+            z: bestRockLocation.position.z + 0.1,
+          }
+        : worldId === 'island3'
+          ? (() => {
+              if (bestRockLocation.bounds) {
+                const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                return {
+                  x: Math.round(centerX * 10) / 10,
+                  y: 1.75,
+                  z: Math.round(centerZ * 10) / 10,
+                };
+              }
+              return {
+                x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                y: 1.75,
+                z: bestRockLocation.position.z + 0.1,
+              };
+            })()
+          : {
+              x: bestRockLocation.position.x, // Same X as the ore block
+              y: 1.75, // Fixed Y position
+              z: -9.27, // Fixed Z position (forward of the ore blocks)
+            };
 
       const playerEntity = this.getPlayerEntity(player);
       if (playerEntity && autoState) {
@@ -1437,22 +1461,6 @@ export class GameManager {
             // Removed space bar check to prevent input interference
           );
 
-          // Check velocity if available
-          let hasVelocityMovement = false;
-          try {
-            const velocity = (playerEnt as any).velocity;
-            if (velocity) {
-              const vx = velocity.x || 0;
-              const vy = velocity.y || 0;
-              const vz = velocity.z || 0;
-              const horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
-              const verticalVelocity = Math.abs(vy);
-              hasVelocityMovement = horizontalVelocity > 0.1 || verticalVelocity > 0.1;
-            }
-          } catch (e) {
-            // Velocity not available, use position-based check
-          }
-
           // Check position distance
           const currentPos = playerEnt.position;
           const dx = currentPos.x - autoState.lastAutoTrainPosition.x;
@@ -1460,10 +1468,10 @@ export class GameManager {
           const dz = currentPos.z - autoState.lastAutoTrainPosition.z;
           const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
           const verticalDistance = Math.abs(dy);
-          const hasPositionMovement = horizontalDistance > 0.3 || verticalDistance > 0.3;
+          const hasPositionMovement = horizontalDistance > 1.0 || verticalDistance > 1.0;
 
-          // If ANY movement detected (input, velocity, or position), turn off auto-train immediately
-          if (hasMovementInput || hasVelocityMovement || hasPositionMovement) {
+          // If ANY movement detected (input or large position drift), turn off auto-train immediately
+          if (hasMovementInput || hasPositionMovement) {
 
             this.toggleAutoTrain(player);
             return; // Stop checking - auto-train is being turned off
@@ -1506,13 +1514,37 @@ export class GameManager {
               setTimeout(() => {
                 if (!autoState?.autoTrainEnabled) return;
                 
-                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
                 if (trainingStarted) {
-                  const newStandPosition = {
-                    x: bestRockLocation.position.x,
-                    y: 1.75,
-                    z: -9.27,
-                  };
+                  const worldId = playerData.currentWorld || 'island1';
+                  const newStandPosition = worldId === 'island2'
+                    ? {
+                        x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                        y: 1.75,
+                        z: bestRockLocation.position.z + 0.1,
+                      }
+                    : worldId === 'island3'
+                      ? (() => {
+                          if (bestRockLocation.bounds) {
+                            const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                            const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                            return {
+                              x: Math.round(centerX * 10) / 10,
+                              y: 1.75,
+                              z: Math.round(centerZ * 10) / 10,
+                            };
+                          }
+                          return {
+                            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                            y: 1.75,
+                            z: bestRockLocation.position.z + 0.1,
+                          };
+                        })()
+                      : {
+                          x: bestRockLocation.position.x,
+                          y: 1.75,
+                          z: -9.27,
+                        };
                   autoState.lastAutoTrainPosition = newStandPosition;
 
                 }

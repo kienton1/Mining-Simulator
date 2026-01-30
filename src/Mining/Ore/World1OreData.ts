@@ -152,7 +152,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.DEEPSLATE,
     rarity: 1,  // 1 in 1
     value: 5,
-    firstDepth: 26,
+    firstDepth: 5,
     firstHealth: 12,
     lastDepth: 1000,
     lastHealth: 19634,
@@ -164,7 +164,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.COAL,
     rarity: 5,  // 1 in 5
     value: 6,
-    firstDepth: 33,
+    firstDepth: 5,
     firstHealth: 8,
     lastDepth: 1000,
     lastHealth: 22000,
@@ -176,7 +176,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.IRON,
     rarity: 10,  // 1 in 10
     value: 10,
-    firstDepth: 38,
+    firstDepth: 5,
     firstHealth: 24,
     lastDepth: 1000,
     lastHealth: 25500,
@@ -190,7 +190,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.TIN,
     rarity: 12,  // 1 in 12
     value: 15,
-    firstDepth: 59,
+    firstDepth: 25,
     firstHealth: 106,
     lastDepth: 1000,
     lastHealth: 27994,
@@ -202,7 +202,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.COBALT,
     rarity: 14,  // 1 in 14
     value: 50,
-    firstDepth: 58,
+    firstDepth: 25,
     firstHealth: 178,
     lastDepth: 1000,
     lastHealth: 45858,
@@ -214,7 +214,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.PYRITE,
     rarity: 16,  // 1 in 16
     value: 100,
-    firstDepth: 68,
+    firstDepth: 25,
     firstHealth: 325,
     lastDepth: 1000,
     lastHealth: 56953,
@@ -226,7 +226,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.GOLD,
     rarity: 22,  // 1 in 22
     value: 250,
-    firstDepth: 97,
+    firstDepth: 25,
     firstHealth: 902,
     lastDepth: 1000,
     lastHealth: 68720,
@@ -240,7 +240,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.OBSIDIAN,
     rarity: 33,  // 1 in 33
     value: 500,
-    firstDepth: 149,
+    firstDepth: 100,
     firstHealth: 3067,
     lastDepth: 1000,
     lastHealth: 93314,
@@ -252,7 +252,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.RUBY,
     rarity: 50,  // 1 in 50
     value: 1000,
-    firstDepth: 113,
+    firstDepth: 100,
     firstHealth: 2890,
     lastDepth: 1000,
     lastHealth: 139970,
@@ -264,7 +264,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.DIAMOND,
     rarity: 100,  // 1 in 100
     value: 2000,
-    firstDepth: 180,
+    firstDepth: 150,
     firstHealth: 6986,
     lastDepth: 1000,
     lastHealth: 180000,
@@ -276,7 +276,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.AMBER,
     rarity: 100,  // 1 in 100
     value: 3500,
-    firstDepth: 245,
+    firstDepth: 200,
     firstHealth: 9735,
     lastDepth: 1000,
     lastHealth: 230000,
@@ -290,7 +290,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.QUARTZ,
     rarity: 100,  // 1 in 100
     value: 5000,
-    firstDepth: 215,
+    firstDepth: 200,
     firstHealth: 12250,
     lastDepth: 1000,
     lastHealth: 245000,
@@ -302,7 +302,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.TOPAZ,
     rarity: 200,  // 1 in 200
     value: 10000,
-    firstDepth: 273,
+    firstDepth: 200,
     firstHealth: 24758,
     lastDepth: 1000,
     lastHealth: 285000,
@@ -314,7 +314,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.EMERALD,
     rarity: 222,  // 1 in 222
     value: 20000,
-    firstDepth: 540,
+    firstDepth: 300,
     firstHealth: 92389,
     lastDepth: 1000,
     lastHealth: 294520,
@@ -326,7 +326,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.RELIC,
     rarity: 250,  // 1 in 250
     value: 50000,
-    firstDepth: 550,
+    firstDepth: 300,
     firstHealth: 159190,
     lastDepth: 1000,
     lastHealth: 385000,
@@ -340,7 +340,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.AMETHYST,
     rarity: 285,  // 1 in 285
     value: 75000,
-    firstDepth: 430,
+    firstDepth: 300,
     firstHealth: 106180,
     lastDepth: 1000,
     lastHealth: 559890,
@@ -352,7 +352,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.SAPPHIRE,
     rarity: 333,  // 1 in 333
     value: 150000,
-    firstDepth: 847,
+    firstDepth: 300,
     firstHealth: 585970,
     lastDepth: 1000,
     lastHealth: 820000,
@@ -364,7 +364,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.LUMINITE,
     rarity: 400,  // 1 in 400
     value: 250000,
-    firstDepth: 893,
+    firstDepth: 300,
     firstHealth: 987200,
     lastDepth: 1000,
     lastHealth: 1310000,
@@ -376,7 +376,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.PRISMATIC,
     rarity: 666,  // 1 in 666
     value: 350000,
-    firstDepth: 638,
+    firstDepth: 300,
     firstHealth: 767500,
     lastDepth: 1000,
     lastHealth: 1550000,
@@ -390,7 +390,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.SUNSTONE,
     rarity: 1000,  // 1 in 1000
     value: 450000,
-    firstDepth: 870,
+    firstDepth: 300,
     firstHealth: 1690000,
     lastDepth: 1000,
     lastHealth: 1900000,
@@ -402,7 +402,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.MITHRIAL,
     rarity: 2000,  // 1 in 2000
     value: 600000,
-    firstDepth: 829,
+    firstDepth: 300,
     firstHealth: 2170000,
     lastDepth: 1000,
     lastHealth: 2400000,
@@ -414,7 +414,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.ASTRALITE,
     rarity: 2857,  // 1 in 2857
     value: 800000,
-    firstDepth: 770,
+    firstDepth: 300,
     firstHealth: 2710000,
     lastDepth: 1000,
     lastHealth: 3100000,
@@ -426,7 +426,7 @@ export const ORE_DATABASE: Record<OreType, OreData> = {
     type: OreType.DRAGONSTONE,
     rarity: 10000,  // 1 in 10000
     value: 1500000,
-    firstDepth: 875,
+    firstDepth: 300,
     firstHealth: 3300000,
     lastDepth: 1000,
     lastHealth: 4000000,

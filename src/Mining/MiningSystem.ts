@@ -8,7 +8,7 @@
  */
 
 import { World, Player, Entity, RigidBodyType } from 'hytopia';
-import { calculateMiningDamage } from '../Stats/StatCalculator';
+import { calculateMiningDamage, getSwingsPerSecond } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
@@ -16,7 +16,7 @@ import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
 /**
  * Mining block position key (x,y,z)
@@ -322,22 +322,25 @@ export class MiningSystem {
     // Use existing mining state (we already verified it exists above)
     const state = existingState;
 
-    // RATE LIMITING: Enforce swing rate based on pickaxe mining speed
+    // RATE LIMITING: Enforce swing rate based on speed + world curve
     // Calculate minimum time between hits (in milliseconds)
-    // Base rate is 2.0 swings/second (BASE_SWING_RATE)
-    // Pickaxe speed is a percentage increase (e.g., 5.0 = +5%, 30.0 = +30%)
-    // Formula: EffectiveRate = BaseRate × (1 + SpeedBonus / 100)
-    const speedMultiplier = 1 + (pickaxe.miningSpeed / 100);
-    const effectiveHitRate = BASE_SWING_RATE * speedMultiplier; // swings per second
-    const minTimeBetweenHits = 1000 / effectiveHitRate; // milliseconds between hits
-    
-    const currentTime = Date.now();
-    const timeSinceLastHit = currentTime - state.lastHitTime;
-    
-    // If not enough time has passed, ignore this click (prevents spam clicking)
-    if (timeSinceLastHit < minTimeBetweenHits) {
-      // Click too soon - rate limit enforced
-      return;
+    // Formula: SPS = getSwingsPerSecond(speed, world)
+    const worldId = this.getPlayerWorldId(player);
+    if (!isAutoMining) {
+      const worldNumber = this.getWorldNumberFromId(worldId);
+      const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber); // swings per second
+      const minTimeBetweenHits = Math.max(1, Math.ceil(1000 / effectiveHitRate)); // milliseconds between hits
+      // Helpful debug (can be noisy if enabled elsewhere):
+      // console.log('[MiningSystem] SPS calc:', { worldId, worldNumber, speed: pickaxe.miningSpeed, effectiveHitRate, minTimeBetweenHits });
+
+      const currentTime = Date.now();
+      const timeSinceLastHit = currentTime - state.lastHitTime;
+
+      // If not enough time has passed, ignore this click (prevents spam clicking)
+      if (timeSinceLastHit < minTimeBetweenHits) {
+        // Click too soon - rate limit enforced
+        return;
+      }
     }
 
     // Get player data for power calculation
@@ -347,61 +350,96 @@ export class MiningSystem {
       return;
     }
 
-    // Perform raycast from player's feet straight down
-    // This allows the player to look around while mining the block they're standing on
-    const playerFeetPosition = {
-      x: playerEntity.position.x,
-      y: playerEntity.position.y, // Player's feet position
-      z: playerEntity.position.z,
-    };
+    // PlayerData.power is stored as a string (BigInt-friendly in JSON). Coerce once for damage calcs.
+    const powerNumRaw = Number(playerData.power || 0);
+    const powerNum = Number.isFinite(powerNumRaw) ? powerNumRaw : 0;
 
-    // Raycast straight down to check what block the player is standing on
-    const direction = { x: 0, y: -1, z: 0 }; // Straight down
+    let resolvedBlockCoordinate: { x: number; y: number; z: number };
+    let hitDepth: number;
 
-    // Draw manual debug markers so the player can see the ray in-game
-    this.drawRaycastDebugLine(playerFeetPosition, direction, 5); // Only need to check a few blocks down
+    if (isAutoMining) {
+      const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
+      const topY = this.mineLevelToTopY(currentMineLevel);
+      const center = this.getMineCenter(player);
+      resolvedBlockCoordinate = {
+        x: Math.floor(center.x),
+        y: topY,
+        z: Math.floor(center.z),
+      };
+      hitDepth = resolvedBlockCoordinate.y;
+    } else {
+      // Perform raycast from player's feet straight down
+      // This allows the player to look around while mining the block they're standing on
+      const playerFeetPosition = {
+        x: playerEntity.position.x,
+        y: playerEntity.position.y, // Player's feet position
+        z: playerEntity.position.z,
+      };
 
-    // Perform raycast straight down from player's feet
-    // Exclude player's own rigid body to prevent self-hits
-    const hitResult = this.world.simulation.raycast(
-      playerFeetPosition,
-      direction,
-      5, // Only need to check a few blocks below feet
-      {
-        filterExcludeRigidBody: (playerEntity as any).rawRigidBody,
+      // Raycast straight down to check what block the player is standing on
+      const direction = { x: 0, y: -1, z: 0 }; // Straight down
+
+      const petRigidBodyHandles = this.getPetRigidBodyHandles();
+      // Prefer colliderMap-based filtering if available: it's the most reliable way
+      // to ensure mining raycasts only hit voxel blocks (and never pets/other entities).
+      const colliderMap = (this.world.simulation as any)?.colliderMap;
+
+      // Draw manual debug markers so the player can see the ray in-game
+      // Increased so mining still works reliably if the player is slightly above the block (step-up, jitter, etc.)
+      this.drawRaycastDebugLine(playerFeetPosition, direction, 30);
+
+      // Perform raycast straight down from player's feet
+      // Exclude player's own rigid body to prevent self-hits
+      const hitResult = this.world.simulation.raycast(
+        playerFeetPosition,
+        direction,
+        30, // Increased: allow mining when slightly above the block
+        {
+          filterExcludeRigidBody: (playerEntity as any).rawRigidBody,
+          filterPredicate: (collider) => {
+            const handle = (collider as any)?.handle;
+
+            // If colliderMap exists, only allow colliders that represent voxel blocks.
+            // This prevents pets (and any other entities) from blocking mining rays.
+            if (colliderMap?.getColliderHandleBlockType && typeof handle === 'number') {
+              return !!colliderMap.getColliderHandleBlockType(handle);
+            }
+
+            // Fallback: exclude pet rigid bodies by handle.
+            const parentHandle = (collider as any).parent?.();
+            if (typeof parentHandle === 'number' && petRigidBodyHandles.has(parentHandle)) return false;
+            return true;
+          },
+        }
+      );
+      
+      if (!hitResult) {
+        // No hit, clear target
+        console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
+        state.currentTargetBlock = null;
+        return;
       }
-    );
-    
-    if (!hitResult) {
-      // No hit, clear target
-      console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
-      state.currentTargetBlock = null;
-      return;
-    }
 
-    // Check if hit block is a mining block
-    const hitBlock = hitResult.hitBlock;
-    const hitPoint = hitResult.hitPoint;
-    const blockGlobalCoordinate = hitBlock?.globalCoordinate;
-    
-    if (!blockGlobalCoordinate && !hitPoint) {
-      return;
+      // Check if hit block is a mining block
+      const hitBlock = hitResult.hitBlock;
+      const hitPoint = hitResult.hitPoint;
+      const blockGlobalCoordinate = hitBlock?.globalCoordinate;
+      
+      if (!blockGlobalCoordinate && !hitPoint) {
+        return;
+      }
+      
+      const rawCoordinate = blockGlobalCoordinate ?? hitPoint!;
+      resolvedBlockCoordinate = {
+        x: Math.floor(rawCoordinate.x),
+        y: Math.floor(rawCoordinate.y),
+        z: Math.floor(rawCoordinate.z),
+      };
+      hitDepth = resolvedBlockCoordinate.y;
     }
-    
-    const rawCoordinate = blockGlobalCoordinate ?? hitPoint!;
-    const resolvedBlockCoordinate = {
-      x: Math.floor(rawCoordinate.x),
-      y: Math.floor(rawCoordinate.y),
-      z: Math.floor(rawCoordinate.z),
-    };
-
-    // Get player's current depth (floor of Y position)
-    const playerDepth = Math.floor(playerEntity.position.y);
-    const hitDepth = resolvedBlockCoordinate.y;
     
     // Check if block is within the mining area bounds (X and Z)
     // Only blocks in the mining area can take damage
-    const worldId = this.getPlayerWorldId(player);
     const offsetBounds = this.getOffsetBounds(state.offset, worldId);
     const isInMiningArea = 
       resolvedBlockCoordinate.x >= offsetBounds.minX &&
@@ -419,7 +457,7 @@ export class MiningSystem {
     // Check if player is mining the level they're standing on
     // Player should only be able to mine blocks within their current mine level (3 blocks tall)
     const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
-    const isMiningCurrentLevel = this.isYCoordinateInMineLevel(hitDepth, currentMineLevel);
+    const isMiningCurrentLevel = isAutoMining ? true : this.isYCoordinateInMineLevel(hitDepth, currentMineLevel);
     
     if (!isMiningCurrentLevel) {
       // Can't mine blocks that aren't in the current mine level
@@ -436,7 +474,7 @@ export class MiningSystem {
 
     // Check if this mine level has a chest, win block, or a normal ore block
     // Use mine level for the key so all 3 Y coordinates share the same block
-    const hitMineLevel = this.yCoordinateToMineLevel(hitDepth);
+    const hitMineLevel = isAutoMining ? currentMineLevel : this.yCoordinateToMineLevel(hitDepth);
     const chestKey = `chest_level_${hitMineLevel}`;
     const miningAreaKey = `mining_area_level_${hitMineLevel}`;
     const unminableGoldKey = `unminable_gold_level_${hitMineLevel}`;
@@ -470,7 +508,7 @@ export class MiningSystem {
       state.currentTargetBlock = chestKey;
       
       // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
-      const baseDamage = calculateMiningDamage(playerData.power);
+      const baseDamage = calculateMiningDamage(powerNum);
       
       // Apply More Damage upgrade multiplier and round to integer
       const damage = Math.round(baseDamage * damageMultiplier);
@@ -524,8 +562,11 @@ export class MiningSystem {
           maxZ: mineBounds.maxZ,
           y: middleY + 0.5, // Center of the middle block
         };
-        // Use stone ore type for neutral brown debris color (or could use a custom chest color)
-        this.debrisManager.spawnDebris(OreType.STONE, areaBounds, 20);
+        // Skip debris during auto mining to keep SPS consistent under load.
+        if (!isAutoMining) {
+          // Use stone ore type for neutral brown debris color (or could use a custom chest color)
+          this.debrisManager.spawnDebris(OreType.STONE, areaBounds, 20);
+        }
         
         // Remove chest from map
         state.chestMap.delete(chestKey);
@@ -598,7 +639,7 @@ export class MiningSystem {
     state.currentTargetBlock = miningAreaKey;
 
     // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
-    const baseDamage = calculateMiningDamage(playerData.power);
+    const baseDamage = calculateMiningDamage(powerNum);
 
     // Apply More Damage upgrade multiplier and round to integer
     const damage = Math.round(baseDamage * damageMultiplier);
@@ -644,7 +685,10 @@ export class MiningSystem {
         maxZ: mineBounds.maxZ,
         y: middleY + 0.5, // Center of the middle block
       };
-      this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
+      // Skip debris during auto mining to keep SPS consistent under load.
+      if (!isAutoMining) {
+        this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
+      }
       
       // Remove shared block from map
       state.blockMap.delete(miningAreaKey);
@@ -727,17 +771,17 @@ export class MiningSystem {
     // Ensure state exists and initial level is generated
     this.getOrCreateState(player, pickaxe);
 
-    // Get mining speed (hits per second)
-    // Base rate is 2.0 swings/second (BASE_SWING_RATE)
-    // Pickaxe speed is a percentage increase (e.g., 5.0 = +5%, 30.0 = +30%)
-    // Formula: EffectiveRate = BaseRate × (1 + SpeedBonus / 100)
-    const speedMultiplier = 1 + (pickaxe.miningSpeed / 100);
-    const effectiveHitRate = BASE_SWING_RATE * speedMultiplier;
-    const hitInterval = 1000 / effectiveHitRate; // Convert to milliseconds
-    console.log('[MiningSystem] startMiningLoop: hitInterval=', hitInterval, 'ms');
+    // Get mining speed (hits per second) from speed + world curve
+    // Formula: SPS = getSwingsPerSecond(speed, world)
+    const worldId = this.getPlayerWorldId(player);
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber);
+    const hitIntervalMs = 1000 / effectiveHitRate;
+    const maxCatchupHits = Math.max(10, Math.ceil(effectiveHitRate * 5)); // Allow up to ~5s of catch-up
+    console.log('[MiningSystem] startMiningLoop: hitInterval=', hitIntervalMs, 'ms');
 
     // Safety check: ensure hitInterval is a valid number (not Infinity or NaN)
-    if (!isFinite(hitInterval) || hitInterval <= 0) {
+    if (!isFinite(hitIntervalMs) || hitIntervalMs <= 0) {
       console.log('[MiningSystem] startMiningLoop: Invalid hitInterval, aborting');
       return; // Don't start mining loop with invalid interval
     }
@@ -765,10 +809,29 @@ export class MiningSystem {
     console.log('[MiningSystem] startMiningLoop: Performing first hit');
     performHit();
 
+    let lastTick = Date.now();
+    let accumulatorMs = 0;
+    const tickIntervalMs = Math.max(16, Math.min(100, Math.floor(hitIntervalMs / 2)));
+
+    const tick = () => {
+      const now = Date.now();
+      const dt = now - lastTick;
+      lastTick = now;
+      accumulatorMs += dt;
+
+      // Allow multiple hits in one tick to catch up after lag, but cap to avoid spirals.
+      let loops = 0;
+      while (accumulatorMs >= hitIntervalMs && loops < maxCatchupHits) {
+        accumulatorMs -= hitIntervalMs;
+        performHit();
+        loops++;
+      }
+    };
+
     // Set up interval for continuous hits
     const currentState = this.miningStates.get(player);
     if (currentState) {
-      currentState.miningIntervalId = setInterval(performHit, hitInterval);
+      currentState.miningIntervalId = setInterval(tick, tickIntervalMs);
       console.log('[MiningSystem] startMiningLoop: Mining interval set up');
     } else {
       console.log('[MiningSystem] startMiningLoop: No state after getOrCreateState, cannot set interval!');
@@ -977,7 +1040,7 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData
   ): {
-    oreType: OreType | null;
+    oreType: string | null;
     isChest: boolean;
     chestType: string | null;
     blockHP: number;
@@ -1017,7 +1080,9 @@ export class MiningSystem {
       // Initialize HP if not already initialized (needs player damage to calculate)
       // Check if maxHP is 0 (indicates HP hasn't been initialized yet)
       if (chest.maxHP === 0) {
-        const baseDamage = calculateMiningDamage(playerData.power);
+        const powerNumRaw = Number(playerData.power || 0);
+        const powerNum = Number.isFinite(powerNumRaw) ? powerNumRaw : 0;
+        const baseDamage = calculateMiningDamage(powerNum);
         // Get combined damage multiplier (includes More Damage upgrade and miner damage bonus)
         const damageMultiplier = this.getCombinedDamageMultiplierCallback?.(player) ?? 1.0;
         const finalDamage = Math.round(baseDamage * damageMultiplier);
@@ -1208,6 +1273,32 @@ export class MiningSystem {
   private getPlayerWorldId(player: Player): string {
     const playerData = this.getPlayerDataCallback?.(player);
     return playerData?.currentWorld || 'island1';
+  }
+
+  /**
+   * Collect rigid body handles for pets so mining raycasts ignore them.
+   */
+  private getPetRigidBodyHandles(): Set<number> {
+    const handles = new Set<number>();
+    const entities = this.world.entityManager.getAllEntities();
+    for (const entity of entities) {
+      if (entity.tag === 'pet') {
+        const handle = (entity as any).rawRigidBody?.handle;
+        if (typeof handle === 'number') {
+          handles.add(handle);
+        }
+      }
+    }
+    return handles;
+  }
+
+  /**
+   * Maps world IDs to numeric world indices for SPS curves.
+   */
+  private getWorldNumberFromId(worldId: string): 1 | 2 | 3 {
+    if (worldId === 'island2') return 2;
+    if (worldId === 'island3') return 3;
+    return 1;
   }
 
   /**
@@ -2126,3 +2217,5 @@ export class MiningSystem {
     return { shouldSpawn: false, chestType: null };
   }
 }
+
+

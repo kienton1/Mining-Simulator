@@ -260,6 +260,7 @@ interface PlayerTrainingState {
   trainingRockLocation?: TrainingRockLocation;
   trainingStartPosition?: { x: number; y: number; z: number }; // Position after teleport (for movement detection baseline)
   originalPosition?: { x: number; y: number; z: number }; // Original position before teleport (for restoration)
+  isAutoTraining?: boolean;
 }
 
 /**
@@ -408,10 +409,11 @@ export class TrainingController {
     if (sceneUI) {
       // Update position to ensure it stays anchored to the rock
       const { x, y, z } = rockLocation.position;
+      const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
       const uiPos = {
         x,
         y: y + 1.8, // float above rock (lowered for better visibility)
-        z,
+        z: z + zOffset,
       };
       sceneUI.setPosition(uiPos);
       return sceneUI;
@@ -419,10 +421,11 @@ export class TrainingController {
 
     // Use the rock's actual world position with offset above the rock
     const { x, y, z } = rockLocation.position;
+    const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
     const uiPos = {
       x,
       y: y + 1.8, // float above rock (lowered for better visibility)
-      z,
+      z: z + zOffset,
     };
 
     sceneUI = new SceneUI({
@@ -456,10 +459,11 @@ export class TrainingController {
     if (!sceneUI) return;
 
     const { x, y, z } = rockLocation.position;
+    const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
     const uiPos = {
       x,
       y: y + 1.8, // float above rock (lowered for better visibility)
-      z,
+      z: z + zOffset,
     };
     sceneUI.setPosition(uiPos);
   }
@@ -485,7 +489,7 @@ export class TrainingController {
    * @param rockLocation - Training rock location to train on (optional, will find nearby if not provided)
    * @returns True if training started successfully
    */
-  startTraining(player: Player, rockLocation?: TrainingRockLocation): boolean {
+  startTraining(player: Player, rockLocation?: TrainingRockLocation, isAutoTraining: boolean = false): boolean {
     if (this.trainingSystem.isPlayerTraining(player)) {
       return true;
     }
@@ -586,6 +590,7 @@ export class TrainingController {
       // Keep the last nearby rock unique id in sync so teleport cleanup can always hide it.
       state.nearbyRockId = targetRock.rockData.id;
       state.nearbyRockUniqueId = uniqueId;
+      state.isAutoTraining = isAutoTraining;
     }
 
     // Start velocity monitoring to detect movement (including jumping)
@@ -749,6 +754,7 @@ export class TrainingController {
       state.trainingRockLocation = undefined;
       state.trainingStartPosition = undefined;
       state.originalPosition = undefined;
+      state.isAutoTraining = false;
     }
   }
 
@@ -1037,7 +1043,7 @@ export class TrainingController {
    * @param rockLocation - Training rock location to train on
    * @returns True if training started successfully
    */
-  startTrainingFromInteract(player: Player, rockLocation: TrainingRockLocation): boolean {
+  startTrainingFromInteract(player: Player, rockLocation: TrainingRockLocation, isAutoTraining: boolean = false): boolean {
     if (this.trainingSystem.isPlayerTraining(player)) {
       return true;
     }
@@ -1113,6 +1119,7 @@ export class TrainingController {
       state.trainingRockLocation = rockLocation;
       state.trainingStartPosition = standPosition;
       state.originalPosition = originalPosition;
+      state.isAutoTraining = isAutoTraining;
     }
 
     // Start velocity monitoring to detect movement (including jumping)
@@ -1488,6 +1495,8 @@ export class TrainingController {
         return;
       }
 
+      const isAutoTraining = Boolean(state.isAutoTraining);
+
       // Get current position and compare to training start position
       const currentPos = playerEntity.position;
       const startPos = state.trainingStartPosition;
@@ -1506,8 +1515,9 @@ export class TrainingController {
           input?.['W'] || input?.['A'] || input?.['S'] || input?.['D'] ||
           input?.[' '] // Space bar for jumping
         );
-        
-        if (isMoving || horizontalDistance > 0.3) {
+
+        const maxHorizontalDrift = isAutoTraining ? 1.0 : 0.3;
+        if (isMoving || horizontalDistance > maxHorizontalDrift) {
           this.stopTraining(player);
         }
         return;
@@ -1528,32 +1538,32 @@ export class TrainingController {
         input?.[' '] // Space bar for jumping
       );
 
-      // Try to get velocity from entity if available
+      // Try to get velocity from entity if available (manual training only)
       let horizontalVelocity = 0;
       let verticalVelocity = 0;
-      try {
-        const velocity = (playerEntity as any).velocity;
-        if (velocity) {
-          const vx = velocity.x || 0;
-          const vy = velocity.y || 0;
-          const vz = velocity.z || 0;
-          horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
-          verticalVelocity = Math.abs(vy);
+      if (!isAutoTraining) {
+        try {
+          const velocity = (playerEntity as any).velocity;
+          if (velocity) {
+            const vx = velocity.x || 0;
+            const vy = velocity.y || 0;
+            const vz = velocity.z || 0;
+            horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
+            verticalVelocity = Math.abs(vy);
+          }
+        } catch (e) {
+          // Velocity not available, use position-based check
         }
-      } catch (e) {
-        // Velocity not available, use position-based check
       }
 
-      // Stop training if ANY movement detected:
-      // - Horizontal movement input (WASD)
-      // - Jump input (space)
-      // - Horizontal velocity > 0.1
-      // - Vertical velocity > 0.1 (jumping)
-      // - Horizontal distance > 0.3 (walked)
-      // - Vertical distance > 0.3 (jumped)
+      // Stop training if movement detected.
+      // Auto training allows more drift to avoid false stops from tiny physics jitter.
+      const maxHorizontalDrift = isAutoTraining ? 1.0 : 0.3;
+      const maxVerticalDrift = isAutoTraining ? 1.0 : 0.3;
+
       const hasMovementInput = isMoving;
-      const hasHorizontalMovement = horizontalVelocity > 0.1 || horizontalDistance > 0.3;
-      const hasVerticalMovement = verticalVelocity > 0.1 || verticalDistance > 0.3;
+      const hasHorizontalMovement = horizontalVelocity > 0.1 || horizontalDistance > maxHorizontalDrift;
+      const hasVerticalMovement = verticalVelocity > 0.1 || verticalDistance > maxVerticalDrift;
       
       if (hasMovementInput || hasHorizontalMovement || hasVerticalMovement) {
         this.stopTraining(player);

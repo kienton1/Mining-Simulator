@@ -1055,6 +1055,12 @@ startServer(world => {
             // Also send updated power stats to update gold display
             gameManager.sendPowerStatsToUI(player);
             gameManager.getTutorialManager().onPickaxePurchased(player);
+
+            // If the player is currently holding to mine, restart the loop so SPS reflects the new pickaxe speed.
+            const miningController = gameManager.getMiningController();
+            if (miningController?.isPlayerMining(player)) {
+              miningController.startMiningLoop(player);
+            }
           } else {
             player.ui.sendData({
               type: 'PICKAXE_PURCHASED',
@@ -1081,6 +1087,12 @@ startServer(world => {
               gold: updatedShopData.playerGold,
               pickaxes: updatedShopData.pickaxes,
             });
+
+            // If the player is currently holding to mine, restart the loop so SPS reflects the newly equipped pickaxe speed.
+            const miningController = gameManager.getMiningController();
+            if (miningController?.isPlayerMining(player)) {
+              miningController.startMiningLoop(player);
+            }
           } else {
             player.ui.sendData({
               type: 'PICKAXE_EQUIPPED',
