@@ -5058,6 +5058,10 @@
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           // Update rebirth badge when power changes
           updateRebirthBadge();
+          // Re-render rebirth options if modal is visible so buttons update in real-time
+          if (rebirthModal && rebirthModal.classList.contains('visible')) {
+            renderRebirthOptions();
+          }
           console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
