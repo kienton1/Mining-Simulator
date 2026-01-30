@@ -1267,6 +1267,7 @@
     const rewardHudEl = document.getElementById('reward-hud');
     const rewardTimerTextEl = document.getElementById('reward-timer-text');
     const rewardButton = document.getElementById('reward-button');
+    const rewardActionButton = document.getElementById('reward-action-button');
     const rewardClaimButton = document.getElementById('reward-claim-button');
     const rewardProgressFillEl = document.getElementById('reward-progress-fill');
     const rewardProgressTextEl = document.getElementById('reward-progress-text');
@@ -1407,6 +1408,20 @@
         hytopia.sendData({ type: 'REQUEST_REWARD_STATE' });
         showModal(rewardModal);
         rewardButton.blur();
+        renderRewardModal();
+        window.focus();
+      });
+    }
+
+    // Setup reward action button click handler (left-side HUD for mobile)
+    if (rewardActionButton && rewardModal) {
+      rewardActionButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'reward' });
+        hytopia.sendData({ type: 'REQUEST_REWARD_STATE' });
+        showModal(rewardModal);
+        rewardActionButton.blur();
         renderRewardModal();
         window.focus();
       });
@@ -2179,6 +2194,11 @@
       if (!rewardHudEl || !rewardTimerTextEl) return;
       const ready = Boolean(state.reward.ready);
       rewardHudEl.classList.toggle('reward-hud--ready', ready);
+      // Sync ready state to mobile action-card badge
+      const rewardActionBadge = document.querySelector('.action-card__badge--reward');
+      if (rewardActionBadge) {
+        rewardActionBadge.style.display = ready ? 'flex' : 'none';
+      }
       if (ready) {
         rewardTimerTextEl.textContent = 'READY!';
       } else {

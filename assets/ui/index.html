@@ -1905,6 +1905,7 @@
     const rewardHudEl = document.getElementById('reward-hud');
     const rewardTimerTextEl = document.getElementById('reward-timer-text');
     const rewardButton = document.getElementById('reward-button');
+    const rewardActionButton = document.getElementById('reward-action-button');
     const rewardClaimButton = document.getElementById('reward-claim-button');
     const rewardProgressFillEl = document.getElementById('reward-progress-fill');
     const rewardProgressTextEl = document.getElementById('reward-progress-text');
@@ -2045,6 +2046,20 @@
         hytopia.sendData({ type: 'REQUEST_REWARD_STATE' });
         showModal(rewardModal);
         rewardButton.blur();
+        renderRewardModal();
+        window.focus();
+      });
+    }
+
+    // Setup reward action button click handler (left-side HUD for mobile)
+    if (rewardActionButton && rewardModal) {
+      rewardActionButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'reward' });
+        hytopia.sendData({ type: 'REQUEST_REWARD_STATE' });
+        showModal(rewardModal);
+        rewardActionButton.blur();
         renderRewardModal();
         window.focus();
       });
@@ -2817,6 +2832,11 @@
       if (!rewardHudEl || !rewardTimerTextEl) return;
       const ready = Boolean(state.reward.ready);
       rewardHudEl.classList.toggle('reward-hud--ready', ready);
+      // Sync ready state to mobile action-card badge
+      const rewardActionBadge = document.querySelector('.action-card__badge--reward');
+      if (rewardActionBadge) {
+        rewardActionBadge.style.display = ready ? 'flex' : 'none';
+      }
       if (ready) {
         rewardTimerTextEl.textContent = 'READY!';
       } else {
@@ -5685,9 +5705,10 @@
     <div id="reward-timer-text" class="reward-hud__timer">15m 00s</div>
     <button id="reward-button" class="reward-button">
       <span class="reward-button__icon">
-        <img src="{{CDN_ASSETS_URL}}/icons/target.png" alt="Reward" />
+        <img src="{{CDN_ASSETS_URL}}/icons/HUDIcons/RewardIcon.png" alt="Reward" />
       </span>
       <span class="reward-button__label">Reward</span>
+      <span class="reward-button__badge"></span>
     </button>
   </div>
   <!-- Trophy (Wins) -->
@@ -5733,6 +5754,13 @@
 <!-- Included from: ./components/LeftActions.html -->
 <!-- Left-side action buttons -->
 <div class="left-actions">
+  <!-- Mobile-only reward button -->
+  <button id="reward-action-button" class="action-card action-card--reward">
+    <span class="action-card__icon">
+      <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/RewardIcon.png" alt="Reward" />
+    </span>
+    <span class="action-card__badge action-card__badge--reward"></span>
+  </button>
   <button id="miner-button" class="action-card action-card--miner">
     <span class="action-card__icon">
       <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/MinerIcon.png" alt="Miners" />
@@ -11648,6 +11676,16 @@
     border-color: #2d6a4f;
   }
 
+  /* Hide reward action-card on desktop (shown in stats-hud-container instead) */
+  .action-card--reward {
+    display: none;
+  }
+
+  /* Hide the reward badge by default (JS toggles display when ready) */
+  .action-card__badge--reward {
+    display: none;
+  }
+
   /* Egg + Pets UI helpers (use existing modal styles as the base) */
   .egg-actions {
     display: flex;
@@ -14101,7 +14139,7 @@
     padding: 12px 16px;
     border-radius: 14px;
     border: 2px solid rgba(0, 0, 0, 0.7);
-    background: linear-gradient(180deg, #171717, #0c0c0c);
+    background: linear-gradient(180deg, rgba(23, 23, 23, 0.8), rgba(12, 12, 12, 0.8));
     color: #b36bff;
     font-size: 18px;
     font-weight: 900;
@@ -14111,6 +14149,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     min-width: 180px;
     width: 100%;
+    position: relative;
   }
 
   .reward-button__icon img {
@@ -14119,12 +14158,58 @@
   }
 
   .reward-button__label {
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+    background: linear-gradient(
+      90deg,
+      #b36bff 0%,
+      #ff6b9d 25%,
+      #ffd700 50%,
+      #ff6b9d 75%,
+      #b36bff 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rewardGradientShift 3s ease-in-out infinite;
+  }
+
+  @keyframes rewardGradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   .reward-hud--ready .reward-button {
     border-color: rgba(255, 214, 92, 0.8);
     box-shadow: 0 0 16px rgba(255, 214, 92, 0.45);
+  }
+
+  .reward-button__badge {
+    display: none;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    background: #e53935;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    animation: rewardBadgePulse 1.5s ease-in-out infinite;
+  }
+
+  .reward-hud--ready .reward-button__badge {
+    display: block;
+  }
+
+  @keyframes rewardBadgePulse {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7);
+    }
+    50% {
+      transform: scale(1.15);
+      box-shadow: 0 0 0 8px rgba(229, 57, 53, 0);
+    }
   }
 
   .auto-control-button {
@@ -14881,6 +14966,8 @@
       left: calc(28px + env(safe-area-inset-left));
       top: 50%;
       transform: translateY(-50%);
+      display: grid;
+      grid-template-columns: repeat(2, 46px);
       gap: 6px;
     }
 
@@ -14898,6 +14985,7 @@
   body.mobile .action-card__icon-img {
     width: 22px;
     height: 22px;
+    transform: scale(1.5); /* Override desktop's scale(2.5) */
   }
 
   body.mobile .action-card__badge {
@@ -15208,23 +15296,15 @@
     gap: 8px;
   }
 
-  body.mobile .reward-hud {
-    gap: 4px;
+  /* Hide reward from stats-hud-container on mobile */
+  body.mobile .stats-hud-container .reward-hud {
+    display: none;
   }
 
-  body.mobile .reward-hud__timer {
-    font-size: 12px;
-  }
-
-  body.mobile .reward-button {
-    padding: 8px 12px;
-    font-size: 14px;
-    min-width: 120px;
-  }
-
-  body.mobile .reward-button__icon img {
-    width: 20px;
-    height: 20px;
+  /* Show reward action-card in left-actions on mobile */
+  body.mobile .action-card--reward {
+    display: flex;
+    border-color: #5c1a5c; /* Purple border to match reward theme */
   }
 
   body.mobile .auto-btn {
