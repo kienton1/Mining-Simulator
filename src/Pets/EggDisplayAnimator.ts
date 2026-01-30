@@ -5,7 +5,7 @@
  * Includes gentle sparkle particles around each egg.
  */
 
-import { World, Entity, RigidBodyType, ColliderShape } from 'hytopia';
+import { World, Entity, RigidBodyType, ParticleEmitter } from 'hytopia';
 
 interface EggConfig {
   name: string;
@@ -17,17 +17,6 @@ interface EggAnimationState {
   entity: Entity;
   baseY: number;
   startTime: number;
-}
-
-interface ParticleData {
-  entity: Entity;
-  spawnTime: number;
-  lifetime: number;
-  basePosition: { x: number; y: number; z: number };
-  orbitRadius: number;
-  orbitSpeed: number;
-  orbitOffset: number;
-  floatSpeed: number;
 }
 
 // Egg configurations for all islands
@@ -49,9 +38,8 @@ const EGG_CONFIGS: EggConfig[] = [
 export class EggDisplayAnimator {
   private world: World;
   private eggStates: EggAnimationState[] = [];
-  private particles: Map<Entity, ParticleData> = new Map();
   private interval?: NodeJS.Timeout;
-  private particleSpawnInterval?: NodeJS.Timeout;
+  private particleEmitters: Map<Entity, ParticleEmitter[]> = new Map();
 
   // Animation parameters (slowed down)
   private readonly TICK_MS = 16; // ~60fps
@@ -60,11 +48,18 @@ export class EggDisplayAnimator {
   private readonly SPIN_SPEED = 0.2; // rotations per second (slowed from 0.5)
   private readonly EGG_SCALE = 2.2;
 
-  // Particle parameters
-  private readonly PARTICLE_SIZE = { x: 0.04, y: 0.04, z: 0.04 };
-  private readonly PARTICLE_LIFETIME_MS = 2500;
-  private readonly PARTICLE_SPAWN_INTERVAL_MS = 400;
-  private readonly PARTICLES_PER_EGG = 3;
+  // Particle textures and colors
+  private readonly PARTICLE_TEXTURES = [
+    'particles/star_01.png',
+    'particles/star_04.png',
+    'particles/symbol_02.png',
+  ];
+
+  private readonly PARTICLE_COLORS = [
+    { start: { r: 255, g: 215, b: 0 }, end: { r: 255, g: 180, b: 0 } },     // Golden
+    { start: { r: 255, g: 255, b: 220 }, end: { r: 255, g: 255, b: 180 } }, // Warm white
+    { start: { r: 255, g: 200, b: 255 }, end: { r: 255, g: 150, b: 220 } }, // Pink/magical
+  ];
 
   constructor(world: World) {
     this.world = world;
@@ -78,14 +73,6 @@ export class EggDisplayAnimator {
     if (!this.interval) {
       this.interval = setInterval(() => this.tick(), this.TICK_MS);
     }
-
-    // Start particle spawning
-    if (!this.particleSpawnInterval) {
-      this.particleSpawnInterval = setInterval(
-        () => this.spawnParticles(),
-        this.PARTICLE_SPAWN_INTERVAL_MS
-      );
-    }
   }
 
   stop(): void {
@@ -94,26 +81,22 @@ export class EggDisplayAnimator {
       this.interval = undefined;
     }
 
-    if (this.particleSpawnInterval) {
-      clearInterval(this.particleSpawnInterval);
-      this.particleSpawnInterval = undefined;
-    }
-
-    // Despawn all eggs
+    // Despawn all eggs and their particle emitters
     for (const state of this.eggStates) {
+      const emitters = this.particleEmitters.get(state.entity);
+      if (emitters) {
+        for (const emitter of emitters) {
+          if (emitter.isSpawned) {
+            emitter.despawn();
+          }
+        }
+      }
       if (state.entity.isSpawned) {
         state.entity.despawn();
       }
     }
     this.eggStates = [];
-
-    // Despawn all particles
-    for (const [entity] of this.particles) {
-      if (entity.isSpawned) {
-        entity.despawn();
-      }
-    }
-    this.particles.clear();
+    this.particleEmitters.clear();
   }
 
   private spawnEggs(): void {
@@ -132,6 +115,13 @@ export class EggDisplayAnimator {
 
       entity.spawn(this.world, config.position);
 
+      // Create and spawn particle emitters for this egg
+      const emitters = this.createParticleEmittersForEgg(config.position);
+      this.particleEmitters.set(entity, emitters);
+      for (const emitter of emitters) {
+        emitter.spawn(this.world);
+      }
+
       this.eggStates.push({
         entity,
         baseY: config.position.y,
@@ -142,76 +132,55 @@ export class EggDisplayAnimator {
     console.log(`[EggDisplayAnimator] Spawned ${this.eggStates.length} egg entities`);
   }
 
-  private spawnParticles(): void {
-    const now = Date.now();
+  private createParticleEmittersForEgg(eggPosition: { x: number; y: number; z: number }): ParticleEmitter[] {
+    const emitters: ParticleEmitter[] = [];
 
-    for (const state of this.eggStates) {
-      // Spawn a few particles per egg
-      for (let i = 0; i < this.PARTICLES_PER_EGG; i++) {
-        // Random orbit parameters
-        const orbitRadius = 0.6 + Math.random() * 0.4; // 0.6 to 1.0
-        const orbitSpeed = 0.5 + Math.random() * 0.5; // 0.5 to 1.0 rad/s
-        const orbitOffset = Math.random() * Math.PI * 2; // Random start angle
-        const floatSpeed = 0.3 + Math.random() * 0.3; // Upward drift
+    for (let i = 0; i < this.PARTICLE_TEXTURES.length; i++) {
+      const emitter = new ParticleEmitter({
+        position: { x: eggPosition.x, y: eggPosition.y, z: eggPosition.z },
+        textureUri: this.PARTICLE_TEXTURES[i],
 
-        // Gentle golden/white sparkle color
-        const sparkleColors = [
-          { r: 255, g: 255, b: 200 }, // Warm white
-          { r: 255, g: 230, b: 150 }, // Golden
-          { r: 200, g: 220, b: 255 }, // Cool white
-          { r: 255, g: 200, b: 255 }, // Pink tint
-        ];
-        const color = sparkleColors[Math.floor(Math.random() * sparkleColors.length)];
+        // Colors
+        colorStart: this.PARTICLE_COLORS[i].start,
+        colorEnd: this.PARTICLE_COLORS[i].end,
 
-        const particle = new Entity({
-          name: 'egg-sparkle',
-          blockTextureUri: 'blocks/glass.png',
-          blockHalfExtents: this.PARTICLE_SIZE,
-          tintColor: color,
-          opacity: 0.7,
-          rigidBodyOptions: {
-            type: RigidBodyType.FIXED,
-            colliders: [
-              {
-                shape: ColliderShape.BLOCK,
-                halfExtents: this.PARTICLE_SIZE,
-                isSensor: true,
-              },
-            ],
-          },
-          tag: 'egg-particle',
-        });
+        // HIGH COLOR INTENSITY - values > 1 create HDR/bloom effects
+        colorIntensityStart: 8,
+        colorIntensityEnd: 5,
 
-        const basePos = {
-          x: state.entity.position.x,
-          y: state.entity.position.y,
-          z: state.entity.position.z,
-        };
+        // Opacity
+        opacityStart: 1.0,
+        opacityEnd: 0.3,
 
-        // Spawn at orbit position
-        const startX = basePos.x + Math.cos(orbitOffset) * orbitRadius;
-        const startZ = basePos.z + Math.sin(orbitOffset) * orbitRadius;
+        // Size - bigger particles
+        sizeStart: 0.4,
+        sizeEnd: 0.15,
+        sizeStartVariance: 0.15,
 
-        particle.spawn(this.world, { x: startX, y: basePos.y, z: startZ });
+        // Movement - simulate swirl effect
+        velocity: { x: 0, y: 0.3, z: 0 },
+        velocityVariance: { x: 0.5, y: 0.2, z: 0.5 },
 
-        this.particles.set(particle, {
-          entity: particle,
-          spawnTime: now,
-          lifetime: this.PARTICLE_LIFETIME_MS,
-          basePosition: basePos,
-          orbitRadius,
-          orbitSpeed,
-          orbitOffset,
-          floatSpeed,
-        });
-      }
+        // Position spread around egg
+        positionVariance: { x: 1.2, y: 0.3, z: 1.2 },
+
+        // Timing - less frequent
+        lifetime: 3.0,
+        lifetimeVariance: 1.0,
+        rate: 1,
+        maxParticles: 5,
+      });
+
+      emitters.push(emitter);
     }
+
+    return emitters;
   }
 
   private tick(): void {
     const now = Date.now();
 
-    // Update eggs
+    // Update eggs - ParticleEmitter handles particle lifecycle automatically
     for (const state of this.eggStates) {
       const elapsed = (now - state.startTime) / 1000; // seconds
 
@@ -237,39 +206,6 @@ export class EggDisplayAnimator {
         z: 0,
         w: Math.cos(halfAngle),
       });
-    }
-
-    // Update particles
-    const particlesToRemove: Entity[] = [];
-
-    for (const [entity, data] of this.particles) {
-      const elapsed = now - data.spawnTime;
-      const progress = elapsed / data.lifetime;
-
-      if (progress >= 1) {
-        particlesToRemove.push(entity);
-        continue;
-      }
-
-      // Calculate orbit position
-      const angle = data.orbitOffset + (elapsed / 1000) * data.orbitSpeed;
-      const x = data.basePosition.x + Math.cos(angle) * data.orbitRadius;
-      const z = data.basePosition.z + Math.sin(angle) * data.orbitRadius;
-      const y = data.basePosition.y + (elapsed / 1000) * data.floatSpeed;
-
-      entity.setPosition({ x, y, z });
-
-      // Fade out opacity
-      const opacity = 0.7 * (1 - progress);
-      entity.setOpacity(opacity);
-    }
-
-    // Remove expired particles
-    for (const entity of particlesToRemove) {
-      if (entity.isSpawned) {
-        entity.despawn();
-      }
-      this.particles.delete(entity);
     }
   }
 }
