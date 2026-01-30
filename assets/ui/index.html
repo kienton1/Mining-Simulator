@@ -1999,9 +1999,13 @@
         // Immediately notify server that modal is opening (before sending rebirth data request)
         // This prevents any click events from triggering mining
         hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'rebirth' });
+        state.rebirth.pendingModalOpen = true;
         hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
       });
     }
+
+    // Request rebirth data silently on load to populate badge
+    hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
 
     // Setup pets button click handler (HUD below rebirth)
     if (petsButton) {
@@ -2122,6 +2126,8 @@
         power: 0,
         rebirths: 0,
         maxRebirths: 0,
+        canRebirth: false,
+        pendingModalOpen: false,
       },
       prompt: {
         visible: false,
@@ -4299,18 +4305,33 @@
       });
     };
 
+    // Update rebirth badge visibility based on stored options and current power
+    const updateRebirthBadge = () => {
+      const canRebirth = state.rebirth.options.some(opt => state.power >= opt.cost);
+      state.rebirth.canRebirth = canRebirth;
+      const rebirthBadge = document.querySelector('.action-card__badge--rebirth');
+      if (rebirthBadge) {
+        rebirthBadge.style.display = canRebirth ? 'flex' : 'none';
+      }
+    };
+
     const updateRebirthModal = (data) => {
       state.power = data.currentPower ?? state.power;
       state.rebirths = data.currentRebirths ?? state.rebirths;
       state.rebirth.options = data.options || [];
       state.rebirth.maxRebirths = data.maxRebirths ?? 0;
-      renderRebirthOptions();
-      showModal(rebirthModal);
 
-      // Toggle rebirth badge visibility
-      const rebirthBadge = document.querySelector('.action-card__badge--rebirth');
-      if (rebirthBadge) {
-        rebirthBadge.style.display = data.canRebirth ? 'flex' : 'none';
+      // Always update the badge
+      updateRebirthBadge();
+
+      // Show modal if user clicked the rebirth button, or update if already visible
+      const isModalVisible = rebirthModal && rebirthModal.classList.contains('visible');
+      if (state.rebirth.pendingModalOpen || isModalVisible) {
+        state.rebirth.pendingModalOpen = false;
+        renderRebirthOptions();
+        if (!isModalVisible) {
+          showModal(rebirthModal);
+        }
       }
     };
 
@@ -5035,6 +5056,8 @@
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          // Update rebirth badge when power changes
+          updateRebirthBadge();
           console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
@@ -9387,39 +9410,35 @@
     z-index: 11000;
   "
 >
-  <div class="reward-modal__container">
-    <div class="reward-modal__header">
-      <div class="reward-modal__title">Reward</div>
-      <button
-        id="reward-close-btn"
-        class="reward-modal__close modal__close"
-        data-close="reward-modal"
-      >
-        X
-      </button>
+  <div class="reward-wrapper">
+    <!-- Title floating above container -->
+    <div class="reward-title-container">
+      <h2 class="reward-title">REWARD</h2>
     </div>
+    <!-- Close button floating at top-right -->
+    <button id="reward-close-btn" class="reward-close-btn" data-close="reward-modal">X</button>
 
-    <div class="reward-modal__body">
-      <div class="reward-modal__egg-title">15 Minute Reward</div>
-
-      <div id="reward-pets-grid" class="reward-pets-grid">
-        <!-- Reward pet cards injected by JS -->
-      </div>
-
-      <div id="reward-message" class="reward-modal__message">
-        Play 15 minutes in-game for a reward!
-      </div>
-
-      <div class="reward-modal__progress">
-        <div class="reward-progress">
-          <div id="reward-progress-fill" class="reward-progress__fill"></div>
-          <div id="reward-progress-text" class="reward-progress__text">15m 00s</div>
+    <div class="reward-modal__container">
+      <div class="reward-modal__body">
+        <div id="reward-pets-grid" class="reward-pets-grid">
+          <!-- Reward pet cards injected by JS -->
         </div>
-      </div>
 
-      <button id="reward-claim-button" class="reward-claim-button" disabled>
-        Claim
-      </button>
+        <div id="reward-message" class="reward-modal__message">
+          Play 15 minutes in-game for a reward!
+        </div>
+
+        <div class="reward-modal__progress">
+          <div class="reward-progress">
+            <div id="reward-progress-fill" class="reward-progress__fill"></div>
+            <div id="reward-progress-text" class="reward-progress__text">15m 00s</div>
+          </div>
+        </div>
+
+        <button id="reward-claim-button" class="reward-claim-button" disabled>
+          Claim
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -9429,59 +9448,75 @@
     display: flex !important;
   }
 
-  .reward-modal__container {
-    width: 860px;
+  /* Wrapper for positioning title and close button */
+  .reward-wrapper {
+    position: relative;
+    width: 700px;
     max-width: 95vw;
-    max-height: 90vh;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  /* Floating title container - centered above the modal */
+  .reward-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(38, 110, 190, 0.95), rgba(16, 58, 110, 0.95));
+    border: 3px solid rgba(72, 164, 255, 0.9);
+    border-radius: 12px;
+    padding: 8px 24px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .reward-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  /* Floating close button - top right corner */
+  .reward-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .reward-modal__container {
+    width: 100%;
+    max-height: 75vh;
     background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
     border: 3px solid rgba(72, 164, 255, 0.9);
-    border-radius: 18px;
+    border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     padding: 18px 18px 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    font-family: "Fredoka", sans-serif;
-  }
-
-  .reward-modal__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .reward-modal__title {
-    font-size: 32px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
-  }
-
-  .reward-modal__close {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.6);
-    background: linear-gradient(135deg, #ff4d4d, #d93333);
-    color: #fff;
-    font-size: 20px;
-    font-weight: 900;
-    cursor: pointer;
+    overflow-y: auto;
   }
 
   .reward-modal__body {
     display: flex;
     flex-direction: column;
     gap: 14px;
-  }
-
-  .reward-modal__egg-title {
-    font-size: 24px;
-    font-weight: 900;
-    text-align: center;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
   }
 
   .reward-pets-grid {
@@ -9518,7 +9553,8 @@
     font-weight: 900;
     font-size: 14px;
     color: #ff5dd2;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+    -webkit-text-stroke: 1px #000;
+    paint-order: stroke fill;
   }
 
   .reward-pet-card__thumb {
@@ -9552,7 +9588,8 @@
     font-size: 18px;
     font-weight: 900;
     color: #ff3b3b;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+    -webkit-text-stroke: 1.5px #000;
+    paint-order: stroke fill;
   }
 
   .reward-modal__progress {
@@ -9587,7 +9624,8 @@
     justify-content: center;
     font-size: 18px;
     font-weight: 900;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+    -webkit-text-stroke: 1.5px #000;
+    paint-order: stroke fill;
   }
 
   .reward-claim-button {
@@ -9611,19 +9649,93 @@
     opacity: 0.6;
   }
 
+  /* ========== MOBILE STYLES ========== */
+  body.mobile .reward-wrapper {
+    margin-top: 20px;
+  }
+
+  body.mobile .reward-title-container {
+    padding: 6px 16px;
+  }
+
+  body.mobile .reward-title {
+    font-size: 18px;
+    -webkit-text-stroke: 1.5px #000;
+  }
+
+  body.mobile .reward-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
   body.mobile .reward-modal__container {
-    width: 95vw;
-    padding: 14px;
+    width: 100%;
+    padding: 12px;
+    max-height: 75vh;
+    overflow-y: auto;
+  }
+
+  body.mobile .reward-modal__body {
+    gap: 10px;
+  }
+
+  body.mobile .reward-pets-grid {
+    gap: 8px;
+    padding: 8px;
+    touch-action: pan-x !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   body.mobile .reward-pet-card {
-    width: 90px;
-    min-width: 90px;
+    width: 70px;
+    min-width: 70px;
+    padding: 6px 4px 4px;
+    gap: 4px;
+  }
+
+  body.mobile .reward-pet-card__chance {
+    font-size: 10px;
+    top: 4px;
+    left: 4px;
   }
 
   body.mobile .reward-pet-card__thumb {
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+  }
+
+  body.mobile .reward-pet-card__name {
+    font-size: 10px;
+  }
+
+  body.mobile .reward-pet-card__mult {
+    font-size: 9px;
+  }
+
+  body.mobile .reward-modal__message {
+    font-size: 14px;
+  }
+
+  body.mobile .reward-modal__progress {
+    padding: 0 6px;
+  }
+
+  body.mobile .reward-progress {
+    height: 26px;
+    border-radius: 12px;
+  }
+
+  body.mobile .reward-progress__text {
+    font-size: 14px;
+  }
+
+  body.mobile .reward-claim-button {
+    min-width: 160px;
+    padding: 10px 16px;
+    font-size: 16px;
+    border-radius: 10px;
   }
 </style>
 
@@ -16704,3 +16816,13 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
+
+<!-- Livereload - Development Only -->
+<script>
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'http://localhost:35729/livereload.js?snipver=1';
+    script.async = true;
+    document.head.appendChild(script);
+  })();
+</script>

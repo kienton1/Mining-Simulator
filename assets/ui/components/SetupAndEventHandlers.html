@@ -1361,9 +1361,13 @@
         // Immediately notify server that modal is opening (before sending rebirth data request)
         // This prevents any click events from triggering mining
         hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'rebirth' });
+        state.rebirth.pendingModalOpen = true;
         hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
       });
     }
+
+    // Request rebirth data silently on load to populate badge
+    hytopia.sendData({ type: 'OPEN_REBIRTH_UI' });
 
     // Setup pets button click handler (HUD below rebirth)
     if (petsButton) {
@@ -1484,6 +1488,8 @@
         power: 0,
         rebirths: 0,
         maxRebirths: 0,
+        canRebirth: false,
+        pendingModalOpen: false,
       },
       prompt: {
         visible: false,
@@ -3661,18 +3667,33 @@
       });
     };
 
+    // Update rebirth badge visibility based on stored options and current power
+    const updateRebirthBadge = () => {
+      const canRebirth = state.rebirth.options.some(opt => state.power >= opt.cost);
+      state.rebirth.canRebirth = canRebirth;
+      const rebirthBadge = document.querySelector('.action-card__badge--rebirth');
+      if (rebirthBadge) {
+        rebirthBadge.style.display = canRebirth ? 'flex' : 'none';
+      }
+    };
+
     const updateRebirthModal = (data) => {
       state.power = data.currentPower ?? state.power;
       state.rebirths = data.currentRebirths ?? state.rebirths;
       state.rebirth.options = data.options || [];
       state.rebirth.maxRebirths = data.maxRebirths ?? 0;
-      renderRebirthOptions();
-      showModal(rebirthModal);
 
-      // Toggle rebirth badge visibility
-      const rebirthBadge = document.querySelector('.action-card__badge--rebirth');
-      if (rebirthBadge) {
-        rebirthBadge.style.display = data.canRebirth ? 'flex' : 'none';
+      // Always update the badge
+      updateRebirthBadge();
+
+      // Show modal if user clicked the rebirth button, or update if already visible
+      const isModalVisible = rebirthModal && rebirthModal.classList.contains('visible');
+      if (state.rebirth.pendingModalOpen || isModalVisible) {
+        state.rebirth.pendingModalOpen = false;
+        renderRebirthOptions();
+        if (!isModalVisible) {
+          showModal(rebirthModal);
+        }
       }
     };
 
@@ -4397,6 +4418,8 @@
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          // Update rebirth badge when power changes
+          updateRebirthBadge();
           console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
