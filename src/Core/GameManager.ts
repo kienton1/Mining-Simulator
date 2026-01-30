@@ -25,6 +25,8 @@ import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
+import { EggType, type PetId } from '../Pets/PetData';
+import { getEggLootTable, getPetDefinition } from '../Pets/PetDatabase';
 import { PetVisualManager } from '../Pets/PetVisualManager';
 import { EggDisplayAnimator } from '../Pets/EggDisplayAnimator';
 import { WorldRegistry } from '../WorldRegistry';
@@ -55,8 +57,14 @@ interface PlayerModalState {
   rebirthModalOpen: boolean;
   petsModalOpen: boolean;
   eggModalOpen: boolean;
+  rewardModalOpen: boolean;
   mapsModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
+}
+
+interface RewardTimerState {
+  startTime: number | null;
+  ready: boolean;
 }
 
 export class GameManager {
@@ -94,6 +102,19 @@ export class GameManager {
   private readonly MINE_RESET_DURATION_MS = 120000; // 2 minutes
   private readonly MINE_RESET_DURATION_UPGRADED_MS = 300000; // 5 minutes (upgraded)
   
+  // Timed reward system (per-player)
+  private rewardStates: Map<Player, RewardTimerState> = new Map();
+  private rewardTickInterval?: NodeJS.Timeout;
+  private rewardPetsCache?: Array<{
+    petId: PetId;
+    name: string;
+    rarity: string;
+    chance: number;
+    multiplier: number;
+  }>;
+  private readonly REWARD_TICK_MS = 1000;
+  private readonly REWARD_DURATION_MS = 10 * 1000; // 10 seconds (debug)
+
   // Debounced save timers per player
   private saveTimers: Map<Player, NodeJS.Timeout> = new Map();
   private readonly SAVE_DEBOUNCE_MS = 2000; // Save at most once per 2 seconds per player
@@ -238,6 +259,7 @@ export class GameManager {
       rebirthModalOpen: false,
       petsModalOpen: false,
       eggModalOpen: false,
+      rewardModalOpen: false,
       mapsModalOpen: false,
       lastModalOpenTime: 0,
     });
@@ -815,6 +837,8 @@ export class GameManager {
       },
     });
     this.sendPowerStatsToUI(player);
+    this.sendRewardConfigUI(player);
+    this.resetRewardTimer(player);
     this.tutorialManager.onPlayerUILoaded(player);
   }
 
@@ -1066,13 +1090,14 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg' | 'maps', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg' | 'reward' | 'maps', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
       eggModalOpen: false,
+      rewardModalOpen: false,
       mapsModalOpen: false,
       lastModalOpenTime: 0,
     };
@@ -1087,6 +1112,8 @@ export class GameManager {
       modalState.petsModalOpen = isOpen;
     } else if (modalType === 'egg') {
       modalState.eggModalOpen = isOpen;
+    } else if (modalType === 'reward') {
+      modalState.rewardModalOpen = isOpen;
     } else if (modalType === 'maps') {
       modalState.mapsModalOpen = isOpen;
     }
@@ -1113,6 +1140,7 @@ export class GameManager {
       modalState.rebirthModalOpen = false;
       modalState.petsModalOpen = false;
       modalState.eggModalOpen = false;
+      modalState.rewardModalOpen = false;
       // Don't touch mapsModalOpen as it's not a blocking modal for mining
       console.log('[GameManager] Cleared all blocking modal states for player:', player.username);
     }
@@ -1136,7 +1164,8 @@ export class GameManager {
       modalState.pickaxeModalOpen ||
       modalState.rebirthModalOpen ||
       modalState.petsModalOpen ||
-      modalState.eggModalOpen
+      modalState.eggModalOpen ||
+      modalState.rewardModalOpen
     ) {
       console.log('[GameManager] isBlockingModalOpen: TRUE - modals:', {
         miner: modalState.minerModalOpen,
@@ -1144,6 +1173,7 @@ export class GameManager {
         rebirth: modalState.rebirthModalOpen,
         pets: modalState.petsModalOpen,
         egg: modalState.eggModalOpen,
+        reward: modalState.rewardModalOpen,
       });
       return true;
     }
@@ -1391,7 +1421,7 @@ export class GameManager {
 
       // Now use the same function as holding E - this will teleport to exact position and start training
       // startTraining will teleport to: x: rock.position.x, y: 1.75, z: -9.27
-      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
       
       if (!trainingStarted) {
 
@@ -1400,11 +1430,35 @@ export class GameManager {
 
       // Store position to detect if player leaves training area
       // Use the same teleport position that startTraining uses
-      const standPosition = {
-        x: bestRockLocation.position.x, // Same X as the ore block
-        y: 1.75, // Fixed Y position
-        z: -9.27, // Fixed Z position (forward of the ore blocks)
-      };
+      const worldId = playerData.currentWorld || 'island1';
+      const standPosition = worldId === 'island2'
+        ? {
+            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+            y: 1.75,
+            z: bestRockLocation.position.z + 0.1,
+          }
+        : worldId === 'island3'
+          ? (() => {
+              if (bestRockLocation.bounds) {
+                const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                return {
+                  x: Math.round(centerX * 10) / 10,
+                  y: 1.75,
+                  z: Math.round(centerZ * 10) / 10,
+                };
+              }
+              return {
+                x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                y: 1.75,
+                z: bestRockLocation.position.z + 0.1,
+              };
+            })()
+          : {
+              x: bestRockLocation.position.x, // Same X as the ore block
+              y: 1.75, // Fixed Y position
+              z: -9.27, // Fixed Z position (forward of the ore blocks)
+            };
 
       const playerEntity = this.getPlayerEntity(player);
       if (playerEntity && autoState) {
@@ -1437,22 +1491,6 @@ export class GameManager {
             // Removed space bar check to prevent input interference
           );
 
-          // Check velocity if available
-          let hasVelocityMovement = false;
-          try {
-            const velocity = (playerEnt as any).velocity;
-            if (velocity) {
-              const vx = velocity.x || 0;
-              const vy = velocity.y || 0;
-              const vz = velocity.z || 0;
-              const horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
-              const verticalVelocity = Math.abs(vy);
-              hasVelocityMovement = horizontalVelocity > 0.1 || verticalVelocity > 0.1;
-            }
-          } catch (e) {
-            // Velocity not available, use position-based check
-          }
-
           // Check position distance
           const currentPos = playerEnt.position;
           const dx = currentPos.x - autoState.lastAutoTrainPosition.x;
@@ -1460,10 +1498,10 @@ export class GameManager {
           const dz = currentPos.z - autoState.lastAutoTrainPosition.z;
           const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
           const verticalDistance = Math.abs(dy);
-          const hasPositionMovement = horizontalDistance > 0.3 || verticalDistance > 0.3;
+          const hasPositionMovement = horizontalDistance > 1.0 || verticalDistance > 1.0;
 
-          // If ANY movement detected (input, velocity, or position), turn off auto-train immediately
-          if (hasMovementInput || hasVelocityMovement || hasPositionMovement) {
+          // If ANY movement detected (input or large position drift), turn off auto-train immediately
+          if (hasMovementInput || hasPositionMovement) {
 
             this.toggleAutoTrain(player);
             return; // Stop checking - auto-train is being turned off
@@ -1506,13 +1544,37 @@ export class GameManager {
               setTimeout(() => {
                 if (!autoState?.autoTrainEnabled) return;
                 
-                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
                 if (trainingStarted) {
-                  const newStandPosition = {
-                    x: bestRockLocation.position.x,
-                    y: 1.75,
-                    z: -9.27,
-                  };
+                  const worldId = playerData.currentWorld || 'island1';
+                  const newStandPosition = worldId === 'island2'
+                    ? {
+                        x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                        y: 1.75,
+                        z: bestRockLocation.position.z + 0.1,
+                      }
+                    : worldId === 'island3'
+                      ? (() => {
+                          if (bestRockLocation.bounds) {
+                            const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                            const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                            return {
+                              x: Math.round(centerX * 10) / 10,
+                              y: 1.75,
+                              z: Math.round(centerZ * 10) / 10,
+                            };
+                          }
+                          return {
+                            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                            y: 1.75,
+                            z: bestRockLocation.position.z + 0.1,
+                          };
+                        })()
+                      : {
+                          x: bestRockLocation.position.x,
+                          y: 1.75,
+                          z: -9.27,
+                        };
                   autoState.lastAutoTrainPosition = newStandPosition;
 
                 }
@@ -1757,6 +1819,140 @@ export class GameManager {
     const elapsed = Date.now() - startTime;
     const remaining = Math.max(0, duration - elapsed);
     this.sendMineResetTimerUI(player, remaining);
+  }
+
+  // === Timed Reward Timer (15 minute reward) ===
+  private ensureRewardTickRunning(): void {
+    if (this.rewardTickInterval) return;
+    this.rewardTickInterval = setInterval(() => {
+      this.tickRewardTimers();
+    }, this.REWARD_TICK_MS);
+  }
+
+  private stopRewardTickIfIdle(): void {
+    if (!this.rewardTickInterval) return;
+    const hasActive = Array.from(this.rewardStates.values()).some((state) => state.startTime !== null && !state.ready);
+    if (!hasActive) {
+      clearInterval(this.rewardTickInterval);
+      this.rewardTickInterval = undefined;
+    }
+  }
+
+  private getRewardState(player: Player): RewardTimerState {
+    let state = this.rewardStates.get(player);
+    if (!state) {
+      state = { startTime: Date.now(), ready: false };
+      this.rewardStates.set(player, state);
+    }
+    return state;
+  }
+
+  private getRewardRemainingMs(state: RewardTimerState, now: number): number {
+    if (!state.startTime || state.ready) return 0;
+    const elapsed = now - state.startTime;
+    return Math.max(0, this.REWARD_DURATION_MS - elapsed);
+  }
+
+  private tickRewardTimers(): void {
+    const now = Date.now();
+    for (const [player, state] of this.rewardStates.entries()) {
+      if (state.ready || state.startTime === null) continue;
+      const remaining = this.getRewardRemainingMs(state, now);
+      if (remaining <= 0) {
+        state.ready = true;
+        state.startTime = null;
+        this.sendRewardTimerUI(player, 0, true);
+        continue;
+      }
+      this.sendRewardTimerUI(player, remaining, false);
+    }
+    this.stopRewardTickIfIdle();
+  }
+
+  private sendRewardTimerUI(player: Player, remainingMs: number, ready: boolean): void {
+    this.safeSendUI(player, {
+      type: 'REWARD_TIMER',
+      remainingMs: Math.max(0, remainingMs),
+      ready: Boolean(ready),
+    });
+  }
+
+  private buildRewardPetsCache(): Array<{ petId: PetId; name: string; rarity: string; chance: number; multiplier: number }> {
+    if (this.rewardPetsCache) return this.rewardPetsCache;
+    const table = getEggLootTable(EggType.REWARD_15) ?? [];
+    let totalWeight = 0;
+    for (const entry of table) {
+      if (entry.weight > 0) totalWeight += entry.weight;
+    }
+    this.rewardPetsCache = table.map((entry) => {
+      const def = getPetDefinition(entry.petId);
+      const chance = totalWeight > 0 ? (entry.weight / totalWeight) * 100 : 0;
+      return {
+        petId: entry.petId,
+        name: def?.name ?? entry.petId,
+        rarity: def?.rarity ?? 'common',
+        chance,
+        multiplier: def?.multiplier ?? 0,
+      };
+    });
+    return this.rewardPetsCache;
+  }
+
+  sendRewardConfigUI(player: Player): void {
+    const pets = this.buildRewardPetsCache();
+    this.safeSendUI(player, {
+      type: 'REWARD_CONFIG',
+      durationMs: this.REWARD_DURATION_MS,
+      pets,
+    });
+  }
+
+  updateRewardTimerUI(player: Player): void {
+    const state = this.getRewardState(player);
+    const remaining = this.getRewardRemainingMs(state, Date.now());
+    if (remaining <= 0 && !state.ready) {
+      state.ready = true;
+      state.startTime = null;
+      this.sendRewardTimerUI(player, 0, true);
+      return;
+    }
+    this.sendRewardTimerUI(player, remaining, state.ready);
+    if (!state.ready) {
+      this.ensureRewardTickRunning();
+    }
+  }
+
+  resetRewardTimer(player: Player): void {
+    const state = this.getRewardState(player);
+    state.startTime = Date.now();
+    state.ready = false;
+    this.sendRewardTimerUI(player, this.REWARD_DURATION_MS, false);
+    this.ensureRewardTickRunning();
+  }
+
+  isRewardReady(player: Player): boolean {
+    const state = this.rewardStates.get(player);
+    return Boolean(state?.ready);
+  }
+
+  claimTimedReward(player: Player): { success: boolean; message?: string; results?: PetId[] } {
+    const state = this.rewardStates.get(player);
+    if (!state || !state.ready) {
+      return { success: false, message: 'Reward not ready yet.' };
+    }
+
+    const hatchRes = this.hatchingSystem.hatch(player, EggType.REWARD_15, 1);
+    if (!hatchRes.success) {
+      return { success: false, message: hatchRes.message ?? 'Failed to claim reward.' };
+    }
+
+    this.resetRewardTimer(player);
+    return { success: true, results: hatchRes.results ?? [] };
+  }
+
+  clearRewardState(player: Player): void {
+    this.rewardStates.delete(player);
+    this.stopRewardTickIfIdle();
   }
 
   /**
@@ -2030,6 +2226,9 @@ export class GameManager {
     // Stop mine reset timer
     this.stopMineResetTimer(player);
 
+    // Clear timed reward state
+    this.clearRewardState(player);
+
     // Save player data before cleanup
     await this.savePlayerData(player);
     
@@ -2068,6 +2267,11 @@ export class GameManager {
     if (this.mineResetTickInterval) {
       clearInterval(this.mineResetTickInterval);
       this.mineResetTickInterval = undefined;
+    }
+
+    if (this.rewardTickInterval) {
+      clearInterval(this.rewardTickInterval);
+      this.rewardTickInterval = undefined;
     }
     
     // Clear all save timers

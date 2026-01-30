@@ -24,7 +24,7 @@ export interface PickaxeData {
   /** Display name */
   name: string;
   
-  /** Mining speed (swings per second) */
+  /** Mining speed (Speed stat used to derive swings per second) */
   miningSpeed: number;
   
   /** Luck bonus percentage (0.0 to 1.0, e.g., 0.20 = 20%) */

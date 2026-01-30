@@ -1,5 +1,15 @@
 <!-- Stats HUD Container (Middle Right) -->
 <div class="stats-hud-container">
+  <!-- Timed Reward -->
+  <div id="reward-hud" class="reward-hud">
+    <div id="reward-timer-text" class="reward-hud__timer">15m 00s</div>
+    <button id="reward-button" class="reward-button">
+      <span class="reward-button__icon">
+        <img src="{{CDN_ASSETS_URL}}/icons/target.png" alt="Reward" />
+      </span>
+      <span class="reward-button__label">Reward</span>
+    </button>
+  </div>
   <!-- Trophy (Wins) -->
   <div class="stat-hud stat-hud--wins">
     <div class="stat-hud__value" id="wins-value">0</div>

@@ -2725,6 +2725,60 @@
     z-index: 900;
   }
 
+  .reward-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .reward-hud__timer {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 900;
+    color: #ff4444;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-hud--ready .reward-hud__timer {
+    color: #ffd65c;
+  }
+
+  .reward-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.7);
+    background: linear-gradient(180deg, #171717, #0c0c0c);
+    color: #b36bff;
+    font-size: 18px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    min-width: 180px;
+    width: 100%;
+  }
+
+  .reward-button__icon img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .reward-button__label {
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  .reward-hud--ready .reward-button {
+    border-color: rgba(255, 214, 92, 0.8);
+    box-shadow: 0 0 16px rgba(255, 214, 92, 0.45);
+  }
+
   .auto-control-button {
     padding: 14px 20px;
     border-radius: 12px;
@@ -3804,6 +3858,25 @@
     transform: translateX(-50%);
     flex-direction: row;
     gap: 8px;
+  }
+
+  body.mobile .reward-hud {
+    gap: 4px;
+  }
+
+  body.mobile .reward-hud__timer {
+    font-size: 12px;
+  }
+
+  body.mobile .reward-button {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 120px;
+  }
+
+  body.mobile .reward-button__icon img {
+    width: 20px;
+    height: 20px;
   }
 
   body.mobile .auto-btn {

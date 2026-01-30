@@ -343,14 +343,70 @@ export function calculateMiningDamage(power: number): number {
 }
 
 /**
- * Gets mining speed from pickaxe
+ * World numbers for swing rate calculations.
+ */
+export type WorldNumber = 1 | 2 | 3;
+
+/**
+ * Calculates swings per second (SPS) from speed and world.
+ *
+ * Formulae:
+ * World 1: 2 + 0.05 * (s ** 1.15)
+ * World 2: 1 + 0.048 * (s ** 1.01)
+ * World 3: 0.4 + 0.271 * (s ** 0.264)
+ *
+ * SPS is capped at 16.
+ *
+ * @param speed - Player speed stat (s >= 0)
+ * @param world - World number (1, 2, or 3)
+ * @returns Swings per second (capped)
+ */
+export function getSwingsPerSecond(speed: number, world: WorldNumber): number {
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const resolvedWorld: WorldNumber = world === 2 || world === 3 ? world : 1;
+  let rawSps = 0;
+
+  switch (resolvedWorld) {
+    case 1:
+      rawSps = 2 + 0.05 * Math.pow(safeSpeed, 1.15);
+      break;
+    case 2:
+      rawSps = 1 + 0.048 * Math.pow(safeSpeed, 1.01);
+      break;
+    case 3:
+      rawSps = 0.4 + 0.271 * Math.pow(safeSpeed, 0.264);
+      break;
+    default:
+      rawSps = 2 + 0.05 * Math.pow(safeSpeed, 1.15);
+      break;
+  }
+
+  const clamped = Math.min(16, Math.max(0, rawSps));
+  return Number.isFinite(clamped) ? clamped : 0;
+}
+
+/**
+ * Calculates total swings in a given time window.
+ *
+ * @param speed - Player speed stat
+ * @param world - World number (1, 2, or 3)
+ * @param seconds - Duration in seconds
+ * @returns Total swings in the window
+ */
+export function getSwingsInWindow(speed: number, world: WorldNumber, seconds: number): number {
+  const safeSeconds = Number.isFinite(seconds) ? seconds : 0;
+  return getSwingsPerSecond(speed, world) * safeSeconds;
+}
+
+/**
+ * Gets mining speed stat from pickaxe
  * 
  * Formula: MiningSpeed = PickaxeMiningSpeed
  * 
  * Reference: gameOverview.txt section 10.3
  * 
  * @param pickaxe - Player's current pickaxe
- * @returns Mining speed (swings per second)
+ * @returns Mining speed stat (Speed)
  */
 export function getMiningSpeed(pickaxe: PickaxeData): number {
   return pickaxe.miningSpeed;
