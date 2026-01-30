@@ -572,6 +572,13 @@ export class TrainingController {
         };
     playerEntity.setPosition(standPosition);
 
+    // Face north (positive Z direction) when training
+    // Identity quaternion (0 degrees rotation)
+    const northFacingRotation = { x: 0, y: 0, z: 0, w: 1 };
+    if (typeof playerEntity.setRotation === 'function') {
+      playerEntity.setRotation(northFacingRotation);
+    }
+
     // Hide prompt while training (both regular and SceneUI)
     this.hideInteractPrompt(player);
     // Use unique ID that includes world ID and hide for this specific player
@@ -1112,6 +1119,13 @@ export class TrainingController {
             z: -9.27,
           };
     playerEntity.setPosition(standPosition);
+
+    // Face north (positive Z direction) when training
+    // Identity quaternion (0 degrees rotation)
+    const northFacingRotation = { x: 0, y: 0, z: 0, w: 1 };
+    if (typeof playerEntity.setRotation === 'function') {
+      playerEntity.setRotation(northFacingRotation);
+    }
 
     // Hide prompt while training (both regular and SceneUI)
     this.hideInteractPrompt(player);

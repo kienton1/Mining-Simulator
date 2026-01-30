@@ -310,6 +310,11 @@
     display: none;
   }
 
+  /* Hide the rebirth badge by default (JS toggles display when canRebirth) */
+  .action-card__badge--rebirth {
+    display: none;
+  }
+
   /* Egg + Pets UI helpers (use existing modal styles as the base) */
   .egg-actions {
     display: flex;
@@ -3609,7 +3614,7 @@
   body.mobile .action-card__icon-img {
     width: 22px;
     height: 22px;
-    transform: scale(1.5); /* Override desktop's scale(2.5) */
+    transform: scale(1.8); /* Override desktop's scale(2.5) */
   }
 
   body.mobile .action-card__badge {
@@ -3619,6 +3624,23 @@
     top: -3px;
     right: -3px;
     border-width: 1.5px;
+  }
+
+  /* Reward badge pulsing animation on mobile */
+  body.mobile .action-card__badge--reward {
+    background: #e53935;
+    animation: rewardBadgePulse 1.5s ease-in-out infinite;
+  }
+
+  /* Rebirth badge pulsing animation on mobile */
+  body.mobile .action-card__badge--rebirth {
+    background: #e53935;
+    animation: rewardBadgePulse 1.5s ease-in-out infinite;
+  }
+
+  /* Reward button icon slightly smaller on mobile */
+  body.mobile .action-card--reward .action-card__icon-img {
+    transform: scale(1.44);
   }
 
   /* Tutorial Progressive Text */
