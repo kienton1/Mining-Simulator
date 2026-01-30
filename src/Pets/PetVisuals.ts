@@ -10,6 +10,10 @@ export type PetModelInfo = {
   modelFolder: string;
   gltfFile: string;
   textureFile: string;
+  /** Optional direct model path under assets (bypasses models/Pets). */
+  modelPath?: string;
+  /** Optional direct texture path under assets (bypasses models/Pets/.../Textures). */
+  texturePath?: string;
 };
 
 const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
@@ -63,6 +67,48 @@ const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
   [PET_IDS.SAPPHIRE_SPARK]: { modelFolder: 'Catfish', gltfFile: 'catfish.gltf', textureFile: 'SAPPHIRE_SPARK.png' },
   [PET_IDS.STONE_SPRITE]: { modelFolder: 'Dog', gltfFile: 'Dog.gltf', textureFile: 'STONE_SPRITE.png' },
   [PET_IDS.TOPAZ_TRACER]: { modelFolder: 'Cow', gltfFile: 'cow.gltf', textureFile: 'TOPAZ_TRACER.png' },
+  [PET_IDS.BLUE_BAT]: {
+    modelFolder: 'Bat',
+    gltfFile: 'bat.gltf',
+    textureFile: 'Blue Bat.png',
+    modelPath: 'models/15 Minute Reward Pets/Bat/bat.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Bat/Blue Bat.png',
+  },
+  [PET_IDS.GOLDEN_FLAMINGO]: {
+    modelFolder: 'Flamingo',
+    gltfFile: 'flamingo.gltf',
+    textureFile: 'Golden Flamingo.png',
+    modelPath: 'models/15 Minute Reward Pets/Flamingo/flamingo.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Flamingo/Golden Flamingo.png',
+  },
+  [PET_IDS.ANGRY_FROG]: {
+    modelFolder: 'Frog',
+    gltfFile: 'frog.gltf',
+    textureFile: 'Angry Frog.png',
+    modelPath: 'models/15 Minute Reward Pets/Frog/frog.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Frog/Angry Frog.png',
+  },
+  [PET_IDS.AQUATIC_LIZARD]: {
+    modelFolder: 'Lizard',
+    gltfFile: 'lizard.gltf',
+    textureFile: 'Aquatic Lizard.png',
+    modelPath: 'models/15 Minute Reward Pets/Lizard/lizard.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Lizard/Aquatic Lizard.png',
+  },
+  [PET_IDS.FROSTED_OCELOT]: {
+    modelFolder: 'Ocelot',
+    gltfFile: 'ocelot.gltf',
+    textureFile: 'Frosted Ocelot.png',
+    modelPath: 'models/15 Minute Reward Pets/Ocelot/ocelot.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Ocelot/Frosted Ocelot.png',
+  },
+  [PET_IDS.LARRY_THE_SKELETON]: {
+    modelFolder: 'Skeleton',
+    gltfFile: 'skeleton.gltf',
+    textureFile: 'Larry the Skeleton.png',
+    modelPath: 'models/15 Minute Reward Pets/Skeleton/skeleton.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Skeleton/Larry the Skeleton.png',
+  },
 };
 
 export function getPetModelInfo(petId: PetId): PetModelInfo | null {
@@ -76,12 +122,14 @@ export function getPetModelInfo(petId: PetId): PetModelInfo | null {
 export function getPetModelUri(petId: PetId): string | null {
   const info = getPetModelInfo(petId);
   if (!info) return null;
+  if (info.modelPath) return info.modelPath;
   return `models/Pets/${info.modelFolder}/${info.gltfFile}`;
 }
 
 export function getPetTextureUri(petId: PetId): string | null {
   const info = getPetModelInfo(petId);
   if (!info) return null;
+  if (info.texturePath) return info.texturePath;
   return `models/Pets/${info.modelFolder}/Textures/${info.textureFile}`;
 }
 

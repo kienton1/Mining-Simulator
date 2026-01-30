@@ -622,6 +622,11 @@ export class TrainingController {
       if (rockData.hitRate !== undefined) {
         hitRate = rockData.hitRate;
       }
+    } else if (worldId === 'island1') {
+      const rockData = targetRock.rockData as TrainingRockData;
+      if (rockData.tier === TrainingRockTier.EMERALD_DEEPSLATE) {
+        hitRate = 3.0; // Rock 6: 3 hits/second
+      }
     }
 
     // Create a unified rock data structure for TrainingSystem
@@ -1143,6 +1148,11 @@ export class TrainingController {
       const rockData = rockLocation.rockData as any;
       if (rockData.hitRate !== undefined) {
         hitRate = rockData.hitRate;
+      }
+    } else if (worldId === 'island1') {
+      const rockData = rockLocation.rockData as TrainingRockData;
+      if (rockData.tier === TrainingRockTier.EMERALD_DEEPSLATE) {
+        hitRate = 3.0; // Rock 6: 3 hits/second
       }
     }
 

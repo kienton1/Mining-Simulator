@@ -24,6 +24,9 @@ export const EGG_DEFINITIONS: Record<EggType, EggDefinition> = {
   [EggType.SAND]: { eggType: EggType.SAND, costGold: 25_000_000_000 },
   [EggType.SNOW]: { eggType: EggType.SNOW, costGold: 1_000_000_000_000 },
   [EggType.LAVA]: { eggType: EggType.LAVA, costGold: 100_000_000_000_000 },
+
+  // Timed reward egg (15 minute reward)
+  [EggType.REWARD_15]: { eggType: EggType.REWARD_15, costGold: 0 },
 };
 
 // Stable pet IDs (persisted)
@@ -95,6 +98,14 @@ export const PET_IDS = {
   BABY_FIERY_ZOMBIE: 'baby_fiery_zombie',
   BABY_PHOENIX: 'baby_phoenix',
   BABY_SCORCHING_MAGMA: 'baby_scorching_magma',
+
+  // Timed reward pets (15 minute reward)
+  BLUE_BAT: 'blue_bat',
+  GOLDEN_FLAMINGO: 'golden_flamingo',
+  ANGRY_FROG: 'angry_frog',
+  AQUATIC_LIZARD: 'aquatic_lizard',
+  FROSTED_OCELOT: 'frosted_ocelot',
+  LARRY_THE_SKELETON: 'larry_the_skeleton',
 } as const satisfies Record<string, PetId>;
 
 const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
@@ -165,6 +176,14 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: PET_IDS.BABY_FIERY_ZOMBIE, name: 'Baby Fiery Zombie', eggType: EggType.LAVA, rarity: PetRarity.EPIC, multiplier: 10000 },
   { id: PET_IDS.BABY_PHOENIX, name: 'Baby Phoenix', eggType: EggType.LAVA, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
   { id: PET_IDS.BABY_SCORCHING_MAGMA, name: 'Baby Scorching Magma', eggType: EggType.LAVA, rarity: PetRarity.LEGENDARY, multiplier: 30000 },
+
+  // Timed reward pets (15 minute reward)
+  { id: PET_IDS.BLUE_BAT, name: 'Blue Bat', eggType: EggType.REWARD_15, rarity: PetRarity.COMMON, multiplier: 50 },
+  { id: PET_IDS.GOLDEN_FLAMINGO, name: 'Golden Flamingo', eggType: EggType.REWARD_15, rarity: PetRarity.RARE, multiplier: 100 },
+  { id: PET_IDS.ANGRY_FROG, name: 'Angry Frog', eggType: EggType.REWARD_15, rarity: PetRarity.EPIC, multiplier: 200 },
+  { id: PET_IDS.AQUATIC_LIZARD, name: 'Aquatic Lizard', eggType: EggType.REWARD_15, rarity: PetRarity.EPIC, multiplier: 500 },
+  { id: PET_IDS.FROSTED_OCELOT, name: 'Frosted Ocelot', eggType: EggType.REWARD_15, rarity: PetRarity.LEGENDARY, multiplier: 5000 },
+  { id: PET_IDS.LARRY_THE_SKELETON, name: 'Larry the Skeleton', eggType: EggType.REWARD_15, rarity: PetRarity.LEGENDARY, multiplier: 1_000_000 },
 ];
 
 export const PET_DEFINITIONS: Record<PetId, PetDefinition> = Object.fromEntries(
@@ -258,6 +277,16 @@ export const EGG_LOOT_TABLES: Record<EggType, EggLootEntry[]> = {
     { petId: PET_IDS.BABY_FIERY_ZOMBIE, weight: 3.0 }, // 3%
     { petId: PET_IDS.BABY_PHOENIX, weight: 0.3 }, // 0.30%
     { petId: PET_IDS.BABY_SCORCHING_MAGMA, weight: 0.03 }, // 0.03%
+  ],
+
+  // Timed reward pets (15 minute reward)
+  [EggType.REWARD_15]: [
+    { petId: PET_IDS.BLUE_BAT, weight: 39.99 }, // 39.99%
+    { petId: PET_IDS.GOLDEN_FLAMINGO, weight: 30.0 }, // 30%
+    { petId: PET_IDS.ANGRY_FROG, weight: 20.0 }, // 20%
+    { petId: PET_IDS.AQUATIC_LIZARD, weight: 9.0 }, // 9%
+    { petId: PET_IDS.FROSTED_OCELOT, weight: 1.0 }, // 1%
+    { petId: PET_IDS.LARRY_THE_SKELETON, weight: 0.01 }, // 0.01%
   ],
 };
 

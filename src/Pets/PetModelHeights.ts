@@ -28,16 +28,21 @@ export const PET_MODEL_HEIGHTS: Record<string, number> = {
   'Beaver': 0.7,
   'Racoon': 0.7,
   'Capybara': 0.8,
+  'Ocelot': 0.9,
 
   // Birds & Insects
   'Chicken': 0.7,
   'Penguin': 0.9,
   'Bee': 0.5,
+  'Bat': 0.6,
+  'Flamingo': 1.6,
 
   // Aquatic
   'Turtle': 0.6,
   'Crab': 0.5,
   'Squid': 1.0,
+  'Lizard': 0.5,
+  'Frog': 0.5,
 
   // Fish - calibrated so they appear similar size to land pets
   'Tuna': 0.8,
@@ -58,6 +63,7 @@ export const PET_MODEL_HEIGHTS: Record<string, number> = {
   // Monsters
   'Spider': 0.7,
   'Zombie': 2.2,
+  'Skeleton': 1.6,
 };
 
 /**

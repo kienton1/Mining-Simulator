@@ -112,6 +112,7 @@
       'rebirth-modal',
       'pets-modal',
       'egg-modal',
+      'reward-modal',
       'maps-modal',
       'merchant-ui',
       'gem-trader-ui',
@@ -1900,9 +1901,18 @@
     const petsModal = document.getElementById('pets-modal');
     const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
+    const rewardModal = document.getElementById('reward-modal');
+    const rewardHudEl = document.getElementById('reward-hud');
+    const rewardTimerTextEl = document.getElementById('reward-timer-text');
+    const rewardButton = document.getElementById('reward-button');
+    const rewardClaimButton = document.getElementById('reward-claim-button');
+    const rewardProgressFillEl = document.getElementById('reward-progress-fill');
+    const rewardProgressTextEl = document.getElementById('reward-progress-text');
+    const rewardPetsGridEl = document.getElementById('reward-pets-grid');
+    const rewardMessageEl = document.getElementById('reward-message');
 
     // Array of all modals for closing others when opening one
-    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, mapsModal, eggModal].filter(Boolean);
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
 
     const minerGridEl = document.getElementById('miner-grid');
     const mapsListEl = document.getElementById('maps-list');
@@ -2026,6 +2036,33 @@
       });
     }
 
+    // Setup reward button click handler (right-side HUD)
+    if (rewardButton && rewardModal) {
+      rewardButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'reward' });
+        hytopia.sendData({ type: 'REQUEST_REWARD_STATE' });
+        showModal(rewardModal);
+        rewardButton.blur();
+        renderRewardModal();
+        window.focus();
+      });
+    }
+
+    if (rewardClaimButton) {
+      rewardClaimButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (eggHatchInProgress) return;
+        if (!state.reward.ready) {
+          state.reward.message = 'Reward not ready yet.';
+          renderRewardModal();
+          return;
+        }
+        startRewardHatchSequence();
+      });
+    }
+
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
@@ -2046,8 +2083,6 @@
     });
     const rebirthOptionsEl = document.getElementById('rebirth-options');
     const rebirthBadge = document.getElementById('rebirth-badge');
-    const rebirthCurrentCountEl = document.getElementById('rebirth-current-count');
-    const rebirthPowerBonusEl = document.getElementById('rebirth-power-bonus');
     const tutorialTextContainer = document.getElementById('tutorial-text-container');
     const tutorialTextEl = document.getElementById('tutorial-text');
     const tutorialPointer = document.getElementById('tutorial-pointer');
@@ -2116,6 +2151,13 @@
         autoCount: 1,
         stations: [], // All available stations in the current group
       },
+      reward: {
+        durationMs: 15 * 60 * 1000,
+        remainingMs: null,
+        ready: false,
+        pets: [],
+        message: '',
+      },
       tutorial: {
         visible: false,
         phase: null,
@@ -2136,6 +2178,7 @@
     let confettiHatchResetTimer = null;
 
     const resetEggHatchOverlay = () => {
+      const hatchContext = currentEggHatch?.context || 'egg';
       if (currentEggHatch?.cleanupTimer) {
         clearTimeout(currentEggHatch.cleanupTimer);
       }
@@ -2146,6 +2189,14 @@
       eggHatchInProgress = false;
       if (eggHatchOverlayEl) eggHatchOverlayEl.hidden = true;
       if (eggHatchSlotsEl) eggHatchSlotsEl.innerHTML = '';
+
+      if (hatchContext === 'reward') {
+        if (rewardModal) {
+          rewardModal.classList.remove('hatch-hidden');
+        }
+        return;
+      }
+
       if (eggModal) {
         if (state.eggStation.inProximity) {
           eggModal.classList.remove('hatch-hidden');
@@ -2167,11 +2218,15 @@
         sand: 'ornament-egg.png',
         snow: 'snowman-egg.png',
         lava: 'fire-egg.png',
+        reward_15: 'models/15 Minute Reward Pets/golden-egg.png',
       };
 
       const fileName = eggIconMap[eggType];
       if (!fileName) return null;
       const cdn = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      if (fileName.includes('/')) {
+        return cdn ? `${cdn}/${fileName}` : fileName;
+      }
       return cdn ? `${cdn}/icons/EggsIcons/${fileName}` : `icons/EggsIcons/${fileName}`;
     };
 
@@ -2707,6 +2762,90 @@
       return `${num.toFixed(3).replace(/\.0+$/, '')}%`;
     };
 
+    const formatRewardTime = (remainingMs) => {
+      const ms = Math.max(0, Number(remainingMs) || 0);
+      const totalSeconds = Math.ceil(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+    };
+
+    const renderRewardPets = () => {
+      if (!rewardPetsGridEl) return;
+      rewardPetsGridEl.innerHTML = '';
+      const list = Array.isArray(state.reward.pets) ? state.reward.pets : [];
+      if (!list.length) return;
+
+      list.forEach((pet) => {
+        const petId = pet?.petId || pet?.id;
+        if (!petId) return;
+
+        const card = document.createElement('div');
+        card.className = `reward-pet-card reward-pet-card--${pet?.rarity || 'common'}`;
+
+        const chance = document.createElement('div');
+        chance.className = 'reward-pet-card__chance';
+        chance.textContent = formatEggChance(pet?.chance ?? 0);
+
+        const thumb = document.createElement('div');
+        thumb.className = 'reward-pet-card__thumb';
+        const img = document.createElement('img');
+        img.alt = pet?.name || petId;
+        img.src = `{{CDN_ASSETS_URL}}/ui/pets/${petId}.png`;
+        img.onerror = () => {
+          thumb.textContent = 'pet';
+        };
+        thumb.appendChild(img);
+
+        const name = document.createElement('div');
+        name.className = 'reward-pet-card__name';
+        name.textContent = pet?.name || petId;
+
+        const mult = document.createElement('div');
+        mult.className = 'reward-pet-card__mult';
+        mult.textContent = `x${formatNumber(pet?.multiplier ?? 0)}`;
+
+        card.appendChild(chance);
+        card.appendChild(thumb);
+        card.appendChild(name);
+        card.appendChild(mult);
+        rewardPetsGridEl.appendChild(card);
+      });
+    };
+
+    const renderRewardHud = () => {
+      if (!rewardHudEl || !rewardTimerTextEl) return;
+      const ready = Boolean(state.reward.ready);
+      rewardHudEl.classList.toggle('reward-hud--ready', ready);
+      if (ready) {
+        rewardTimerTextEl.textContent = 'READY!';
+      } else {
+        const remaining = state.reward.remainingMs ?? state.reward.durationMs;
+        rewardTimerTextEl.textContent = formatRewardTime(remaining);
+      }
+    };
+
+    const renderRewardModal = () => {
+      const ready = Boolean(state.reward.ready);
+      const duration = Number(state.reward.durationMs || 0);
+      const remaining = Number(state.reward.remainingMs ?? duration);
+      const progress = duration > 0 ? Math.min(1, Math.max(0, 1 - remaining / duration)) : 0;
+
+      if (rewardProgressFillEl) {
+        rewardProgressFillEl.style.width = `${Math.round(progress * 100)}%`;
+      }
+      if (rewardProgressTextEl) {
+        rewardProgressTextEl.textContent = ready ? 'Ready!' : formatRewardTime(remaining);
+      }
+      if (rewardClaimButton) {
+        rewardClaimButton.disabled = !ready || eggHatchInProgress;
+      }
+      if (rewardMessageEl) {
+        const defaultMessage = 'Play 15 minutes in-game for a reward!';
+        rewardMessageEl.textContent = state.reward.message || defaultMessage;
+      }
+    };
+
     const renderEggShopPets = () => {
       if (!eggShopGridEl) return;
       eggShopGridEl.innerHTML = '';
@@ -2784,9 +2923,10 @@
       if (!currentEggHatch || !currentEggHatch.revealed || !currentEggHatch.results) return;
       renderEggHatchResults(currentEggHatch.results);
       if (currentEggHatch.cleanupTimer) return;
+      const hatchContext = currentEggHatch.context || 'egg';
       currentEggHatch.cleanupTimer = setTimeout(() => {
         resetEggHatchOverlay();
-        if (state.eggStation.autoEnabled && state.eggStation.inProximity) {
+        if (hatchContext === 'egg' && state.eggStation.autoEnabled && state.eggStation.inProximity) {
           startEggHatchSequence(state.eggStation.autoCount);
         }
       }, EGG_HATCH_COOLDOWN_MS);
@@ -2832,6 +2972,7 @@
         cleanupTimer: null,
         confettiFired: false,
         crackTimers: [],
+        context: 'egg',
       };
 
       // Play crack SFX on every other rotation during the egg shake (single instance even for 3 eggs)
@@ -2847,6 +2988,60 @@
         if (!currentEggHatch) return;
         slots.forEach((slot) => slot.classList.add('is-cracking'));
         hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count });
+      }, EGG_HATCH_SHAKE_MS);
+
+      setTimeout(() => {
+        if (!currentEggHatch) return;
+        slots.forEach((slot) => slot.classList.add('is-revealed'));
+        currentEggHatch.revealed = true;
+        renderEggHatchResults(currentEggHatch.results);
+        playEggOpenSfx();
+        maybeFinishEggHatch();
+      }, EGG_HATCH_TOTAL_MS);
+    };
+
+    const startRewardHatchSequence = () => {
+      if (!eggHatchOverlayEl || !eggHatchSlotsEl) return;
+      if (eggHatchInProgress) return;
+      if (!state.reward.ready) {
+        state.reward.message = 'Reward not ready yet.';
+        renderRewardModal();
+        return;
+      }
+
+      eggHatchInProgress = true;
+      state.reward.message = '';
+      renderRewardModal();
+
+      if (rewardModal) {
+        rewardModal.classList.add('hatch-hidden');
+      }
+      eggHatchOverlayEl.hidden = false;
+
+      const slots = buildEggHatchSlots(1, 'reward_15');
+      currentEggHatch = {
+        count: 1,
+        slots,
+        results: null,
+        revealed: false,
+        cleanupTimer: null,
+        confettiFired: false,
+        crackTimers: [],
+        context: 'reward',
+      };
+
+      const crackBeats = [0.12, 0.4, 0.68, 0.96];
+      crackBeats.forEach((beat) => {
+        const timer = setTimeout(() => {
+          playEggCrackSfx();
+        }, beat * EGG_HATCH_SHAKE_MS);
+        currentEggHatch.crackTimers.push(timer);
+      });
+
+      setTimeout(() => {
+        if (!currentEggHatch) return;
+        slots.forEach((slot) => slot.classList.add('is-cracking'));
+        hytopia.sendData({ type: 'REWARD_CLAIM' });
       }, EGG_HATCH_SHAKE_MS);
 
       setTimeout(() => {
@@ -2906,6 +3101,7 @@
         sand: '🏜️',
         snow: '❄️',
         lava: '🌋',
+        reward_15: '🎁',
       };
       return icons[eggType] || '🥚';
     };
@@ -3544,6 +3740,8 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
       } else if (el.id === 'pets-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
+      } else if (el.id === 'reward-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'reward' });
       } else if (el.id === 'egg-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'egg' });
         // Egg modal uses inline display styles, so we need to explicitly set display: none
@@ -4052,8 +4250,7 @@
           card.classList.add('unavailable');
         }
         btn.addEventListener('click', () => {
-          // Re-check affordability at click-time since power can change while the modal is open (e.g., training).
-          if (state.power < opt.cost) return;
+          if (!affordable) return;
           console.log(`[UI] Performing rebirth: ${opt.count}`);
           hytopia.sendData({ type: 'PERFORM_REBIRTH', rebirthCount: opt.count });
         });
@@ -4069,20 +4266,9 @@
       state.rebirths = data.currentRebirths ?? state.rebirths;
       state.rebirth.options = data.options || [];
       state.rebirth.maxRebirths = data.maxRebirths ?? 0;
-      // Update the stats shown inside the modal, if present.
-      if (rebirthCurrentCountEl) rebirthCurrentCountEl.textContent = formatNumber(state.rebirths || 0);
-      if (rebirthPowerBonusEl) rebirthPowerBonusEl.textContent = `+${(state.rebirths || 0) * 10}%`;
       renderRebirthOptions();
       showModal(rebirthModal);
       if (rebirthBadge) rebirthBadge.hidden = !(data.canRebirth);
-    };
-
-    const refreshRebirthModalIfOpen = () => {
-      if (!rebirthModal || !rebirthModal.classList.contains('visible')) return;
-      // Re-render so costs + disabled states reflect the latest power without requiring reopen.
-      renderRebirthOptions();
-      if (rebirthCurrentCountEl) rebirthCurrentCountEl.textContent = formatNumber(state.rebirths || 0);
-      if (rebirthPowerBonusEl) rebirthPowerBonusEl.textContent = `+${(state.rebirths || 0) * 10}%`;
     };
 
     const spawnMinedOrePopup = (oreName, oreColor) => {
@@ -4807,7 +4993,6 @@
           if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
-          refreshRebirthModalIfOpen();
           break;
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
@@ -4828,6 +5013,22 @@
           state.rebirths = data.rebirths ?? 0;
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           console.log('[UI] Updated rebirths stats:', state.rebirths);
+          break;
+        case 'REWARD_CONFIG':
+          state.reward.durationMs = Number(data.durationMs ?? state.reward.durationMs);
+          state.reward.pets = Array.isArray(data.pets) ? data.pets : [];
+          renderRewardPets();
+          renderRewardHud();
+          renderRewardModal();
+          break;
+        case 'REWARD_TIMER':
+          state.reward.remainingMs = Number(data.remainingMs ?? state.reward.remainingMs);
+          state.reward.ready = Boolean(data.ready);
+          if (state.reward.ready) {
+            state.reward.message = '';
+          }
+          renderRewardHud();
+          renderRewardModal();
           break;
         case 'TUTORIAL_UPDATE': {
           console.log('[TUTORIAL] TUTORIAL_UPDATE received | phase:', data.phase, '| visible:', data.visible, '| pointerTarget:', data.pointerTarget, '| isInMine:', state.mining.isInMine);
@@ -4868,7 +5069,6 @@
           } else {
             console.warn('[UI] Invalid amount for popup:', data.amount);
           }
-          refreshRebirthModalIfOpen();
           break;
         case 'TRAINING_PROMPT':
           // Show or hide the training prompt based on visibility
@@ -5062,10 +5262,32 @@
               currentEggHatch.confettiFired = true;
             }
           }
-          // NOTE: Don't optimistically subtract gold here.
-          // The server already sends an authoritative GOLD_STATS update as part of hatching.
-          // Depending on event ordering, subtracting here can temporarily double-decrement the HUD.
+          if (typeof data.goldSpent === 'number') {
+            // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
+            state.gold = Math.max(0, state.gold - data.goldSpent);
+            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          }
           renderEggStation();
+          break;
+        }
+        case 'REWARD_HATCH_RESULT': {
+          if (!data.success) {
+            state.reward.message = data.message || 'Failed to claim reward.';
+            resetEggHatchOverlay();
+            renderRewardModal();
+            break;
+          }
+
+          if (currentEggHatch) {
+            currentEggHatch.results = data.results || [];
+            maybeFinishEggHatch();
+            if (Array.isArray(currentEggHatch.slots) && !currentEggHatch.confettiFired) {
+              spawnHatchConfettiFromSlots(currentEggHatch.slots);
+              currentEggHatch.confettiFired = true;
+            }
+          }
+          state.reward.message = '';
+          renderRewardModal();
           break;
         }
         case 'PET_STATE':
@@ -5458,6 +5680,16 @@
 <!-- Included from: ./components/StatsHUD.html -->
 <!-- Stats HUD Container (Middle Right) -->
 <div class="stats-hud-container">
+  <!-- Timed Reward -->
+  <div id="reward-hud" class="reward-hud">
+    <div id="reward-timer-text" class="reward-hud__timer">15m 00s</div>
+    <button id="reward-button" class="reward-button">
+      <span class="reward-button__icon">
+        <img src="{{CDN_ASSETS_URL}}/icons/target.png" alt="Reward" />
+      </span>
+      <span class="reward-button__label">Reward</span>
+    </button>
+  </div>
   <!-- Trophy (Wins) -->
   <div class="stat-hud stat-hud--wins">
     <div class="stat-hud__value" id="wins-value">0</div>
@@ -9082,6 +9314,265 @@
     };
   })();
 </script>
+
+
+<!-- Included from: ./components/RewardModal.html -->
+<!-- Timed Reward Modal -->
+<div
+  id="reward-modal"
+  class="hud reward-modal"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="reward-modal__container">
+    <div class="reward-modal__header">
+      <div class="reward-modal__title">Reward</div>
+      <button
+        id="reward-close-btn"
+        class="reward-modal__close modal__close"
+        data-close="reward-modal"
+      >
+        X
+      </button>
+    </div>
+
+    <div class="reward-modal__body">
+      <div class="reward-modal__egg-title">15 Minute Reward</div>
+
+      <div id="reward-pets-grid" class="reward-pets-grid">
+        <!-- Reward pet cards injected by JS -->
+      </div>
+
+      <div id="reward-message" class="reward-modal__message">
+        Play 15 minutes in-game for a reward!
+      </div>
+
+      <div class="reward-modal__progress">
+        <div class="reward-progress">
+          <div id="reward-progress-fill" class="reward-progress__fill"></div>
+          <div id="reward-progress-text" class="reward-progress__text">15m 00s</div>
+        </div>
+      </div>
+
+      <button id="reward-claim-button" class="reward-claim-button" disabled>
+        Claim
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #reward-modal.visible {
+    display: flex !important;
+  }
+
+  .reward-modal__container {
+    width: 860px;
+    max-width: 95vw;
+    max-height: 90vh;
+    background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
+    border: 3px solid rgba(72, 164, 255, 0.9);
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    padding: 18px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-family: "Fredoka", sans-serif;
+  }
+
+  .reward-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .reward-modal__title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .reward-modal__close {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: linear-gradient(135deg, #ff4d4d, #d93333);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .reward-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .reward-modal__egg-title {
+    font-size: 24px;
+    font-weight: 900;
+    text-align: center;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .reward-pets-grid {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    overflow-x: auto;
+  }
+
+  .reward-pet-card {
+    position: relative;
+    width: 120px;
+    min-width: 120px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    padding: 10px 8px 8px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+
+  .reward-pet-card__chance {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-weight: 900;
+    font-size: 14px;
+    color: #ff5dd2;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-pet-card__thumb {
+    width: 70px;
+    height: 70px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .reward-pet-card__thumb img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .reward-pet-card__name {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .reward-pet-card__mult {
+    font-size: 12px;
+    font-weight: 800;
+    color: #ffd66b;
+  }
+
+  .reward-modal__message {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: #ff3b3b;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-modal__progress {
+    padding: 0 10px;
+  }
+
+  .reward-progress {
+    position: relative;
+    height: 34px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    overflow: hidden;
+  }
+
+  .reward-progress__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #7cfc00, #43d11f);
+    transition: width 0.3s ease;
+  }
+
+  .reward-progress__text {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 900;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+  }
+
+  .reward-claim-button {
+    align-self: center;
+    min-width: 220px;
+    padding: 12px 20px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(180deg, #4bd350, #2cad2f);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .reward-claim-button:disabled {
+    background: linear-gradient(180deg, #444, #333);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  body.mobile .reward-modal__container {
+    width: 95vw;
+    padding: 14px;
+  }
+
+  body.mobile .reward-pet-card {
+    width: 90px;
+    min-width: 90px;
+  }
+
+  body.mobile .reward-pet-card__thumb {
+    width: 56px;
+    height: 56px;
+  }
+</style>
 
 
 <!-- Included from: ./components/PetsModal.html -->
@@ -13582,6 +14073,60 @@
     z-index: 900;
   }
 
+  .reward-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .reward-hud__timer {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 900;
+    color: #ff4444;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-hud--ready .reward-hud__timer {
+    color: #ffd65c;
+  }
+
+  .reward-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.7);
+    background: linear-gradient(180deg, #171717, #0c0c0c);
+    color: #b36bff;
+    font-size: 18px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    min-width: 180px;
+    width: 100%;
+  }
+
+  .reward-button__icon img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .reward-button__label {
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+  }
+
+  .reward-hud--ready .reward-button {
+    border-color: rgba(255, 214, 92, 0.8);
+    box-shadow: 0 0 16px rgba(255, 214, 92, 0.45);
+  }
+
   .auto-control-button {
     padding: 14px 20px;
     border-radius: 12px;
@@ -14663,6 +15208,25 @@
     gap: 8px;
   }
 
+  body.mobile .reward-hud {
+    gap: 4px;
+  }
+
+  body.mobile .reward-hud__timer {
+    font-size: 12px;
+  }
+
+  body.mobile .reward-button {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 120px;
+  }
+
+  body.mobile .reward-button__icon img {
+    width: 20px;
+    height: 20px;
+  }
+
   body.mobile .auto-btn {
     padding: 8px 14px;
     font-size: 12px;
@@ -15244,7 +15808,8 @@
     color: #ffaa00; /* Orange/Gold */
   }
 
-  /* Included from: ./components/ThemeStyles.html */
+
+<!-- Included from: ./components/ThemeStyles.html -->
 
   body.mobile .training-prompt__title {
     font-size: 14px;
@@ -15484,6 +16049,16 @@
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
+.reward-button {
+  border-color: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.reward-hud--ready .reward-button {
+  border-color: rgba(255, 214, 92, 0.8);
+  box-shadow: 0 0 16px rgba(255, 214, 92, 0.45);
+}
+
 /* Modals */
 .modal {
   background: rgba(6, 8, 16, 0.7);
@@ -15648,6 +16223,11 @@
   }
 
   .egg-modal.hatch-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .reward-modal.hatch-hidden {
     opacity: 0;
     pointer-events: none;
   }
@@ -15997,13 +16577,3 @@
   background: rgba(244, 196, 78, 0.8);
 }
 </style>
-
-<!-- Livereload - Development Only -->
-<script>
-  (function() {
-    const script = document.createElement('script');
-    script.src = 'http://localhost:35729/livereload.js?snipver=1';
-    script.async = true;
-    document.head.appendChild(script);
-  })();
-</script>

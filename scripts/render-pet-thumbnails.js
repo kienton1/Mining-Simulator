@@ -34,13 +34,23 @@ const parsePetIds = (filePath) => {
 const parsePetVisuals = (filePath) => {
   const content = fs.readFileSync(filePath, 'utf8');
   const map = new Map();
-  const regex = /\[PET_IDS\.([A-Z0-9_]+)\]:\s*\{\s*modelFolder:\s*'([^']+)',\s*gltfFile:\s*'([^']+)',\s*textureFile:\s*'([^']+)'\s*\}/g;
+  const entryRegex = /\[PET_IDS\.([A-Z0-9_]+)\]:\s*\{([\s\S]*?)\}\s*,?/g;
   let match;
-  while ((match = regex.exec(content)) !== null) {
+
+  const readProp = (block, prop) => {
+    const propRegex = new RegExp(`${prop}\\s*:\\s*['\"]([^'\"]+)['\"]`);
+    const propMatch = propRegex.exec(block);
+    return propMatch ? propMatch[1] : null;
+  };
+
+  while ((match = entryRegex.exec(content)) !== null) {
+    const block = match[2];
     map.set(match[1], {
-      modelFolder: match[2],
-      gltfFile: match[3],
-      textureFile: match[4],
+      modelFolder: readProp(block, 'modelFolder'),
+      gltfFile: readProp(block, 'gltfFile'),
+      textureFile: readProp(block, 'textureFile'),
+      modelPath: readProp(block, 'modelPath'),
+      texturePath: readProp(block, 'texturePath'),
     });
   }
   return map;
@@ -205,23 +215,20 @@ const main = async () => {
         continue;
       }
 
-      const modelPath = path.join(
-        rootDir,
-        'assets',
-        'models',
-        'Pets',
-        mapping.modelFolder,
-        mapping.gltfFile
-      );
-      const texturePath = path.join(
-        rootDir,
-        'assets',
-        'models',
-        'Pets',
-        mapping.modelFolder,
-        'Textures',
-        mapping.textureFile
-      );
+      if (!mapping.modelPath && (!mapping.modelFolder || !mapping.gltfFile)) {
+        console.warn(`[pet-thumbnails] Missing model info for ${constName}.`);
+        continue;
+      }
+
+      const modelPath = mapping.modelPath
+        ? path.join(rootDir, 'assets', mapping.modelPath)
+        : path.join(rootDir, 'assets', 'models', 'Pets', mapping.modelFolder, mapping.gltfFile);
+
+      const texturePath = mapping.texturePath
+        ? path.join(rootDir, 'assets', mapping.texturePath)
+        : (mapping.modelFolder && mapping.textureFile
+          ? path.join(rootDir, 'assets', 'models', 'Pets', mapping.modelFolder, 'Textures', mapping.textureFile)
+          : null);
 
       if (!fs.existsSync(modelPath)) {
         console.warn(`[pet-thumbnails] Missing model file: ${modelPath}`);
@@ -229,7 +236,7 @@ const main = async () => {
       }
 
       const modelUrl = pathToFileURL(modelPath).href;
-      const textureUrl = fs.existsSync(texturePath) ? pathToFileURL(texturePath).href : null;
+      const textureUrl = texturePath && fs.existsSync(texturePath) ? pathToFileURL(texturePath).href : null;
 
       await page.evaluate((mUrl, tUrl) => window.renderPet(mUrl, tUrl), modelUrl, textureUrl);
 

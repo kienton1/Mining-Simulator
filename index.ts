@@ -876,7 +876,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'maps') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -892,12 +892,16 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'reward') {
             gameManager.setModalState(player, data.modalType, false);
           }
           break;
         case 'REQUEST_PET_STATE':
           sendPetState(player);
+          break;
+        case 'REQUEST_REWARD_STATE':
+          gameManager.sendRewardConfigUI(player);
+          gameManager.updateRewardTimerUI(player);
           break;
         case 'PET_EQUIP': {
           const petId = String(data.petId ?? '');
@@ -1038,6 +1042,32 @@ startServer(world => {
           });
           sendPetState(player);
           gameManager.getTutorialManager().onEggHatched(player);
+          break;
+        }
+        case 'REWARD_CLAIM': {
+          const claimRes = gameManager.claimTimedReward(player);
+          if (!claimRes.success) {
+            player.ui.sendData({ type: 'REWARD_HATCH_RESULT', success: false, message: claimRes.message });
+            break;
+          }
+
+          const results = (claimRes.results ?? []).map((id) => {
+            const def = getPetDefinition(id);
+            return {
+              id,
+              name: def?.name ?? id,
+              rarity: def?.rarity ?? 'common',
+              eggType: def?.eggType ?? EggType.REWARD_15,
+              multiplier: def?.multiplier ?? 0,
+            };
+          });
+
+          player.ui.sendData({
+            type: 'REWARD_HATCH_RESULT',
+            success: true,
+            results,
+          });
+          sendPetState(player);
           break;
         }
         case 'BUY_PICKAXE':

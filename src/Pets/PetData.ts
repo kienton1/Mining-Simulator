@@ -27,6 +27,9 @@ export enum EggType {
   SAND = 'sand',
   SNOW = 'snow',
   LAVA = 'lava',
+
+  // Timed reward egg (15 minute reward)
+  REWARD_15 = 'reward_15',
 }
 
 /**

@@ -1,0 +1,256 @@
+<!-- Timed Reward Modal -->
+<div
+  id="reward-modal"
+  class="hud reward-modal"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="reward-modal__container">
+    <div class="reward-modal__header">
+      <div class="reward-modal__title">Reward</div>
+      <button
+        id="reward-close-btn"
+        class="reward-modal__close modal__close"
+        data-close="reward-modal"
+      >
+        X
+      </button>
+    </div>
+
+    <div class="reward-modal__body">
+      <div class="reward-modal__egg-title">15 Minute Reward</div>
+
+      <div id="reward-pets-grid" class="reward-pets-grid">
+        <!-- Reward pet cards injected by JS -->
+      </div>
+
+      <div id="reward-message" class="reward-modal__message">
+        Play 15 minutes in-game for a reward!
+      </div>
+
+      <div class="reward-modal__progress">
+        <div class="reward-progress">
+          <div id="reward-progress-fill" class="reward-progress__fill"></div>
+          <div id="reward-progress-text" class="reward-progress__text">15m 00s</div>
+        </div>
+      </div>
+
+      <button id="reward-claim-button" class="reward-claim-button" disabled>
+        Claim
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #reward-modal.visible {
+    display: flex !important;
+  }
+
+  .reward-modal__container {
+    width: 860px;
+    max-width: 95vw;
+    max-height: 90vh;
+    background: linear-gradient(180deg, rgba(38, 110, 190, 0.96), rgba(16, 58, 110, 0.96));
+    border: 3px solid rgba(72, 164, 255, 0.9);
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    padding: 18px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-family: "Fredoka", sans-serif;
+  }
+
+  .reward-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .reward-modal__title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .reward-modal__close {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: linear-gradient(135deg, #ff4d4d, #d93333);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .reward-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .reward-modal__egg-title {
+    font-size: 24px;
+    font-weight: 900;
+    text-align: center;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .reward-pets-grid {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    overflow-x: auto;
+  }
+
+  .reward-pet-card {
+    position: relative;
+    width: 120px;
+    min-width: 120px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    padding: 10px 8px 8px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+
+  .reward-pet-card__chance {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-weight: 900;
+    font-size: 14px;
+    color: #ff5dd2;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-pet-card__thumb {
+    width: 70px;
+    height: 70px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .reward-pet-card__thumb img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .reward-pet-card__name {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .reward-pet-card__mult {
+    font-size: 12px;
+    font-weight: 800;
+    color: #ffd66b;
+  }
+
+  .reward-modal__message {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: #ff3b3b;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .reward-modal__progress {
+    padding: 0 10px;
+  }
+
+  .reward-progress {
+    position: relative;
+    height: 34px;
+    border-radius: 16px;
+    background: rgba(10, 18, 35, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    overflow: hidden;
+  }
+
+  .reward-progress__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #7cfc00, #43d11f);
+    transition: width 0.3s ease;
+  }
+
+  .reward-progress__text {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 900;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+  }
+
+  .reward-claim-button {
+    align-self: center;
+    min-width: 220px;
+    padding: 12px 20px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(180deg, #4bd350, #2cad2f);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .reward-claim-button:disabled {
+    background: linear-gradient(180deg, #444, #333);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  body.mobile .reward-modal__container {
+    width: 95vw;
+    padding: 14px;
+  }
+
+  body.mobile .reward-pet-card {
+    width: 90px;
+    min-width: 90px;
+  }
+
+  body.mobile .reward-pet-card__thumb {
+    width: 56px;
+    height: 56px;
+  }
+</style>
