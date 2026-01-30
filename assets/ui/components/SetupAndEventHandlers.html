@@ -1457,21 +1457,11 @@
       });
     }
 
-    // Setup daily reward close button handler
-    const dailyRewardCloseBtn = document.getElementById('daily-reward-close-btn');
-    if (dailyRewardCloseBtn) {
-      dailyRewardCloseBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeDailyRewardModal();
-      });
-    }
-
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
-      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close');
-      
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close, .daily-reward-close-btn, .reward-close-btn');
+
       if (closeButton) {
         const modalId = closeButton.getAttribute('data-close');
         if (modalId) {
@@ -1479,7 +1469,12 @@
           if (modal) {
             e.preventDefault();
             e.stopPropagation();
-            hideModal(modal); // Use hideModal to notify server
+            // Special handling for daily reward modal to call its cleanup function
+            if (modalId === 'daily-reward-modal') {
+              closeDailyRewardModal();
+            } else {
+              hideModal(modal);
+            }
             console.log(`[UI] Closed modal: ${modalId}`);
           }
         }
@@ -2359,11 +2354,7 @@
           card.appendChild(desc);
           dailyRewardCardsGrid.appendChild(card);
         });
-
-        // Start animation if can claim and haven't started
-        if (canClaim && !state.dailyReward.animationComplete && possibleRewards.length > 0) {
-          startDailyRewardAnimation();
-        }
+        // Animation now only starts when user clicks Claim - no auto-start
       }
     };
 
@@ -2397,7 +2388,72 @@
       cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
     };
 
-    const showDailyRewardWinner = (result) => {
+    /**
+     * Runs a spin-to-win animation that cycles through cards with deceleration,
+     * landing on the target winner index after ~1.5-2 seconds.
+     */
+    const runDailyRewardSpinAnimation = (winnerIndex, callback) => {
+      stopDailyRewardAnimation();
+
+      const cards = document.querySelectorAll('.daily-reward-card');
+      if (cards.length === 0) {
+        callback?.();
+        return;
+      }
+
+      // Calculate how many total steps we want (ensures we land on winner)
+      // We want at least 2 full rotations + landing on winner
+      const minRotations = 2;
+      const totalCards = cards.length;
+      const baseSteps = minRotations * totalCards;
+      // Add steps to land exactly on winner
+      const stepsToWinner = (winnerIndex - (baseSteps % totalCards) + totalCards) % totalCards;
+      const totalSteps = baseSteps + stepsToWinner + totalCards; // One more full rotation for smoothness
+
+      let currentStep = 0;
+      let currentIndex = 0;
+
+      // Easing function: starts fast, slows down at the end
+      const getDelay = (step, total) => {
+        const progress = step / total;
+        // Starts at ~60ms, ends at ~350ms with ease-out curve
+        const minDelay = 60;
+        const maxDelay = 350;
+        // Use cubic ease-out for smooth deceleration
+        const eased = 1 - Math.pow(1 - progress, 3);
+        return minDelay + (maxDelay - minDelay) * eased;
+      };
+
+      const animateStep = () => {
+        // Remove highlight from all
+        cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
+
+        // Highlight current
+        if (cards[currentIndex]) {
+          cards[currentIndex].classList.add('daily-reward-card--highlight');
+        }
+
+        currentStep++;
+
+        if (currentStep >= totalSteps) {
+          // Animation complete - we should be on the winner
+          callback?.();
+          return;
+        }
+
+        // Move to next card
+        currentIndex = (currentIndex + 1) % totalCards;
+
+        // Schedule next step with eased delay
+        const delay = getDelay(currentStep, totalSteps);
+        setTimeout(animateStep, delay);
+      };
+
+      // Start animation
+      animateStep();
+    };
+
+    const showDailyRewardWinner = (result, skipAnimation = false, onComplete = null) => {
       stopDailyRewardAnimation();
 
       const cards = document.querySelectorAll('.daily-reward-card');
@@ -2407,19 +2463,34 @@
       let winnerIndex = possibleRewards.findIndex((r) => r.type === result.type);
       if (winnerIndex < 0) winnerIndex = 0;
 
-      if (cards[winnerIndex]) {
-        cards[winnerIndex].classList.add('daily-reward-card--winner');
+      const applyWinnerEffect = () => {
+        // Remove any highlights and add winner class
+        cards.forEach((card) => card.classList.remove('daily-reward-card--highlight'));
 
-        // Update the card to show the actual result
-        const nameEl = cards[winnerIndex].querySelector('.daily-reward-card__name');
-        if (nameEl) nameEl.textContent = result.displayName;
-      }
+        if (cards[winnerIndex]) {
+          cards[winnerIndex].classList.add('daily-reward-card--winner');
 
-      // Update message
-      const dailyRewardMessage = document.getElementById('daily-reward-message');
-      if (dailyRewardMessage) {
-        dailyRewardMessage.textContent = `You received: ${result.displayName}!`;
-        dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+          // Update the card to show the actual result
+          const nameEl = cards[winnerIndex].querySelector('.daily-reward-card__name');
+          if (nameEl) nameEl.textContent = result.displayName;
+        }
+
+        // Update message
+        const dailyRewardMessage = document.getElementById('daily-reward-message');
+        if (dailyRewardMessage) {
+          dailyRewardMessage.textContent = `You received: ${result.displayName}!`;
+          dailyRewardMessage.classList.remove('daily-reward-modal__message--waiting');
+        }
+
+        // Call completion callback if provided
+        onComplete?.();
+      };
+
+      if (skipAnimation) {
+        applyWinnerEffect();
+      } else {
+        // Run spin animation first, then apply winner effect
+        runDailyRewardSpinAnimation(winnerIndex, applyWinnerEffect);
       }
     };
 
@@ -4934,14 +5005,17 @@
             state.dailyReward.lastResult = data.result;
             state.dailyReward.canClaim = false;
             state.dailyReward.animationComplete = true;
-            // Show winner effect
-            showDailyRewardWinner(data.result);
-            spawnConfettiBurst();
-            playUpgradePurchaseSfx();
+            // Run spin animation, then show winner effect with confetti/SFX
+            // Note: Don't call renderDailyRewardModal() here as it would destroy the cards
+            // the animation is cycling through
+            showDailyRewardWinner(data.result, false, () => {
+              spawnConfettiBurst();
+              playUpgradePurchaseSfx();
+            });
           } else {
             state.dailyReward.message = data.message || 'Failed to claim reward.';
+            renderDailyRewardModal();
           }
-          renderDailyRewardModal();
           break;
         }
         case 'PET_STATE':

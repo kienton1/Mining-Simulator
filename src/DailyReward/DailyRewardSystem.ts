@@ -144,6 +144,15 @@ export class DailyRewardSystem {
   }
 
   /**
+   * Gets the weakest pet (lowest multiplier) as a starter pet for new players
+   * This is offered when the player has no pets yet
+   */
+  private getWeakestPet(): { petId: string; name: string; multiplier: number } {
+    // Stone Sprite is the weakest pet (multiplier: 2)
+    return { petId: 'stone_sprite', name: 'Stone Sprite', multiplier: 2 };
+  }
+
+  /**
    * Gets all possible rewards for the player (used for UI animation)
    */
   getPossibleRewards(player: Player): DailyRewardOption[] {
@@ -178,7 +187,7 @@ export class DailyRewardSystem {
       });
     }
 
-    // Best pet duplicate (if has any pets)
+    // Best pet duplicate (if has any pets) OR weakest pet as starter (if no pets)
     const bestPet = this.getBestOwnedPet(playerData);
     if (bestPet) {
       options.push({
@@ -187,6 +196,16 @@ export class DailyRewardSystem {
         iconUri: 'icons/HUDIcons/PetIcon.png',
         description: `Best Pet (x${bestPet.multiplier})`,
         value: bestPet.petId,
+      });
+    } else {
+      // Player has no pets - offer weakest pet as starter
+      const weakestPet = this.getWeakestPet();
+      options.push({
+        type: DailyRewardType.DUPLICATE_BEST_PET, // Reuse type for granting logic
+        displayName: weakestPet.name,
+        iconUri: 'icons/HUDIcons/PetIcon.png',
+        description: `Starter Pet (x${weakestPet.multiplier})`,
+        value: weakestPet.petId,
       });
     }
 
@@ -246,10 +265,14 @@ export class DailyRewardSystem {
       eligible.push({ type: DailyRewardType.NEXT_MINER, value: nextMinerTier });
     }
 
-    // Best pet duplicate
+    // Best pet duplicate (or starter pet if no pets owned)
     const bestPet = this.getBestOwnedPet(playerData);
     if (bestPet) {
       eligible.push({ type: DailyRewardType.DUPLICATE_BEST_PET, value: bestPet.petId });
+    } else {
+      // Player has no pets - offer weakest pet as starter
+      const weakestPet = this.getWeakestPet();
+      eligible.push({ type: DailyRewardType.DUPLICATE_BEST_PET, value: weakestPet.petId });
     }
 
     // Currency rewards (always available)
