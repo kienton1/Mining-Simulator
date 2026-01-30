@@ -290,7 +290,8 @@ export class MiningSystem {
     onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
     isBlockingModalOpen?: () => boolean,
-    isAutoMining: boolean = false
+    isAutoMining: boolean = false,
+    onBlockDestroyed?: (player: Player) => void
   ): void {
     // First check if player is in the mine - if not, do nothing
     const existingState = this.miningStates.get(player);
@@ -616,12 +617,15 @@ export class MiningSystem {
           // Fallback: try to set position directly on entity if rigidBody method doesn't work
 
         }
+
+        // Notify callback that block was destroyed (for animation reset)
+        onBlockDestroyed?.(player);
       }
-      
+
       state.lastHitTime = Date.now();
       return; // Chest handled, exit early
     }
-    
+
     // Normal ore block mining (existing logic)
     // Get shared block for entire mining area at this mine level
     // All levels are pre-generated, so this should always exist
@@ -739,7 +743,10 @@ export class MiningSystem {
         // The player will fall naturally due to physics, but we can at least set the position
 
       }
-      
+
+      // Notify callback that block was destroyed (for animation reset)
+      onBlockDestroyed?.(player);
+
       // No need to generate levels ahead - all 1000 levels are already generated!
     }
 
@@ -762,7 +769,8 @@ export class MiningSystem {
     onOreMined: (player: Player, oreType: string, amount: number) => void,
     onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
-    isBlockingModalOpen?: () => boolean
+    isBlockingModalOpen?: () => boolean,
+    onBlockDestroyed?: (player: Player) => void
   ): void {
     console.log('[MiningSystem] startMiningLoop called for player:', player.username);
     // Stop any existing loop
@@ -802,7 +810,7 @@ export class MiningSystem {
       }
 
       // Perform mining click (auto-mining mode)
-      this.handleMiningClick(player, pickaxe, onOreMined, onDamageDealt, damageMultiplier, isBlockingModalOpen, true);
+      this.handleMiningClick(player, pickaxe, onOreMined, onDamageDealt, damageMultiplier, isBlockingModalOpen, true, onBlockDestroyed);
     };
 
     // Perform first hit immediately

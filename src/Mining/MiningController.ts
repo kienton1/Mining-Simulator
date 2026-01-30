@@ -14,7 +14,7 @@ import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
-import { BASE_SWING_RATE, MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
+import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
 import { getSwingsPerSecond } from '../Stats/StatCalculator';
 
 /**
@@ -346,16 +346,18 @@ export class MiningController {
   startMiningLoop(player: Player): void {
     console.log('[MiningController] startMiningLoop called for player:', player.username);
 
+    // Calculate animation speed multiplier (used for both initial start and restart on block break)
+    const pickaxeForAnim = this.gameManager.getPlayerPickaxe(player);
+    const playerDataForAnim = this.gameManager.getPlayerData(player);
+    const worldId = playerDataForAnim?.currentWorld || 'island1';
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const speedStat = pickaxeForAnim?.miningSpeed ?? 0;
+    const swingsPerSecond = getSwingsPerSecond(speedStat, worldNumber);
+    const animSpeedMultiplier = Math.min(swingsPerSecond, MAX_MINING_ANIMATION_SPEED);
+
     // Start mining animation on player entity with speed scaled to pickaxe
     const playerEntity = this.gameManager.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
-      const pickaxeForAnim = this.gameManager.getPlayerPickaxe(player);
-      const playerDataForAnim = this.gameManager.getPlayerData(player);
-      const worldId = playerDataForAnim?.currentWorld || 'island1';
-      const worldNumber = this.getWorldNumberFromId(worldId);
-      const speedStat = pickaxeForAnim?.miningSpeed ?? 0;
-      const swingsPerSecond = getSwingsPerSecond(speedStat, worldNumber);
-      const animSpeedMultiplier = Math.min(swingsPerSecond / BASE_SWING_RATE, MAX_MINING_ANIMATION_SPEED);
       (playerEntity as any).startMiningAnimation(animSpeedMultiplier);
     }
 
@@ -452,7 +454,18 @@ export class MiningController {
         }
       },
       damageMultiplier,
-      undefined // Modal check is done at entry point, not per-tick
+      undefined, // Modal check is done at entry point, not per-tick
+      (p: Player) => {
+        // Block destroyed callback - stop and restart mining animation for visual reset
+        const pEntity = this.getPlayerEntity(p);
+        if (pEntity && typeof (pEntity as any).stopMiningAnimation === 'function') {
+          (pEntity as any).stopMiningAnimation();
+          // Immediately restart since we're in a mining loop
+          if (typeof (pEntity as any).startMiningAnimation === 'function') {
+            (pEntity as any).startMiningAnimation(animSpeedMultiplier);
+          }
+        }
+      }
     );
 
     // Send initial progress update and mining state
