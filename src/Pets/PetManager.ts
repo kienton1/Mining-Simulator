@@ -9,6 +9,7 @@ import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
 import type { PetId } from './PetData';
+import { getBasePetIdFromAnyPetId, getNextPetTier, getPetTierFromPetId, makeUpgradedPetId, PET_MAX_TIER } from './PetUpgrades';
 
 type GetPlayerData = (player: Player) => PlayerData | undefined;
 type UpdatePlayerData = (player: Player, data: PlayerData) => void;
@@ -304,6 +305,72 @@ export class PetManager {
     data.petInventory = allOwned.slice(PET_EQUIP_CAPACITY);
     this.updatePlayerData(player, data);
     return { success: true };
+  }
+
+  /**
+   * Craft/upgrade pets by merging 3 identical pet instances into 1 of the next tier.
+   *
+   * - Counts across BOTH inventory + equipped.
+   * - Consumes inventory first, then equipped if needed.
+   * - Adds the upgraded pet to inventory.
+   *
+   * Tier progression:
+   *   Normal -> Large -> Huge -> Giga (MAX)
+   */
+  craftUpgrade(player: Player, petId: PetId): { success: boolean; message?: string; newPetId?: PetId } {
+    const data = this.getPlayerData(player);
+    if (!data) return { success: false, message: 'Player data not found' };
+    if (!isPetId(petId)) return { success: false, message: 'Invalid pet id' };
+
+    const tier = getPetTierFromPetId(petId);
+    if (tier === null) return { success: false, message: 'Invalid pet id' };
+    if (tier >= PET_MAX_TIER) {
+      return { success: false, message: 'MAX' };
+    }
+
+    const nextTier = getNextPetTier(tier);
+    if (nextTier === null) return { success: false, message: 'MAX' };
+
+    data.petInventory = Array.isArray(data.petInventory) ? data.petInventory : [];
+    data.equippedPets = Array.isArray(data.equippedPets) ? data.equippedPets : [];
+    data.petDiscovered = Array.isArray(data.petDiscovered) ? data.petDiscovered : [];
+
+    const ownedCount = data.petInventory.filter((id) => id === petId).length + data.equippedPets.filter((id) => id === petId).length;
+    if (ownedCount < 3) {
+      return { success: false, message: 'Not enough pets to craft (need 3)' };
+    }
+
+    let toRemove = 3;
+
+    // Remove from inventory first (iterate backwards so indices don't shift)
+    for (let i = data.petInventory.length - 1; i >= 0 && toRemove > 0; i--) {
+      if (data.petInventory[i] !== petId) continue;
+      data.petInventory.splice(i, 1);
+      toRemove--;
+    }
+
+    // Remove remaining from equipped
+    for (let i = data.equippedPets.length - 1; i >= 0 && toRemove > 0; i--) {
+      if (data.equippedPets[i] !== petId) continue;
+      data.equippedPets.splice(i, 1);
+      toRemove--;
+    }
+
+    if (toRemove !== 0) {
+      // Should never happen if ownedCount check passed, but keep state safe.
+      return { success: false, message: 'Failed to craft (internal error)' };
+    }
+
+    const basePetId = getBasePetIdFromAnyPetId(petId);
+    const newPetId = makeUpgradedPetId(basePetId, nextTier);
+    data.petInventory.push(newPetId);
+
+    if (!data.petDiscovered.includes(newPetId)) {
+      data.petDiscovered.push(newPetId);
+    }
+
+    this.updatePlayerData(player, data);
+    return { success: true, newPetId };
   }
 }
 

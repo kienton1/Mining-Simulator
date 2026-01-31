@@ -1292,6 +1292,7 @@
     // Pets UI elements (grid)
     const petsGridEl = document.getElementById('pets-grid');
     const petsOwnedCountEl = document.getElementById('pets-owned-count');
+    const petsMaxCountEl = document.getElementById('pets-max-count');
     const petsEquippedCountEl = document.getElementById('pets-equipped-count');
     const petsMultiplierSumEl = document.getElementById('pets-multiplier-sum');
     const petsEquipBestBtn = document.getElementById('pets-equip-best');
@@ -1311,6 +1312,7 @@
     const petDetailRarityEl = document.getElementById('pet-detail-rarity');
     const petDetailStatsEl = document.getElementById('pet-detail-stats');
     const petDetailActionEl = document.getElementById('pet-detail-action');
+    const petDetailCraftEl = document.getElementById('pet-detail-craft');
 
     // Egg station UI elements
     const eggModalTitleEl = document.getElementById('egg-modal-title');
@@ -2886,11 +2888,16 @@
       renderEggShopPets();
     };
 
-    // Format multiplier with K, M, B suffixes (max 1 decimal place)
+    // Format multiplier with K, M, B suffixes (supports decimals for small values)
     const formatMultiplier = (value) => {
       if (value < 0) return '-' + formatMultiplier(-value);
       if (value === 0) return '0';
-      if (value < 1000) return String(Math.round(value));
+      if (value < 1000) {
+        if (Number.isFinite(value) && Math.abs(value % 1) > 1e-9) {
+          return value.toFixed(2).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+        return String(Math.round(value));
+      }
       
       if (value >= 1e9) {
         const billions = value / 1e9;
@@ -2918,7 +2925,8 @@
 
     const renderPets = () => {
       // Top counters
-      if (petsOwnedCountEl) petsOwnedCountEl.textContent = `${state.pets.ownedCount}/${state.pets.ownedCap}`;
+      if (petsOwnedCountEl) petsOwnedCountEl.textContent = `${state.pets.ownedCount}`;
+      if (petsMaxCountEl) petsMaxCountEl.textContent = `${state.pets.ownedCap}`;
       if (petsEquippedCountEl) petsEquippedCountEl.textContent = `${state.pets.equippedCount}/${state.pets.equippedCap}`;
       if (petsMultiplierSumEl) petsMultiplierSumEl.textContent = formatMultiplier(state.pets.multiplierSum ?? 0);
 
@@ -2984,6 +2992,10 @@
             petDetailActionEl.disabled = true;
             petDetailActionEl.classList.remove('pet-detail__action--equip', 'pet-detail__action--unequip', 'pets-details__action-btn--unequip');
           }
+          if (petDetailCraftEl) {
+            petDetailCraftEl.textContent = 'Craft Large 0/3';
+            petDetailCraftEl.disabled = true;
+          }
           return;
         }
 
@@ -3033,6 +3045,22 @@
           petDetailActionEl.classList.toggle('pet-detail__action--unequip', isEquipped);
           petDetailActionEl.classList.toggle('pets-details__action-btn--unequip', isEquipped);
         }
+
+        if (petDetailCraftEl) {
+          const tier = Number(pet.tier ?? 0);
+          const maxTier = Number(pet.maxTier ?? 3);
+          const sameCount = list.filter((p) => p && p.petId === pet.petId).length;
+
+          if (tier >= maxTier) {
+            petDetailCraftEl.textContent = 'MAX';
+            // Keep it as a button; clicking does nothing at MAX.
+            petDetailCraftEl.disabled = false;
+          } else {
+            const nextLabel = tier === 0 ? 'Large' : tier === 1 ? 'Huge' : 'Giga';
+            petDetailCraftEl.textContent = `Craft ${nextLabel} ${sameCount}/3`;
+            petDetailCraftEl.disabled = false;
+          }
+        }
       };
 
       // Keep detail panel synced with latest state
@@ -3063,7 +3091,15 @@
         mult.className = 'pet-tile__mult';
         mult.textContent = formatMultiplier(pet.multiplier ?? 0);
 
+        const stars = document.createElement('div');
+        stars.className = 'pet-tile__stars';
+        const starCount = Number(pet.stars ?? pet.tier ?? 0);
+        if (starCount > 0) {
+          stars.textContent = '★'.repeat(Math.min(3, Math.max(0, starCount)));
+        }
+
         tile.appendChild(imgWrap);
+        tile.appendChild(stars);
         tile.appendChild(mult);
 
         if (state.pets.deleteMode) {
@@ -3189,6 +3225,25 @@
         } else {
           hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
         }
+      });
+    }
+
+    if (petDetailCraftEl) {
+      petDetailCraftEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const list = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+        const current = state.pets.selectedPetInstanceId ? (list.find(p => p.instanceId === state.pets.selectedPetInstanceId) || null) : null;
+        if (!current) return;
+
+        const tier = Number(current.tier ?? 0);
+        const maxTier = Number(current.maxTier ?? 3);
+        if (tier >= maxTier) return; // MAX: do nothing
+
+        const sameCount = list.filter((p) => p && p.petId === current.petId).length;
+        if (sameCount < 3) return; // Not enough: do nothing
+
+        hytopia.sendData({ type: 'PET_CRAFT_UPGRADE', petId: current.petId });
       });
     }
 

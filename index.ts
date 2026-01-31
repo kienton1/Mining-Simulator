@@ -46,6 +46,7 @@ import { ShopLabelManager, type ShopLabelDefinition } from './src/Shop/ShopLabel
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, PET_MAX_TIER } from './src/Pets/PetUpgrades';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 import { EGG_STATIONS } from './src/Pets/EggStationsConfig';
@@ -327,9 +328,16 @@ startServer(world => {
       ...inv.map((petId: string, idx: number) => ({ instanceId: `inv:${idx}`, petId, equipped: false, slotIndex: idx })),
     ].map((p) => {
       const def = getPetDefinition(p.petId);
+      const tier = getPetTierFromPetId(p.petId) ?? 0;
+      const basePetId = getBasePetIdFromAnyPetId(p.petId);
       return {
         instanceId: p.instanceId,
         petId: p.petId,
+        basePetId,
+        tier,
+        stars: getStarsForTier(tier),
+        maxTier: PET_MAX_TIER,
+        imageUri: `ui/pets/${basePetId}.png`,
         equipped: p.equipped,
         slotIndex: p.slotIndex,
         name: def?.name ?? p.petId,
@@ -1066,6 +1074,23 @@ startServer(world => {
             deletedCount: res.deletedCount ?? 0,
           });
           sendPetState(player);
+          break;
+        }
+        case 'PET_CRAFT_UPGRADE': {
+          const petId = String((data as any).petId ?? '');
+          const res = gameManager.getPetManager().craftUpgrade(player, petId);
+          player.ui.sendData({
+            type: 'PET_ACTION_RESULT',
+            action: 'craftUpgrade',
+            success: res.success,
+            message: res.message,
+            newPetId: res.newPetId,
+          });
+          sendPetState(player);
+          if (res.success) {
+            // Crafting can consume equipped pets, so always resync visuals on success.
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'EGG_AUTO_DELETE_TOGGLE': {

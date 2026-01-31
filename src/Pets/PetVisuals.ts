@@ -5,6 +5,7 @@
 
 import type { PetId } from './PetData';
 import { PET_IDS } from './PetDatabase';
+import { getBasePetIdFromAnyPetId } from './PetUpgrades';
 
 export type PetModelInfo = {
   modelFolder: string;
@@ -112,7 +113,8 @@ const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
 };
 
 export function getPetModelInfo(petId: PetId): PetModelInfo | null {
-  const info = PET_MODEL_MAP[petId];
+  const basePetId = getBasePetIdFromAnyPetId(petId);
+  const info = PET_MODEL_MAP[basePetId];
   if (!info) {
     return null;
   }
@@ -134,5 +136,6 @@ export function getPetTextureUri(petId: PetId): string | null {
 }
 
 export function getPetImageUri(petId: PetId): string | null {
-  return `ui/pets/${petId}.png`;
+  const basePetId = getBasePetIdFromAnyPetId(petId);
+  return `ui/pets/${basePetId}.png`;
 }

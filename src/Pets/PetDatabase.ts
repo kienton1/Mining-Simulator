@@ -5,6 +5,12 @@
  */
 
 import { EggType, PetRarity, type EggDefinition, type PetDefinition, type PetId } from './PetData';
+import {
+  deriveUpgradedPetDefinition,
+  getBasePetIdFromAnyPetId,
+  getPetTierFromPetId,
+  type PetTier,
+} from './PetUpgrades';
 
 export const PET_INVENTORY_CAPACITY = 50;
 export const PET_EQUIP_CAPACITY = 8;
@@ -186,16 +192,28 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: PET_IDS.LARRY_THE_SKELETON, name: 'Larry the Skeleton', eggType: EggType.REWARD_15, rarity: PetRarity.LEGENDARY, multiplier: 1_000_000 },
 ];
 
-export const PET_DEFINITIONS: Record<PetId, PetDefinition> = Object.fromEntries(
+const BASE_PET_DEFINITIONS: Record<PetId, PetDefinition> = Object.fromEntries(
   PET_DEFINITIONS_ARRAY.map((p) => [p.id, p])
 ) as Record<PetId, PetDefinition>;
 
 export function getPetDefinition(petId: PetId): PetDefinition | undefined {
-  return PET_DEFINITIONS[petId];
+  const tier = getPetTierFromPetId(petId);
+  if (tier === null) return undefined;
+
+  const basePetId = getBasePetIdFromAnyPetId(petId);
+  const baseDef = BASE_PET_DEFINITIONS[basePetId];
+  if (!baseDef) return undefined;
+
+  if (tier === 0) return baseDef;
+  return deriveUpgradedPetDefinition(baseDef, tier as PetTier);
 }
 
 export function isPetId(value: unknown): value is PetId {
-  return typeof value === 'string' && value in PET_DEFINITIONS;
+  if (typeof value !== 'string') return false;
+  const tier = getPetTierFromPetId(value);
+  if (tier === null) return false;
+  const basePetId = getBasePetIdFromAnyPetId(value);
+  return typeof basePetId === 'string' && basePetId in BASE_PET_DEFINITIONS;
 }
 
 export type EggLootEntry = { petId: PetId; weight: number };

@@ -41,6 +41,7 @@
               <div class="pets-stat-row" style="justify-content: center; color: #7a8ba3;">Select a pet</div>
             </div>
             <button id="pet-detail-action" class="pets-details__action-btn" disabled>—</button>
+            <button id="pet-detail-craft" class="pets-details__craft-btn" disabled>Craft Large 0/3</button>
           </div>
         </div>
 
@@ -324,6 +325,33 @@
     border-color: rgba(239, 68, 68, 0.9);
   }
 
+  .pets-details__craft-btn {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 2px solid rgba(234, 179, 8, 0.95);
+    font-size: 12px;
+    font-weight: 800;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: linear-gradient(180deg, #facc15, #ca8a04);
+    color: #1b1b1b;
+  }
+
+  .pets-details__craft-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #fde047, #facc15);
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.35);
+    transform: translateY(-2px);
+  }
+
+  .pets-details__craft-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
   /* Right Panel - Grid */
   .pets-right-panel {
     flex: 1;
@@ -421,6 +449,30 @@
     font-weight: 800;
     font-size: 10px;
     border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .pet-tile__stars {
+    position: absolute;
+    bottom: 3px;
+    left: 3px;
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1px 4px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255, 215, 0, 0.35);
+    color: #ffd700;
+    font-weight: 900;
+    font-size: 10px;
+    line-height: 1;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+  }
+
+  .pet-tile__stars:empty {
+    display: none;
   }
 
   .pet-tile__delete-overlay {
@@ -749,294 +801,4 @@
   }
 </style>
 
-<script>
-  (function() {
-    const petsOverlay = document.getElementById("pets-modal");
-    const petsCloseBtn = document.getElementById("pets-close-btn");
-    const petsGrid = document.getElementById("pets-grid");
-    const petsOwnedCount = document.getElementById("pets-owned-count");
-    const petsMaxCount = document.getElementById("pets-max-count");
-    const petsMultiplierSum = document.getElementById("pets-multiplier-sum");
-
-    // Detail panel elements
-    const petDetailName = document.getElementById("pet-detail-name");
-    const petDetailImgEl = document.getElementById("pet-detail-img-el");
-    const petDetailEmoji = document.getElementById("pet-detail-emoji");
-    const petDetailMult = document.getElementById("pet-detail-mult");
-    const petDetailStats = document.getElementById("pet-detail-stats");
-    const petDetailAction = document.getElementById("pet-detail-action");
-
-    // Badge elements (moved from footer)
-    const petsEquipBest = document.getElementById("pets-equip-best");
-    const petsUnequipAll = document.getElementById("pets-unequip-all");
-    const petsTrashToggle = document.getElementById("pets-trash-toggle");
-
-    // Delete bar elements
-    const petsDeleteBar = document.getElementById("pets-delete-bar");
-    const petsDeleteText = document.getElementById("pets-delete-text");
-    const petsDeleteConfirm = document.getElementById("pets-delete-confirm");
-    const petsDeleteCancel = document.getElementById("pets-delete-cancel");
-
-    let petsData = null;
-    let pets = [];
-    let selectedPetId = null;
-    let deleteMode = false;
-    let petsToDelete = new Set();
-
-    function openPetsModal() {
-      petsOverlay.style.display = "flex";
-      selectedPetId = null;
-      deleteMode = false;
-      petsToDelete.clear();
-
-      const wrapper = document.querySelector(".pets-wrapper");
-      wrapper.classList.remove("closing");
-      void wrapper.offsetWidth;
-
-      updateDeleteModeUI();
-      hytopia.lockPointer(false, true);
-      hytopia.sendData({ type: "GET_PETS_DATA" });
-      if (window.setModalOpen) window.setModalOpen(true);
-    }
-
-    function closePetsModal() {
-      const wrapper = document.querySelector(".pets-wrapper");
-      wrapper.classList.add("closing");
-
-      setTimeout(() => {
-        petsOverlay.style.display = "none";
-        petsOverlay.classList.remove("visible");
-        wrapper.classList.remove("closing");
-        deleteMode = false;
-        petsToDelete.clear();
-        updateDeleteModeUI();
-      }, 400);
-      if (window.setModalOpen) window.setModalOpen(false);
-    }
-
-    function renderPetsGrid(data) {
-      petsData = data;
-      pets = data.pets || [];
-      const maxPets = data.maxPets || 50;
-      const maxEquipped = data.maxEquipped || 8;
-      const equippedPets = pets.filter(p => p.equipped);
-
-      // Update count badge
-      petsOwnedCount.textContent = pets.length;
-      petsMaxCount.textContent = maxPets;
-
-      // Calculate total multiplier
-      const totalMult = equippedPets.reduce((sum, p) => sum + (p.multiplier || 1), 0);
-      petsMultiplierSum.textContent = totalMult > 0 ? totalMult.toFixed(1) : "0";
-
-      if (pets.length === 0) {
-        petsGrid.innerHTML = `
-          <div class="pets-empty">
-            <span class="pets-empty__icon">🥚</span>
-            <span>No pets yet!</span>
-            <span class="pets-empty__hint">Visit an Egg Station to hatch pets</span>
-          </div>
-        `;
-        renderPetDetail(null);
-        return;
-      }
-
-      // Auto-select first pet if none selected
-      if (!selectedPetId) {
-        selectedPetId = pets[0].id;
-      }
-
-      // Sort: equipped first, then by multiplier desc
-      const sortedPets = [...pets].sort((a, b) => {
-        if (a.equipped !== b.equipped) return b.equipped - a.equipped;
-        return (b.multiplier || 1) - (a.multiplier || 1);
-      });
-
-      petsGrid.innerHTML = sortedPets.map(pet => {
-        const isSelected = pet.id === selectedPetId;
-        const isEquipped = pet.equipped;
-        const isDeleteSelected = petsToDelete.has(pet.id);
-        const rarity = (pet.rarity || "common").toLowerCase();
-
-        const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
-        const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
-
-        let selectionClass = "";
-        if (deleteMode && isDeleteSelected) selectionClass = "pet-tile--delete-selected";
-        else if (!deleteMode && isSelected) selectionClass = "pet-tile--selected";
-
-        return `
-          <div class="pet-tile pet-tile--${rarity} ${isEquipped ? "pet-tile--equipped" : ""} ${selectionClass}" data-pet-id="${pet.id}">
-            <div class="pet-tile__img">
-              ${iconPath
-                ? `<img class="pet-tile__img-el" src="${iconPath}" alt="${pet.name}" />`
-                : `<span class="pet-tile__emoji">&#x1F43E;</span>`
-              }
-            </div>
-            <div class="pet-tile__mult">x${pet.multiplier || 1}</div>
-            ${deleteMode && isDeleteSelected ? '<div class="pet-tile__delete-overlay">✕</div>' : ''}
-          </div>
-        `;
-      }).join("");
-
-      // Add click handlers
-      petsGrid.querySelectorAll(".pet-tile").forEach(tile => {
-        tile.addEventListener("click", () => {
-          const id = tile.dataset.petId;
-          if (deleteMode) {
-            if (petsToDelete.has(id)) {
-              petsToDelete.delete(id);
-            } else {
-              petsToDelete.add(id);
-            }
-            updateDeleteModeUI();
-            renderPetsGrid(petsData);
-          } else {
-            selectedPetId = id;
-            const pet = pets.find(p => p.id === id);
-            renderPetDetail(pet);
-            renderPetsGrid(petsData);
-          }
-        });
-      });
-
-      // Update detail panel
-      if (!deleteMode) {
-        const selectedPet = pets.find(p => p.id === selectedPetId);
-        renderPetDetail(selectedPet || null);
-      } else {
-        renderPetDetail(null);
-      }
-    }
-
-    function renderPetDetail(pet) {
-      if (!pet) {
-        petDetailImgEl.style.display = "none";
-        petDetailEmoji.style.display = "block";
-        petDetailEmoji.innerHTML = "&#x1F43E;";
-        petDetailName.textContent = "No Pet Selected";
-        petDetailMult.textContent = "";
-        petDetailStats.innerHTML = '<div class="pets-stat-row" style="justify-content: center; color: #7a8ba3;">Select a pet</div>';
-        petDetailAction.textContent = "—";
-        petDetailAction.disabled = true;
-        petDetailAction.className = "pets-details__action-btn";
-        return;
-      }
-
-      const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
-      const iconPath = pet.icon ? (cdn ? `${cdn}/${pet.icon}` : `../${pet.icon}`) : null;
-
-      if (iconPath) {
-        petDetailImgEl.src = iconPath;
-        petDetailImgEl.style.display = "block";
-        petDetailEmoji.style.display = "none";
-      } else {
-        petDetailImgEl.style.display = "none";
-        petDetailEmoji.style.display = "block";
-        petDetailEmoji.innerHTML = "&#x1F43E;";
-      }
-
-      petDetailName.textContent = pet.name || "Pet";
-      petDetailMult.textContent = `x${pet.multiplier || 1}`;
-
-      const rarity = (pet.rarity || "common").toLowerCase();
-      let statsHtml = '';
-      statsHtml += `<div class="pets-stat-row"><span class="pets-stat-row__label">Multiplier</span><span class="pets-stat-row__value pets-stat-row__value--mult">x${pet.multiplier || 1}</span></div>`;
-      statsHtml += `<div class="pets-stat-row"><span class="pets-stat-row__label">Rarity</span><span class="pets-stat-row__value pets-stat-row__value--rarity">${rarity.charAt(0).toUpperCase() + rarity.slice(1)}</span></div>`;
-      petDetailStats.innerHTML = statsHtml;
-
-      petDetailAction.disabled = false;
-      if (pet.equipped) {
-        petDetailAction.textContent = "Unequip";
-        petDetailAction.className = "pets-details__action-btn pets-details__action-btn--unequip";
-      } else {
-        petDetailAction.textContent = "Equip";
-        petDetailAction.className = "pets-details__action-btn";
-      }
-    }
-
-    function updateDeleteModeUI() {
-      petsTrashToggle.classList.toggle("active", deleteMode);
-
-      if (deleteMode) {
-        petsDeleteBar.hidden = false;
-        petsDeleteText.textContent = `Delete ${petsToDelete.size} Pet${petsToDelete.size !== 1 ? 's' : ''}!`;
-        petsDeleteConfirm.disabled = petsToDelete.size === 0;
-        renderPetDetail(null);
-      } else {
-        petsDeleteBar.hidden = true;
-        petsToDelete.clear();
-      }
-    }
-
-    // Event listeners
-    petsCloseBtn?.addEventListener("click", closePetsModal);
-
-    petDetailAction?.addEventListener("click", () => {
-      if (petDetailAction.disabled) return;
-      if (!selectedPetId) return;
-      const pet = pets.find(p => p.id === selectedPetId);
-      if (!pet) return;
-
-      if (pet.equipped) {
-        hytopia.sendData({ type: "UNEQUIP_PET", petId: selectedPetId });
-      } else {
-        hytopia.sendData({ type: "EQUIP_PET", petId: selectedPetId });
-      }
-    });
-
-    petsEquipBest?.addEventListener("click", () => {
-      hytopia.sendData({ type: "EQUIP_BEST_PETS" });
-    });
-
-    petsUnequipAll?.addEventListener("click", () => {
-      hytopia.sendData({ type: "UNEQUIP_ALL_PETS" });
-    });
-
-    petsTrashToggle?.addEventListener("click", () => {
-      deleteMode = !deleteMode;
-      petsToDelete.clear();
-      updateDeleteModeUI();
-      if (petsData) renderPetsGrid(petsData);
-    });
-
-    petsDeleteConfirm?.addEventListener("click", () => {
-      if (petsToDelete.size === 0) return;
-      hytopia.sendData({ type: "DELETE_PETS", petIds: Array.from(petsToDelete) });
-      deleteMode = false;
-      petsToDelete.clear();
-      updateDeleteModeUI();
-    });
-
-    petsDeleteCancel?.addEventListener("click", () => {
-      deleteMode = false;
-      petsToDelete.clear();
-      updateDeleteModeUI();
-      if (petsData) renderPetsGrid(petsData);
-    });
-
-    // Listen for data from server
-    hytopia.onData(data => {
-      if (data.type === "PETS_DATA") {
-        renderPetsGrid(data);
-      }
-      if (data.type === "OPEN_PETS_MODAL") {
-        openPetsModal();
-      }
-    });
-
-    // Global function to open modal
-    window.openPetsModal = openPetsModal;
-
-    // Attach click sounds
-    if (typeof window.attachClickSounds === "function") {
-      window.attachClickSounds(petsCloseBtn);
-      window.attachClickSounds(petDetailAction);
-      window.attachClickSounds(petsEquipBest);
-      window.attachClickSounds(petsUnequipAll);
-      window.attachClickSounds(petsTrashToggle);
-      window.attachClickSounds(petsDeleteConfirm);
-      window.attachClickSounds(petsDeleteCancel);
-    }
-  })();
-</script>
+<!-- Pets modal behavior is implemented in ./components/SetupAndEventHandlers.html -->
