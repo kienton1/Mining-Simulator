@@ -111,6 +111,7 @@
       'miner-modal',
       'rebirth-modal',
       'pets-modal',
+      'achievements-modal',
       'egg-modal',
       'reward-modal',
       'maps-modal',
@@ -1953,14 +1954,24 @@
     const pickaxeButton = document.getElementById('pickaxe-button');
     const rebirthButton = document.getElementById('rebirth-button');
     const petsButton = document.getElementById('pets-button');
+    const achievementsButton = document.getElementById('achievements-button');
     const mapsButton = document.getElementById('maps-button');
     const minerModal = document.getElementById('miner-modal');
     const pickaxeModal = document.getElementById('pickaxe-modal');
     const rebirthModal = document.getElementById('rebirth-modal');
     const petsModal = document.getElementById('pets-modal');
+    const achievementsModal = document.getElementById('achievements-modal');
     const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
     const rewardModal = document.getElementById('reward-modal');
+    const achievementsCloseBtn = document.getElementById('achievements-close-btn');
+    const achievementsBackBtn = document.getElementById('achievements-back-btn');
+    const achievementsCategoriesView = document.getElementById('achievements-categories-view');
+    const achievementsDetailView = document.getElementById('achievements-detail-view');
+    const achievementsCategoriesEl = document.getElementById('achievements-categories');
+    const achievementsListEl = document.getElementById('achievements-list');
+    const achievementsDetailTitleEl = document.getElementById('achievements-detail-title');
+    const achievementsBadgeEl = document.getElementById('achievements-badge');
     const rewardHudEl = document.getElementById('reward-hud');
     const rewardTimerTextEl = document.getElementById('reward-timer-text');
     const rewardButton = document.getElementById('reward-button');
@@ -1972,7 +1983,7 @@
     const rewardMessageEl = document.getElementById('reward-message');
 
     // Array of all modals for closing others when opening one
-    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, achievementsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
 
     const minerGridEl = document.getElementById('miner-grid');
     const mapsListEl = document.getElementById('maps-list');
@@ -2048,6 +2059,22 @@
         // This prevents any click events from triggering mining
         hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pickaxe' });
         hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+      });
+    }
+
+    // Setup achievements button click handler
+    if (achievementsButton) {
+      achievementsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!achievementsModal) return;
+        // Open modal immediately; request data
+        showModal(achievementsModal);
+        state.achievements.selectedCategoryId = null;
+        if (achievementsCategoriesView) achievementsCategoriesView.hidden = false;
+        if (achievementsDetailView) achievementsDetailView.hidden = true;
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'achievements' });
+        hytopia.sendData({ type: 'REQUEST_ACHIEVEMENTS_STATE' });
       });
     }
 
@@ -2250,6 +2277,20 @@
         autoCount: 1,
         stations: [], // All available stations in the current group
       },
+      achievements: {
+        selectedCategoryId: null,
+        categories: [],
+        bonuses: {
+          damageMultiplier: 1,
+          trainingSpeedMultiplier: 1,
+          coinMultiplier: 1,
+          hatchSpeedMultiplier: 1,
+          miningSpeedMultiplier: 1,
+          petEquipCap: 8,
+          petInventoryCap: 50,
+          extraLuckPercent: 0,
+        },
+      },
       reward: {
         durationMs: 15 * 60 * 1000,
         remainingMs: null,
@@ -2271,6 +2312,13 @@
     const EGG_HATCH_SHAKE_MS = 2000;
     const EGG_HATCH_TOTAL_MS = 3000;
     const EGG_HATCH_COOLDOWN_MS = 1000;
+    const getEggHatchSpeedMultiplier = () => {
+      const mult = Number(state.achievements?.bonuses?.hatchSpeedMultiplier ?? 1);
+      return Number.isFinite(mult) && mult > 0 ? mult : 1;
+    };
+    const getEggHatchShakeMs = () => Math.max(1, Math.round(EGG_HATCH_SHAKE_MS / getEggHatchSpeedMultiplier()));
+    const getEggHatchTotalMs = () => Math.max(1, Math.round(EGG_HATCH_TOTAL_MS / getEggHatchSpeedMultiplier()));
+    const getEggHatchCooldownMs = () => Math.max(1, Math.round(EGG_HATCH_COOLDOWN_MS / getEggHatchSpeedMultiplier()));
     let eggHatchInProgress = false;
     let currentEggHatch = null;
     let confettiContainer = null;
@@ -3291,7 +3339,7 @@
         if (hatchContext === 'egg' && state.eggStation.autoEnabled && state.eggStation.inProximity) {
           startEggHatchSequence(state.eggStation.autoCount);
         }
-      }, EGG_HATCH_COOLDOWN_MS);
+      }, getEggHatchCooldownMs());
     };
 
     const startEggHatchSequence = (count) => {
@@ -3342,7 +3390,7 @@
       crackBeats.forEach((beat) => {
         const timer = setTimeout(() => {
           playEggCrackSfx();
-        }, beat * EGG_HATCH_SHAKE_MS);
+        }, beat * getEggHatchShakeMs());
         currentEggHatch.crackTimers.push(timer);
       });
 
@@ -3350,7 +3398,7 @@
         if (!currentEggHatch) return;
         slots.forEach((slot) => slot.classList.add('is-cracking'));
         hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count });
-      }, EGG_HATCH_SHAKE_MS);
+      }, getEggHatchShakeMs());
 
       setTimeout(() => {
         if (!currentEggHatch) return;
@@ -3359,7 +3407,7 @@
         renderEggHatchResults(currentEggHatch.results);
         playEggOpenSfx();
         maybeFinishEggHatch();
-      }, EGG_HATCH_TOTAL_MS);
+      }, getEggHatchTotalMs());
     };
 
     const startRewardHatchSequence = () => {
@@ -3396,7 +3444,7 @@
       crackBeats.forEach((beat) => {
         const timer = setTimeout(() => {
           playEggCrackSfx();
-        }, beat * EGG_HATCH_SHAKE_MS);
+        }, beat * getEggHatchShakeMs());
         currentEggHatch.crackTimers.push(timer);
       });
 
@@ -3404,7 +3452,7 @@
         if (!currentEggHatch) return;
         slots.forEach((slot) => slot.classList.add('is-cracking'));
         hytopia.sendData({ type: 'REWARD_CLAIM' });
-      }, EGG_HATCH_SHAKE_MS);
+      }, getEggHatchShakeMs());
 
       setTimeout(() => {
         if (!currentEggHatch) return;
@@ -3413,7 +3461,7 @@
         renderEggHatchResults(currentEggHatch.results);
         playEggOpenSfx();
         maybeFinishEggHatch();
-      }, EGG_HATCH_TOTAL_MS);
+      }, getEggHatchTotalMs());
     };
 
     // Egg station local auto-open loop (client-side)
@@ -3837,6 +3885,131 @@
       }
     };
 
+    const renderAchievements = () => {
+      // Badge on left action button (claimable count)
+      const categories = Array.isArray(state.achievements.categories) ? state.achievements.categories : [];
+      const claimableTotal = categories.reduce((sum, c) => sum + (Number(c.claimableCount ?? 0) || 0), 0);
+      if (achievementsBadgeEl) {
+        if (claimableTotal > 0) {
+          achievementsBadgeEl.style.display = 'flex';
+          achievementsBadgeEl.textContent = String(Math.min(99, claimableTotal));
+        } else {
+          achievementsBadgeEl.style.display = 'none';
+          achievementsBadgeEl.textContent = '';
+        }
+      }
+
+      if (!achievementsCategoriesEl || !achievementsListEl || !achievementsCategoriesView || !achievementsDetailView) {
+        return;
+      }
+
+      const cdn = '{{CDN_ASSETS_URL}}';
+
+      // Render category buttons
+      achievementsCategoriesEl.innerHTML = '';
+      categories.forEach((cat) => {
+        const btn = document.createElement('button');
+        btn.className = 'ach-cat-btn';
+        btn.setAttribute('tabindex', '-1');
+
+        const img = document.createElement('img');
+        img.className = 'ach-cat-btn__icon';
+        img.alt = cat.name || 'Category';
+        img.src = `${cdn}/${cat.icon}`;
+        btn.appendChild(img);
+
+        const badge = document.createElement('div');
+        badge.className = 'ach-cat-btn__badge';
+        const claimable = Number(cat.claimableCount ?? 0) || 0;
+        if (claimable > 0) {
+          badge.style.display = 'flex';
+          badge.textContent = String(Math.min(99, claimable));
+        }
+        btn.appendChild(badge);
+
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          state.achievements.selectedCategoryId = cat.id;
+          achievementsCategoriesView.hidden = true;
+          achievementsDetailView.hidden = false;
+          if (achievementsDetailTitleEl) achievementsDetailTitleEl.textContent = cat.name || 'Achievements';
+          renderAchievements();
+        });
+
+        if (typeof window.attachClickSounds === 'function') window.attachClickSounds(btn);
+
+        achievementsCategoriesEl.appendChild(btn);
+      });
+
+      const selectedId = state.achievements.selectedCategoryId;
+      const selected = categories.find((c) => c.id === selectedId) || null;
+
+      // If no category selected, show categories view
+      if (!selected) {
+        achievementsCategoriesView.hidden = false;
+        achievementsDetailView.hidden = true;
+        achievementsListEl.innerHTML = '';
+        return;
+      }
+
+      // Render achievement cards
+      achievementsListEl.innerHTML = '';
+      const items = Array.isArray(selected.items) ? selected.items : [];
+      items.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'ach-card';
+
+        const rank = document.createElement('div');
+        rank.className = 'ach-card__rank';
+        rank.textContent = item.rankLabel || 'Rank';
+
+        const reward = document.createElement('div');
+        reward.className = 'ach-card__reward';
+        reward.textContent = item.rewardText || '';
+
+        const task = document.createElement('div');
+        task.className = 'ach-card__task';
+        task.textContent = item.requirementText || '';
+
+        card.appendChild(rank);
+        card.appendChild(reward);
+        card.appendChild(task);
+
+        const isClaimed = Boolean(item.claimed);
+        const canClaim = Boolean(item.canClaim);
+
+        if (canClaim && !isClaimed) {
+          const claim = document.createElement('button');
+          claim.className = 'ach-card__claim';
+          claim.textContent = 'Claim';
+          claim.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hytopia.sendData({ type: 'ACHIEVEMENT_CLAIM', categoryId: selected.id, rankIndex: item.rankIndex });
+          });
+          if (typeof window.attachClickSounds === 'function') window.attachClickSounds(claim);
+          card.appendChild(claim);
+        } else {
+          const bar = document.createElement('div');
+          bar.className = 'ach-card__bar';
+          const fill = document.createElement('div');
+          fill.className = 'ach-card__bar-fill';
+          fill.style.width = `${Math.max(0, Math.min(100, Number(item.progressPct ?? 0) || 0))}%`;
+          bar.appendChild(fill);
+
+          const progress = document.createElement('div');
+          progress.className = 'ach-card__progress';
+          progress.textContent = item.progressText || '';
+
+          card.appendChild(bar);
+          card.appendChild(progress);
+        }
+
+        achievementsListEl.appendChild(card);
+      });
+    };
+
     // Footer buttons
     if (petsEquipBestBtn) {
       petsEquipBestBtn.addEventListener('click', (e) => {
@@ -3922,6 +4095,26 @@
         } else {
           hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
         }
+      });
+    }
+
+    // Achievements modal controls
+    if (achievementsCloseBtn && achievementsModal) {
+      achievementsCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideModal(achievementsModal);
+      });
+    }
+
+    if (achievementsBackBtn) {
+      achievementsBackBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.achievements.selectedCategoryId = null;
+        if (achievementsCategoriesView) achievementsCategoriesView.hidden = false;
+        if (achievementsDetailView) achievementsDetailView.hidden = true;
+        renderAchievements();
       });
     }
 
@@ -4162,6 +4355,8 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
       } else if (el.id === 'pets-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
+      } else if (el.id === 'achievements-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'achievements' });
       } else if (el.id === 'reward-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'reward' });
       } else if (el.id === 'egg-modal') {
@@ -5799,6 +5994,24 @@
             console.log('[UI] Pet action failed:', data.message);
           }
           break;
+        case 'ACHIEVEMENTS_STATE':
+          state.achievements.categories = data.categories || [];
+          state.achievements.bonuses = data.bonuses || state.achievements.bonuses;
+          renderAchievements();
+          break;
+        case 'ACHIEVEMENT_CLAIM_RESULT':
+          if (data.success) {
+            // Celebrate like ore selling
+            spawnConfettiBurst();
+            playUpgradePurchaseSfx();
+            // Refresh state
+            hytopia.sendData({ type: 'REQUEST_ACHIEVEMENTS_STATE' });
+            // Achievements rewards can affect pets/egg/etc; refresh pet state too
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          } else {
+            console.log('[UI] Achievement claim failed:', data.message);
+          }
+          break;
         case 'UPGRADE_PURCHASED':
           console.log('[UI] Upgrade purchased:', data);
           state.gems = data.remainingGems ?? state.gems;
@@ -6255,6 +6468,12 @@
     <span class="action-card__icon">
       <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/PetIcon.png" alt="Pets" />
     </span>
+  </button>
+  <button id="achievements-button" class="action-card action-card--achievements">
+    <span class="action-card__icon">
+      <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/AchievementsIcon.png" alt="Achievements" />
+    </span>
+    <span id="achievements-badge" class="action-card__badge action-card__badge--achievements"></span>
   </button>
   <button id="maps-button" class="action-card action-card--maps">
     <span class="action-card__icon">
@@ -11424,6 +11643,342 @@
 <!-- Pets modal behavior is implemented in ./components/SetupAndEventHandlers.html -->
 
 
+<!-- Included from: ./components/AchievementsModal.html -->
+<!-- Achievements Modal -->
+<div
+  id="achievements-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="achievements-wrapper">
+    <div class="achievements-title-container">
+      <h2 class="achievements-title">ACHIEVEMENTS</h2>
+    </div>
+    <button id="achievements-close-btn" class="achievements-close-btn">X</button>
+
+    <div class="achievements-container">
+      <!-- Category picker -->
+      <div id="achievements-categories-view" class="achievements-view">
+        <div id="achievements-categories" class="achievements-categories">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Detail list -->
+      <div id="achievements-detail-view" class="achievements-view" hidden>
+        <div class="achievements-detail-header">
+          <button id="achievements-back-btn" class="achievements-back-btn">Back</button>
+          <div id="achievements-detail-title" class="achievements-detail-title">Category</div>
+          <div class="achievements-detail-spacer"></div>
+        </div>
+
+        <div id="achievements-list" class="achievements-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #achievements-modal.visible {
+    display: flex !important;
+  }
+
+  .achievements-wrapper {
+    position: relative;
+    width: 900px;
+    max-width: 95vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 40px;
+  }
+
+  .achievements-container {
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
+    border: 3px solid rgba(139, 69, 19, 0.9);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    height: 75vh;
+    min-height: 70vh;
+    max-height: 75vh;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    animation: achievementsSlideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .achievements-wrapper.closing .achievements-container {
+    animation: achievementsSlideOutDown 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  }
+
+  @keyframes achievementsSlideInUp {
+    from { opacity: 0; transform: translateY(60px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes achievementsSlideOutDown {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(60px) scale(0.95); }
+  }
+
+  .achievements-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(45, 106, 79, 0.95), rgba(34, 85, 65, 0.95));
+    border: 3px solid rgba(100, 200, 150, 0.8);
+    border-radius: 12px;
+    padding: 6px 20px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .achievements-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .achievements-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 3px solid rgba(255, 71, 87, 1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .achievements-close-btn:hover {
+    background: linear-gradient(135deg, rgba(255, 91, 107, 1), rgba(240, 60, 75, 1));
+    transform: translate(50%, -50%) scale(1.1);
+  }
+
+  .achievements-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Ensure the HTML `hidden` attribute actually hides views (author CSS overrides UA defaults). */
+  .achievements-view[hidden] {
+    display: none !important;
+  }
+
+  .achievements-categories {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    padding: 18px;
+    margin-top: 10px;
+  }
+
+  .ach-cat-btn {
+    position: relative;
+    border-radius: 14px;
+    border: 3px solid rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 10px 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 88px;
+  }
+
+  .ach-cat-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/200% auto no-repeat;
+    filter: saturate(0.35);
+    z-index: 0;
+  }
+
+  .ach-cat-btn > * { position: relative; z-index: 1; }
+
+  .ach-cat-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  }
+
+  .ach-cat-btn__icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  }
+
+  .ach-cat-btn__badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: #e53935;
+    color: #fff;
+    font-weight: 900;
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .achievements-detail-header {
+    display: grid;
+    grid-template-columns: 110px 1fr 110px;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .achievements-back-btn {
+    justify-self: start;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 2px solid rgba(239, 68, 68, 0.9);
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    color: #fff;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .achievements-detail-title {
+    justify-self: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 18px;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .achievements-detail-spacer { justify-self: end; }
+
+  .achievements-list {
+    padding: 14px;
+    overflow-y: auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ach-card {
+    border-radius: 14px;
+    border: 3px solid rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 10px 12px;
+    color: rgba(255, 255, 255, 0.92);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ach-card__rank {
+    font-weight: 900;
+    font-size: 18px;
+    text-align: center;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .ach-card__reward {
+    font-weight: 900;
+    text-align: center;
+    color: #ff4d4d;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .ach-card__task {
+    text-align: center;
+    font-weight: 800;
+  }
+
+  .ach-card__bar {
+    height: 14px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+  }
+
+  .ach-card__bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-right: 2px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .ach-card__progress {
+    text-align: center;
+    font-weight: 900;
+    color: #00ff57;
+  }
+
+  .ach-card__claim {
+    margin-top: 4px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid rgba(34, 197, 94, 0.9);
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    color: #fff;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .ach-card__claim:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* Scrollbar */
+  .achievements-list::-webkit-scrollbar { width: 6px; }
+  .achievements-list::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
+  .achievements-list::-webkit-scrollbar-thumb { background: rgba(139, 69, 19, 0.6); border-radius: 3px; }
+
+  /* Mobile */
+  body.mobile .achievements-wrapper { margin-top: 20px; }
+  body.mobile .achievements-categories { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.mobile .achievements-list { grid-template-columns: 1fr; }
+</style>
+
+
+
 <!-- Included from: ./components/MapsModal.html -->
 <!-- Maps Modal -->
 <div
@@ -12496,6 +13051,11 @@
     border-color: #2d6a4f;
   }
 
+  /* Achievements action button accent */
+  .action-card--achievements {
+    border-color: rgba(250, 204, 21, 0.9);
+  }
+
   /* Hide reward action-card on desktop (shown in stats-hud-container instead) */
   .action-card--reward {
     display: none;
@@ -12508,6 +13068,11 @@
 
   /* Hide the rebirth badge by default (JS toggles display when canRebirth) */
   .action-card__badge--rebirth {
+    display: none;
+  }
+
+  /* Hide achievements badge by default (JS toggles display when claimable) */
+  .action-card__badge--achievements {
     display: none;
   }
 
@@ -16752,12 +17317,10 @@
     color: #ffaa00; /* Orange/Gold */
   }
 
-
-<!-- Included from: ./components/ThemeStyles.html -->
-
+  /* Included from: ./components/ThemeStyles.html */
   body.mobile .training-prompt__title {
-    font-size: 14px;
-  }
+  font-size: 14px;
+}
 
   body.mobile .training-prompt__requirement {
     font-size: 11px;

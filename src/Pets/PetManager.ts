@@ -10,6 +10,7 @@ import type { PlayerData } from '../Core/PlayerData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
 import type { PetId } from './PetData';
 import { getBasePetIdFromAnyPetId, getNextPetTier, getPetTierFromPetId, makeUpgradedPetId, PET_MAX_TIER } from './PetUpgrades';
+import { getBonuses } from '../Achievements/Achievements';
 
 type GetPlayerData = (player: Player) => PlayerData | undefined;
 type UpdatePlayerData = (player: Player, data: PlayerData) => void;
@@ -58,13 +59,25 @@ export class PetManager {
     return this.getInventoryCount(player) + this.getEquippedCount(player);
   }
 
+  private getInventoryCap(player: Player): number {
+    const data = this.getPlayerData(player);
+    if (!data) return PET_INVENTORY_CAPACITY;
+    return getBonuses(data).petInventoryCap ?? PET_INVENTORY_CAPACITY;
+  }
+
+  private getEquipCap(player: Player): number {
+    const data = this.getPlayerData(player);
+    if (!data) return PET_EQUIP_CAPACITY;
+    return getBonuses(data).petEquipCap ?? PET_EQUIP_CAPACITY;
+  }
+
   hasInventorySpace(player: Player, amount: number): boolean {
     // Capacity is total owned pets (inventory + equipped). This matches the "X/50 owned" UI.
-    return this.getOwnedCount(player) + amount <= PET_INVENTORY_CAPACITY;
+    return this.getOwnedCount(player) + amount <= this.getInventoryCap(player);
   }
 
   canEquipMore(player: Player, amount: number): boolean {
-    return this.getEquippedCount(player) + amount <= PET_EQUIP_CAPACITY;
+    return this.getEquippedCount(player) + amount <= this.getEquipCap(player);
   }
 
   /**
@@ -81,8 +94,9 @@ export class PetManager {
     data.petDiscovered = Array.isArray(data.petDiscovered) ? data.petDiscovered : [];
 
     const ownedCount = (data.petInventory.length || 0) + (data.equippedPets.length || 0);
-    if (ownedCount >= PET_INVENTORY_CAPACITY) {
-      return { success: false, message: `Pet capacity full (${PET_INVENTORY_CAPACITY})` };
+    const cap = this.getInventoryCap(player);
+    if (ownedCount >= cap) {
+      return { success: false, message: `Pet capacity full (${cap})` };
     }
 
     data.petInventory.push(petId);
@@ -103,8 +117,9 @@ export class PetManager {
     data.petInventory = Array.isArray(data.petInventory) ? data.petInventory : [];
     data.equippedPets = Array.isArray(data.equippedPets) ? data.equippedPets : [];
 
-    if (data.equippedPets.length >= PET_EQUIP_CAPACITY) {
-      return { success: false, message: `Equip limit reached (${PET_EQUIP_CAPACITY})` };
+    const equipCap = this.getEquipCap(player);
+    if (data.equippedPets.length >= equipCap) {
+      return { success: false, message: `Equip limit reached (${equipCap})` };
     }
 
     const idx = data.petInventory.indexOf(petId);
@@ -130,8 +145,9 @@ export class PetManager {
     data.petInventory = Array.isArray(data.petInventory) ? data.petInventory : [];
     data.equippedPets = Array.isArray(data.equippedPets) ? data.equippedPets : [];
 
-    if (data.equippedPets.length >= PET_EQUIP_CAPACITY) {
-      return { success: false, message: `Equip limit reached (${PET_EQUIP_CAPACITY})` };
+    const equipCap = this.getEquipCap(player);
+    if (data.equippedPets.length >= equipCap) {
+      return { success: false, message: `Equip limit reached (${equipCap})` };
     }
 
     if (inventoryIndex < 0 || inventoryIndex >= data.petInventory.length) {
@@ -301,8 +317,9 @@ export class PetManager {
       return mb - ma;
     });
 
-    data.equippedPets = allOwned.slice(0, PET_EQUIP_CAPACITY);
-    data.petInventory = allOwned.slice(PET_EQUIP_CAPACITY);
+    const equipCap = this.getEquipCap(player);
+    data.equippedPets = allOwned.slice(0, equipCap);
+    data.petInventory = allOwned.slice(equipCap);
     this.updatePlayerData(player, data);
     return { success: true };
   }

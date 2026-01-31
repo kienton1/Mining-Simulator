@@ -1256,14 +1256,24 @@
     const pickaxeButton = document.getElementById('pickaxe-button');
     const rebirthButton = document.getElementById('rebirth-button');
     const petsButton = document.getElementById('pets-button');
+    const achievementsButton = document.getElementById('achievements-button');
     const mapsButton = document.getElementById('maps-button');
     const minerModal = document.getElementById('miner-modal');
     const pickaxeModal = document.getElementById('pickaxe-modal');
     const rebirthModal = document.getElementById('rebirth-modal');
     const petsModal = document.getElementById('pets-modal');
+    const achievementsModal = document.getElementById('achievements-modal');
     const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
     const rewardModal = document.getElementById('reward-modal');
+    const achievementsCloseBtn = document.getElementById('achievements-close-btn');
+    const achievementsBackBtn = document.getElementById('achievements-back-btn');
+    const achievementsCategoriesView = document.getElementById('achievements-categories-view');
+    const achievementsDetailView = document.getElementById('achievements-detail-view');
+    const achievementsCategoriesEl = document.getElementById('achievements-categories');
+    const achievementsListEl = document.getElementById('achievements-list');
+    const achievementsDetailTitleEl = document.getElementById('achievements-detail-title');
+    const achievementsBadgeEl = document.getElementById('achievements-badge');
     const rewardHudEl = document.getElementById('reward-hud');
     const rewardTimerTextEl = document.getElementById('reward-timer-text');
     const rewardButton = document.getElementById('reward-button');
@@ -1275,7 +1285,7 @@
     const rewardMessageEl = document.getElementById('reward-message');
 
     // Array of all modals for closing others when opening one
-    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, achievementsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
 
     const minerGridEl = document.getElementById('miner-grid');
     const mapsListEl = document.getElementById('maps-list');
@@ -1351,6 +1361,22 @@
         // This prevents any click events from triggering mining
         hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'pickaxe' });
         hytopia.sendData({ type: 'OPEN_PICKAXE_SHOP' });
+      });
+    }
+
+    // Setup achievements button click handler
+    if (achievementsButton) {
+      achievementsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!achievementsModal) return;
+        // Open modal immediately; request data
+        showModal(achievementsModal);
+        state.achievements.selectedCategoryId = null;
+        if (achievementsCategoriesView) achievementsCategoriesView.hidden = false;
+        if (achievementsDetailView) achievementsDetailView.hidden = true;
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'achievements' });
+        hytopia.sendData({ type: 'REQUEST_ACHIEVEMENTS_STATE' });
       });
     }
 
@@ -1553,6 +1579,20 @@
         autoCount: 1,
         stations: [], // All available stations in the current group
       },
+      achievements: {
+        selectedCategoryId: null,
+        categories: [],
+        bonuses: {
+          damageMultiplier: 1,
+          trainingSpeedMultiplier: 1,
+          coinMultiplier: 1,
+          hatchSpeedMultiplier: 1,
+          miningSpeedMultiplier: 1,
+          petEquipCap: 8,
+          petInventoryCap: 50,
+          extraLuckPercent: 0,
+        },
+      },
       reward: {
         durationMs: 15 * 60 * 1000,
         remainingMs: null,
@@ -1574,6 +1614,13 @@
     const EGG_HATCH_SHAKE_MS = 2000;
     const EGG_HATCH_TOTAL_MS = 3000;
     const EGG_HATCH_COOLDOWN_MS = 1000;
+    const getEggHatchSpeedMultiplier = () => {
+      const mult = Number(state.achievements?.bonuses?.hatchSpeedMultiplier ?? 1);
+      return Number.isFinite(mult) && mult > 0 ? mult : 1;
+    };
+    const getEggHatchShakeMs = () => Math.max(1, Math.round(EGG_HATCH_SHAKE_MS / getEggHatchSpeedMultiplier()));
+    const getEggHatchTotalMs = () => Math.max(1, Math.round(EGG_HATCH_TOTAL_MS / getEggHatchSpeedMultiplier()));
+    const getEggHatchCooldownMs = () => Math.max(1, Math.round(EGG_HATCH_COOLDOWN_MS / getEggHatchSpeedMultiplier()));
     let eggHatchInProgress = false;
     let currentEggHatch = null;
     let confettiContainer = null;
@@ -2594,7 +2641,7 @@
         if (hatchContext === 'egg' && state.eggStation.autoEnabled && state.eggStation.inProximity) {
           startEggHatchSequence(state.eggStation.autoCount);
         }
-      }, EGG_HATCH_COOLDOWN_MS);
+      }, getEggHatchCooldownMs());
     };
 
     const startEggHatchSequence = (count) => {
@@ -2645,7 +2692,7 @@
       crackBeats.forEach((beat) => {
         const timer = setTimeout(() => {
           playEggCrackSfx();
-        }, beat * EGG_HATCH_SHAKE_MS);
+        }, beat * getEggHatchShakeMs());
         currentEggHatch.crackTimers.push(timer);
       });
 
@@ -2653,7 +2700,7 @@
         if (!currentEggHatch) return;
         slots.forEach((slot) => slot.classList.add('is-cracking'));
         hytopia.sendData({ type: 'EGG_HATCH', eggType: state.eggStation.eggType, count });
-      }, EGG_HATCH_SHAKE_MS);
+      }, getEggHatchShakeMs());
 
       setTimeout(() => {
         if (!currentEggHatch) return;
@@ -2662,7 +2709,7 @@
         renderEggHatchResults(currentEggHatch.results);
         playEggOpenSfx();
         maybeFinishEggHatch();
-      }, EGG_HATCH_TOTAL_MS);
+      }, getEggHatchTotalMs());
     };
 
     const startRewardHatchSequence = () => {
@@ -2699,7 +2746,7 @@
       crackBeats.forEach((beat) => {
         const timer = setTimeout(() => {
           playEggCrackSfx();
-        }, beat * EGG_HATCH_SHAKE_MS);
+        }, beat * getEggHatchShakeMs());
         currentEggHatch.crackTimers.push(timer);
       });
 
@@ -2707,7 +2754,7 @@
         if (!currentEggHatch) return;
         slots.forEach((slot) => slot.classList.add('is-cracking'));
         hytopia.sendData({ type: 'REWARD_CLAIM' });
-      }, EGG_HATCH_SHAKE_MS);
+      }, getEggHatchShakeMs());
 
       setTimeout(() => {
         if (!currentEggHatch) return;
@@ -2716,7 +2763,7 @@
         renderEggHatchResults(currentEggHatch.results);
         playEggOpenSfx();
         maybeFinishEggHatch();
-      }, EGG_HATCH_TOTAL_MS);
+      }, getEggHatchTotalMs());
     };
 
     // Egg station local auto-open loop (client-side)
@@ -3140,6 +3187,131 @@
       }
     };
 
+    const renderAchievements = () => {
+      // Badge on left action button (claimable count)
+      const categories = Array.isArray(state.achievements.categories) ? state.achievements.categories : [];
+      const claimableTotal = categories.reduce((sum, c) => sum + (Number(c.claimableCount ?? 0) || 0), 0);
+      if (achievementsBadgeEl) {
+        if (claimableTotal > 0) {
+          achievementsBadgeEl.style.display = 'flex';
+          achievementsBadgeEl.textContent = String(Math.min(99, claimableTotal));
+        } else {
+          achievementsBadgeEl.style.display = 'none';
+          achievementsBadgeEl.textContent = '';
+        }
+      }
+
+      if (!achievementsCategoriesEl || !achievementsListEl || !achievementsCategoriesView || !achievementsDetailView) {
+        return;
+      }
+
+      const cdn = '{{CDN_ASSETS_URL}}';
+
+      // Render category buttons
+      achievementsCategoriesEl.innerHTML = '';
+      categories.forEach((cat) => {
+        const btn = document.createElement('button');
+        btn.className = 'ach-cat-btn';
+        btn.setAttribute('tabindex', '-1');
+
+        const img = document.createElement('img');
+        img.className = 'ach-cat-btn__icon';
+        img.alt = cat.name || 'Category';
+        img.src = `${cdn}/${cat.icon}`;
+        btn.appendChild(img);
+
+        const badge = document.createElement('div');
+        badge.className = 'ach-cat-btn__badge';
+        const claimable = Number(cat.claimableCount ?? 0) || 0;
+        if (claimable > 0) {
+          badge.style.display = 'flex';
+          badge.textContent = String(Math.min(99, claimable));
+        }
+        btn.appendChild(badge);
+
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          state.achievements.selectedCategoryId = cat.id;
+          achievementsCategoriesView.hidden = true;
+          achievementsDetailView.hidden = false;
+          if (achievementsDetailTitleEl) achievementsDetailTitleEl.textContent = cat.name || 'Achievements';
+          renderAchievements();
+        });
+
+        if (typeof window.attachClickSounds === 'function') window.attachClickSounds(btn);
+
+        achievementsCategoriesEl.appendChild(btn);
+      });
+
+      const selectedId = state.achievements.selectedCategoryId;
+      const selected = categories.find((c) => c.id === selectedId) || null;
+
+      // If no category selected, show categories view
+      if (!selected) {
+        achievementsCategoriesView.hidden = false;
+        achievementsDetailView.hidden = true;
+        achievementsListEl.innerHTML = '';
+        return;
+      }
+
+      // Render achievement cards
+      achievementsListEl.innerHTML = '';
+      const items = Array.isArray(selected.items) ? selected.items : [];
+      items.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'ach-card';
+
+        const rank = document.createElement('div');
+        rank.className = 'ach-card__rank';
+        rank.textContent = item.rankLabel || 'Rank';
+
+        const reward = document.createElement('div');
+        reward.className = 'ach-card__reward';
+        reward.textContent = item.rewardText || '';
+
+        const task = document.createElement('div');
+        task.className = 'ach-card__task';
+        task.textContent = item.requirementText || '';
+
+        card.appendChild(rank);
+        card.appendChild(reward);
+        card.appendChild(task);
+
+        const isClaimed = Boolean(item.claimed);
+        const canClaim = Boolean(item.canClaim);
+
+        if (canClaim && !isClaimed) {
+          const claim = document.createElement('button');
+          claim.className = 'ach-card__claim';
+          claim.textContent = 'Claim';
+          claim.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hytopia.sendData({ type: 'ACHIEVEMENT_CLAIM', categoryId: selected.id, rankIndex: item.rankIndex });
+          });
+          if (typeof window.attachClickSounds === 'function') window.attachClickSounds(claim);
+          card.appendChild(claim);
+        } else {
+          const bar = document.createElement('div');
+          bar.className = 'ach-card__bar';
+          const fill = document.createElement('div');
+          fill.className = 'ach-card__bar-fill';
+          fill.style.width = `${Math.max(0, Math.min(100, Number(item.progressPct ?? 0) || 0))}%`;
+          bar.appendChild(fill);
+
+          const progress = document.createElement('div');
+          progress.className = 'ach-card__progress';
+          progress.textContent = item.progressText || '';
+
+          card.appendChild(bar);
+          card.appendChild(progress);
+        }
+
+        achievementsListEl.appendChild(card);
+      });
+    };
+
     // Footer buttons
     if (petsEquipBestBtn) {
       petsEquipBestBtn.addEventListener('click', (e) => {
@@ -3225,6 +3397,26 @@
         } else {
           hytopia.sendData({ type: 'PET_EQUIP_INSTANCE', slotIndex: current.slotIndex });
         }
+      });
+    }
+
+    // Achievements modal controls
+    if (achievementsCloseBtn && achievementsModal) {
+      achievementsCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideModal(achievementsModal);
+      });
+    }
+
+    if (achievementsBackBtn) {
+      achievementsBackBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.achievements.selectedCategoryId = null;
+        if (achievementsCategoriesView) achievementsCategoriesView.hidden = false;
+        if (achievementsDetailView) achievementsDetailView.hidden = true;
+        renderAchievements();
       });
     }
 
@@ -3465,6 +3657,8 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'rebirth' });
       } else if (el.id === 'pets-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'pets' });
+      } else if (el.id === 'achievements-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'achievements' });
       } else if (el.id === 'reward-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'reward' });
       } else if (el.id === 'egg-modal') {
@@ -5100,6 +5294,24 @@
         case 'PET_ACTION_RESULT':
           if (!data.success) {
             console.log('[UI] Pet action failed:', data.message);
+          }
+          break;
+        case 'ACHIEVEMENTS_STATE':
+          state.achievements.categories = data.categories || [];
+          state.achievements.bonuses = data.bonuses || state.achievements.bonuses;
+          renderAchievements();
+          break;
+        case 'ACHIEVEMENT_CLAIM_RESULT':
+          if (data.success) {
+            // Celebrate like ore selling
+            spawnConfettiBurst();
+            playUpgradePurchaseSfx();
+            // Refresh state
+            hytopia.sendData({ type: 'REQUEST_ACHIEVEMENTS_STATE' });
+            // Achievements rewards can affect pets/egg/etc; refresh pet state too
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          } else {
+            console.log('[UI] Achievement claim failed:', data.message);
           }
           break;
         case 'UPGRADE_PURCHASED':

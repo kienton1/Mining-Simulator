@@ -47,6 +47,7 @@ import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, PET_MAX_TIER } from './src/Pets/PetUpgrades';
+import { addCoinsEarned, addEggsHatched, addTimePlayedMs, buildAchievementsUIState, claimAchievement, getBonuses } from './src/Achievements/Achievements';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 import { EGG_STATIONS } from './src/Pets/EggStationsConfig';
@@ -320,6 +321,7 @@ startServer(world => {
     const inv = Array.isArray(playerData.petInventory) ? playerData.petInventory : [];
     const eq = Array.isArray(playerData.equippedPets) ? playerData.equippedPets : [];
     const ownedCount = inv.length + eq.length;
+    const bonuses = getBonuses(playerData);
 
     // Expanded list: one entry per pet instance with a stable instanceId.
     // This is required to support duplicates reliably in the UI.
@@ -354,11 +356,22 @@ startServer(world => {
       type: 'PET_STATE',
       pets,
       ownedCount,
-      ownedCap: PET_INVENTORY_CAPACITY,
+      ownedCap: bonuses.petInventoryCap,
       equippedCount: eq.length,
-      equippedCap: PET_EQUIP_CAPACITY,
+      equippedCap: bonuses.petEquipCap,
       multiplierSum,
       trainingMultiplier,
+    });
+  }
+
+  function sendAchievementsState(player: any) {
+    const playerData = gameManager.getPlayerData(player);
+    if (!playerData) return;
+    const payload = buildAchievementsUIState(playerData);
+    player.ui.sendData({
+      type: 'ACHIEVEMENTS_STATE',
+      bonuses: payload.bonuses,
+      categories: payload.categories,
     });
   }
 
@@ -554,6 +567,22 @@ startServer(world => {
     eggStationManager.addPlayer(player);
     // Add player to daily chest tracking
     dailyChestController.addPlayer(player);
+
+    // === Achievements: time played tracking ===
+    (player as any).__achLastTickMs = Date.now();
+    const achInterval = setInterval(() => {
+      const now = Date.now();
+      const last = Number((player as any).__achLastTickMs ?? now);
+      (player as any).__achLastTickMs = now;
+      const delta = Math.max(0, now - last);
+      const pd = gameManager.getPlayerData(player);
+      if (!pd || delta <= 0) return;
+      addTimePlayedMs(pd, delta);
+      gameManager.updatePlayerData(player, pd);
+      // Keep achievements UI + badge reasonably fresh (also drives time-played unlocks).
+      sendAchievementsState(player);
+    }, 30000);
+    (player as any).__achPlaytimeInterval = achInterval;
     
     // Initialize player data with defaults first (synchronous)
     // This ensures entity can spawn immediately for proper camera setup
@@ -750,6 +779,8 @@ startServer(world => {
               playerId: player.id,
             },
           });
+          // Send achievements state early so other UIs (egg hatch speed, pet caps) are correct immediately.
+          sendAchievementsState(player);
           break;
         case 'TOGGLE_AUTO_MINE':
 
@@ -771,6 +802,11 @@ startServer(world => {
           // Send updated inventory and gold
           const inventoryAfterSell = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSell = gameManager.getPlayerData(player);
+          if (playerDataAfterSell && goldEarned > 0) {
+            addCoinsEarned(playerDataAfterSell, goldEarned);
+            gameManager.updatePlayerData(player, playerDataAfterSell);
+            sendAchievementsState(player);
+          }
           
           // Calculate totalValue with all multipliers using SellingSystem
           const totalValueAfterSell = gameManager.getSellingSystem().getSellValue(player);
@@ -814,6 +850,11 @@ startServer(world => {
           // Send updated inventory and gold
           const inventoryAfterSellAll = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSellAll = gameManager.getPlayerData(player);
+          if (playerDataAfterSellAll && totalGoldEarned > 0) {
+            addCoinsEarned(playerDataAfterSellAll, totalGoldEarned);
+            gameManager.updatePlayerData(player, playerDataAfterSellAll);
+            sendAchievementsState(player);
+          }
           
           // Calculate totalValue with all multipliers using SellingSystem
           const totalValueAfterSellAll = gameManager.getSellingSystem().getSellValue(player);
@@ -934,7 +975,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'maps') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -950,13 +991,34 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'reward') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward') {
             gameManager.setModalState(player, data.modalType, false);
           }
           break;
         case 'REQUEST_PET_STATE':
           sendPetState(player);
           break;
+        case 'REQUEST_ACHIEVEMENTS_STATE':
+          sendAchievementsState(player);
+          break;
+        case 'ACHIEVEMENT_CLAIM': {
+          const categoryId = String((data as any).categoryId ?? '') as any;
+          const rankIndex = Number((data as any).rankIndex ?? -1);
+          const playerData = gameManager.getPlayerData(player);
+          if (!playerData) {
+            player.ui.sendData({ type: 'ACHIEVEMENT_CLAIM_RESULT', success: false, message: 'Player data not found' });
+            break;
+          }
+          const res = claimAchievement(playerData, categoryId, rankIndex);
+          if (res.success) {
+            gameManager.updatePlayerData(player, playerData);
+          }
+          player.ui.sendData({ type: 'ACHIEVEMENT_CLAIM_RESULT', success: res.success, message: res.message });
+          sendAchievementsState(player);
+          // Rewards can affect pet caps, etc.
+          sendPetState(player);
+          break;
+        }
         case 'REQUEST_REWARD_STATE':
           gameManager.sendRewardConfigUI(player);
           gameManager.updateRewardTimerUI(player);
@@ -1156,6 +1218,13 @@ startServer(world => {
             goldSpent: hatchRes.goldSpent ?? 0,
             results,
           });
+          // Achievements: eggs hatched progress
+          const playerDataAfterHatch = gameManager.getPlayerData(player);
+          if (playerDataAfterHatch) {
+            addEggsHatched(playerDataAfterHatch, count);
+            gameManager.updatePlayerData(player, playerDataAfterHatch);
+            sendAchievementsState(player);
+          }
           sendPetState(player);
           gameManager.getTutorialManager().onEggHatched(player);
           break;
@@ -1806,6 +1875,21 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => {
+    // Finalize achievements time played tracking on leave
+    const now = Date.now();
+    const last = Number((player as any).__achLastTickMs ?? now);
+    const delta = Math.max(0, now - last);
+    const pd = gameManager.getPlayerData(player);
+    if (pd && delta > 0) {
+      addTimePlayedMs(pd, delta);
+      gameManager.updatePlayerData(player, pd);
+    }
+    const achInterval = (player as any).__achPlaytimeInterval;
+    if (achInterval) {
+      clearInterval(achInterval);
+      (player as any).__achPlaytimeInterval = null;
+    }
+
     // Remove player from merchant tracking
     merchantEntities.forEach(entity => entity.removePlayer(player));
     // Remove player from mine reset upgrade NPC tracking

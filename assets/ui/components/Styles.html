@@ -300,6 +300,11 @@
     border-color: #2d6a4f;
   }
 
+  /* Achievements action button accent */
+  .action-card--achievements {
+    border-color: rgba(250, 204, 21, 0.9);
+  }
+
   /* Hide reward action-card on desktop (shown in stats-hud-container instead) */
   .action-card--reward {
     display: none;
@@ -312,6 +317,11 @@
 
   /* Hide the rebirth badge by default (JS toggles display when canRebirth) */
   .action-card__badge--rebirth {
+    display: none;
+  }
+
+  /* Hide achievements badge by default (JS toggles display when claimable) */
+  .action-card__badge--achievements {
     display: none;
   }
 

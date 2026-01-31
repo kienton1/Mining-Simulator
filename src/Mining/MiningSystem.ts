@@ -11,6 +11,7 @@ import { World, Player, Entity, RigidBodyType, ParticleEmitter } from 'hytopia';
 import { calculateMiningDamage, getSwingsPerSecond } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
+import { getBonuses } from '../Achievements/Achievements';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
@@ -331,7 +332,9 @@ export class MiningSystem {
     const worldId = this.getPlayerWorldId(player);
     if (!isAutoMining) {
       const worldNumber = this.getWorldNumberFromId(worldId);
-      const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber); // swings per second
+      const pd = this.getPlayerDataCallback?.(player);
+      const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
+      const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1); // swings per second
       const minTimeBetweenHits = Math.max(1, Math.ceil(1000 / effectiveHitRate)); // milliseconds between hits
       // Helpful debug (can be noisy if enabled elsewhere):
       // console.log('[MiningSystem] SPS calc:', { worldId, worldNumber, speed: pickaxe.miningSpeed, effectiveHitRate, minTimeBetweenHits });
@@ -789,7 +792,9 @@ export class MiningSystem {
     // Formula: SPS = getSwingsPerSecond(speed, world)
     const worldId = this.getPlayerWorldId(player);
     const worldNumber = this.getWorldNumberFromId(worldId);
-    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber);
+    const pd = this.getPlayerDataCallback?.(player);
+    const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
+    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1);
     const hitIntervalMs = 1000 / effectiveHitRate;
     const maxCatchupHits = Math.max(10, Math.ceil(effectiveHitRate * 5)); // Allow up to ~5s of catch-up
     console.log('[MiningSystem] startMiningLoop: hitInterval=', hitIntervalMs, 'ms');

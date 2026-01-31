@@ -12,6 +12,7 @@ import { Player, PersistenceManager } from 'hytopia';
 import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
 import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
+import { getBonuses } from '../Achievements/Achievements';
 import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 import { stringToBigInt, bigIntToString } from './BigIntUtils';
 import { TutorialPhase } from '../Tutorial/TutorialTypes';
@@ -88,6 +89,25 @@ function validatePlayerData(data: any): data is PlayerData {
   if (data.lastDailyRewardClaim !== undefined && (typeof data.lastDailyRewardClaim !== 'number' || isNaN(data.lastDailyRewardClaim) || data.lastDailyRewardClaim < 0)) return false;
   if (data.maxGoldEverHeld !== undefined && (typeof data.maxGoldEverHeld !== 'number' || isNaN(data.maxGoldEverHeld) || data.maxGoldEverHeld < 0)) return false;
   if (data.maxGemsEverHeld !== undefined && (typeof data.maxGemsEverHeld !== 'number' || isNaN(data.maxGemsEverHeld) || data.maxGemsEverHeld < 0)) return false;
+
+  // Achievements fields are optional for backward compatibility
+  if (data.achievementProgress !== undefined) {
+    if (!data.achievementProgress || typeof data.achievementProgress !== 'object') return false;
+    if (data.achievementProgress.blocksMined !== undefined && (typeof data.achievementProgress.blocksMined !== 'number' || isNaN(data.achievementProgress.blocksMined) || data.achievementProgress.blocksMined < 0)) return false;
+    if (data.achievementProgress.eggsHatched !== undefined && (typeof data.achievementProgress.eggsHatched !== 'number' || isNaN(data.achievementProgress.eggsHatched) || data.achievementProgress.eggsHatched < 0)) return false;
+    if (data.achievementProgress.timePlayedMs !== undefined && (typeof data.achievementProgress.timePlayedMs !== 'number' || isNaN(data.achievementProgress.timePlayedMs) || data.achievementProgress.timePlayedMs < 0)) return false;
+    if (data.achievementProgress.powerTrained !== undefined && (typeof data.achievementProgress.powerTrained !== 'string')) return false;
+    if (data.achievementProgress.coinsEarned !== undefined && (typeof data.achievementProgress.coinsEarned !== 'string')) return false;
+  }
+  if (data.achievementClaims !== undefined) {
+    if (!data.achievementClaims || typeof data.achievementClaims !== 'object') return false;
+    const c = data.achievementClaims;
+    if (c.blocksMined !== undefined && (typeof c.blocksMined !== 'number' || isNaN(c.blocksMined) || c.blocksMined < 0)) return false;
+    if (c.powerTrained !== undefined && (typeof c.powerTrained !== 'number' || isNaN(c.powerTrained) || c.powerTrained < 0)) return false;
+    if (c.coinsEarned !== undefined && (typeof c.coinsEarned !== 'number' || isNaN(c.coinsEarned) || c.coinsEarned < 0)) return false;
+    if (c.eggsHatched !== undefined && (typeof c.eggsHatched !== 'number' || isNaN(c.eggsHatched) || c.eggsHatched < 0)) return false;
+    if (c.timePlayed !== undefined && (typeof c.timePlayed !== 'number' || isNaN(c.timePlayed) || c.timePlayed < 0)) return false;
+  }
 
   return true;
 }
@@ -203,12 +223,17 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     // Pet system (sanitize + cap)
     petInventory: (() => {
       const raw = Array.isArray(savedData.petInventory) ? savedData.petInventory : (defaults.petInventory ?? []);
-      const sanitized = raw.filter(isPetId).slice(0, PET_INVENTORY_CAPACITY);
+      // Compute dynamic cap based on achievement claims if present.
+      const tempData: PlayerData = { ...defaults, ...(savedData as any) } as any;
+      const cap = Math.max(PET_INVENTORY_CAPACITY, getBonuses(tempData).petInventoryCap);
+      const sanitized = raw.filter(isPetId).slice(0, cap);
       return sanitized;
     })(),
     equippedPets: (() => {
       const raw = Array.isArray(savedData.equippedPets) ? savedData.equippedPets : (defaults.equippedPets ?? []);
-      const sanitized = raw.filter(isPetId).slice(0, PET_EQUIP_CAPACITY);
+      const tempData: PlayerData = { ...defaults, ...(savedData as any) } as any;
+      const cap = Math.max(PET_EQUIP_CAPACITY, getBonuses(tempData).petEquipCap);
+      const sanitized = raw.filter(isPetId).slice(0, cap);
       return sanitized;
     })(),
     petDiscovered: (() => {
@@ -304,6 +329,61 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     maxGemsEverHeld: typeof savedData.maxGemsEverHeld === 'number' && !isNaN(savedData.maxGemsEverHeld) && savedData.maxGemsEverHeld >= 0
       ? savedData.maxGemsEverHeld
       : (defaults.maxGemsEverHeld ?? 0),
+
+    // Achievements (with defaults)
+    achievementProgress: (() => {
+      const ap = savedData.achievementProgress;
+      const base = defaults.achievementProgress ?? {
+        blocksMined: 0,
+        powerTrained: '0',
+        coinsEarned: '0',
+        eggsHatched: 0,
+        timePlayedMs: 0,
+      };
+      if (!ap || typeof ap !== 'object') return { ...base };
+      const blocksMined = typeof ap.blocksMined === 'number' && !isNaN(ap.blocksMined) && ap.blocksMined >= 0 ? ap.blocksMined : (base.blocksMined ?? 0);
+      const eggsHatched = typeof ap.eggsHatched === 'number' && !isNaN(ap.eggsHatched) && ap.eggsHatched >= 0 ? ap.eggsHatched : (base.eggsHatched ?? 0);
+      const timePlayedMs = typeof ap.timePlayedMs === 'number' && !isNaN(ap.timePlayedMs) && ap.timePlayedMs >= 0 ? ap.timePlayedMs : (base.timePlayedMs ?? 0);
+
+      const powerTrained = (() => {
+        const raw = typeof ap.powerTrained === 'string' ? ap.powerTrained : (base.powerTrained ?? '0');
+        try {
+          return bigIntToString(stringToBigInt(raw));
+        } catch {
+          return base.powerTrained ?? '0';
+        }
+      })();
+
+      const coinsEarned = (() => {
+        const raw = typeof ap.coinsEarned === 'string' ? ap.coinsEarned : (base.coinsEarned ?? '0');
+        try {
+          return bigIntToString(stringToBigInt(raw));
+        } catch {
+          return base.coinsEarned ?? '0';
+        }
+      })();
+
+      return { blocksMined, powerTrained, coinsEarned, eggsHatched, timePlayedMs };
+    })(),
+    achievementClaims: (() => {
+      const ac = savedData.achievementClaims;
+      const base = defaults.achievementClaims ?? {
+        blocksMined: 0,
+        powerTrained: 0,
+        coinsEarned: 0,
+        eggsHatched: 0,
+        timePlayed: 0,
+      };
+      if (!ac || typeof ac !== 'object') return { ...base };
+      const numOr = (v: any, d: number) => (typeof v === 'number' && !isNaN(v) && v >= 0 ? Math.floor(v) : d);
+      return {
+        blocksMined: numOr(ac.blocksMined, base.blocksMined ?? 0),
+        powerTrained: numOr(ac.powerTrained, base.powerTrained ?? 0),
+        coinsEarned: numOr(ac.coinsEarned, base.coinsEarned ?? 0),
+        eggsHatched: numOr(ac.eggsHatched, base.eggsHatched ?? 0),
+        timePlayed: numOr(ac.timePlayed, base.timePlayed ?? 0),
+      };
+    })(),
   };
 
   // Sanitize inventory values (ensure they're numbers and non-negative)

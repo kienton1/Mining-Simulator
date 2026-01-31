@@ -6,9 +6,10 @@
 
 import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
-import { EGG_DEFINITIONS, getEggLootTable, isPetId, rollPetId, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { EGG_DEFINITIONS, getEggLootTable, isPetId, rollPetId } from './PetDatabase';
 import { EggType, type PetId } from './PetData';
 import { PetManager } from './PetManager';
+import { getBonuses } from '../Achievements/Achievements';
 
 type GetPlayerData = (player: Player) => PlayerData | undefined;
 type UpdatePlayerData = (player: Player, data: PlayerData) => void;
@@ -64,8 +65,9 @@ export class HatchingSystem {
     const invCount = Array.isArray(data.petInventory) ? data.petInventory.length : 0;
     const eqCount = Array.isArray(data.equippedPets) ? data.equippedPets.length : 0;
     const ownedCount = invCount + eqCount;
-    if (ownedCount + count > PET_INVENTORY_CAPACITY) {
-      return { canHatch: false, message: `Pet capacity full (${ownedCount}/${PET_INVENTORY_CAPACITY})` };
+    const cap = getBonuses(data).petInventoryCap ?? invCount + eqCount;
+    if (ownedCount + count > cap) {
+      return { canHatch: false, message: `Pet capacity full (${ownedCount}/${cap})` };
     }
 
     return { canHatch: true };

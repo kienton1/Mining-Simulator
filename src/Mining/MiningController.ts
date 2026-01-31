@@ -16,6 +16,7 @@ import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
 import { getSwingsPerSecond } from '../Stats/StatCalculator';
+import { addBlocksMined, getBonuses } from '../Achievements/Achievements';
 
 /**
  * Mining Controller class
@@ -80,7 +81,10 @@ export class MiningController {
     // Set callback to get miner ore luck bonus
     this.miningSystem.setGetMinerOreLuckBonusCallback((player) => {
       const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
-      return equippedMiner?.oreLuckBonus ?? 0;
+      const minerLuck = equippedMiner?.oreLuckBonus ?? 0;
+      const pd = this.gameManager.getPlayerData(player);
+      const extraLuck = pd ? (getBonuses(pd).extraLuckPercent ?? 0) : 0;
+      return minerLuck + extraLuck;
     });
     // Set callback to get combined damage multiplier (for chest HP initialization)
     this.miningSystem.setGetCombinedDamageMultiplierCallback((player: Player) => {
@@ -93,7 +97,9 @@ export class MiningController {
       
       // Convert multipliers to percentages, add them together, then convert back
       const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-      const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+      const pd = this.gameManager.getPlayerData(player);
+      const achDamagePercent = pd ? ((getBonuses(pd).damageMultiplier - 1.0) * 100) : 0;
+      const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
       return 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
     });
     // Set callback for when a chest is broken (to award gems)
@@ -149,7 +155,8 @@ export class MiningController {
     
     // Convert multipliers to percentages, add them together, then convert back
     const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+    const achDamagePercent = ((getBonuses(playerData).damageMultiplier - 1.0) * 100) || 0;
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
     const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
 
     // Handle single click mining
@@ -398,15 +405,18 @@ export class MiningController {
     const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
     const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
 
-    // Convert multipliers to percentages, add them together, then convert back
-    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
-    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
+    // Get player data first (needed for achievement bonuses)
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
       console.log('[MiningController] No player data, aborting');
       return;
     }
+
+    // Convert multipliers to percentages, add them together, then convert back
+    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
+    const achDamagePercent = ((getBonuses(playerData).damageMultiplier - 1.0) * 100) || 0;
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
+    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
 
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
@@ -589,6 +599,14 @@ export class MiningController {
     oreMined: string | null = null,
     oreMinedColor: string | null = null
   ): void {
+    // Achievements: count blocks mined when an ore block is destroyed (not chests)
+    if (oreMined) {
+      const pd = this.gameManager.getPlayerData(player);
+      if (pd) {
+        addBlocksMined(pd, 1);
+        this.gameManager.updatePlayerData(player, pd);
+      }
+    }
     // Calculate sell value for ores (if not a chest)
     let sellValue: number | null = null;
     let finalGemReward: number | null = null;

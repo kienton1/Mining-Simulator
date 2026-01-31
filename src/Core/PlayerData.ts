@@ -99,13 +99,35 @@ export interface PlayerData {
   maxGoldEverHeld?: number;
   /** Maximum gems the player has ever held (for daily reward) */
   maxGemsEverHeld?: number;
+
+  /**
+   * Achievements System (persistent)
+   * - Progress accumulates forever
+   * - Claims are rank counts per category (sequential claim enforced)
+   */
+  achievementProgress?: {
+    blocksMined?: number;
+    /** BigInt-string */
+    powerTrained?: string;
+    /** BigInt-string */
+    coinsEarned?: string;
+    eggsHatched?: number;
+    timePlayedMs?: number;
+  };
+  achievementClaims?: {
+    blocksMined?: number;
+    powerTrained?: number;
+    coinsEarned?: number;
+    eggsHatched?: number;
+    timePlayed?: number;
+  };
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 11;
+export const CURRENT_DATA_VERSION = 12;
 
 /**
  * Inventory data structure
@@ -151,6 +173,20 @@ export function createDefaultPlayerData(): PlayerData {
     lastDailyRewardClaim: 0,
     maxGoldEverHeld: 0,
     maxGemsEverHeld: 0,
+    achievementProgress: {
+      blocksMined: 0,
+      powerTrained: '0',
+      coinsEarned: '0',
+      eggsHatched: 0,
+      timePlayedMs: 0,
+    },
+    achievementClaims: {
+      blocksMined: 0,
+      powerTrained: 0,
+      coinsEarned: 0,
+      eggsHatched: 0,
+      timePlayed: 0,
+    },
   };
 }
 

@@ -57,6 +57,7 @@ interface PlayerModalState {
   pickaxeModalOpen: boolean;
   rebirthModalOpen: boolean;
   petsModalOpen: boolean;
+  achievementsModalOpen: boolean;
   eggModalOpen: boolean;
   rewardModalOpen: boolean;
   mapsModalOpen: boolean;
@@ -1108,12 +1109,13 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg' | 'reward' | 'maps', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'maps', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
+      achievementsModalOpen: false,
       eggModalOpen: false,
       rewardModalOpen: false,
       mapsModalOpen: false,
@@ -1128,6 +1130,8 @@ export class GameManager {
       modalState.rebirthModalOpen = isOpen;
     } else if (modalType === 'pets') {
       modalState.petsModalOpen = isOpen;
+    } else if (modalType === 'achievements') {
+      modalState.achievementsModalOpen = isOpen;
     } else if (modalType === 'egg') {
       modalState.eggModalOpen = isOpen;
     } else if (modalType === 'reward') {
@@ -1157,6 +1161,7 @@ export class GameManager {
       modalState.pickaxeModalOpen = false;
       modalState.rebirthModalOpen = false;
       modalState.petsModalOpen = false;
+      modalState.achievementsModalOpen = false;
       modalState.eggModalOpen = false;
       modalState.rewardModalOpen = false;
       // Don't touch mapsModalOpen as it's not a blocking modal for mining
@@ -1182,6 +1187,7 @@ export class GameManager {
       modalState.pickaxeModalOpen ||
       modalState.rebirthModalOpen ||
       modalState.petsModalOpen ||
+      modalState.achievementsModalOpen ||
       modalState.eggModalOpen ||
       modalState.rewardModalOpen
     ) {
@@ -1190,6 +1196,7 @@ export class GameManager {
         pickaxe: modalState.pickaxeModalOpen,
         rebirth: modalState.rebirthModalOpen,
         pets: modalState.petsModalOpen,
+        achievements: modalState.achievementsModalOpen,
         egg: modalState.eggModalOpen,
         reward: modalState.rewardModalOpen,
       });

@@ -110,6 +110,7 @@ import { detectTrainingRockPlacements } from './TrainingRockLocator';
 import { GameManager } from '../../Core/GameManager';
 import type { PlayerData } from '../../Core/PlayerData';
 import { calculatePowerGainPerHit } from '../../Stats/StatCalculator';
+import { addPowerTrained, getBonuses } from '../../Achievements/Achievements';
 import { 
   ISLAND2_TRAINING_ROCK_DATABASE,
   ISLAND2_BLOCK_TYPE_TO_TIER,
@@ -640,6 +641,12 @@ export class TrainingController {
       }
     }
 
+    // Achievements: faster training is applied as a multiplier to hit rate.
+    const trainingSpeedMult = getBonuses(playerData).trainingSpeedMultiplier ?? 1;
+    if (Number.isFinite(trainingSpeedMult) && trainingSpeedMult > 0) {
+      hitRate *= trainingSpeedMult;
+    }
+
     // Create a unified rock data structure for TrainingSystem
     // TrainingSystem expects TrainingRockData, but we might have Island2/Island3 data
     let rockDataForSystem: TrainingRockData;
@@ -683,6 +690,8 @@ export class TrainingController {
           finalGain = MAX_SAFE_POWER_GAIN;
         }
         
+        // Achievements: track total power trained (persistent)
+        addPowerTrained(playerData, finalGain);
         const newTotal = this.gameManager.addPower(p, finalGain);
         this.gameManager.getTutorialManager().onTrainingPowerGain(p);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
@@ -1174,6 +1183,12 @@ export class TrainingController {
       }
     }
 
+    // Achievements: faster training is applied as a multiplier to hit rate.
+    const trainingSpeedMult = getBonuses(playerData).trainingSpeedMultiplier ?? 1;
+    if (Number.isFinite(trainingSpeedMult) && trainingSpeedMult > 0) {
+      hitRate *= trainingSpeedMult;
+    }
+
     // Create a unified rock data structure for TrainingSystem
     let rockDataForSystem: TrainingRockData;
     if ((worldId === 'island2' || worldId === 'island3') && 'uiPowerBonus' in rockLocation.rockData) {
@@ -1210,6 +1225,8 @@ export class TrainingController {
           finalGain = MAX_SAFE_POWER_GAIN;
         }
 
+        // Achievements: track total power trained (persistent)
+        addPowerTrained(playerData, finalGain);
         const newTotal = this.gameManager.addPower(p, finalGain);
         this.gameManager.getTutorialManager().onTrainingPowerGain(p);
         this.sendPowerGainEvent(p, finalGain, newTotal, rockLocation.position);
