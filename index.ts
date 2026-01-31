@@ -1724,7 +1724,7 @@ startServer(world => {
 
     world.chatManager.sendPlayerMessage(player, '=== Your Saved Data ===', '00FFFF');
     world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Gold: ${playerData.gold.toLocaleString()}`, 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, `Rebirths: ${playerData.rebirths} | Wins: ${playerData.wins}`, 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, `Rebirths: ${playerData.rebirths} | Trophies: ${playerData.trophies}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Pickaxe Tier: ${playerData.currentPickaxeTier}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Inventory: ${inventoryCount} ore types, ${totalOres} total ores`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Player ID: ${player.id} (check ./dev/persistence/player-${player.id}.json)`, 'FFFF00');

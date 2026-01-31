@@ -30,8 +30,8 @@ export interface PlayerData {
   /** Current gems/currency amount (secondary currency) */
   gems: number;
   
-  /** Number of wins (reaching bottom of mines) */
-  wins: number;
+  /** Number of trophies (reaching bottom of mines) */
+  trophies: number;
   
   /** Current pickaxe tier (0 = Rusty, 1 = Stone, etc.) */
   currentPickaxeTier: number;
@@ -105,7 +105,7 @@ export interface PlayerData {
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 10;
+export const CURRENT_DATA_VERSION = 11;
 
 /**
  * Inventory data structure
@@ -129,7 +129,7 @@ export function createDefaultPlayerData(): PlayerData {
     rebirths: 0,
     gold: 0,
     gems: 0,
-    wins: 0,
+    trophies: 0,
     currentPickaxeTier: 0,
     ownedPickaxes: [0], // Start with tier 0 (Wooden) pickaxe
     currentMinerTier: -1, // Start with no miner equipped

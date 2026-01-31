@@ -29,11 +29,16 @@ function validatePlayerData(data: any): data is PlayerData {
 
   // Check required fields (dataVersion is optional for backwards compatibility)
   // Note: gems is optional for backwards compatibility with old saves
-  const requiredFields = ['power', 'rebirths', 'gold', 'wins', 'currentPickaxeTier', 'inventory'];
+  const requiredFields = ['power', 'rebirths', 'gold', 'currentPickaxeTier', 'inventory'];
   for (const field of requiredFields) {
     if (!(field in data)) {
       return false;
     }
+  }
+  const hasTrophies = 'trophies' in data;
+  const hasWins = 'wins' in data;
+  if (!hasTrophies && !hasWins) {
+    return false;
   }
 
   // Validate types
@@ -42,7 +47,8 @@ function validatePlayerData(data: any): data is PlayerData {
   if (typeof data.rebirths !== 'number' || isNaN(data.rebirths) || data.rebirths < 0) return false;
   if (typeof data.gold !== 'number' || isNaN(data.gold) || data.gold < 0) return false;
   if (data.gems !== undefined && (typeof data.gems !== 'number' || isNaN(data.gems) || data.gems < 0)) return false;
-  if (typeof data.wins !== 'number' || isNaN(data.wins) || data.wins < 0) return false;
+  if (data.trophies !== undefined && (typeof data.trophies !== 'number' || isNaN(data.trophies) || data.trophies < 0)) return false;
+  if (data.wins !== undefined && (typeof data.wins !== 'number' || isNaN(data.wins) || data.wins < 0)) return false;
   if (typeof data.currentPickaxeTier !== 'number' || isNaN(data.currentPickaxeTier) || data.currentPickaxeTier < 0) return false;
   // Upgrade levels are optional for backward compatibility
   if (data.moreGemsLevel !== undefined && (typeof data.moreGemsLevel !== 'number' || isNaN(data.moreGemsLevel) || data.moreGemsLevel < 0)) return false;
@@ -116,9 +122,15 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     gems: typeof savedData.gems === 'number' && !isNaN(savedData.gems) && savedData.gems >= 0 
       ? savedData.gems 
       : (defaults.gems || 0),
-    wins: typeof savedData.wins === 'number' && !isNaN(savedData.wins) && savedData.wins >= 0 
-      ? savedData.wins 
-      : defaults.wins,
+    trophies: (() => {
+      if (typeof savedData.trophies === 'number' && !isNaN(savedData.trophies) && savedData.trophies >= 0) {
+        return savedData.trophies;
+      }
+      if (typeof savedData.wins === 'number' && !isNaN(savedData.wins) && savedData.wins >= 0) {
+        return savedData.wins;
+      }
+      return defaults.trophies;
+    })(),
     currentPickaxeTier: (() => {
       const savedTier = typeof savedData.currentPickaxeTier === 'number' && !isNaN(savedData.currentPickaxeTier) && savedData.currentPickaxeTier >= 0
         ? savedData.currentPickaxeTier

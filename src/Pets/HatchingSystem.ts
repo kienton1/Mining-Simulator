@@ -64,10 +64,7 @@ export class HatchingSystem {
     const invCount = Array.isArray(data.petInventory) ? data.petInventory.length : 0;
     const eqCount = Array.isArray(data.equippedPets) ? data.equippedPets.length : 0;
     const ownedCount = invCount + eqCount;
-    const autoDeleteSet = this.getAutoDeleteSet(data);
-    const table = getEggLootTable(eggType) || [];
-    const allAutoDeleted = table.length > 0 && table.every((entry) => autoDeleteSet.has(entry.petId));
-    if (!allAutoDeleted && ownedCount + count > PET_INVENTORY_CAPACITY) {
+    if (ownedCount + count > PET_INVENTORY_CAPACITY) {
       return { canHatch: false, message: `Pet capacity full (${ownedCount}/${PET_INVENTORY_CAPACITY})` };
     }
 

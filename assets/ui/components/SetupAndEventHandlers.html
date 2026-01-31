@@ -1225,7 +1225,7 @@
     const powerValueEl = document.getElementById('power-value');
     const moneyValueEl = document.getElementById('money-value');
     const gemsValueEl = document.getElementById('gems-value');
-    const winsValueEl = document.getElementById('wins-value');
+    const trophiesValueEl = document.getElementById('trophies-value');
     const rebirthsValueEl = document.getElementById('rebirths-value');
     const powerGainLayer = document.getElementById('power-gain-layer');
     const trainingPromptEl = document.getElementById('training-prompt');
@@ -1489,7 +1489,7 @@
       power: 0,
       gold: 0,
       gems: 0,
-      wins: 0,
+      trophies: 0,
       rebirths: 0,
       miner: {
         currentTier: -1,
@@ -3197,6 +3197,8 @@
       if (!mapsListEl) return;
       mapsListEl.innerHTML = '';
 
+      const trophyIcon = '{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png';
+
       worlds.forEach((world) => {
         const worldCard = document.createElement('div');
         worldCard.className = `maps-card ${world.isCurrent ? 'maps-card--current' : ''} ${!world.isUnlocked ? 'maps-card--locked' : ''}`;
@@ -3212,7 +3214,12 @@
         if (world.trophyMultiplier > 1) {
           const trophyMultiplier = document.createElement('div');
           trophyMultiplier.className = 'maps-card__multiplier';
-          trophyMultiplier.innerHTML = `🏆 x${world.trophyMultiplier}`;
+          const multIcon = document.createElement('img');
+          multIcon.className = 'maps-card__multiplier-icon';
+          multIcon.src = trophyIcon;
+          multIcon.alt = '';
+          trophyMultiplier.appendChild(multIcon);
+          trophyMultiplier.appendChild(document.createTextNode(` x${world.trophyMultiplier}`));
           worldInfo.appendChild(trophyMultiplier);
         }
 
@@ -3232,7 +3239,7 @@
           const unlockBtn = document.createElement('button');
           unlockBtn.className = 'maps-card__btn maps-card__btn--unlock';
           if (world.unlockRequirement) {
-            unlockBtn.textContent = `Unlock (${world.unlockRequirement.amount} wins)`;
+            unlockBtn.innerHTML = `Unlock <span class="maps-card__btn-cost"><img src="${trophyIcon}" alt="" /> ${world.unlockRequirement.amount}</span>`;
           } else {
             unlockBtn.textContent = 'Unlock';
           }
@@ -4668,12 +4675,12 @@
           state.power = data.power ?? 0;
           state.gold = data.gold ?? state.gold;
           state.gems = data.gems ?? state.gems;
-          state.wins = data.wins ?? state.wins;
+          state.trophies = data.trophies ?? data.wins ?? state.trophies;
           state.rebirths = data.rebirths ?? state.rebirths;
           if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
-          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           // Update rebirth badge when power changes
           updateRebirthBadge();
@@ -4681,7 +4688,7 @@
           if (rebirthModal && rebirthModal.classList.contains('visible')) {
             renderRebirthOptions();
           }
-          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'trophies:', state.trophies, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
@@ -4693,10 +4700,15 @@
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           console.log('[UI] Updated gems stats:', state.gems);
           break;
+        case 'TROPHIES_STATS':
+          state.trophies = data.trophies ?? data.wins ?? 0;
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
+          console.log('[UI] Updated trophies stats:', state.trophies);
+          break;
         case 'WINS_STATS':
-          state.wins = data.wins ?? 0;
-          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
-          console.log('[UI] Updated wins stats:', state.wins);
+          state.trophies = data.trophies ?? data.wins ?? 0;
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
+          console.log('[UI] Updated trophies stats (legacy wins):', state.trophies);
           break;
         case 'REBIRTHS_STATS':
           state.rebirths = data.rebirths ?? 0;

@@ -270,7 +270,7 @@ export class MiningSystem {
   /**
    * Sets callback for when player reaches the win condition
    *
-   * @param callback - Function called when player wins (player)
+   * @param callback - Function called when player reaches the bottom (player)
    */
   setWinCallback(callback: (player: Player) => void): void {
     this.onWinCallback = callback;

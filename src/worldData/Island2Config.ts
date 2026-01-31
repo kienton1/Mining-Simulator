@@ -15,8 +15,8 @@ export const ISLAND2_CONFIG: WorldConfig = {
 
   // Unlock Requirements
   unlockRequirement: {
-    type: 'wins',
-    amount: 1, // Unlock with 1 win
+    type: 'trophies',
+    amount: 1, // Unlock with 1 trophy
   },
 
   // Trophy Multiplier

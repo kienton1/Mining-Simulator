@@ -165,7 +165,7 @@
     color: #4caf50;
   }
 
-  .stat-hud--wins .stat-hud__value {
+  .stat-hud--trophies .stat-hud__value {
     color: #ffd700;
   }
 
@@ -1115,6 +1115,15 @@
     border: 1px solid rgba(251, 191, 36, 0.4);
     padding: 4px 10px;
     border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .maps-card__multiplier-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
   }
 
   .maps-card__current {
@@ -1149,6 +1158,19 @@
     text-transform: uppercase;
     letter-spacing: 0.8px;
     transition: transform 0.16s ease, filter 0.16s ease;
+  }
+
+  .maps-card__btn-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+  }
+
+  .maps-card__btn-cost img {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
   }
 
   .maps-card__btn--teleport {

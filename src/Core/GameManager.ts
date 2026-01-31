@@ -892,7 +892,7 @@ export class GameManager {
       power: data.power,
       gold: data.gold,
       gems: data.gems || 0,
-      wins: data.wins || 0,
+      trophies: data.trophies || 0,
       rebirths: data.rebirths,
     });
   }
@@ -1254,7 +1254,7 @@ export class GameManager {
 
   /**
    * Handles player win condition (reaching depth 1000)
-   * Increments wins, teleports to surface, resets mines, and resets timer
+   * Increments trophies, teleports to surface, resets mines, and resets timer
    *
    * @param player - Player who reached the win condition
    */
@@ -1269,23 +1269,23 @@ export class GameManager {
       return;
     }
 
-    // Increment wins ("trophies") based on current world's trophy multiplier
+    // Increment trophies based on current world's trophy multiplier
     const worldId = playerData.currentWorld || 'island1';
     const worldConfig = WorldRegistry.getWorldConfig(worldId);
     const winMultiplier = worldConfig?.trophyMultiplier ?? 1;
-    playerData.wins += winMultiplier;
+    playerData.trophies += winMultiplier;
     this.updatePlayerData(player, playerData);
 
-    // Update UI with new wins count
+    // Update UI with new trophies count
     this.sendPowerStatsToUI(player);
 
     // Stop auto modes and mining
     const autoState = this.playerAutoStates.get(player);
+    const wasAutoMineEnabled = Boolean(autoState?.autoMineEnabled);
     if (autoState) {
       if (autoState.autoMineEnabled) {
+        // Stop the loop but keep auto-mine enabled so it can resume after reset.
         this.stopAutoMine(player);
-        autoState.autoMineEnabled = false;
-        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
       }
       if (autoState.autoTrainEnabled) {
         this.stopAutoTrain(player);
@@ -1332,8 +1332,17 @@ export class GameManager {
     // Send win notification
     player.ui.sendData({
       type: 'PLAYER_WIN',
-      wins: playerData.wins,
+      trophies: playerData.trophies,
     });
+
+    // If auto-mine was enabled, resume it after the win reset.
+    if (wasAutoMineEnabled) {
+      setTimeout(() => {
+        const stateNow = this.playerAutoStates.get(player);
+        if (!stateNow?.autoMineEnabled) return;
+        this.startAutoMine(player);
+      }, 1200);
+    }
   }
 
   /**
@@ -2571,22 +2580,28 @@ export class GameManager {
       return { success: false, message: 'World already unlocked' };
     }
 
-    // Check unlock requirement
-    if (worldConfig.unlockRequirement.type === 'wins') {
-      if (playerData.wins < worldConfig.unlockRequirement.amount) {
-        return { 
-          success: false, 
-          message: `Need ${worldConfig.unlockRequirement.amount} wins to unlock this world` 
+    // Check unlock requirement (trophies)
+    let cost = 0;
+    if (worldConfig.unlockRequirement.type === 'trophies') {
+      cost = worldConfig.unlockRequirement.amount ?? 0;
+      if (playerData.trophies < cost) {
+        return {
+          success: false,
+          message: `Need ${cost} trophies to unlock this world`,
         };
       }
     }
 
-    // Unlock the world
+    // Unlock the world + spend trophies
     if (!unlockedWorlds.includes(worldId)) {
       unlockedWorlds.push(worldId);
       playerData.unlockedWorlds = unlockedWorlds;
-      this.updatePlayerData(player, playerData);
     }
+    if (cost > 0) {
+      playerData.trophies = Math.max(0, (playerData.trophies ?? 0) - cost);
+    }
+    this.updatePlayerData(player, playerData);
+    this.sendPowerStatsToUI(player);
 
     return { success: true };
   }

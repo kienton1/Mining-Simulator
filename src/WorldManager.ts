@@ -190,9 +190,9 @@ export class WorldManager {
     const worldConfig = WorldRegistry.getWorldConfig(worldId);
     if (!worldConfig) return false;
 
-    // For now, only check wins requirement
-    if (worldConfig.unlockRequirement.type === 'wins') {
-      return player.wins >= worldConfig.unlockRequirement.amount;
+    // For now, only check trophies requirement
+    if (worldConfig.unlockRequirement.type === 'trophies') {
+      return player.trophies >= worldConfig.unlockRequirement.amount;
     }
 
     return false;

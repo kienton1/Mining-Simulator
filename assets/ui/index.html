@@ -1922,7 +1922,7 @@
     const powerValueEl = document.getElementById('power-value');
     const moneyValueEl = document.getElementById('money-value');
     const gemsValueEl = document.getElementById('gems-value');
-    const winsValueEl = document.getElementById('wins-value');
+    const trophiesValueEl = document.getElementById('trophies-value');
     const rebirthsValueEl = document.getElementById('rebirths-value');
     const powerGainLayer = document.getElementById('power-gain-layer');
     const trainingPromptEl = document.getElementById('training-prompt');
@@ -2186,7 +2186,7 @@
       power: 0,
       gold: 0,
       gems: 0,
-      wins: 0,
+      trophies: 0,
       rebirths: 0,
       miner: {
         currentTier: -1,
@@ -3894,6 +3894,8 @@
       if (!mapsListEl) return;
       mapsListEl.innerHTML = '';
 
+      const trophyIcon = '{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png';
+
       worlds.forEach((world) => {
         const worldCard = document.createElement('div');
         worldCard.className = `maps-card ${world.isCurrent ? 'maps-card--current' : ''} ${!world.isUnlocked ? 'maps-card--locked' : ''}`;
@@ -3909,7 +3911,12 @@
         if (world.trophyMultiplier > 1) {
           const trophyMultiplier = document.createElement('div');
           trophyMultiplier.className = 'maps-card__multiplier';
-          trophyMultiplier.innerHTML = `🏆 x${world.trophyMultiplier}`;
+          const multIcon = document.createElement('img');
+          multIcon.className = 'maps-card__multiplier-icon';
+          multIcon.src = trophyIcon;
+          multIcon.alt = '';
+          trophyMultiplier.appendChild(multIcon);
+          trophyMultiplier.appendChild(document.createTextNode(` x${world.trophyMultiplier}`));
           worldInfo.appendChild(trophyMultiplier);
         }
 
@@ -3929,7 +3936,7 @@
           const unlockBtn = document.createElement('button');
           unlockBtn.className = 'maps-card__btn maps-card__btn--unlock';
           if (world.unlockRequirement) {
-            unlockBtn.textContent = `Unlock (${world.unlockRequirement.amount} wins)`;
+            unlockBtn.innerHTML = `Unlock <span class="maps-card__btn-cost"><img src="${trophyIcon}" alt="" /> ${world.unlockRequirement.amount}</span>`;
           } else {
             unlockBtn.textContent = 'Unlock';
           }
@@ -5365,12 +5372,12 @@
           state.power = data.power ?? 0;
           state.gold = data.gold ?? state.gold;
           state.gems = data.gems ?? state.gems;
-          state.wins = data.wins ?? state.wins;
+          state.trophies = data.trophies ?? data.wins ?? state.trophies;
           state.rebirths = data.rebirths ?? state.rebirths;
           if (powerValueEl) powerValueEl.textContent = formatNumber(state.power);
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
-          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
           // Update rebirth badge when power changes
           updateRebirthBadge();
@@ -5378,7 +5385,7 @@
           if (rebirthModal && rebirthModal.classList.contains('visible')) {
             renderRebirthOptions();
           }
-          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'wins:', state.wins, 'rebirths:', state.rebirths);
+          console.log('[UI] Updated stats - power:', state.power, 'gold:', state.gold, 'gems:', state.gems, 'trophies:', state.trophies, 'rebirths:', state.rebirths);
           break;
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
@@ -5390,10 +5397,15 @@
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           console.log('[UI] Updated gems stats:', state.gems);
           break;
+        case 'TROPHIES_STATS':
+          state.trophies = data.trophies ?? data.wins ?? 0;
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
+          console.log('[UI] Updated trophies stats:', state.trophies);
+          break;
         case 'WINS_STATS':
-          state.wins = data.wins ?? 0;
-          if (winsValueEl) winsValueEl.textContent = formatNumber(state.wins);
-          console.log('[UI] Updated wins stats:', state.wins);
+          state.trophies = data.trophies ?? data.wins ?? 0;
+          if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
+          console.log('[UI] Updated trophies stats (legacy wins):', state.trophies);
           break;
         case 'REBIRTHS_STATS':
           state.rebirths = data.rebirths ?? 0;
@@ -6118,11 +6130,11 @@
       <span class="reward-button__badge"></span>
     </button>
   </div>
-  <!-- Trophy (Wins) -->
-  <div class="stat-hud stat-hud--wins">
-    <div class="stat-hud__value" id="wins-value">0</div>
+  <!-- Trophies -->
+  <div class="stat-hud stat-hud--trophies">
+    <div class="stat-hud__value" id="trophies-value">0</div>
     <div class="stat-hud__icon">
-      <img class="stat-hud__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png" alt="Wins" />
+      <img class="stat-hud__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png" alt="Trophies" />
     </div>
   </div>
 
@@ -10651,6 +10663,7 @@
     border-radius: 16px;
     padding: 0;
     width: 100%;
+    height: 75vh;
     min-height: 70vh;
     max-height: 75vh;
     display: flex;
@@ -10727,6 +10740,7 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-height: 0;
   }
 
   /* Left Panel - Compact Details */
@@ -10883,6 +10897,7 @@
     padding: 12px;
     background: rgba(0, 0, 0, 0.3);
     overflow: hidden;
+    min-height: 0;
   }
 
   .pets-grid-container {
@@ -10890,6 +10905,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
+    height: 100%;
   }
 
   .pets-grid {
@@ -11838,6 +11854,21 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .maps-card__badge-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-block;
+  }
+
+  .maps-card__badge-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .maps-card__badge--multiplier {
@@ -11919,6 +11950,26 @@
     cursor: not-allowed;
     filter: grayscale(0.5);
     transform: none;
+  }
+
+  .maps-card__btn-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    font-weight: 900;
+  }
+
+  .maps-card__btn-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
+  }
+
+  .maps-card__btn-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .maps-empty {
@@ -12049,16 +12100,21 @@
         const isCurrent = world.isCurrent || false;
         const isUnlocked = world.isUnlocked !== undefined ? world.isUnlocked : (world.unlocked || false);
         const multiplier = world.trophyMultiplier || world.multiplier || 1;
-        const winsRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
+        const trophiesRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
+
+        const trophyIcon = `{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png`;
+        const unlockLabel = trophiesRequired > 0
+          ? `Unlock <span class="maps-card__btn-cost"><span class="maps-card__btn-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired}</span>`
+          : 'Unlock';
 
         return `
           <div class="maps-card ${isCurrent ? 'maps-card--current' : ''} ${!isUnlocked ? 'maps-card--locked' : ''}"
                data-id="${world.id}">
             <div class="maps-card__name">${world.name}</div>
             <div class="maps-card__info">
-              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier">x${multiplier} Trophies</span>` : ''}
+              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>x${multiplier}</span>` : ''}
               ${isCurrent ? '<span class="maps-card__badge maps-card__badge--current">Current</span>' : ''}
-              ${!isUnlocked && winsRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked">${winsRequired} Wins Required</span>` : ''}
+              ${!isUnlocked && trophiesRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired} Required</span>` : ''}
             </div>
             <div class="maps-card__actions">
               ${isUnlocked && !isCurrent
@@ -12066,7 +12122,7 @@
                 : ''
               }
               ${!isUnlocked
-                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">Unlock</button>`
+                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">${unlockLabel}</button>`
                 : ''
               }
               ${isCurrent ? '<span style="color: #4caf50; font-weight: 700;">You are here</span>' : ''}
@@ -12488,7 +12544,7 @@
     color: #4caf50;
   }
 
-  .stat-hud--wins .stat-hud__value {
+  .stat-hud--trophies .stat-hud__value {
     color: #ffd700;
   }
 
@@ -13438,6 +13494,15 @@
     border: 1px solid rgba(251, 191, 36, 0.4);
     padding: 4px 10px;
     border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .maps-card__multiplier-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
   }
 
   .maps-card__current {
@@ -13472,6 +13537,19 @@
     text-transform: uppercase;
     letter-spacing: 0.8px;
     transition: transform 0.16s ease, filter 0.16s ease;
+  }
+
+  .maps-card__btn-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+  }
+
+  .maps-card__btn-cost img {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
   }
 
   .maps-card__btn--teleport {
@@ -16959,7 +17037,7 @@
 }
 
 .stat-hud--money .stat-hud__value,
-.stat-hud--wins .stat-hud__value {
+.stat-hud--trophies .stat-hud__value {
   color: var(--od-primary);
 }
 

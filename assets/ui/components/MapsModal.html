@@ -244,6 +244,21 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .maps-card__badge-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-block;
+  }
+
+  .maps-card__badge-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .maps-card__badge--multiplier {
@@ -325,6 +340,26 @@
     cursor: not-allowed;
     filter: grayscale(0.5);
     transform: none;
+  }
+
+  .maps-card__btn-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    font-weight: 900;
+  }
+
+  .maps-card__btn-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-block;
+  }
+
+  .maps-card__btn-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .maps-empty {
@@ -455,16 +490,21 @@
         const isCurrent = world.isCurrent || false;
         const isUnlocked = world.isUnlocked !== undefined ? world.isUnlocked : (world.unlocked || false);
         const multiplier = world.trophyMultiplier || world.multiplier || 1;
-        const winsRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
+        const trophiesRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
+
+        const trophyIcon = `{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png`;
+        const unlockLabel = trophiesRequired > 0
+          ? `Unlock <span class="maps-card__btn-cost"><span class="maps-card__btn-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired}</span>`
+          : 'Unlock';
 
         return `
           <div class="maps-card ${isCurrent ? 'maps-card--current' : ''} ${!isUnlocked ? 'maps-card--locked' : ''}"
                data-id="${world.id}">
             <div class="maps-card__name">${world.name}</div>
             <div class="maps-card__info">
-              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier">x${multiplier} Trophies</span>` : ''}
+              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>x${multiplier}</span>` : ''}
               ${isCurrent ? '<span class="maps-card__badge maps-card__badge--current">Current</span>' : ''}
-              ${!isUnlocked && winsRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked">${winsRequired} Wins Required</span>` : ''}
+              ${!isUnlocked && trophiesRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired} Required</span>` : ''}
             </div>
             <div class="maps-card__actions">
               ${isUnlocked && !isCurrent
@@ -472,7 +512,7 @@
                 : ''
               }
               ${!isUnlocked
-                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">Unlock</button>`
+                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">${unlockLabel}</button>`
                 : ''
               }
               ${isCurrent ? '<span style="color: #4caf50; font-weight: 700;">You are here</span>' : ''}

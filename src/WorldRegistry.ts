@@ -32,12 +32,12 @@ export class WorldRegistry {
   }
 
   /**
-   * Get worlds that are unlocked based on player wins
+   * Get worlds that are unlocked based on player trophies
    */
-  public static getUnlockedWorlds(playerWins: number): WorldConfig[] {
+  public static getUnlockedWorlds(playerTrophies: number): WorldConfig[] {
     return this.getAllWorlds().filter(world => {
-      if (world.unlockRequirement.type === 'wins') {
-        return playerWins >= world.unlockRequirement.amount;
+      if (world.unlockRequirement.type === 'trophies') {
+        return playerTrophies >= world.unlockRequirement.amount;
       }
       return false;
     });

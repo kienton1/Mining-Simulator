@@ -229,7 +229,7 @@ export class TutorialManager {
     const hasPets = (data.petInventory?.length ?? 0) > 0 || (data.equippedPets?.length ?? 0) > 0;
     const hasProgress =
       data.rebirths > 0 ||
-      data.wins > 0 ||
+      data.trophies > 0 ||
       data.gold > 0 ||
       powerNum > 1 ||
       hasInventory ||
