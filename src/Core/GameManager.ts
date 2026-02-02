@@ -62,6 +62,10 @@ interface PlayerModalState {
   rewardModalOpen: boolean;
   goldenMachineModalOpen: boolean;
   mapsModalOpen: boolean;
+  merchantModalOpen: boolean;
+  mineResetUpgradeModalOpen: boolean;
+  gemTraderModalOpen: boolean;
+  dailyRewardModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
 }
 
@@ -272,6 +276,10 @@ export class GameManager {
       rewardModalOpen: false,
       mapsModalOpen: false,
       goldenMachineModalOpen: false,
+      merchantModalOpen: false,
+      mineResetUpgradeModalOpen: false,
+      gemTraderModalOpen: false,
+      dailyRewardModalOpen: false,
       lastModalOpenTime: 0,
     });
     
@@ -1112,7 +1120,7 @@ export class GameManager {
    * @param modalType - Type of modal to check
    * @returns True if the modal is open, false otherwise
    */
-  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps'): boolean {
+  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward'): boolean {
     const modalState = this.playerModalStates.get(player);
     if (!modalState) return false;
 
@@ -1126,6 +1134,10 @@ export class GameManager {
       case 'reward': return modalState.rewardModalOpen;
       case 'goldenMachine': return modalState.goldenMachineModalOpen;
       case 'maps': return modalState.mapsModalOpen;
+      case 'merchant': return modalState.merchantModalOpen;
+      case 'mineResetUpgrade': return modalState.mineResetUpgradeModalOpen;
+      case 'gemTrader': return modalState.gemTraderModalOpen;
+      case 'dailyReward': return modalState.dailyRewardModalOpen;
       default: return false;
     }
   }
@@ -1137,7 +1149,7 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
@@ -1148,6 +1160,10 @@ export class GameManager {
       rewardModalOpen: false,
       goldenMachineModalOpen: false,
       mapsModalOpen: false,
+      merchantModalOpen: false,
+      mineResetUpgradeModalOpen: false,
+      gemTraderModalOpen: false,
+      dailyRewardModalOpen: false,
       lastModalOpenTime: 0,
     };
 
@@ -1169,6 +1185,14 @@ export class GameManager {
       modalState.goldenMachineModalOpen = isOpen;
     } else if (modalType === 'maps') {
       modalState.mapsModalOpen = isOpen;
+    } else if (modalType === 'merchant') {
+      modalState.merchantModalOpen = isOpen;
+    } else if (modalType === 'mineResetUpgrade') {
+      modalState.mineResetUpgradeModalOpen = isOpen;
+    } else if (modalType === 'gemTrader') {
+      modalState.gemTraderModalOpen = isOpen;
+    } else if (modalType === 'dailyReward') {
+      modalState.dailyRewardModalOpen = isOpen;
     }
 
     // Update timestamp when opening a modal (to prevent race conditions with clicks)
@@ -1196,6 +1220,10 @@ export class GameManager {
       modalState.eggModalOpen = false;
       modalState.rewardModalOpen = false;
       modalState.goldenMachineModalOpen = false;
+      modalState.merchantModalOpen = false;
+      modalState.mineResetUpgradeModalOpen = false;
+      modalState.gemTraderModalOpen = false;
+      modalState.dailyRewardModalOpen = false;
       // Don't touch mapsModalOpen as it's not a blocking modal for mining
       console.log('[GameManager] Cleared all blocking modal states for player:', player.username);
     }

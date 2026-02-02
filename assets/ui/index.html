@@ -1416,8 +1416,9 @@
 
     // Close button handler
     merchantUIClose.addEventListener('click', () => {
-      console.log('[UI] Merchant UI close clicked');
+      console.log('[UI ZOOM] Merchant close button clicked - sending MODAL_CLOSED');
       merchantUI.classList.remove('visible');
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'merchant' });
       hytopia.sendData({ type: 'CLOSE_MERCHANT_UI' });
       setTimeout(() => {
         if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
@@ -1449,8 +1450,9 @@
 
     // Close button handler
     upgradeUIClose.addEventListener('click', () => {
-      console.log('[UI] Mine Reset Upgrade UI close clicked');
+      console.log('[UI ZOOM] MineResetUpgrade close button clicked - sending MODAL_CLOSED');
       upgradeUI.classList.remove('visible');
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'mineResetUpgrade' });
       hytopia.sendData({ type: 'CLOSE_MINE_RESET_UPGRADE_UI' });
       setTimeout(() => {
         if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
@@ -1538,8 +1540,9 @@
 
     // Close button handler
     gemTraderUIClose.addEventListener('click', () => {
-      console.log('[UI] Gem Trader UI close clicked');
+      console.log('[UI ZOOM] GemTrader close button clicked - sending MODAL_CLOSED');
       gemTraderUI.classList.remove('visible');
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'gemTrader' });
       setTimeout(() => {
         if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
           if (window.setModalOpen) window.setModalOpen(false);
@@ -3307,6 +3310,7 @@
 
     // Daily reward close handler
     const closeDailyRewardModal = () => {
+      console.log('[UI ZOOM] closeDailyRewardModal called');
       const dailyRewardModal = document.getElementById('daily-reward-modal');
       if (dailyRewardModal) {
         hideModal(dailyRewardModal);
@@ -3317,7 +3321,11 @@
           state.dailyReward.animationComplete = false;
           state.dailyReward.lastResult = null;
         }
+        console.log('[UI ZOOM] DailyReward: Closing modal and sending MODAL_CLOSED');
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'dailyReward' });
         hytopia.sendData({ type: 'DAILY_REWARD_MODAL_CLOSED' });
+      } else {
+        console.log('[UI ZOOM] closeDailyRewardModal: daily-reward-modal element not found!');
       }
     };
 
@@ -6167,34 +6175,42 @@
           triggerWinCelebration();
           break;
         case 'MERCHANT_PROXIMITY':
-          console.log('[UI] Merchant proximity:', data.inProximity);
+          console.log('[UI ZOOM] MERCHANT_PROXIMITY received:', data.inProximity);
           state.gold = data.gold ?? state.gold;
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           const merchantUI = document.getElementById('merchant-ui');
           if (merchantUI) {
             if (data.inProximity) {
+              console.log('[UI ZOOM] Merchant: Entering proximity - showing UI and sending MODAL_OPENED');
               merchantUI.classList.add('visible');
+              hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'merchant' });
               if (window.setModalOpen) window.setModalOpen(true);
               updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
             } else {
+              console.log('[UI ZOOM] Merchant: Leaving proximity - hiding UI and sending MODAL_CLOSED');
               merchantUI.classList.remove('visible');
+              hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'merchant' });
               setTimeout(() => {
                 if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
                   if (window.setModalOpen) window.setModalOpen(false);
                 }
               }, 10);
             }
+          } else {
+            console.log('[UI ZOOM] Merchant: merchantUI element not found!');
           }
           applyTutorialHighlights();
           break;
         case 'MINE_RESET_UPGRADE_PROXIMITY':
-          console.log('[UI] Mine Reset Upgrade proximity:', data.inProximity);
+          console.log('[UI ZOOM] MINE_RESET_UPGRADE_PROXIMITY received:', data.inProximity);
           state.gold = data.gold ?? state.gold;
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           const upgradeUI = document.getElementById('mine-reset-upgrade-ui');
           if (upgradeUI) {
             if (data.inProximity) {
+              console.log('[UI ZOOM] MineResetUpgrade: Entering proximity - showing UI and sending MODAL_OPENED');
               upgradeUI.classList.add('visible');
+              hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'mineResetUpgrade' });
               if (window.setModalOpen) window.setModalOpen(true);
               updateMineResetUpgradeUI(
                 data.hasUpgrade ?? false,
@@ -6202,33 +6218,43 @@
                 data.gold ?? 0
               );
             } else {
+              console.log('[UI ZOOM] MineResetUpgrade: Leaving proximity - hiding UI and sending MODAL_CLOSED');
               upgradeUI.classList.remove('visible');
+              hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'mineResetUpgrade' });
               setTimeout(() => {
                 if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
                   if (window.setModalOpen) window.setModalOpen(false);
                 }
               }, 10);
             }
+          } else {
+            console.log('[UI ZOOM] MineResetUpgrade: upgradeUI element not found!');
           }
           break;
         case 'GEM_TRADER_PROXIMITY':
-          console.log('[UI] Gem Trader proximity:', data.inProximity);
+          console.log('[UI ZOOM] GEM_TRADER_PROXIMITY received:', data.inProximity);
           state.gems = data.gems ?? state.gems;
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           const gemTraderUI = document.getElementById('gem-trader-ui');
           if (gemTraderUI) {
             if (data.inProximity) {
+              console.log('[UI ZOOM] GemTrader: Entering proximity - showing UI and sending MODAL_OPENED');
               gemTraderUI.classList.add('visible');
+              hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'gemTrader' });
               if (window.setModalOpen) window.setModalOpen(true);
               updateGemTraderUI(data.upgrades || {}, data.gems || 0);
             } else {
+              console.log('[UI ZOOM] GemTrader: Leaving proximity - hiding UI and sending MODAL_CLOSED');
               gemTraderUI.classList.remove('visible');
+              hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'gemTrader' });
               setTimeout(() => {
                 if (window.isAnyModalOpen && !window.isAnyModalOpen()) {
                   if (window.setModalOpen) window.setModalOpen(false);
                 }
               }, 10);
             }
+          } else {
+            console.log('[UI ZOOM] GemTrader: gemTraderUI element not found!');
           }
           break;
         case 'GOLDEN_MACHINE_PROXIMITY': {
@@ -6399,18 +6425,26 @@
           break;
         }
         case 'DAILY_REWARD_OPEN': {
+          console.log('[UI ZOOM] DAILY_REWARD_OPEN received, userClosed=', state.dailyReward?.userClosed);
           // Don't reopen if user manually closed while still in proximity
           if (state.dailyReward?.userClosed) {
+            console.log('[UI ZOOM] DailyReward: Skipping open - user previously closed modal');
             break;
           }
           const dailyRewardModal = document.getElementById('daily-reward-modal');
           if (dailyRewardModal) {
+            console.log('[UI ZOOM] DailyReward: Opening modal and sending MODAL_OPENED');
             showModal(dailyRewardModal);
+            hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'dailyReward' });
             hytopia.sendData({ type: 'REQUEST_DAILY_REWARD_STATE' });
+          } else {
+            console.log('[UI ZOOM] DailyReward: daily-reward-modal element not found!');
           }
           break;
         }
         case 'DAILY_REWARD_CLOSE': {
+          console.log('[UI ZOOM] DAILY_REWARD_CLOSE received - sending MODAL_CLOSED');
+          hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'dailyReward' });
           closeDailyRewardModal();
           // Reset userClosed flag AFTER closing, since closeDailyRewardModal() sets it to true
           // This allows the modal to reopen when player re-enters proximity
@@ -12667,6 +12701,7 @@
     border: 4px solid #1a1a2e;
     border-radius: 16px;
     padding: 0;
+    padding-right: 12px;
     width: 100%;
     height: 75vh;
     min-height: 70vh;

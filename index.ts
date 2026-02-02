@@ -798,13 +798,17 @@ startServer(world => {
      * Helper function to smoothly transition camera zoom with ease-out animation
      */
     const transitionCameraZoom = (targetZoom: number) => {
+      const startZoom = player.camera.zoom;
+      const zoomDirection = targetZoom > startZoom ? 'ZOOM OUT' : 'ZOOM IN';
+      console.log(`[ZOOM DEBUG] transitionCameraZoom called: ${zoomDirection} from ${startZoom.toFixed(2)} to ${targetZoom.toFixed(2)}`);
+
       // Clear any existing transition
       const existingTimeout = (player as any).__zoomTransitionTimeout;
       if (existingTimeout) {
+        console.log(`[ZOOM DEBUG] Clearing existing zoom transition`);
         clearTimeout(existingTimeout);
       }
 
-      const startZoom = player.camera.zoom;
       const startTime = Date.now();
 
       (player as any).__zoomTransitionActive = true;
@@ -825,6 +829,7 @@ startServer(world => {
         } else {
           (player as any).__zoomTransitionActive = false;
           player.camera.setZoom(targetZoom);
+          console.log(`[ZOOM DEBUG] Zoom transition COMPLETE: now at ${targetZoom.toFixed(2)}`);
         }
       };
 
@@ -835,13 +840,16 @@ startServer(world => {
      * Helper function to check if any modal is currently open for the player
      */
     const isAnyModalOpen = (): boolean => {
-      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'egg', 'reward', 'goldenMachine', 'maps'] as const;
+      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'egg', 'reward', 'goldenMachine', 'maps', 'merchant', 'mineResetUpgrade', 'gemTrader', 'dailyReward'] as const;
+      const openModals: string[] = [];
       for (const modalType of modalTypes) {
         if (gameManager.getModalState(player, modalType)) {
-          return true;
+          openModals.push(modalType);
         }
       }
-      return false;
+      const anyOpen = openModals.length > 0;
+      console.log(`[ZOOM DEBUG] isAnyModalOpen check: ${anyOpen} | Open modals: [${openModals.join(', ')}]`);
+      return anyOpen;
     };
 
     // Set up per-player UI event handler (as per Hytopia SDK guide)
@@ -1065,14 +1073,19 @@ startServer(world => {
           });
           break;
         case 'MODAL_OPENED':
-
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps') {
+          console.log(`[ZOOM DEBUG] MODAL_OPENED event received: modalType="${data.modalType}"`);
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
             // Check if any modal was already open before setting new state
+            console.log(`[ZOOM DEBUG] Valid modalType, checking if any modal was already open...`);
             const wasAnyModalOpen = isAnyModalOpen();
+            console.log(`[ZOOM DEBUG] wasAnyModalOpen=${wasAnyModalOpen}, setting "${data.modalType}" to OPEN`);
             gameManager.setModalState(player, data.modalType, true);
             // Zoom out when first modal opens
             if (!wasAnyModalOpen) {
+              console.log(`[ZOOM DEBUG] First modal opened - triggering ZOOM OUT to ${CAMERA_MODAL_ZOOM}`);
               transitionCameraZoom(CAMERA_MODAL_ZOOM);
+            } else {
+              console.log(`[ZOOM DEBUG] Another modal already open - skipping zoom out`);
             }
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -1084,15 +1097,22 @@ startServer(world => {
                 miningController.stopMiningLoop(player);
               }
             }
+          } else {
+            console.log(`[ZOOM DEBUG] MODAL_OPENED: Unknown modalType "${data.modalType}" - IGNORED`);
           }
           break;
         case 'MODAL_CLOSED':
-
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps') {
+          console.log(`[ZOOM DEBUG] MODAL_CLOSED event received: modalType="${data.modalType}"`);
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
+            console.log(`[ZOOM DEBUG] Valid modalType, setting "${data.modalType}" to CLOSED`);
             gameManager.setModalState(player, data.modalType, false);
             // Zoom back to default when all modals are closed
+            console.log(`[ZOOM DEBUG] Checking if all modals are now closed...`);
             if (!isAnyModalOpen()) {
+              console.log(`[ZOOM DEBUG] All modals closed - triggering ZOOM IN to ${CAMERA_DEFAULT_ZOOM}`);
               transitionCameraZoom(CAMERA_DEFAULT_ZOOM);
+            } else {
+              console.log(`[ZOOM DEBUG] Other modals still open - skipping zoom in`);
             }
           }
           break;
