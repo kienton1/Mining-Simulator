@@ -2201,7 +2201,7 @@
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
-      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close, .daily-reward-close-btn, .reward-close-btn');
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close, .daily-reward-close-btn, .reward-close-btn, .pets-close-btn');
 
       if (closeButton) {
         const modalId = closeButton.getAttribute('data-close');
@@ -11075,8 +11075,17 @@
     height: 40px;
     border-radius: 8px;
     cursor: pointer;
+    transition: all 0.2s ease;
     z-index: 100;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .daily-reward-close-btn:hover {
+    transform: translate(50%, -50%) scale(1.01);
+  }
+
+  .daily-reward-close-btn:active {
+    transform: translate(50%, -50%) scale(0.99);
   }
 
   .daily-reward-modal__container {
@@ -11745,7 +11754,7 @@
       <h2 class="pets-title">PETS</h2>
     </div>
     <!-- Close button -->
-    <button id="pets-close-btn" class="pets-close-btn">X</button>
+    <button id="pets-close-btn" class="pets-close-btn" data-close="pets-modal">X</button>
 
     <div class="pets-container">
       <!-- Main Content: Left Details + Right Grid -->
@@ -11892,7 +11901,11 @@
 
   .pets-close-btn:hover {
     background: linear-gradient(135deg, rgba(255, 91, 107, 1), rgba(240, 60, 75, 1));
-    transform: translate(50%, -50%) scale(1.1);
+    transform: translate(50%, -50%) scale(1.01);
+  }
+
+  .pets-close-btn:active {
+    transform: translate(50%, -50%) scale(0.99);
   }
 
   /* Content wrapper */

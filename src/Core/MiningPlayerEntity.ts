@@ -26,9 +26,6 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
    * so we can safely create a convenience getter (like NewGame does).
    */
   public get playerController(): DefaultPlayerEntityController {
-    if (!this.controller) {
-      return {} as DefaultPlayerEntityController;
-    }
     return this.controller as DefaultPlayerEntityController;
   }
 
@@ -38,55 +35,29 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       name: 'Player',
     });
 
-    // Set up controller immediately - the method has retry logic if controller isn't ready yet
+    // Set up controller immediately - controller is always available in constructor
     this.setupMiningController();
   }
 
   /**
-   * Sets up the mining controller input handling
-   * Called after entity is spawned to ensure controller is ready
+   * Sets up the mining controller input handling.
+   * The controller is always available in the constructor for DefaultPlayerEntity.
    */
   private setupMiningController(): void {
-    try {
-      if (!this.controller) {
-        setTimeout(() => this.setupMiningController(), 100);
-        return;
-      }
+    // Prevent mouse left click from being cancelled, required for mining mechanics
+    this.playerController.autoCancelMouseLeftClick = false;
 
-      // Prevent mouse left click from being cancelled, required for mining mechanics
-      this.playerController.autoCancelMouseLeftClick = false;
+    // Use standard idle animations
+    this.applyStandardAnimations();
 
-      // Use standard idle animations
-      this.applyStandardAnimations();
+    // Set up movement control callbacks
+    this.playerController.canWalk = () => !this.inputSuppressed;
+    this.playerController.canRun = () => !this.inputSuppressed;
+    this.playerController.canJump = () => !this.inputSuppressed;
+    this.playerController.canSwim = () => !this.inputSuppressed;
 
-      // Set up movement control callbacks - these are checked by the SDK BEFORE processing movement
-      // This is the proper way to disable movement (not zeroing input keys in event handler)
-      this.playerController.canWalk = () => !this.inputSuppressed;
-      this.playerController.canRun = () => !this.inputSuppressed;
-      this.playerController.canJump = () => !this.inputSuppressed;
-      this.playerController.canSwim = () => !this.inputSuppressed;
-
-      // Setup input handler for mining
-      this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
-
-    } catch (error) {
-      console.error('[MiningPlayerEntity] Error setting up controller:', error);
-      setTimeout(() => {
-        try {
-          if (this.controller) {
-            this.playerController.autoCancelMouseLeftClick = false;
-            this.applyStandardAnimations();
-            this.playerController.canWalk = () => !this.inputSuppressed;
-            this.playerController.canRun = () => !this.inputSuppressed;
-            this.playerController.canJump = () => !this.inputSuppressed;
-            this.playerController.canSwim = () => !this.inputSuppressed;
-            this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
-          }
-        } catch (retryError) {
-          console.error('[MiningPlayerEntity] Error in retry setup:', retryError);
-        }
-      }, 300);
-    }
+    // Setup input handler for mining
+    this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
   }
 
   /**

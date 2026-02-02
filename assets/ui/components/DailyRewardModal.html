@@ -99,8 +99,17 @@
     height: 40px;
     border-radius: 8px;
     cursor: pointer;
+    transition: all 0.2s ease;
     z-index: 100;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+  }
+
+  .daily-reward-close-btn:hover {
+    transform: translate(50%, -50%) scale(1.01);
+  }
+
+  .daily-reward-close-btn:active {
+    transform: translate(50%, -50%) scale(0.99);
   }
 
   .daily-reward-modal__container {

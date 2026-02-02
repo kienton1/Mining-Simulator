@@ -1502,7 +1502,7 @@
     // Setup modal close handlers
     document.addEventListener('click', (e) => {
       // Use closest to find the close button (handles clicks on text/children inside button)
-      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close, .daily-reward-close-btn, .reward-close-btn');
+      const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, .maps-modal__close, .daily-reward-close-btn, .reward-close-btn, .pets-close-btn');
 
       if (closeButton) {
         const modalId = closeButton.getAttribute('data-close');

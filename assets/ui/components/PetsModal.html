@@ -21,7 +21,7 @@
       <h2 class="pets-title">PETS</h2>
     </div>
     <!-- Close button -->
-    <button id="pets-close-btn" class="pets-close-btn">X</button>
+    <button id="pets-close-btn" class="pets-close-btn" data-close="pets-modal">X</button>
 
     <div class="pets-container">
       <!-- Main Content: Left Details + Right Grid -->
@@ -168,7 +168,11 @@
 
   .pets-close-btn:hover {
     background: linear-gradient(135deg, rgba(255, 91, 107, 1), rgba(240, 60, 75, 1));
-    transform: translate(50%, -50%) scale(1.1);
+    transform: translate(50%, -50%) scale(1.01);
+  }
+
+  .pets-close-btn:active {
+    transform: translate(50%, -50%) scale(0.99);
   }
 
   /* Content wrapper */
