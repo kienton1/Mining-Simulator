@@ -56,7 +56,7 @@ import { WorldRegistry } from './src/WorldRegistry';
 import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
 import { ISLAND3_CONFIG } from './src/worldData/Island3Config';
-import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from './src/Core/GameConstants';
+import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, CAMERA_DEFAULT_ZOOM, CAMERA_MODAL_ZOOM, CAMERA_ZOOM_TRANSITION_MS, CAMERA_ZOOM_STEP_INTERVAL } from './src/Core/GameConstants';
 import { DailyChestEntity } from './src/DailyReward/DailyChestEntity';
 import { DailyChestLabelManager } from './src/DailyReward/DailyChestLabelManager';
 import { DailyChestController } from './src/DailyReward/DailyChestController';
@@ -647,26 +647,36 @@ startServer(world => {
     // Set and lock camera zoom (zoom out a bit and prevent player from changing it)
     // Wait a moment for camera to initialize
     setTimeout(() => {
-      const LOCKED_ZOOM = .6; // Zoom out a bit (1.0 = first person, higher = more zoomed out)
-      player.camera.setZoom(LOCKED_ZOOM);
-      
+      player.camera.setZoom(CAMERA_DEFAULT_ZOOM);
+
       // Store the locked zoom value on the player object
-      (player as any).__lockedZoom = LOCKED_ZOOM;
-      
+      (player as any).__lockedZoom = CAMERA_DEFAULT_ZOOM;
+
+      // Only set target zoom if not already set (prevents overwriting early modal opens)
+      if ((player as any).__targetZoom === undefined) {
+        (player as any).__targetZoom = CAMERA_DEFAULT_ZOOM;
+      }
+
+      // Only set transition flag if not already set
+      if ((player as any).__zoomTransitionActive === undefined) {
+        (player as any).__zoomTransitionActive = false;
+      }
+
       // Continuously enforce the zoom level (lock it) - check very frequently
+      // Skip enforcement during transitions to allow smooth animation
       const zoomLockInterval = setInterval(() => {
+        // Don't enforce zoom during transitions
+        if ((player as any).__zoomTransitionActive) return;
+
         const currentZoom = player.camera.zoom;
-        const lockedZoom = (player as any).__lockedZoom;
-        
-        // Always set it, even if it matches (ensures it stays locked)
-        if (Math.abs(currentZoom - lockedZoom) > 0.01) {
-          player.camera.setZoom(lockedZoom);
-        } else {
-          // Even if it matches, set it again to prevent any changes
-          player.camera.setZoom(lockedZoom);
+        const targetZoom = (player as any).__targetZoom ?? CAMERA_DEFAULT_ZOOM;
+
+        // Enforce zoom to target level
+        if (Math.abs(currentZoom - targetZoom) > 0.01) {
+          player.camera.setZoom(targetZoom);
         }
       }, 16); // Check every 16ms (~60fps) for maximum responsiveness
-      
+
       // Store interval ID for cleanup
       (player as any).__zoomLockInterval = zoomLockInterval;
 
@@ -784,6 +794,56 @@ startServer(world => {
       }
     }, 2000);
     
+    /**
+     * Helper function to smoothly transition camera zoom with ease-out animation
+     */
+    const transitionCameraZoom = (targetZoom: number) => {
+      // Clear any existing transition
+      const existingTimeout = (player as any).__zoomTransitionTimeout;
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      const startZoom = player.camera.zoom;
+      const startTime = Date.now();
+
+      (player as any).__zoomTransitionActive = true;
+      (player as any).__targetZoom = targetZoom;
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / CAMERA_ZOOM_TRANSITION_MS, 1);
+
+        // Ease-out function: 1 - (1 - t)^2
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const currentZoom = startZoom + (targetZoom - startZoom) * eased;
+
+        player.camera.setZoom(currentZoom);
+
+        if (progress < 1) {
+          (player as any).__zoomTransitionTimeout = setTimeout(animate, CAMERA_ZOOM_STEP_INTERVAL);
+        } else {
+          (player as any).__zoomTransitionActive = false;
+          player.camera.setZoom(targetZoom);
+        }
+      };
+
+      animate();
+    };
+
+    /**
+     * Helper function to check if any modal is currently open for the player
+     */
+    const isAnyModalOpen = (): boolean => {
+      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'egg', 'reward', 'goldenMachine', 'maps'] as const;
+      for (const modalType of modalTypes) {
+        if (gameManager.getModalState(player, modalType)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     // Set up per-player UI event handler (as per Hytopia SDK guide)
     // This listens for data sent from this specific player's UI
     player.ui.on(PlayerUIEvent.DATA, ({ playerUI, data }) => {
@@ -1007,7 +1067,13 @@ startServer(world => {
         case 'MODAL_OPENED':
 
           if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps') {
+            // Check if any modal was already open before setting new state
+            const wasAnyModalOpen = isAnyModalOpen();
             gameManager.setModalState(player, data.modalType, true);
+            // Zoom out when first modal opens
+            if (!wasAnyModalOpen) {
+              transitionCameraZoom(CAMERA_MODAL_ZOOM);
+            }
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
             if (miningController && miningController.isPlayerMining(player)) {
@@ -1022,8 +1088,12 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, false);
+            // Zoom back to default when all modals are closed
+            if (!isAnyModalOpen()) {
+              transitionCameraZoom(CAMERA_DEFAULT_ZOOM);
+            }
           }
           break;
         case 'REQUEST_PET_STATE':
@@ -2078,7 +2148,13 @@ startServer(world => {
     if (zoomLockInterval) {
       clearInterval(zoomLockInterval);
     }
-    
+
+    // Clean up zoom transition timeout
+    const zoomTransitionTimeout = (player as any).__zoomTransitionTimeout;
+    if (zoomTransitionTimeout) {
+      clearTimeout(zoomTransitionTimeout);
+    }
+
     // Clean up pickaxe entity
     pickaxeManager.cleanupPlayer(player);
     

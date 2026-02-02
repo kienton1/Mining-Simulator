@@ -279,3 +279,11 @@ export const ISLAND3_SHARED_MINE_SHAFT = {
  * Keep large enough to avoid accidental overlap between players.
  */
 export const MINE_INSTANCE_SPACING = 256;
+
+/**
+ * Camera System Constants
+ */
+export const CAMERA_DEFAULT_ZOOM = 0.6;
+export const CAMERA_MODAL_ZOOM = 0.5;  // Lower value = more zoomed out (camera further away)
+export const CAMERA_ZOOM_TRANSITION_MS = 200;
+export const CAMERA_ZOOM_STEP_INTERVAL = 16;

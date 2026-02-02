@@ -267,6 +267,7 @@ export class GameManager {
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
+      achievementsModalOpen: false,
       eggModalOpen: false,
       rewardModalOpen: false,
       mapsModalOpen: false,
@@ -1102,6 +1103,31 @@ export class GameManager {
    */
   getPlayerModalState(player: Player): PlayerModalState | undefined {
     return this.playerModalStates.get(player);
+  }
+
+  /**
+   * Gets the open state of a specific modal for a player
+   *
+   * @param player - Player to check
+   * @param modalType - Type of modal to check
+   * @returns True if the modal is open, false otherwise
+   */
+  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps'): boolean {
+    const modalState = this.playerModalStates.get(player);
+    if (!modalState) return false;
+
+    switch (modalType) {
+      case 'miner': return modalState.minerModalOpen;
+      case 'pickaxe': return modalState.pickaxeModalOpen;
+      case 'rebirth': return modalState.rebirthModalOpen;
+      case 'pets': return modalState.petsModalOpen;
+      case 'achievements': return modalState.achievementsModalOpen;
+      case 'egg': return modalState.eggModalOpen;
+      case 'reward': return modalState.rewardModalOpen;
+      case 'goldenMachine': return modalState.goldenMachineModalOpen;
+      case 'maps': return modalState.mapsModalOpen;
+      default: return false;
+    }
   }
 
   /**

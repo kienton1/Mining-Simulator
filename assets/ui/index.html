@@ -4239,12 +4239,10 @@
         // Progress fill element (fills from bottom based on progress)
         const progressFill = document.createElement('div');
         progressFill.className = 'ach-cat-btn__progress';
-        // Calculate progress percentage based on next unclaimed achievement
-        // If canClaim is true, don't show progress fill (show 0%) since the badge indicates action needed
-        const nextItem = Array.isArray(cat.items) ? cat.items.find(item => !item.claimed) : null;
-        const progressPct = nextItem
-          ? (nextItem.canClaim ? 0 : nextItem.progressPct)
-          : 100;
+        // Calculate progress percentage as claimed / total achievements
+        const totalItems = Array.isArray(cat.items) ? cat.items.length : 0;
+        const claimedCount = Number(cat.claimedCount || 0);
+        const progressPct = totalItems > 0 ? Math.round((claimedCount / totalItems) * 100) : 0;
         progressFill.style.height = `${progressPct}%`;
         btn.appendChild(progressFill);
 
@@ -4786,6 +4784,8 @@
         el.style.display = 'none';
       } else if (el.id === 'golden-machine-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'goldenMachine' });
+      } else if (el.id === 'maps-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'maps' });
       }
       
       // Check if any modals are still open, if not, remove body.modal-open
@@ -12656,7 +12656,7 @@
 
   .achievements-wrapper {
     position: relative;
-    width: 956px;
+    width: fit-content;
     max-width: 95vw;
     font-family: "Fredoka", sans-serif;
     margin-top: 40px;
@@ -12753,7 +12753,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    padding: 24px;
+    padding: 32px;
     margin-top: 10px;
     justify-content: center;
     width: 100%;
@@ -12801,7 +12801,7 @@
     background: var(--cat-color, #dc3545);
     transition: height 0.3s ease;
     z-index: 0;
-    border-radius: 0 0 10px 10px;
+    border-radius: 10px;
   }
 
   /* Category-specific colors */
@@ -12816,8 +12816,8 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 110px;
-    height: 110px;
+    width: 200px;
+    height: 200px;
     object-fit: contain;
     z-index: 1;
     filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
@@ -12982,10 +12982,11 @@
   .achievements-list::-webkit-scrollbar-thumb { background: rgba(139, 69, 19, 0.6); border-radius: 3px; }
 
   /* Mobile */
-  body.mobile .achievements-wrapper { margin-top: 20px; }
+  body.mobile .achievements-wrapper { margin-top: 20px; max-width: 90vw; }
+  body.mobile .achievements-container { height: auto; min-height: auto; max-height: 60vh; }
   body.mobile .achievements-categories { gap: 10px; padding: 16px; }
-  body.mobile .ach-cat-btn { width: 100px; }
-  body.mobile .ach-cat-btn__icon { width: 70px; height: 70px; }
+  body.mobile .ach-cat-btn { width: 120px; }
+  body.mobile .ach-cat-btn__icon { width: 140px; height: 140px; }
   body.mobile .ach-cat-btn__rank-num { font-size: 24px; }
   body.mobile .ach-cat-btn__rank-label { font-size: 11px; margin-bottom: 6px; }
   body.mobile .achievements-list { grid-template-columns: 1fr; }

@@ -3540,12 +3540,10 @@
         // Progress fill element (fills from bottom based on progress)
         const progressFill = document.createElement('div');
         progressFill.className = 'ach-cat-btn__progress';
-        // Calculate progress percentage based on next unclaimed achievement
-        // If canClaim is true, don't show progress fill (show 0%) since the badge indicates action needed
-        const nextItem = Array.isArray(cat.items) ? cat.items.find(item => !item.claimed) : null;
-        const progressPct = nextItem
-          ? (nextItem.canClaim ? 0 : nextItem.progressPct)
-          : 100;
+        // Calculate progress percentage as claimed / total achievements
+        const totalItems = Array.isArray(cat.items) ? cat.items.length : 0;
+        const claimedCount = Number(cat.claimedCount || 0);
+        const progressPct = totalItems > 0 ? Math.round((claimedCount / totalItems) * 100) : 0;
         progressFill.style.height = `${progressPct}%`;
         btn.appendChild(progressFill);
 
@@ -4087,6 +4085,8 @@
         el.style.display = 'none';
       } else if (el.id === 'golden-machine-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'goldenMachine' });
+      } else if (el.id === 'maps-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'maps' });
       }
       
       // Check if any modals are still open, if not, remove body.modal-open
