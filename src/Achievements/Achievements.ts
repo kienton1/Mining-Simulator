@@ -30,6 +30,7 @@ export type AchievementsUICategory = {
   name: string;
   icon: string; // assets path under CDN
   claimableCount: number;
+  claimedCount: number; // number of claimed achievements in this category
   items: AchievementsUIItem[];
 };
 
@@ -225,8 +226,7 @@ const TRACKS: TrackDef[] = [
   {
     id: 'time',
     name: 'Time Played',
-    // Per request: use Miner icon in the category grid
-    icon: 'icons/HUDIcons/MinerIcon.png',
+    icon: 'icons/HUDIcons/TimerIcon.png',
     rewardText: '',
     requirementPrefix: 'Play For',
     thresholds: [
@@ -476,6 +476,7 @@ export function buildAchievementsUIState(data: PlayerData): { bonuses: Achieveme
       name: track.name,
       icon: track.icon,
       claimableCount,
+      claimedCount,
       items,
     };
   });

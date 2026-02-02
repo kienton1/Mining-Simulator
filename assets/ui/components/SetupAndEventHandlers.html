@@ -2612,12 +2612,13 @@
       if (dailyRewardModal) {
         hideModal(dailyRewardModal);
         stopDailyRewardAnimation();
-        hytopia.sendData({ type: 'DAILY_REWARD_MODAL_CLOSED' });
-        // Reset animation state for next open
+        // Mark as user-closed to prevent reopening while in proximity
         if (state.dailyReward) {
+          state.dailyReward.userClosed = true;
           state.dailyReward.animationComplete = false;
           state.dailyReward.lastResult = null;
         }
+        hytopia.sendData({ type: 'DAILY_REWARD_MODAL_CLOSED' });
       }
     };
 
@@ -3533,14 +3534,41 @@
       categories.forEach((cat) => {
         const btn = document.createElement('button');
         btn.className = 'ach-cat-btn';
+        btn.setAttribute('data-category', cat.id);
         btn.setAttribute('tabindex', '-1');
 
+        // Progress fill element (fills from bottom based on progress)
+        const progressFill = document.createElement('div');
+        progressFill.className = 'ach-cat-btn__progress';
+        // Calculate progress percentage based on next unclaimed achievement
+        // If canClaim is true, don't show progress fill (show 0%) since the badge indicates action needed
+        const nextItem = Array.isArray(cat.items) ? cat.items.find(item => !item.claimed) : null;
+        const progressPct = nextItem
+          ? (nextItem.canClaim ? 0 : nextItem.progressPct)
+          : 100;
+        progressFill.style.height = `${progressPct}%`;
+        btn.appendChild(progressFill);
+
+        // Icon
         const img = document.createElement('img');
         img.className = 'ach-cat-btn__icon';
         img.alt = cat.name || 'Category';
         img.src = `${cdn}/${cat.icon}`;
         btn.appendChild(img);
 
+        // Rank number
+        const rankNum = document.createElement('div');
+        rankNum.className = 'ach-cat-btn__rank-num';
+        rankNum.textContent = String(cat.claimedCount || 0);
+        btn.appendChild(rankNum);
+
+        // Rank label
+        const rankLabel = document.createElement('div');
+        rankLabel.className = 'ach-cat-btn__rank-label';
+        rankLabel.textContent = 'Rank';
+        btn.appendChild(rankLabel);
+
+        // Notification badge (shows count of claimable achievements)
         const badge = document.createElement('div');
         badge.className = 'ach-cat-btn__badge';
         const claimable = Number(cat.claimableCount ?? 0) || 0;
@@ -5672,6 +5700,10 @@
           break;
         }
         case 'DAILY_REWARD_OPEN': {
+          // Don't reopen if user manually closed while still in proximity
+          if (state.dailyReward?.userClosed) {
+            break;
+          }
           const dailyRewardModal = document.getElementById('daily-reward-modal');
           if (dailyRewardModal) {
             showModal(dailyRewardModal);
@@ -5681,6 +5713,11 @@
         }
         case 'DAILY_REWARD_CLOSE': {
           closeDailyRewardModal();
+          // Reset userClosed flag AFTER closing, since closeDailyRewardModal() sets it to true
+          // This allows the modal to reopen when player re-enters proximity
+          if (state.dailyReward) {
+            state.dailyReward.userClosed = false;
+          }
           break;
         }
         case 'DAILY_REWARD_RESULT': {

@@ -59,8 +59,8 @@
   }
 
   .achievements-container {
-    background: linear-gradient(180deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
-    border: 3px solid rgba(139, 69, 19, 0.9);
+    background: linear-gradient(180deg, #1e3a5f, #152238);
+    border: 4px solid #1a1a2e;
     border-radius: 16px;
     padding: 0;
     width: 100%;
@@ -146,68 +146,117 @@
   }
 
   .achievements-categories {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 12px;
-    padding: 18px;
+    padding: 24px;
     margin-top: 10px;
+    justify-content: center;
+    width: 100%;
   }
 
   .ach-cat-btn {
     position: relative;
+    aspect-ratio: 1;
+    width: 160px;
     border-radius: 14px;
-    border: 3px solid rgba(0, 0, 0, 0.55);
-    background: rgba(0, 0, 0, 0.25);
-    padding: 10px 8px;
+    border: 4px solid #1a1a2e;
+    background: #2d4a6a;
+    padding: 0;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    overflow: visible;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    height: 88px;
+    justify-content: flex-start;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
+  /* Inner border effect */
   .ach-cat-btn::before {
     content: "";
     position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: url("{{CDN_ASSETS_URL}}/icons/ThunbnailBackground.png") center/200% auto no-repeat;
-    filter: saturate(0.35);
-    z-index: 0;
+    inset: 3px;
+    border: 3px solid rgba(100, 160, 200, 0.5);
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 2;
   }
-
-  .ach-cat-btn > * { position: relative; z-index: 1; }
 
   .ach-cat-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
   }
 
+  /* Progress fill container */
+  .ach-cat-btn__progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--cat-color, #dc3545);
+    transition: height 0.3s ease;
+    z-index: 0;
+    border-radius: 0 0 10px 10px;
+  }
+
+  /* Category-specific colors */
+  .ach-cat-btn[data-category="pickaxe"] { --cat-color: #dc3545; }
+  .ach-cat-btn[data-category="power"] { --cat-color: #d97706; }
+  .ach-cat-btn[data-category="coins"] { --cat-color: #eab308; }
+  .ach-cat-btn[data-category="eggs"] { --cat-color: #06b6d4; }
+  .ach-cat-btn[data-category="time"] { --cat-color: #22c55e; }
+
   .ach-cat-btn__icon {
-    width: 48px;
-    height: 48px;
+    width: 80px;
+    height: 80px;
     object-fit: contain;
-    transform: scale(1.2);
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+    margin-top: 14px;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  }
+
+  .ach-cat-btn__rank-num {
+    font-size: 32px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+    position: relative;
+    z-index: 1;
+    line-height: 1;
+  }
+
+  .ach-cat-btn__rank-label {
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    position: relative;
+    z-index: 1;
+    text-transform: uppercase;
   }
 
   .ach-cat-btn__badge {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid #fff;
+    top: -8px;
+    right: -8px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: 8px;
+    border: 3px solid #fff;
     background: #e53935;
     color: #fff;
     font-weight: 900;
-    font-size: 13px;
+    font-size: 14px;
     display: none;
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    z-index: 10;
   }
 
   .achievements-detail-header {
@@ -327,7 +376,12 @@
 
   /* Mobile */
   body.mobile .achievements-wrapper { margin-top: 20px; }
-  body.mobile .achievements-categories { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.mobile .achievements-categories { gap: 10px; padding: 16px; }
+  body.mobile .ach-cat-btn { width: 120px; }
+  body.mobile .ach-cat-btn__icon { width: 56px; height: 56px; margin-top: 10px; }
+  body.mobile .ach-cat-btn__icon { width: 48px; height: 48px; margin-top: 8px; }
+  body.mobile .ach-cat-btn__rank-num { font-size: 24px; }
+  body.mobile .ach-cat-btn__rank-label { font-size: 12px; }
   body.mobile .achievements-list { grid-template-columns: 1fr; }
 </style>
 
