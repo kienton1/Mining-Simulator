@@ -52,7 +52,7 @@
 
   .achievements-wrapper {
     position: relative;
-    width: 900px;
+    width: 956px;
     max-width: 95vw;
     font-family: "Fredoka", sans-serif;
     margin-top: 40px;
@@ -158,7 +158,7 @@
   .ach-cat-btn {
     position: relative;
     aspect-ratio: 1;
-    width: 160px;
+    width: 168px;
     border-radius: 14px;
     border: 4px solid #1a1a2e;
     background: #2d4a6a;
@@ -168,7 +168,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: flex-end;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
@@ -208,23 +208,25 @@
   .ach-cat-btn[data-category="time"] { --cat-color: #22c55e; }
 
   .ach-cat-btn__icon {
-    width: 80px;
-    height: 80px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 110px;
+    height: 110px;
     object-fit: contain;
-    margin-top: 14px;
-    position: relative;
     z-index: 1;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
   }
 
   .ach-cat-btn__rank-num {
-    font-size: 32px;
+    font-size: 36px;
     font-weight: 900;
     color: #fff;
     -webkit-text-stroke: 3px #000;
     paint-order: stroke fill;
     position: relative;
-    z-index: 1;
+    z-index: 3;
     line-height: 1;
   }
 
@@ -235,8 +237,9 @@
     -webkit-text-stroke: 2px #000;
     paint-order: stroke fill;
     position: relative;
-    z-index: 1;
+    z-index: 3;
     text-transform: uppercase;
+    margin-bottom: 8px;
   }
 
   .ach-cat-btn__badge {
@@ -377,11 +380,10 @@
   /* Mobile */
   body.mobile .achievements-wrapper { margin-top: 20px; }
   body.mobile .achievements-categories { gap: 10px; padding: 16px; }
-  body.mobile .ach-cat-btn { width: 120px; }
-  body.mobile .ach-cat-btn__icon { width: 56px; height: 56px; margin-top: 10px; }
-  body.mobile .ach-cat-btn__icon { width: 48px; height: 48px; margin-top: 8px; }
+  body.mobile .ach-cat-btn { width: 100px; }
+  body.mobile .ach-cat-btn__icon { width: 70px; height: 70px; }
   body.mobile .ach-cat-btn__rank-num { font-size: 24px; }
-  body.mobile .ach-cat-btn__rank-label { font-size: 12px; }
+  body.mobile .ach-cat-btn__rank-label { font-size: 11px; margin-bottom: 6px; }
   body.mobile .achievements-list { grid-template-columns: 1fr; }
 </style>
 
