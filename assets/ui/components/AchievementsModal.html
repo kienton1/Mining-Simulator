@@ -139,6 +139,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   /* Ensure the HTML `hidden` attribute actually hides views (author CSS overrides UA defaults). */
@@ -151,9 +152,14 @@
     flex-wrap: wrap;
     gap: 12px;
     padding: 32px;
+    padding-right: 36px;
     margin-top: 10px;
     justify-content: center;
     width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
   }
 
   .ach-cat-btn {
@@ -297,8 +303,11 @@
 
   .achievements-list {
     padding: 14px;
+    padding-right: 18px;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
+    flex: 1;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
@@ -374,18 +383,30 @@
   }
 
   /* Scrollbar */
-  .achievements-list::-webkit-scrollbar { width: 6px; }
-  .achievements-list::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
-  .achievements-list::-webkit-scrollbar-thumb { background: rgba(139, 69, 19, 0.6); border-radius: 3px; }
+  .achievements-list::-webkit-scrollbar,
+  .achievements-categories::-webkit-scrollbar { width: 6px; }
+  .achievements-list::-webkit-scrollbar-track,
+  .achievements-categories::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
+  .achievements-list::-webkit-scrollbar-thumb,
+  .achievements-categories::-webkit-scrollbar-thumb { background: rgba(139, 69, 19, 0.6); border-radius: 3px; }
+
+  /* Mobile scrolling */
+  body.mobile .achievements-categories,
+  body.mobile .achievements-categories *,
+  body.mobile .achievements-list,
+  body.mobile .achievements-list * {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
 
   /* Mobile */
   body.mobile .achievements-wrapper { margin-top: 20px; max-width: 90vw; }
-  body.mobile .achievements-container { height: auto; min-height: auto; max-height: 60vh; }
+  body.mobile .achievements-container { height: auto; min-height: auto; max-height: 60vh; min-width: 85vw; }
   body.mobile .achievements-categories { gap: 10px; padding: 16px; }
   body.mobile .ach-cat-btn { width: 120px; }
   body.mobile .ach-cat-btn__icon { width: 140px; height: 140px; }
   body.mobile .ach-cat-btn__rank-num { font-size: 24px; }
   body.mobile .ach-cat-btn__rank-label { font-size: 11px; margin-bottom: 6px; }
-  body.mobile .achievements-list { grid-template-columns: 1fr; }
+  body.mobile .achievements-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 </style>
 

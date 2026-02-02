@@ -246,19 +246,28 @@
     padding: 14px;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .gm-grid {
-    height: 100%;
+    flex: 1;
     overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    overflow-x: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
     gap: 12px;
-    padding-right: 6px;
+    padding: 4px;
+    padding-right: 8px;
+    min-height: 0;
   }
 
   .gm-pet-tile {
-    aspect-ratio: 1;
+    width: 92px;
+    height: 92px;
+    flex-shrink: 0;
     border-radius: 12px;
     border: 4px solid rgba(0, 0, 0, 0.7);
     cursor: pointer;
@@ -385,7 +394,16 @@
   .gm-grid::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
   .gm-grid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.35); border-radius: 4px; }
 
+  /* Mobile scrolling */
+  body.mobile .gm-right,
+  body.mobile .gm-right *,
+  body.mobile .gm-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
   body.mobile .gm-wrapper { width: 96vw; }
+  body.mobile .gm-pet-tile { width: 75px; height: 75px; }
   body.mobile .gm-left { width: 200px; min-width: 200px; }
   body.mobile .gm-chance__value { font-size: 44px; }
   body.mobile .gm-btn { font-size: 18px; }

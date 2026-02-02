@@ -368,11 +368,13 @@
   }
 
   .pets-grid-container {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    padding-right: 4px;
     min-height: 0;
-    height: 100%;
   }
 
   .pets-grid {
@@ -822,7 +824,10 @@
   }
 
   /* Mobile scrolling */
-  body.mobile .pets-grid-container {
+  body.mobile .pets-right-panel,
+  body.mobile .pets-right-panel *,
+  body.mobile .pets-grid-container,
+  body.mobile .pets-grid {
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch !important;
   }

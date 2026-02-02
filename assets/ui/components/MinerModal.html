@@ -271,6 +271,9 @@
 
   .miner-stat-row__value {
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .miner-stat-row__value--power { color: #ff5252; }
@@ -364,7 +367,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 120px;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    min-height: 0;
   }
 
   .miner-card:hover {
@@ -457,6 +462,16 @@
     font-size: 11px;
     color: #ffd700;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .miner-card__cost .coin-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 0;
   }
 
   .miner-empty {
@@ -573,7 +588,7 @@
   }
 
   body.mobile .miner-card {
-    min-height: 90px;
+    aspect-ratio: 1 / 1;
     padding: 6px;
   }
 
@@ -593,6 +608,11 @@
 
   body.mobile .miner-card__cost {
     font-size: 8px;
+  }
+
+  body.mobile .miner-card__cost .coin-icon {
+    width: 10px;
+    height: 10px;
   }
 </style>
 
@@ -635,6 +655,7 @@
         minerOverlay.classList.remove("visible");
         wrapper.classList.remove("closing");
       }, 400);
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'miner' });
       if (window.setModalOpen) window.setModalOpen(false);
     }
 

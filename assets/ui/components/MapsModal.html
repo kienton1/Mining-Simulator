@@ -473,6 +473,7 @@
         mapsOverlay.classList.remove("visible");
         wrapper.classList.remove("closing");
       }, 400);
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'maps' });
       if (window.setModalOpen) window.setModalOpen(false);
     }
 
