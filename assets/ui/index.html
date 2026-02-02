@@ -3958,22 +3958,30 @@
 
 // Keep cumulative rotation so the wheel doesn't snap between spins
 let gmSpinAccumDeg = 0;
+let gmActiveSpinId = null;
 
 // Helper math
 const gmClamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const gmMod360 = (deg) => ((deg % 360) + 360) % 360;
-const gmRand = (a, b) => a + Math.random() * (b - a);
 
-// Show wheel with correct gradient orientation.
-// IMPORTANT: This orientation MUST match gmSpinWheel math below.
-const gmShowWheelPending = (chancePercent) => {
-  // If you have the scoped version (getGmElement), use it.
-  // Otherwise these fallbacks still work.
+// IMPORTANT: We define wheel coordinates as:
+// - Pointer is at TOP
+// - conic-gradient uses "from -90deg" so 0deg is TOP
+// - When the wheel is rotated by +R degrees (clockwise), the angle under the pointer becomes (-R mod 360)
+const gmAngleAtPointerFromRotation = (rotationDeg) => gmMod360(-gmMod360(rotationDeg));
+
+const gmGetEls = () => {
   const wheelEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel') : document.getElementById('gm-wheel');
   const wheelDiskEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-disk') : document.getElementById('gm-wheel-disk');
   const wheelTextEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-text') : document.getElementById('gm-wheel-text');
   const gridEl = (typeof getGmElement === 'function') ? getGmElement('gm-grid') : document.getElementById('gm-grid');
+  return { wheelEl, wheelDiskEl, wheelTextEl, gridEl };
+};
 
+// Show wheel with correct gradient orientation.
+// MUST match gmSpinWheel math (from -90deg so 0deg is at TOP).
+const gmShowWheelPending = (chancePercent) => {
+  const { wheelEl, wheelDiskEl, wheelTextEl, gridEl } = gmGetEls();
   if (!wheelEl || !wheelDiskEl) return;
 
   const pct = gmClamp(Number(chancePercent) || 0, 0, 100);
@@ -3981,17 +3989,18 @@ const gmShowWheelPending = (chancePercent) => {
 
   // Reset any in-progress transition
   wheelDiskEl.style.transition = 'none';
+
+  // Keep visual state consistent with accumulated rotation
   wheelDiskEl.style.transform = `rotate(${gmMod360(gmSpinAccumDeg)}deg)`;
 
-  // ✅ Green begins at TOP (pointer) because from 0deg means 0deg is at 12:00
+  // ✅ 0deg at TOP (pointer) because from -90deg sets start at 12:00
   wheelDiskEl.style.background =
-    `conic-gradient(from 0deg,
-      #22c55e 0deg,
-      #22c55e ${greenDeg}deg,
-      #ef4444 ${greenDeg}deg,
-      #ef4444 360deg)`;
-
-  // Force reflow so next transition definitely animates
+  `conic-gradient(from -90deg,
+    #22c55e 0deg,
+    #22c55e ${greenDeg}deg,
+    #ef4444 ${greenDeg}deg,
+    #ef4444 360deg)`;
+  // Force reflow so next animation definitely runs
   wheelDiskEl.getBoundingClientRect();
 
   if (wheelTextEl) wheelTextEl.textContent = 'Rolling...';
@@ -3999,105 +4008,130 @@ const gmShowWheelPending = (chancePercent) => {
   if (gridEl) gridEl.hidden = true;
 };
 
-// Physics-based spin wheel with deceleration
-// Signature: gmSpinWheel(targetAngle, chancePercent, spinId)
-const gmSpinWheel = (targetAngle, chancePercent, spinId) => {
-  const wheelDiskEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-disk') : document.getElementById('gm-wheel-disk');
-  const wheelTextEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-text') : document.getElementById('gm-wheel-text');
-
+// Spin the wheel to land so that the pointer ends at targetPointerAngleDeg.
+// targetPointerAngleDeg is defined in the SAME coordinate system as the gradient:
+// - 0deg is TOP (pointer)
+// - angles increase clockwise around the wheel
+//
+// If backend gives you "targetAngle", it MUST mean this pointer-angle.
+// (i.e., what slice angle should end under the pointer at the end)
+const gmSpinWheel = (targetPointerAngleDeg, chancePercent, spinId) => {
+  const { wheelDiskEl, wheelTextEl } = gmGetEls();
   if (!wheelDiskEl) return;
+
+  // Cancel/ignore previous spins
+  gmActiveSpinId = spinId;
 
   const pct = gmClamp(Number(chancePercent) || 0, 0, 100);
   const greenDeg = pct * 3.6;
-  const targetAngleDeg = gmMod360(Number(targetAngle) || 0);
 
-  // Physics parameters - tuned for natural deceleration
-  const INITIAL_VELOCITY = 12 + Math.random() * 8; // degrees per frame (randomized for variety)
-  const DECELERATION = 0.96; // Friction coefficient (0.96 = 4% reduction per frame)
-  const MIN_VELOCITY = 0.05; // Stop when velocity drops below this
-  const SNAP_THRESHOLD = 1.5; // Snap to target when within this distance
+  // Normalize target pointer angle
+  const targetPointer = gmMod360(Number(targetPointerAngleDeg) || 0);
 
-  // Calculate total rotation needed to reach target angle
-  // Add multiple full spins for visual effect (6-8 spins)
-  const spins = 6 + Math.floor(Math.random() * 3);
-  const totalRotation = spins * 360 + targetAngleDeg;
-  
+  // Compute what rotation modulo 360 achieves that pointer angle:
+  // angleAtPointer = (-rotation mod 360) == targetPointer
+  // => rotationMod360 == -targetPointer (mod 360)
+  const desiredRotationMod360 = gmMod360(-targetPointer);
+
   // Start from current accumulated rotation
   const startRotation = gmSpinAccumDeg;
-  let accumulatedRotation = 0;
+  const startRotationMod360 = gmMod360(startRotation);
+
+  // Choose extra spins for flair
+  const spins = 6 + Math.floor(Math.random() * 3);
+
+  // Compute smallest clockwise delta to reach desiredRotationMod360, then add full spins
+  const deltaToDesired = gmMod360(desiredRotationMod360 - startRotationMod360);
+  const totalRotationDelta = spins * 360 + deltaToDesired;
+
+  // Physics-ish params
+  const INITIAL_VELOCITY = 14 + Math.random() * 6; // degrees/frame
+  const DECELERATION = 0.965;                      // friction
+  const MIN_VELOCITY = 0.02;
+  const SNAP_THRESHOLD = 0.15;
+
+  let progressed = 0;
   let velocity = INITIAL_VELOCITY;
-  let animationId = null;
-  
-  // Remove any existing transition
+  let rafId = null;
+
   wheelDiskEl.style.transition = 'none';
   if (wheelTextEl) wheelTextEl.textContent = 'Spinning...';
 
-  // Physics-based animation loop
   const animate = () => {
-    // Apply velocity (accumulate rotation)
-    accumulatedRotation += velocity;
-    
-    // Apply deceleration (friction)
-    velocity *= DECELERATION;
-    
-    // Update visual rotation
-    const currentRotation = startRotation + accumulatedRotation;
-    wheelDiskEl.style.transform = `rotate(${currentRotation}deg)`;
-    
-    // Calculate remaining rotation to target
-    const remainingRotation = totalRotation - accumulatedRotation;
-    const distanceToTarget = Math.abs(remainingRotation);
-    
-    // Check if we should stop
-    if (velocity < MIN_VELOCITY || distanceToTarget < SNAP_THRESHOLD) {
-      // Cancel animation frame if still running
-      if (animationId !== null) {
-        cancelAnimationFrame(animationId);
-      }
-      
-      // Snap to final position
-      const finalRotation = startRotation + totalRotation;
-      wheelDiskEl.style.transform = `rotate(${finalRotation}deg)`;
-      gmSpinAccumDeg = finalRotation;
-      
-      // Calculate result: when wheel rotates by targetAngle, the segment at (360 - targetAngle) mod 360
-      // ends up at the pointer (0 degrees). So we check what segment is at that position.
-      const finalTargetAngle = gmMod360(targetAngleDeg);
-      // The segment that ends up at pointer (0 degrees) is the one originally at (360 - finalTargetAngle) mod 360
-      const segmentAtPointer = gmMod360(360 - finalTargetAngle);
-      const didWin = segmentAtPointer >= 0 && segmentAtPointer < greenDeg;
-      
-      console.log('[Golden Machine] Wheel result:', {
-        targetAngle: finalTargetAngle,
-        segmentAtPointer: segmentAtPointer,
-        greenDeg: greenDeg,
-        didWin: didWin
-      });
-      
-      // Update UI text
-      if (wheelTextEl) wheelTextEl.textContent = didWin ? 'SUCCESS!' : 'FAILED!';
-      
-      // Send result to server for validation
-      hytopia.sendData({
-        type: 'GOLDEN_MACHINE_SPIN_RESULT',
-        spinId: spinId,
-        didWin: didWin,
-        finalAngle: segmentAtPointer, // Send the segment at pointer, not the target angle
-      });
-      
-      // Note: Server will respond with GOLDEN_MACHINE_RESULT containing token if won
-      // The result handling is done in the GOLDEN_MACHINE_RESULT handler
-      
-      return; // Stop animation
+    // If a newer spin started, stop this one
+    if (gmActiveSpinId !== spinId) {
+      if (rafId) cancelAnimationFrame(rafId);
+      return;
     }
-    
-    // Continue animation
-    animationId = requestAnimationFrame(animate);
+
+    progressed += velocity;
+    velocity *= DECELERATION;
+
+    // Clamp so we never overshoot wildly (optional safety)
+    if (progressed > totalRotationDelta) progressed = totalRotationDelta;
+
+    const currentRotation = startRotation + progressed;
+    wheelDiskEl.style.transform = `rotate(${currentRotation}deg)`;
+
+    const remaining = totalRotationDelta - progressed;
+
+    if (velocity < MIN_VELOCITY || remaining < SNAP_THRESHOLD) {
+      if (rafId) cancelAnimationFrame(rafId);
+
+      const finalRotation = startRotation + totalRotationDelta;
+
+      // Snap nicely
+      wheelDiskEl.style.transition = 'transform 0.18s ease-out';
+      wheelDiskEl.style.transform = `rotate(${finalRotation}deg)`;
+
+      gmSpinAccumDeg = finalRotation;
+
+      setTimeout(() => {
+        // If a newer spin started, don't finalize this one
+        if (gmActiveSpinId !== spinId) return;
+
+        wheelDiskEl.style.transition = 'none';
+
+        // ✅ Compute the ACTUAL angle under the pointer from final rotation
+        const angleAtPointer = gmAngleAtPointerFromRotation(gmSpinAccumDeg);
+
+        // ✅ Visual wedge is green from 0..greenDeg
+        const didWin = angleAtPointer >= 0 && angleAtPointer < greenDeg;
+
+        console.log('[Golden Machine] Wheel finalize:', {
+          spinId,
+          chancePercent: pct,
+          greenDeg,
+          targetPointer,
+          desiredRotationMod360,
+          startRotationMod360,
+          finalRotationMod360: gmMod360(gmSpinAccumDeg),
+          angleAtPointer,
+          didWin
+        });
+
+        if (wheelTextEl) wheelTextEl.textContent = didWin ? 'SUCCESS!' : 'FAILED!';
+
+        // IMPORTANT: If you want backend to be authoritative,
+        // send angleAtPointer and let server decide win/lose.
+        // (Server should ignore client "didWin" if it wants true authority.)
+        hytopia.sendData({
+          type: 'GOLDEN_MACHINE_SPIN_RESULT',
+          spinId,
+          angleAtPointer,
+          didWin
+        });
+      }, 180);
+
+      return;
+    }
+
+    rafId = requestAnimationFrame(animate);
   };
-  
-  // Start animation
-  animationId = requestAnimationFrame(animate);
+
+  rafId = requestAnimationFrame(animate);
 };
+
 
     const gmFormatPct = (value) => {
       const num = Number(value);
@@ -6489,17 +6523,32 @@ const gmSpinWheel = (targetAngle, chancePercent, spinId) => {
           state.goldenMachine.status = '';
           state.goldenMachine.view = 'wheel';
           state.goldenMachine.spinId = spinId;
-          renderGoldenMachine();
           
-          // Start physics-based spin animation
-          setTimeout(() => {
-            if (typeof gmSpinWheel === 'function') {
-              console.log('[Golden Machine] Starting wheel spin animation');
-              gmSpinWheel(targetAngle, chance, spinId);
-            } else {
-              console.error('[Golden Machine] gmSpinWheel function not found!');
-            }
-          }, 50);
+          // Show wheel UI but don't call renderGoldenMachine which would call gmShowWheelPending
+          // We'll let the spin animation handle the initial positioning
+          const { wheelEl, wheelDiskEl, wheelTextEl, gridEl } = gmGetEls();
+          if (wheelEl) wheelEl.hidden = false;
+          if (gridEl) gridEl.hidden = true;
+          if (wheelTextEl) wheelTextEl.textContent = 'Spinning...';
+          
+          // Update other UI elements without triggering wheel positioning
+          if (gmStatusEl) gmStatusEl.textContent = '';
+          // Format chance percentage
+          const formatPct = (value) => {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return '0%';
+            if (Math.abs(num % 1) < 1e-9) return `${Math.round(num)}%`;
+            return `${num.toFixed(1).replace(/\.0$/, '')}%`;
+          };
+          if (gmChanceValueEl) gmChanceValueEl.textContent = formatPct(chance);
+          
+          // Start physics-based spin animation immediately (no delay needed)
+          if (typeof gmSpinWheel === 'function') {
+            console.log('[Golden Machine] Starting wheel spin animation');
+            gmSpinWheel(targetAngle, chance, spinId);
+          } else {
+            console.error('[Golden Machine] gmSpinWheel function not found!');
+          }
           break;
         }
         case 'GOLDEN_MACHINE_RESULT': {

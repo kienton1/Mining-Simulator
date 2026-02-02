@@ -1200,39 +1200,51 @@ startServer(world => {
           }
 
           // Calculate target angle for wheel animation
-          // The wheel rotates, and when it stops, the segment at the pointer (0 degrees / 12:00) determines the result
-          // The gradient is fixed: green from 0 to greenDeg, red from greenDeg to 360
-          // When the wheel rotates by `targetAngle` degrees, the segment that ends up at 0 degrees
-          // is the one that was originally at `360 - targetAngle` degrees (mod 360)
-          // So: if we want green at pointer, we need 360 - targetAngle in [0, greenDeg]
-          //     which means targetAngle in [360 - greenDeg, 360] or [0, greenDeg] (wrapping)
-          // Actually simpler: if targetAngle is in [0, greenDeg], then 360 - targetAngle is in [360 - greenDeg, 360]
-          // That's the red zone, so that's wrong.
+          // The gradient is: green from 0deg to greenDeg, red from greenDeg to 360deg
+          // The pointer is fixed at 0deg (top/12:00)
+          // When the wheel rotates clockwise by X degrees, the segment originally at (360 - X) mod 360 ends up at the pointer
           // 
-          // Correct approach: The wheel rotates clockwise. If we rotate by `targetAngle`,
-          // the segment at position `360 - targetAngle` (mod 360) ends up at the pointer.
-          // So to get green at pointer: we need 360 - targetAngle (mod 360) in [0, greenDeg]
-          // Which means: targetAngle (mod 360) should be in [360 - greenDeg, 360]
-          // Or equivalently: targetAngle should be in [360 - greenDeg, 360] or [0, greenDeg] if wrapping
-          //
-          // Actually, let me think differently: if the wheel rotates by X degrees clockwise,
-          // the segment at position (360 - X) mod 360 ends up at the top (0 degrees).
-          // So if we want the green zone (0 to greenDeg) at the top, we need:
-          // (360 - targetAngle) mod 360 to be in [0, greenDeg]
-          // Which means targetAngle mod 360 should be in [360 - greenDeg, 360]
-          //
-          // For red zone at top: (360 - targetAngle) mod 360 should be in [greenDeg, 360]
-          // Which means targetAngle mod 360 should be in [0, 360 - greenDeg]
+          // For success (green at pointer): we need (360 - targetAngle) mod 360 in [0, greenDeg]
+          //   => targetAngle mod 360 in [360 - greenDeg, 360]
+          // For failure (red at pointer): we need (360 - targetAngle) mod 360 in [greenDeg, 360]
+          //   => targetAngle mod 360 in [0, 360 - greenDeg]
           const chance = Number(res.chance ?? 0);
           const greenDeg = chance * 3.6;
           let targetAngle: number;
+          
+          // When wheel rotates clockwise by X degrees, segment at (360 - X) mod 360 ends up at pointer (0deg)
+          // For green at pointer: need (360 - X) mod 360 in [0, greenDeg] => X mod 360 in [360 - greenDeg, 360]
+          // For red at pointer: need (360 - X) mod 360 in [greenDeg, 360] => X mod 360 in [0, 360 - greenDeg]
           if (res.didWin) {
-            // Want green at pointer: targetAngle should be in [360 - greenDeg, 360]
-            targetAngle = 360 - greenDeg + Math.random() * greenDeg;
+            // Green at pointer: targetAngle mod 360 should be in [360 - greenDeg, 360]
+            // Example: if greenDeg = 180, targetAngle mod 360 should be in [180, 360]
+            // So targetAngle could be 200, 250, 300, etc.
+            const minAngle = 360 - greenDeg;
+            const maxAngle = 360;
+            targetAngle = minAngle + Math.random() * (maxAngle - minAngle);
+            // Ensure we're in the right range (handle edge case where greenDeg = 0)
+            if (greenDeg > 0) {
+              targetAngle = Math.max(minAngle, Math.min(maxAngle, targetAngle));
+            } else {
+              // If greenDeg is 0, any angle in [0, 360) should be red, but we won't win anyway
+              targetAngle = Math.random() * 360;
+            }
           } else {
-            // Want red at pointer: targetAngle should be in [0, 360 - greenDeg]
-            targetAngle = Math.random() * (360 - greenDeg);
+            // Red at pointer: targetAngle mod 360 should be in [0, 360 - greenDeg]
+            // Example: if greenDeg = 180, targetAngle mod 360 should be in [0, 180]
+            // So targetAngle could be 0, 50, 100, 150, etc.
+            const maxAngle = 360 - greenDeg;
+            targetAngle = Math.random() * maxAngle;
           }
+          
+          console.log('[Golden Machine] Server calculated target angle:', {
+            didWin: res.didWin,
+            chance: chance,
+            greenDeg: greenDeg,
+            targetAngle: targetAngle,
+            targetAngleMod360: targetAngle % 360,
+            expectedSegmentAtPointer: (360 - (targetAngle % 360)) % 360
+          });
 
           // Generate unique spin ID
           const spinId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
