@@ -9,6 +9,8 @@ import {
   deriveUpgradedPetDefinition,
   getBasePetIdFromAnyPetId,
   getPetTierFromPetId,
+  isGoldenPetId,
+  stripGoldenFromPetId,
   type PetTier,
 } from './PetUpgrades';
 
@@ -197,22 +199,31 @@ const BASE_PET_DEFINITIONS: Record<PetId, PetDefinition> = Object.fromEntries(
 ) as Record<PetId, PetDefinition>;
 
 export function getPetDefinition(petId: PetId): PetDefinition | undefined {
-  const tier = getPetTierFromPetId(petId);
+  const isGolden = isGoldenPetId(petId);
+  const normalized = stripGoldenFromPetId(petId);
+  const tier = getPetTierFromPetId(normalized);
   if (tier === null) return undefined;
 
-  const basePetId = getBasePetIdFromAnyPetId(petId);
+  const basePetId = getBasePetIdFromAnyPetId(normalized);
   const baseDef = BASE_PET_DEFINITIONS[basePetId];
   if (!baseDef) return undefined;
 
-  if (tier === 0) return baseDef;
-  return deriveUpgradedPetDefinition(baseDef, tier as PetTier);
+  const def = tier === 0 ? baseDef : deriveUpgradedPetDefinition(baseDef, tier as PetTier);
+  if (!isGolden) return def;
+  return {
+    ...def,
+    id: petId,
+    // Golden does NOT change the pet's display name; it only doubles power.
+    multiplier: def.multiplier * 2,
+  };
 }
 
 export function isPetId(value: unknown): value is PetId {
   if (typeof value !== 'string') return false;
-  const tier = getPetTierFromPetId(value);
+  const normalized = stripGoldenFromPetId(value);
+  const tier = getPetTierFromPetId(normalized);
   if (tier === null) return false;
-  const basePetId = getBasePetIdFromAnyPetId(value);
+  const basePetId = getBasePetIdFromAnyPetId(normalized);
   return typeof basePetId === 'string' && basePetId in BASE_PET_DEFINITIONS;
 }
 

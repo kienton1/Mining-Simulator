@@ -21,6 +21,7 @@ import type { PetId } from './PetData';
 import { getPetDefinition } from './PetDatabase';
 import { getPetModelUri, getPetTextureUri, getPetModelInfo } from './PetVisuals';
 import { getModelScaleForHeight } from './PetModelHeights';
+import { isGoldenPetId } from './PetUpgrades';
 import {
   PET_FORMATION_BEHIND_DISTANCE,
   PET_FORMATION_SIDE_OFFSET,
@@ -159,6 +160,11 @@ export class MiningPetEntity extends Entity {
 
     if (textureUri) {
       entityOptions.modelTextureUri = textureUri;
+    }
+
+    // Golden variant tint (client-side should also tint thumbnails).
+    if (isGoldenPetId(options.petId)) {
+      entityOptions.tintColor = { r: 255, g: 215, b: 0 };
     }
 
     super(entityOptions);

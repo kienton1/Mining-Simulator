@@ -114,6 +114,7 @@
       'achievements-modal',
       'egg-modal',
       'reward-modal',
+      'golden-machine-modal',
       'maps-modal',
       'merchant-ui',
       'gem-trader-ui',
@@ -1960,6 +1961,7 @@
     const pickaxeModal = document.getElementById('pickaxe-modal');
     const rebirthModal = document.getElementById('rebirth-modal');
     const petsModal = document.getElementById('pets-modal');
+    const goldenMachineModal = document.getElementById('golden-machine-modal');
     const achievementsModal = document.getElementById('achievements-modal');
     const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
@@ -1983,7 +1985,7 @@
     const rewardMessageEl = document.getElementById('reward-message');
 
     // Array of all modals for closing others when opening one
-    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, achievementsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, goldenMachineModal, achievementsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
 
     const minerGridEl = document.getElementById('miner-grid');
     const mapsListEl = document.getElementById('maps-list');
@@ -2021,6 +2023,19 @@
     const petDetailStatsEl = document.getElementById('pet-detail-stats');
     const petDetailActionEl = document.getElementById('pet-detail-action');
     const petDetailCraftEl = document.getElementById('pet-detail-craft');
+
+    // Golden machine UI elements
+    const gmModal = document.getElementById('golden-machine-modal');
+    const gmCloseBtn = document.getElementById('gm-close-btn');
+    const gmGridEl = document.getElementById('gm-grid');
+    const gmChanceValueEl = document.getElementById('gm-chance-value');
+    const gmCraftBtn = document.getElementById('gm-craft-btn');
+    const gmCraftAllBtn = document.getElementById('gm-craft-all-btn');
+    const gmBackBtn = document.getElementById('gm-back-btn');
+    const gmStatusEl = document.getElementById('gm-status');
+    const gmWheelEl = document.getElementById('gm-wheel');
+    const gmWheelDiskEl = document.getElementById('gm-wheel-disk');
+    const gmWheelTextEl = document.getElementById('gm-wheel-text');
 
     // Egg station UI elements
     const eggModalTitleEl = document.getElementById('egg-modal-title');
@@ -2276,6 +2291,17 @@
         autoArmed: false,
         autoCount: 1,
         stations: [], // All available stations in the current group
+      },
+      goldenMachine: {
+        inProximity: false,
+        view: 'select', // 'select' | 'merge' | 'wheel'
+        basePetId: null,
+        selected: {}, // instanceId -> true
+        chance: 0,
+        pending: false,
+        pendingToken: null,
+        status: '',
+        lastResult: null, // { didWin: boolean } | null
       },
       achievements: {
         selectedCategoryId: null,
@@ -2904,6 +2930,44 @@
           fall,
           isStar,
           starSize: 20 + Math.random() * 12,
+        });
+      }
+    };
+
+    // Golden confetti (used for Golden Machine success)
+    const spawnGoldenConfettiBurst = (count = 160) => {
+      const container = ensureConfettiContainer();
+      if (!container) return;
+      elevateConfettiForHatch();
+      const colors = ['#ffd700', '#ffec80', '#fbbf24', '#f59e0b', '#fff7c2'];
+      const width = window.innerWidth || 1280;
+      const height = window.innerHeight || 720;
+      const originX = width * 0.5;
+      const originY = height * 0.32;
+      for (let i = 0; i < count; i++) {
+        const sizeW = 10 + Math.random() * 10;
+        const sizeH = 18 + Math.random() * 14;
+        const duration = 1100 + Math.random() * 1200;
+        const delay = Math.random() * 120;
+        const dx = (Math.random() - 0.5) * width * 0.55;
+        const rot = (Math.random() * 900) - 450;
+        const lift = 220 + Math.random() * 220;
+        const fall = 560 + Math.random() * 460;
+        spawnConfettiPiece(container, {
+          x: originX,
+          y: originY,
+          variant: 'hatch',
+          color: colors[i % colors.length],
+          width: sizeW,
+          height: sizeH,
+          duration,
+          delay,
+          dx,
+          rot,
+          lift,
+          fall,
+          isStar: Math.random() < 0.75,
+          starSize: 22 + Math.random() * 14,
         });
       }
     };
@@ -3755,13 +3819,17 @@
           const rarityText = rarityLabel ? rarityLabel.charAt(0).toUpperCase() + rarityLabel.slice(1) : 'Common';
           petDetailStatsEl.innerHTML =
             `<div class="pets-stat-row"><span class="pets-stat-row__label">Multiplier</span><span class="pets-stat-row__value pets-stat-row__value--mult">x${formatMultiplier(pet.multiplier ?? 0)}</span></div>` +
-            `<div class="pets-stat-row"><span class="pets-stat-row__label">Rarity</span><span class="pets-stat-row__value pets-stat-row__value--rarity">${rarityText}</span></div>`;
+            `<div class="pets-stat-row"><span class="pets-stat-row__label">Rarity</span><span class="pets-stat-row__value pets-stat-row__value--rarity">${rarityText}</span></div>` +
+            (pet.isGolden
+              ? `<div class="pets-stat-row"><span class="pets-stat-row__label">Variant</span><span class="pets-stat-row__value pets-stat-row__value--mult">Golden</span></div>`
+              : ``);
         }
 
         const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
         if (petDetailImgEl) {
           petDetailImgEl.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           petDetailImgEl.style.display = 'block';
+          petDetailImgEl.classList.toggle('pet-img--golden', Boolean(pet.isGolden));
           if (petDetailEmojiEl) petDetailEmojiEl.style.display = 'none';
           petDetailImgEl.onerror = () => {
             petDetailImgEl.style.display = 'none';
@@ -3776,6 +3844,7 @@
           img.alt = pet.name || pet.petId || 'Pet';
           img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           img.className = 'pet-detail__img-el';
+          if (pet.isGolden) img.classList.add('pet-img--golden');
           img.onerror = () => {
             petDetailImageEl.textContent = '🐾';
           };
@@ -3814,7 +3883,7 @@
       for (const pet of list) {
         const tile = document.createElement('button');
         const isMarkedForDelete = Boolean(state.pets.deleteSelected?.[pet.instanceId]);
-        tile.className = `pet-tile ${rarityToClass(pet.rarity)} ${pet.equipped ? 'pet-tile--equipped' : ''} ${state.pets.deleteMode ? 'pet-tile--delete-mode' : ''} ${isMarkedForDelete ? 'pet-tile--delete-selected' : ''}`;
+        tile.className = `pet-tile ${rarityToClass(pet.rarity)} ${pet.isGolden ? 'pet-tile--golden' : ''} ${pet.equipped ? 'pet-tile--equipped' : ''} ${state.pets.deleteMode ? 'pet-tile--delete-mode' : ''} ${isMarkedForDelete ? 'pet-tile--delete-selected' : ''}`;
         tile.setAttribute('tabindex', '-1');
 
         const imgWrap = document.createElement('div');
@@ -3882,6 +3951,306 @@
         });
 
         petsGridEl.appendChild(tile);
+      }
+    };
+
+ // ===== Golden Machine Wheel (FOOL PROOF) =====
+
+// Keep cumulative rotation so the wheel doesn't snap between spins
+let gmSpinAccumDeg = 0;
+
+// Helper math
+const gmClamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const gmMod360 = (deg) => ((deg % 360) + 360) % 360;
+const gmRand = (a, b) => a + Math.random() * (b - a);
+
+// Show wheel with correct gradient orientation.
+// IMPORTANT: This orientation MUST match gmSpinWheel math below.
+const gmShowWheelPending = (chancePercent) => {
+  // If you have the scoped version (getGmElement), use it.
+  // Otherwise these fallbacks still work.
+  const wheelEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel') : document.getElementById('gm-wheel');
+  const wheelDiskEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-disk') : document.getElementById('gm-wheel-disk');
+  const wheelTextEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-text') : document.getElementById('gm-wheel-text');
+  const gridEl = (typeof getGmElement === 'function') ? getGmElement('gm-grid') : document.getElementById('gm-grid');
+
+  if (!wheelEl || !wheelDiskEl) return;
+
+  const pct = gmClamp(Number(chancePercent) || 0, 0, 100);
+  const greenDeg = pct * 3.6;
+
+  // Reset any in-progress transition
+  wheelDiskEl.style.transition = 'none';
+  wheelDiskEl.style.transform = `rotate(${gmMod360(gmSpinAccumDeg)}deg)`;
+
+  // ✅ Green begins at TOP (pointer) because from 0deg means 0deg is at 12:00
+  wheelDiskEl.style.background =
+    `conic-gradient(from 0deg,
+      #22c55e 0deg,
+      #22c55e ${greenDeg}deg,
+      #ef4444 ${greenDeg}deg,
+      #ef4444 360deg)`;
+
+  // Force reflow so next transition definitely animates
+  wheelDiskEl.getBoundingClientRect();
+
+  if (wheelTextEl) wheelTextEl.textContent = 'Rolling...';
+  wheelEl.hidden = false;
+  if (gridEl) gridEl.hidden = true;
+};
+
+// Physics-based spin wheel with deceleration
+// Signature: gmSpinWheel(targetAngle, chancePercent, spinId)
+const gmSpinWheel = (targetAngle, chancePercent, spinId) => {
+  const wheelDiskEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-disk') : document.getElementById('gm-wheel-disk');
+  const wheelTextEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-text') : document.getElementById('gm-wheel-text');
+
+  if (!wheelDiskEl) return;
+
+  const pct = gmClamp(Number(chancePercent) || 0, 0, 100);
+  const greenDeg = pct * 3.6;
+  const targetAngleDeg = gmMod360(Number(targetAngle) || 0);
+
+  // Physics parameters - tuned for natural deceleration
+  const INITIAL_VELOCITY = 12 + Math.random() * 8; // degrees per frame (randomized for variety)
+  const DECELERATION = 0.96; // Friction coefficient (0.96 = 4% reduction per frame)
+  const MIN_VELOCITY = 0.05; // Stop when velocity drops below this
+  const SNAP_THRESHOLD = 1.5; // Snap to target when within this distance
+
+  // Calculate total rotation needed to reach target angle
+  // Add multiple full spins for visual effect (6-8 spins)
+  const spins = 6 + Math.floor(Math.random() * 3);
+  const totalRotation = spins * 360 + targetAngleDeg;
+  
+  // Start from current accumulated rotation
+  const startRotation = gmSpinAccumDeg;
+  let accumulatedRotation = 0;
+  let velocity = INITIAL_VELOCITY;
+  let animationId = null;
+  
+  // Remove any existing transition
+  wheelDiskEl.style.transition = 'none';
+  if (wheelTextEl) wheelTextEl.textContent = 'Spinning...';
+
+  // Physics-based animation loop
+  const animate = () => {
+    // Apply velocity (accumulate rotation)
+    accumulatedRotation += velocity;
+    
+    // Apply deceleration (friction)
+    velocity *= DECELERATION;
+    
+    // Update visual rotation
+    const currentRotation = startRotation + accumulatedRotation;
+    wheelDiskEl.style.transform = `rotate(${currentRotation}deg)`;
+    
+    // Calculate remaining rotation to target
+    const remainingRotation = totalRotation - accumulatedRotation;
+    const distanceToTarget = Math.abs(remainingRotation);
+    
+    // Check if we should stop
+    if (velocity < MIN_VELOCITY || distanceToTarget < SNAP_THRESHOLD) {
+      // Cancel animation frame if still running
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+      }
+      
+      // Snap to final position
+      const finalRotation = startRotation + totalRotation;
+      wheelDiskEl.style.transform = `rotate(${finalRotation}deg)`;
+      gmSpinAccumDeg = finalRotation;
+      
+      // Calculate result: when wheel rotates by targetAngle, the segment at (360 - targetAngle) mod 360
+      // ends up at the pointer (0 degrees). So we check what segment is at that position.
+      const finalTargetAngle = gmMod360(targetAngleDeg);
+      // The segment that ends up at pointer (0 degrees) is the one originally at (360 - finalTargetAngle) mod 360
+      const segmentAtPointer = gmMod360(360 - finalTargetAngle);
+      const didWin = segmentAtPointer >= 0 && segmentAtPointer < greenDeg;
+      
+      console.log('[Golden Machine] Wheel result:', {
+        targetAngle: finalTargetAngle,
+        segmentAtPointer: segmentAtPointer,
+        greenDeg: greenDeg,
+        didWin: didWin
+      });
+      
+      // Update UI text
+      if (wheelTextEl) wheelTextEl.textContent = didWin ? 'SUCCESS!' : 'FAILED!';
+      
+      // Send result to server for validation
+      hytopia.sendData({
+        type: 'GOLDEN_MACHINE_SPIN_RESULT',
+        spinId: spinId,
+        didWin: didWin,
+        finalAngle: segmentAtPointer, // Send the segment at pointer, not the target angle
+      });
+      
+      // Note: Server will respond with GOLDEN_MACHINE_RESULT containing token if won
+      // The result handling is done in the GOLDEN_MACHINE_RESULT handler
+      
+      return; // Stop animation
+    }
+    
+    // Continue animation
+    animationId = requestAnimationFrame(animate);
+  };
+  
+  // Start animation
+  animationId = requestAnimationFrame(animate);
+};
+
+    const gmFormatPct = (value) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '0%';
+      if (Math.abs(num % 1) < 1e-9) return `${Math.round(num)}%`;
+      return `${num.toFixed(1).replace(/\.0$/, '')}%`;
+    };
+
+    const gmComputeChance = () => {
+      const count = state.goldenMachine?.selected ? Object.keys(state.goldenMachine.selected).length : 0;
+      const chance = Math.min(100, count * 12.5);
+      state.goldenMachine.chance = chance;
+      return { count, chance };
+    };
+
+    const gmRarityToClass = (rarity) => {
+      switch ((rarity || '').toLowerCase()) {
+        case 'legendary': return 'gm-pet-tile--legendary';
+        case 'epic': return 'gm-pet-tile--epic';
+        case 'rare': return 'gm-pet-tile--rare';
+        default: return 'gm-pet-tile--common';
+      }
+    };
+
+    const gmReset = () => {
+      state.goldenMachine.view = 'select';
+      state.goldenMachine.basePetId = null;
+      state.goldenMachine.selected = {};
+      state.goldenMachine.chance = 0;
+      state.goldenMachine.pending = false;
+      state.goldenMachine.pendingToken = null;
+      state.goldenMachine.status = '';
+      state.goldenMachine.lastResult = null;
+    };
+
+    const renderGoldenMachine = () => {
+      if (!gmModal) return;
+      const gm = state.goldenMachine || {};
+      const { count, chance } = gmComputeChance();
+
+      if (gmStatusEl) gmStatusEl.textContent = gm.status || '';
+      if (gmChanceValueEl) gmChanceValueEl.textContent = gmFormatPct(chance);
+
+      const inWheel = gm.view === 'wheel';
+      if (gmWheelEl) gmWheelEl.hidden = !inWheel;
+      if (gmGridEl) gmGridEl.hidden = inWheel;
+      if (gmBackBtn) gmBackBtn.hidden = gm.view !== 'merge';
+
+      if (gmCraftBtn) gmCraftBtn.disabled = inWheel || gm.pending || count === 0;
+      if (gmCraftAllBtn) gmCraftAllBtn.disabled = inWheel || gm.pending || gm.view !== 'merge';
+
+      if (inWheel) {
+        gmShowWheelPending(chance);
+        return;
+      }
+
+      if (!gmGridEl) return;
+      gmGridEl.innerHTML = '';
+
+      const allPets = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+      console.log('[Golden Machine] Rendering pets, total:', allPets.length);
+      const list =
+        gm.view === 'merge' && gm.basePetId
+          ? allPets.filter((p) => p && p.petId === gm.basePetId && !p.isGolden && !p.equipped)
+          : allPets.filter((p) => p && !p.isGolden && !p.equipped);
+      console.log('[Golden Machine] Filtered pets for display:', list.length);
+
+      // Sort: equipped first, then multiplier high-to-low
+      list.sort((a, b) => {
+        const ea = Boolean(a.equipped);
+        const eb = Boolean(b.equipped);
+        if (ea !== eb) return ea ? -1 : 1;
+        return (b.multiplier ?? 0) - (a.multiplier ?? 0);
+      });
+
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'pets-empty';
+        empty.innerHTML = '<div class="pets-empty__icon">🐾</div><div>No pets available</div><div class="pets-empty__hint">Golden pets can’t be used here.</div>';
+        gmGridEl.appendChild(empty);
+        return;
+      }
+
+      for (const pet of list) {
+        const tile = document.createElement('button');
+        const selected = Boolean(state.goldenMachine?.selected?.[pet.instanceId]);
+        tile.className = `gm-pet-tile ${gmRarityToClass(pet.rarity)} ${selected ? 'gm-pet-tile--selected' : ''}`;
+        tile.setAttribute('tabindex', '-1');
+
+        const img = document.createElement('img');
+        img.className = 'gm-pet-tile__img';
+        img.alt = pet.name || pet.petId || 'Pet';
+        const uri = pet.imageUri || `ui/pets/${pet.basePetId}.png`;
+        img.src = `{{CDN_ASSETS_URL}}/${uri}`;
+        img.onerror = () => {
+          img.style.display = 'none';
+        };
+
+        const mult = document.createElement('div');
+        mult.className = 'gm-pet-tile__mult';
+        mult.textContent = formatMultiplier(pet.multiplier ?? 0);
+
+        const stars = document.createElement('div');
+        stars.className = 'gm-pet-tile__stars';
+        const starCount = Number(pet.stars ?? pet.tier ?? 0);
+        if (starCount > 0) stars.textContent = '★'.repeat(Math.min(3, Math.max(0, starCount)));
+
+        const check = document.createElement('div');
+        check.className = 'gm-pet-tile__check';
+        const badge = document.createElement('div');
+        badge.className = 'gm-pet-tile__check-badge';
+        badge.textContent = '✓';
+        check.appendChild(badge);
+
+        tile.appendChild(img);
+        tile.appendChild(stars);
+        tile.appendChild(mult);
+        tile.appendChild(check);
+
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (state.goldenMachine.pending) return;
+
+          // Select view: choose base pet, enter merge
+          if (state.goldenMachine.view !== 'merge') {
+            state.goldenMachine.view = 'merge';
+            state.goldenMachine.basePetId = pet.petId;
+            state.goldenMachine.selected = { [pet.instanceId]: true };
+            state.goldenMachine.status = '';
+            renderGoldenMachine();
+            return;
+          }
+
+          // Merge view: toggle selection (max 8)
+          if (!state.goldenMachine.selected) state.goldenMachine.selected = {};
+          const currentCount = Object.keys(state.goldenMachine.selected).length;
+          if (state.goldenMachine.selected[pet.instanceId]) {
+            delete state.goldenMachine.selected[pet.instanceId];
+          } else {
+            if (currentCount >= 8) {
+              state.goldenMachine.status = 'Max 8 pets (100% chance).';
+              renderGoldenMachine();
+              return;
+            }
+            state.goldenMachine.selected[pet.instanceId] = true;
+          }
+          state.goldenMachine.status = '';
+          renderGoldenMachine();
+        });
+
+        gmGridEl.appendChild(tile);
       }
     };
 
@@ -4071,6 +4440,77 @@
         state.pets.deleteSelected = {};
         state.pets.deleteMode = false;
         if (petsDeleteBarEl) petsDeleteBarEl.hidden = true;
+      });
+    }
+
+    // Golden machine controls
+    const closeGoldenMachineModal = () => {
+      if (!gmModal) return;
+      gmReset();
+      hideModal(gmModal);
+      hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'goldenMachine' });
+      hytopia.sendData({ type: 'CLOSE_GOLDEN_MACHINE_UI' });
+    };
+
+    if (gmCloseBtn && gmModal) {
+      gmCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeGoldenMachineModal();
+      });
+    }
+
+    if (gmBackBtn) {
+      gmBackBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.goldenMachine.view = 'select';
+        state.goldenMachine.basePetId = null;
+        state.goldenMachine.selected = {};
+        state.goldenMachine.status = '';
+        renderGoldenMachine();
+      });
+    }
+
+    if (gmCraftAllBtn) {
+      gmCraftAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.goldenMachine.pending) return;
+        if (state.goldenMachine.view !== 'merge' || !state.goldenMachine.basePetId) return;
+        const allPets = Array.isArray(state.pets.pets) ? state.pets.pets : [];
+        const matches = allPets
+          .filter((p) => p && p.petId === state.goldenMachine.basePetId && !p.isGolden && !p.equipped)
+          .sort((a, b) => {
+            const ea = Boolean(a.equipped);
+            const eb = Boolean(b.equipped);
+            if (ea !== eb) return ea ? -1 : 1;
+            return (b.multiplier ?? 0) - (a.multiplier ?? 0);
+          })
+          .slice(0, 8);
+        const next = {};
+        matches.forEach((p) => {
+          next[p.instanceId] = true;
+        });
+        state.goldenMachine.selected = next;
+        state.goldenMachine.status = '';
+        renderGoldenMachine();
+      });
+    }
+
+    if (gmCraftBtn) {
+      gmCraftBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.goldenMachine.pending) return;
+        const selected = state.goldenMachine.selected || {};
+        const ids = Object.keys(selected);
+        if (ids.length === 0) return;
+        state.goldenMachine.pending = true;
+        state.goldenMachine.status = '';
+        state.goldenMachine.view = 'wheel';
+        renderGoldenMachine();
+        hytopia.sendData({ type: 'GOLDEN_MACHINE_CRAFT', instanceIds: ids });
       });
     }
 
@@ -4300,7 +4740,7 @@
       
       // Prevent clicks inside the modal container from closing
       // But allow close button clicks to work
-      const container = el.querySelector('.pickaxe-modal__container');
+      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper');
       if (container) {
         // Remove existing container handler if any
         const existingContainerHandler = modalContainerHandlers.get(container);
@@ -4310,7 +4750,7 @@
         
         const handleContainerClick = (e) => {
           // Don't stop propagation if clicking the close button
-          const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close');
+          const closeButton = e.target.closest('.pickaxe-modal__close, .modal__close, .rebirth-modal__close, #gm-close-btn');
           if (!closeButton) {
             e.stopPropagation();
           }
@@ -4337,7 +4777,7 @@
       }
       
       // Remove container click listener
-      const container = el.querySelector('.pickaxe-modal__container');
+      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper');
       if (container) {
         const containerHandler = modalContainerHandlers.get(container);
         if (containerHandler) {
@@ -4363,6 +4803,8 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'egg' });
         // Egg modal uses inline display styles, so we need to explicitly set display: none
         el.style.display = 'none';
+      } else if (el.id === 'golden-machine-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'goldenMachine' });
       }
       
       // Check if any modals are still open, if not, remove body.modal-open
@@ -5808,6 +6250,35 @@
             }
           }
           break;
+        case 'GOLDEN_MACHINE_PROXIMITY': {
+          if (!data.inProximity) {
+            state.goldenMachine.inProximity = false;
+            state.goldenMachine.pending = false;
+            state.goldenMachine.status = '';
+            gmReset();
+            if (gmModal) {
+              hideModal(gmModal);
+            }
+            break;
+          }
+
+          state.goldenMachine.inProximity = true;
+
+          // Open modal and block manual mining clicks
+          if (gmModal && !gmModal.classList.contains('visible')) {
+            // Always reset state when opening so we never get stuck in wheel view.
+            gmReset();
+            hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'goldenMachine' });
+            showModal(gmModal);
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+            // Hard-guard: ensure we start on the pet grid (wheel hidden) even if state was stale.
+            if (gmWheelEl) gmWheelEl.hidden = true;
+            if (gmGridEl) gmGridEl.hidden = false;
+          }
+
+          renderGoldenMachine();
+          break;
+        }
         case 'EGG_STATION_PROXIMITY': {
           // Server-driven proximity: show/hide egg modal
           if (!data.inProximity) {
@@ -5988,12 +6459,111 @@
           renderPets();
           // Egg modal also displays pet inventory count, so refresh it too
           renderEggStation();
+          // Golden machine depends on pet list too; refresh it if open / in proximity.
+          if (state.goldenMachine?.inProximity || (gmModal && gmModal.classList.contains('visible'))) {
+            renderGoldenMachine();
+          }
           break;
         case 'PET_ACTION_RESULT':
           if (!data.success) {
             console.log('[UI] Pet action failed:', data.message);
           }
           break;
+        case 'GOLDEN_MACHINE_SPIN_START': {
+          // Server sends target angle for physics-based spin
+          if (!data.success) {
+            state.goldenMachine.pending = false;
+            state.goldenMachine.view = state.goldenMachine.basePetId ? 'merge' : 'select';
+            state.goldenMachine.status = data.message || 'Failed.';
+            renderGoldenMachine();
+            break;
+          }
+
+          const targetAngle = Number(data.targetAngle ?? 0);
+          const chance = Number(data.chance ?? state.goldenMachine.chance ?? 0);
+          const spinId = String(data.spinId ?? '');
+          
+          console.log('[Golden Machine] Spin start:', { targetAngle, chance, spinId });
+          
+          state.goldenMachine.pending = false;
+          state.goldenMachine.status = '';
+          state.goldenMachine.view = 'wheel';
+          state.goldenMachine.spinId = spinId;
+          renderGoldenMachine();
+          
+          // Start physics-based spin animation
+          setTimeout(() => {
+            if (typeof gmSpinWheel === 'function') {
+              console.log('[Golden Machine] Starting wheel spin animation');
+              gmSpinWheel(targetAngle, chance, spinId);
+            } else {
+              console.error('[Golden Machine] gmSpinWheel function not found!');
+            }
+          }, 50);
+          break;
+        }
+        case 'GOLDEN_MACHINE_RESULT': {
+          // Server validates spin and sends result (after physics spin completes)
+          if (!data.success) {
+            state.goldenMachine.pending = false;
+            state.goldenMachine.view = state.goldenMachine.basePetId ? 'merge' : 'select';
+            state.goldenMachine.status = data.message || 'Validation failed.';
+            state.goldenMachine.pendingToken = null;
+            renderGoldenMachine();
+            break;
+          }
+
+          const didWin = Boolean(data.didWin);
+          state.goldenMachine.pendingToken = data.token || null;
+          
+          // Update UI text if wheel is still visible
+          const wheelTextEl = (typeof getGmElement === 'function') ? getGmElement('gm-wheel-text') : document.getElementById('gm-wheel-text');
+          if (wheelTextEl) {
+            wheelTextEl.textContent = didWin ? 'SUCCESS!' : 'FAILED!';
+          }
+
+          // If we won, claim the reward
+          if (didWin && data.token) {
+            hytopia.sendData({ type: 'GOLDEN_MACHINE_CLAIM', token: data.token });
+          } else {
+            // Loss: reset after a short pause
+            setTimeout(() => {
+              if (typeof gmReset === 'function') gmReset();
+              if (typeof renderGoldenMachine === 'function') renderGoldenMachine();
+              hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+            }, 900);
+          }
+          break;
+        }
+        case 'GOLDEN_MACHINE_CLAIM_RESULT': {
+          // Reward arrives after the wheel finishes.
+          if (!data.success) {
+            state.goldenMachine.pendingToken = null;
+            if (gmWheelTextEl) gmWheelTextEl.textContent = data.message || 'Claim failed.';
+            setTimeout(() => {
+              gmReset();
+              renderGoldenMachine();
+              hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+            }, 900);
+            break;
+          }
+
+          state.goldenMachine.pendingToken = null;
+          if (gmWheelTextEl) gmWheelTextEl.textContent = 'Golden pet received!';
+
+          if (typeof spawnGoldenConfettiBurst === 'function') {
+            spawnGoldenConfettiBurst();
+          }
+          // Small celebratory burst (existing win celebration is rainbow; golden confetti is gold-only)
+          if (typeof playWinningSfx === 'function') playWinningSfx();
+
+          setTimeout(() => {
+            gmReset();
+            renderGoldenMachine();
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          }, 900);
+          break;
+        }
         case 'ACHIEVEMENTS_STATE':
           state.achievements.categories = data.categories || [];
           state.achievements.bonuses = data.bonuses || state.achievements.bonuses;
@@ -10836,6 +11406,403 @@
 </style>
 
 
+<!-- Included from: ./components/GoldenMachineModal.html -->
+<!-- Golden Machine Modal -->
+<div
+  id="golden-machine-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 12000;
+  "
+>
+  <div class="gm-wrapper">
+    <div class="gm-title-container">
+      <h2 class="gm-title">Golden Pets</h2>
+    </div>
+    <button id="gm-close-btn" class="gm-close-btn">X</button>
+
+    <div class="gm-container">
+      <div class="gm-left">
+        <div class="gm-instructions">
+          <div class="gm-instructions__headline">Select pets that<br />you want to craft!</div>
+          <div class="gm-instructions__warning">You will lose<br />selected pets.</div>
+        </div>
+
+        <div class="gm-chance">
+          <div id="gm-chance-value" class="gm-chance__value">0%</div>
+          <div class="gm-chance__label">Chance</div>
+        </div>
+
+        <div class="gm-actions">
+          <button id="gm-craft-btn" class="gm-btn gm-btn--green" disabled>Craft</button>
+          <button id="gm-craft-all-btn" class="gm-btn gm-btn--green">Craft All</button>
+          <button id="gm-back-btn" class="gm-btn gm-btn--blue" hidden>Back</button>
+          <div id="gm-status" class="gm-status"></div>
+        </div>
+      </div>
+
+      <div class="gm-right">
+        <div id="gm-grid" class="gm-grid">
+          <!-- Pet tiles populated dynamically -->
+        </div>
+
+        <div id="gm-wheel" class="gm-wheel" hidden>
+          <div class="gm-wheel__pointer"></div>
+          <div id="gm-wheel-disk" class="gm-wheel__disk"></div>
+          <div id="gm-wheel-text" class="gm-wheel__text">Rolling...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Ensure HTML [hidden] always wins (prevents wheel showing on open). */
+  #golden-machine-modal [hidden] {
+    display: none !important;
+  }
+
+  #golden-machine-modal.visible {
+    display: flex !important;
+  }
+
+  .gm-wrapper {
+    position: relative;
+    width: 860px;
+    max-width: 96vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 30px;
+  }
+
+  .gm-container {
+    height: 72vh;
+    min-height: 68vh;
+    max-height: 78vh;
+    background: linear-gradient(180deg, rgba(20, 130, 175, 0.95), rgba(10, 95, 140, 0.95));
+    border: 4px solid rgba(0, 0, 0, 0.6);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    animation: gmSlideInUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes gmSlideInUp {
+    from { opacity: 0; transform: translateY(60px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .gm-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.35);
+    border: 4px solid rgba(0, 0, 0, 0.65);
+    border-radius: 12px;
+    padding: 6px 22px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  }
+
+  .gm-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 4px solid rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.18s ease;
+    z-index: 110;
+  }
+
+  .gm-close-btn:hover {
+    transform: translate(50%, -50%) scale(1.08);
+  }
+
+  .gm-left {
+    width: 240px;
+    min-width: 240px;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-right: 3px solid rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .gm-instructions__headline {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    line-height: 1.05;
+  }
+
+  .gm-instructions__warning {
+    margin-top: 10px;
+    font-size: 20px;
+    font-weight: 900;
+    color: #ff2e2e;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    line-height: 1.05;
+  }
+
+  .gm-chance {
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .gm-chance__value {
+    font-size: 56px;
+    font-weight: 900;
+    color: #ffd700;
+    -webkit-text-stroke: 4px #000;
+    paint-order: stroke fill;
+    line-height: 1;
+  }
+
+  .gm-chance__label {
+    font-size: 26px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+    line-height: 1;
+  }
+
+  .gm-actions {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gm-btn {
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 4px solid rgba(0, 0, 0, 0.65);
+    font-size: 20px;
+    font-weight: 900;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+    paint-order: stroke fill;
+    transition: transform 0.14s ease, filter 0.14s ease;
+  }
+
+  .gm-btn--green {
+    background: linear-gradient(180deg, #58ff2c, #20c41a);
+    color: #fff;
+  }
+
+  .gm-btn--blue {
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    color: #fff;
+  }
+
+  .gm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+  }
+
+  .gm-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  .gm-status {
+    min-height: 18px;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .gm-right {
+    flex: 1;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gm-grid {
+    height: 100%;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 12px;
+    padding-right: 6px;
+  }
+
+  .gm-pet-tile {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    border: 4px solid rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.2);
+    transition: transform 0.15s ease;
+  }
+
+  .gm-pet-tile:hover {
+    transform: translateY(-2px);
+  }
+
+  .gm-pet-tile--common { background: linear-gradient(180deg, #6b7280, #4b5563); }
+  .gm-pet-tile--rare { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+  .gm-pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); }
+  .gm-pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+
+  .gm-pet-tile__img {
+    width: 72%;
+    height: 72%;
+    object-fit: contain;
+    image-rendering: auto;
+  }
+
+  .gm-pet-tile__mult {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-pet-tile__stars {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    font-size: 14px;
+    font-weight: 900;
+    color: #ffd700;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-pet-tile__check {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .gm-pet-tile__check-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #76ff66, #25cc23);
+    border: 4px solid rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    font-weight: 900;
+    color: #0a3b0a;
+  }
+
+  .gm-pet-tile--selected .gm-pet-tile__check {
+    display: flex;
+  }
+
+  /* Wheel view */
+  .gm-wheel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+  }
+
+  .gm-wheel__pointer {
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 24px solid rgba(0, 0, 0, 0.85);
+    transform: translateY(-12px);
+    z-index: 2;
+  }
+
+  .gm-wheel__disk {
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    border: 10px solid rgba(0, 0, 0, 0.75);
+    box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.15), 0 10px 25px rgba(0, 0, 0, 0.45);
+    background: conic-gradient(from -90deg, #22c55e 0deg, #ef4444 0deg);
+    transform: rotate(0deg);
+    transition: transform 3.2s cubic-bezier(0.12, 0.85, 0.15, 1);
+    will-change: transform;
+  }
+
+  .gm-wheel__text {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  /* Scrollbar */
+  .gm-grid::-webkit-scrollbar { width: 8px; }
+  .gm-grid::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+  .gm-grid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.35); border-radius: 4px; }
+
+  body.mobile .gm-wrapper { width: 96vw; }
+  body.mobile .gm-left { width: 200px; min-width: 200px; }
+  body.mobile .gm-chance__value { font-size: 44px; }
+  body.mobile .gm-btn { font-size: 18px; }
+  body.mobile .gm-wheel__disk { width: 250px; height: 250px; }
+</style>
+
+
+
 <!-- Included from: ./components/PetsModal.html -->
 <!-- Pets Modal -->
 <div
@@ -11243,6 +12210,29 @@
   .pet-tile--rare { background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-color: #3b82f6; }
   .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); border-color: #a855f7; }
   .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); border-color: #facc15; }
+
+  /* Golden variant (tint + small tag) */
+  .pet-tile--golden .pet-tile__img-el,
+  .pet-img--golden {
+    filter: sepia(1) saturate(3) hue-rotate(10deg) brightness(1.08);
+  }
+
+  .pet-tile--golden::after {
+    content: 'GOLD';
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 215, 0, 0.7);
+    color: #ffd700;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+  }
 
   .pet-tile--equipped {
     outline: 3px solid rgba(255, 255, 255, 0.9);
@@ -17318,9 +18308,10 @@
   }
 
   /* Included from: ./components/ThemeStyles.html */
+
   body.mobile .training-prompt__title {
-  font-size: 14px;
-}
+    font-size: 14px;
+  }
 
   body.mobile .training-prompt__requirement {
     font-size: 11px;

@@ -52,6 +52,7 @@ includeContent("./components/RebirthModal.html");
 includeContent("./components/EggModal.html");
 includeContent("./components/RewardModal.html");
 includeContent("./components/DailyRewardModal.html");
+includeContent("./components/GoldenMachineModal.html");
 includeContent("./components/PetsModal.html");
 includeContent("./components/AchievementsModal.html");
 includeContent("./components/MapsModal.html");

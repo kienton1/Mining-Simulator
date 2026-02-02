@@ -71,6 +71,17 @@ export interface PlayerData {
   autoDeletePets?: string[];
 
   /**
+   * Golden Machine (golden pets)
+   * When a player wins the wheel roll, the server stores a short-lived pending reward.
+   * The UI claims it after the wheel animation finishes.
+   */
+  pendingGoldenMachineCraft?: {
+    token: string;
+    outputPetId: string;
+    expiresAt: number;
+  };
+
+  /**
    * World System
    * 
    * Multi-world support for different maps/locations.

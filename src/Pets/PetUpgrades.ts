@@ -17,6 +17,17 @@ export type PetTier = 0 | 1 | 2 | 3;
 
 export const PET_MAX_TIER: PetTier = 3;
 
+/**
+ * Golden pets are a variant of any pet tier.
+ *
+ * Encoding:
+ *   <basePetId>__golden
+ *   <basePetId>__large__golden
+ *   <basePetId>__huge__golden
+ *   <basePetId>__giga__golden
+ */
+export const PET_GOLDEN_SUFFIX = '__golden';
+
 export const PET_TIER_SUFFIX: Record<PetTier, string> = {
   0: '',
   1: '__large',
@@ -38,19 +49,35 @@ export const PET_TIER_MULTIPLIER_FACTOR: Record<PetTier, number> = {
   3: 2,
 };
 
+export function isGoldenPetId(petId: PetId): boolean {
+  return typeof petId === 'string' && petId.endsWith(PET_GOLDEN_SUFFIX);
+}
+
+export function stripGoldenFromPetId(petId: PetId): PetId {
+  if (!isGoldenPetId(petId)) return petId;
+  return petId.slice(0, -PET_GOLDEN_SUFFIX.length);
+}
+
+export function makeGoldenPetId(petId: PetId): PetId {
+  const stripped = stripGoldenFromPetId(petId);
+  return `${stripped}${PET_GOLDEN_SUFFIX}`;
+}
+
 export function getPetTierFromPetId(petId: PetId): PetTier | null {
   if (typeof petId !== 'string' || petId.length === 0) return null;
-  if (petId.endsWith(PET_TIER_SUFFIX[3])) return 3;
-  if (petId.endsWith(PET_TIER_SUFFIX[2])) return 2;
-  if (petId.endsWith(PET_TIER_SUFFIX[1])) return 1;
+  const normalized = stripGoldenFromPetId(petId);
+  if (normalized.endsWith(PET_TIER_SUFFIX[3])) return 3;
+  if (normalized.endsWith(PET_TIER_SUFFIX[2])) return 2;
+  if (normalized.endsWith(PET_TIER_SUFFIX[1])) return 1;
   return 0;
 }
 
 export function getBasePetIdFromAnyPetId(petId: PetId): PetId {
-  const tier = getPetTierFromPetId(petId);
-  if (tier === null || tier === 0) return petId;
+  const normalized = stripGoldenFromPetId(petId);
+  const tier = getPetTierFromPetId(normalized);
+  if (tier === null || tier === 0) return normalized;
   const suffix = PET_TIER_SUFFIX[tier];
-  return petId.slice(0, -suffix.length);
+  return normalized.slice(0, -suffix.length);
 }
 
 export function makeUpgradedPetId(basePetId: PetId, tier: PetTier): PetId {

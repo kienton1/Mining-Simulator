@@ -60,6 +60,7 @@ interface PlayerModalState {
   achievementsModalOpen: boolean;
   eggModalOpen: boolean;
   rewardModalOpen: boolean;
+  goldenMachineModalOpen: boolean;
   mapsModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
 }
@@ -269,6 +270,7 @@ export class GameManager {
       eggModalOpen: false,
       rewardModalOpen: false,
       mapsModalOpen: false,
+      goldenMachineModalOpen: false,
       lastModalOpenTime: 0,
     });
     
@@ -1109,7 +1111,7 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'maps', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
@@ -1118,6 +1120,7 @@ export class GameManager {
       achievementsModalOpen: false,
       eggModalOpen: false,
       rewardModalOpen: false,
+      goldenMachineModalOpen: false,
       mapsModalOpen: false,
       lastModalOpenTime: 0,
     };
@@ -1136,6 +1139,8 @@ export class GameManager {
       modalState.eggModalOpen = isOpen;
     } else if (modalType === 'reward') {
       modalState.rewardModalOpen = isOpen;
+    } else if (modalType === 'goldenMachine') {
+      modalState.goldenMachineModalOpen = isOpen;
     } else if (modalType === 'maps') {
       modalState.mapsModalOpen = isOpen;
     }
@@ -1164,6 +1169,7 @@ export class GameManager {
       modalState.achievementsModalOpen = false;
       modalState.eggModalOpen = false;
       modalState.rewardModalOpen = false;
+      modalState.goldenMachineModalOpen = false;
       // Don't touch mapsModalOpen as it's not a blocking modal for mining
       console.log('[GameManager] Cleared all blocking modal states for player:', player.username);
     }
@@ -1189,7 +1195,8 @@ export class GameManager {
       modalState.petsModalOpen ||
       modalState.achievementsModalOpen ||
       modalState.eggModalOpen ||
-      modalState.rewardModalOpen
+      modalState.rewardModalOpen ||
+      modalState.goldenMachineModalOpen
     ) {
       console.log('[GameManager] isBlockingModalOpen: TRUE - modals:', {
         miner: modalState.minerModalOpen,
@@ -1199,6 +1206,7 @@ export class GameManager {
         achievements: modalState.achievementsModalOpen,
         egg: modalState.eggModalOpen,
         reward: modalState.rewardModalOpen,
+        goldenMachine: modalState.goldenMachineModalOpen,
       });
       return true;
     }

@@ -9,7 +9,7 @@ import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
 import type { PetId } from './PetData';
-import { getBasePetIdFromAnyPetId, getNextPetTier, getPetTierFromPetId, makeUpgradedPetId, PET_MAX_TIER } from './PetUpgrades';
+import { getBasePetIdFromAnyPetId, getNextPetTier, getPetTierFromPetId, isGoldenPetId, makeGoldenPetId, makeUpgradedPetId, PET_MAX_TIER, stripGoldenFromPetId } from './PetUpgrades';
 import { getBonuses } from '../Achievements/Achievements';
 
 type GetPlayerData = (player: Player) => PlayerData | undefined;
@@ -339,7 +339,9 @@ export class PetManager {
     if (!data) return { success: false, message: 'Player data not found' };
     if (!isPetId(petId)) return { success: false, message: 'Invalid pet id' };
 
-    const tier = getPetTierFromPetId(petId);
+    const wasGolden = isGoldenPetId(petId);
+    const normalized = stripGoldenFromPetId(petId);
+    const tier = getPetTierFromPetId(normalized);
     if (tier === null) return { success: false, message: 'Invalid pet id' };
     if (tier >= PET_MAX_TIER) {
       return { success: false, message: 'MAX' };
@@ -378,8 +380,9 @@ export class PetManager {
       return { success: false, message: 'Failed to craft (internal error)' };
     }
 
-    const basePetId = getBasePetIdFromAnyPetId(petId);
-    const newPetId = makeUpgradedPetId(basePetId, nextTier);
+    const basePetId = getBasePetIdFromAnyPetId(normalized);
+    const upgradedId = makeUpgradedPetId(basePetId, nextTier);
+    const newPetId = wasGolden ? makeGoldenPetId(upgradedId) : upgradedId;
     data.petInventory.push(newPetId);
 
     if (!data.petDiscovered.includes(newPetId)) {
@@ -388,6 +391,178 @@ export class PetManager {
 
     this.updatePlayerData(player, data);
     return { success: true, newPetId };
+  }
+
+  /**
+   * Golden Machine: gamble selected identical pet instances to create a Golden variant.
+   *
+   * Rules:
+   * - Only non-golden pets can be used.
+   * - All selected instances must be the exact same PetId (tier included).
+   * - Each selected pet contributes +12.5% chance, capped at 100% (max 8 pets).
+   * - On failure, all selected pets are destroyed.
+   * - On success, all selected pets are destroyed and a pending golden pet reward is created.
+   *   The UI claims it after the wheel animation finishes.
+   */
+  craftGoldenVariant(
+    player: Player,
+    instanceIds: string[]
+  ): {
+    success: boolean;
+    message?: string;
+    rolled?: boolean;
+    didWin?: boolean;
+    chance?: number;
+    inputPetId?: PetId;
+    outputPetId?: PetId;
+    token?: string;
+  } {
+    const data = this.getPlayerData(player);
+    if (!data) return { success: false, message: 'Player data not found' };
+
+    // Clear any stale pending reward (new craft attempt replaces it).
+    if ((data as any).pendingGoldenMachineCraft) {
+      (data as any).pendingGoldenMachineCraft = undefined;
+    }
+
+    const raw = Array.isArray(instanceIds) ? instanceIds : [];
+    const unique = Array.from(new Set(raw.map((s) => String(s || '').trim()).filter(Boolean)));
+    if (unique.length === 0) {
+      return { success: false, message: 'Select at least 1 pet' };
+    }
+    if (unique.length > 8) {
+      return { success: false, message: 'You can only use up to 8 pets (100% max)' };
+    }
+
+    data.petInventory = Array.isArray(data.petInventory) ? data.petInventory : [];
+    data.equippedPets = Array.isArray(data.equippedPets) ? data.equippedPets : [];
+    data.petDiscovered = Array.isArray(data.petDiscovered) ? data.petDiscovered : [];
+
+    type Parsed = { src: 'inv' | 'eq'; idx: number; instanceId: string };
+    const parsed: Parsed[] = [];
+
+    for (const id of unique) {
+      const [srcRaw, idxRaw] = id.split(':');
+      const src = srcRaw === 'inv' ? 'inv' : srcRaw === 'eq' ? 'eq' : null;
+      const idx = Number(idxRaw);
+      if (!src || !Number.isFinite(idx)) {
+        return { success: false, message: 'Invalid pet selection' };
+      }
+      if (src === 'eq') {
+        return { success: false, message: 'Unequip pets before using the Golden Machine' };
+      }
+      const intIdx = Math.floor(idx);
+      if (intIdx < 0) return { success: false, message: 'Invalid pet selection' };
+      parsed.push({ src, idx: intIdx, instanceId: `${src}:${intIdx}` });
+    }
+
+    // Resolve selections to actual PetIds and validate they match.
+    let inputPetId: PetId | null = null;
+    for (const p of parsed) {
+      const arr = p.src === 'inv' ? data.petInventory : data.equippedPets;
+      if (p.idx < 0 || p.idx >= arr.length) {
+        return { success: false, message: 'Selected pet no longer exists' };
+      }
+      const pid = arr[p.idx];
+      if (!isPetId(pid)) {
+        return { success: false, message: 'Invalid pet id' };
+      }
+      if (isGoldenPetId(pid)) {
+        return { success: false, message: 'Golden pets cannot be used in the Golden Machine' };
+      }
+      if (!inputPetId) inputPetId = pid;
+      if (pid !== inputPetId) {
+        return { success: false, message: 'All selected pets must be the same' };
+      }
+    }
+
+    if (!inputPetId) {
+      return { success: false, message: 'Invalid pet selection' };
+    }
+
+    const chance = Math.min(100, unique.length * 12.5);
+    const didWin = Math.random() < chance / 100;
+
+    // Delete selected pets (descending indices per array so slots don't shift).
+    const invIndices = parsed.filter((p) => p.src === 'inv').map((p) => p.idx);
+    const eqIndices = parsed.filter((p) => p.src === 'eq').map((p) => p.idx);
+
+    const deleteDescending = (arr: any[], indices: number[]) => {
+      const sorted = Array.from(new Set(indices)).sort((a, b) => b - a);
+      for (const idx of sorted) {
+        if (idx < 0 || idx >= arr.length) continue;
+        arr.splice(idx, 1);
+      }
+    };
+
+    deleteDescending(data.petInventory, invIndices);
+    deleteDescending(data.equippedPets, eqIndices);
+
+    let outputPetId: PetId | undefined;
+    let token: string | undefined;
+    if (didWin) {
+      outputPetId = makeGoldenPetId(inputPetId);
+      token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      (data as any).pendingGoldenMachineCraft = {
+        token,
+        outputPetId,
+        expiresAt: Date.now() + 60_000, // 60s to claim after roll
+      };
+    }
+
+    this.updatePlayerData(player, data);
+    return {
+      success: true,
+      rolled: true,
+      didWin,
+      chance,
+      inputPetId,
+      outputPetId,
+      token,
+    };
+  }
+
+  /**
+   * Claim a pending Golden Machine reward after the UI finishes the wheel animation.
+   */
+  claimGoldenVariant(player: Player, token: string): { success: boolean; message?: string; petId?: PetId } {
+    const data = this.getPlayerData(player);
+    if (!data) return { success: false, message: 'Player data not found' };
+
+    const pending = (data as any).pendingGoldenMachineCraft;
+    if (!pending || typeof pending !== 'object') {
+      return { success: false, message: 'No pending reward to claim' };
+    }
+
+    const now = Date.now();
+    if (typeof pending.expiresAt !== 'number' || pending.expiresAt < now) {
+      (data as any).pendingGoldenMachineCraft = undefined;
+      this.updatePlayerData(player, data);
+      return { success: false, message: 'Reward expired' };
+    }
+
+    if (String(pending.token) !== String(token)) {
+      return { success: false, message: 'Invalid claim token' };
+    }
+
+    const petId = String(pending.outputPetId ?? '');
+    if (!isPetId(petId)) {
+      (data as any).pendingGoldenMachineCraft = undefined;
+      this.updatePlayerData(player, data);
+      return { success: false, message: 'Invalid reward pet id' };
+    }
+
+    data.petInventory = Array.isArray(data.petInventory) ? data.petInventory : [];
+    data.petDiscovered = Array.isArray(data.petDiscovered) ? data.petDiscovered : [];
+
+    data.petInventory.push(petId);
+    if (!data.petDiscovered.includes(petId)) {
+      data.petDiscovered.push(petId);
+    }
+
+    (data as any).pendingGoldenMachineCraft = undefined;
+    this.updatePlayerData(player, data);
+    return { success: true, petId };
   }
 }
 

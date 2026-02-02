@@ -46,11 +46,12 @@ import { ShopLabelManager, type ShopLabelDefinition } from './src/Shop/ShopLabel
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
-import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, PET_MAX_TIER } from './src/Pets/PetUpgrades';
+import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, isGoldenPetId, PET_MAX_TIER } from './src/Pets/PetUpgrades';
 import { addCoinsEarned, addEggsHatched, addTimePlayedMs, buildAchievementsUIState, claimAchievement, getBonuses } from './src/Achievements/Achievements';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
 import { EGG_STATIONS } from './src/Pets/EggStationsConfig';
+import { GoldenMachineEntity } from './src/Pets/GoldenMachineEntity';
 import { WorldRegistry } from './src/WorldRegistry';
 import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
@@ -270,6 +271,23 @@ startServer(world => {
   setTimeout(() => shopLabelManager.start(), 1000);
 
   /**
+   * Golden Machine (pet merger -> golden variant)
+   * Placed in Island 1 at the requested coordinates.
+   */
+  const goldenMachine = new GoldenMachineEntity(
+    world,
+    { x: -12.73, y: 1.72, z: 14.65 },
+    'models/BuyStations/checkpoint-block.gltf',
+    // Decrease size by 2x vs previous tuning
+    { proximityRadius: 3.0, modelScale: 1.5 }
+  );
+  goldenMachine.spawn();
+  goldenMachine.onProximityChange = (player, inProximity, distance) => {
+    console.log(`[Golden Machine] Player ${player.username} proximity: ${inProximity}, distance: ${distance.toFixed(2)}`);
+    player.ui.sendData({ type: 'GOLDEN_MACHINE_PROXIMITY', inProximity });
+  };
+
+  /**
    * Daily Reward Chest System
    * Spawn treasure chests near each gem upgrade store with sparkle particles
    */
@@ -332,6 +350,7 @@ startServer(world => {
       const def = getPetDefinition(p.petId);
       const tier = getPetTierFromPetId(p.petId) ?? 0;
       const basePetId = getBasePetIdFromAnyPetId(p.petId);
+      const isGolden = isGoldenPetId(p.petId);
       return {
         instanceId: p.instanceId,
         petId: p.petId,
@@ -346,6 +365,7 @@ startServer(world => {
         rarity: def?.rarity ?? 'common',
         eggType: def?.eggType ?? 'stone',
         multiplier: def?.multiplier ?? 0,
+        isGolden,
       };
     });
 
@@ -565,6 +585,8 @@ startServer(world => {
     gemTraderEntities.forEach(entity => entity.addPlayer(player));
     // Add player to egg station tracking
     eggStationManager.addPlayer(player);
+    // Add player to golden machine tracking
+    goldenMachine.addPlayer(player);
     // Add player to daily chest tracking
     dailyChestController.addPlayer(player);
 
@@ -781,6 +803,8 @@ startServer(world => {
           });
           // Send achievements state early so other UIs (egg hatch speed, pet caps) are correct immediately.
           sendAchievementsState(player);
+          // Preload PET_STATE so proximity UIs (Golden Machine) can render pets immediately on first open.
+          sendPetState(player);
           break;
         case 'TOGGLE_AUTO_MINE':
 
@@ -909,6 +933,13 @@ startServer(world => {
             inProximity: false,
           });
           break;
+        case 'CLOSE_GOLDEN_MACHINE_UI':
+          // Hide golden machine UI until the player leaves and re-enters proximity.
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_PROXIMITY',
+            inProximity: false,
+          });
+          break;
         case 'OPEN_MINER_SHOP':
           gameManager.setModalState(player, 'miner', true);
           const minerShopData = gameManager.getMinerShop().getShopData(player);
@@ -975,7 +1006,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'maps') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps') {
             gameManager.setModalState(player, data.modalType, true);
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
@@ -991,7 +1022,7 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
 
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine') {
             gameManager.setModalState(player, data.modalType, false);
           }
           break;
@@ -1153,6 +1184,127 @@ startServer(world => {
             // Crafting can consume equipped pets, so always resync visuals on success.
             gameManager.syncEquippedPets(player);
           }
+          break;
+        }
+        case 'GOLDEN_MACHINE_CRAFT': {
+          const instanceIds = Array.isArray((data as any).instanceIds) ? (data as any).instanceIds : [];
+          const res = gameManager.getPetManager().craftGoldenVariant(player, instanceIds);
+          if (!res.success) {
+            player.ui.sendData({
+              type: 'GOLDEN_MACHINE_RESULT',
+              success: false,
+              message: res.message ?? 'Failed',
+            });
+            sendPetState(player);
+            break;
+          }
+
+          // Calculate target angle for wheel animation
+          // The wheel rotates, and when it stops, the segment at the pointer (0 degrees / 12:00) determines the result
+          // The gradient is fixed: green from 0 to greenDeg, red from greenDeg to 360
+          // When the wheel rotates by `targetAngle` degrees, the segment that ends up at 0 degrees
+          // is the one that was originally at `360 - targetAngle` degrees (mod 360)
+          // So: if we want green at pointer, we need 360 - targetAngle in [0, greenDeg]
+          //     which means targetAngle in [360 - greenDeg, 360] or [0, greenDeg] (wrapping)
+          // Actually simpler: if targetAngle is in [0, greenDeg], then 360 - targetAngle is in [360 - greenDeg, 360]
+          // That's the red zone, so that's wrong.
+          // 
+          // Correct approach: The wheel rotates clockwise. If we rotate by `targetAngle`,
+          // the segment at position `360 - targetAngle` (mod 360) ends up at the pointer.
+          // So to get green at pointer: we need 360 - targetAngle (mod 360) in [0, greenDeg]
+          // Which means: targetAngle (mod 360) should be in [360 - greenDeg, 360]
+          // Or equivalently: targetAngle should be in [360 - greenDeg, 360] or [0, greenDeg] if wrapping
+          //
+          // Actually, let me think differently: if the wheel rotates by X degrees clockwise,
+          // the segment at position (360 - X) mod 360 ends up at the top (0 degrees).
+          // So if we want the green zone (0 to greenDeg) at the top, we need:
+          // (360 - targetAngle) mod 360 to be in [0, greenDeg]
+          // Which means targetAngle mod 360 should be in [360 - greenDeg, 360]
+          //
+          // For red zone at top: (360 - targetAngle) mod 360 should be in [greenDeg, 360]
+          // Which means targetAngle mod 360 should be in [0, 360 - greenDeg]
+          const chance = Number(res.chance ?? 0);
+          const greenDeg = chance * 3.6;
+          let targetAngle: number;
+          if (res.didWin) {
+            // Want green at pointer: targetAngle should be in [360 - greenDeg, 360]
+            targetAngle = 360 - greenDeg + Math.random() * greenDeg;
+          } else {
+            // Want red at pointer: targetAngle should be in [0, 360 - greenDeg]
+            targetAngle = Math.random() * (360 - greenDeg);
+          }
+
+          // Generate unique spin ID
+          const spinId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+          // Store result temporarily (will be sent after spin animation completes)
+          if (!(player as any).__goldenMachinePendingResults) {
+            (player as any).__goldenMachinePendingResults = new Map();
+          }
+          (player as any).__goldenMachinePendingResults.set(spinId, {
+            didWin: Boolean(res.didWin),
+            chance: chance,
+            inputPetId: res.inputPetId,
+            outputPetId: res.outputPetId ?? null,
+            token: res.token ?? null,
+          });
+
+          // Send spin start event to trigger wheel animation
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_SPIN_START',
+            success: true,
+            targetAngle: targetAngle,
+            chance: chance,
+            spinId: spinId,
+          });
+
+          sendPetState(player);
+          // This can consume equipped pets, so always resync visuals.
+          gameManager.syncEquippedPets(player);
+          break;
+        }
+        case 'GOLDEN_MACHINE_SPIN_RESULT': {
+          // Client finished wheel animation, now send the actual result
+          const spinId = String((data as any).spinId ?? '');
+          const pendingResults = (player as any).__goldenMachinePendingResults;
+          
+          if (!pendingResults || !pendingResults.has(spinId)) {
+            player.ui.sendData({
+              type: 'GOLDEN_MACHINE_RESULT',
+              success: false,
+              message: 'Invalid spin ID',
+            });
+            break;
+          }
+
+          const result = pendingResults.get(spinId);
+          pendingResults.delete(spinId);
+
+          // Send the stored result
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_RESULT',
+            success: true,
+            didWin: result.didWin,
+            chance: result.chance,
+            inputPetId: result.inputPetId,
+            outputPetId: result.outputPetId,
+            token: result.token,
+          });
+
+          break;
+        }
+        case 'GOLDEN_MACHINE_CLAIM': {
+          const token = String((data as any).token ?? '');
+          const res = gameManager.getPetManager().claimGoldenVariant(player, token);
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_CLAIM_RESULT',
+            success: res.success,
+            message: res.message ?? (res.success ? 'OK' : 'Failed'),
+            petId: res.petId ?? null,
+          });
+          sendPetState(player);
+          // Claim adds a pet; resync visuals in case the player equips it immediately.
+          gameManager.syncEquippedPets(player);
           break;
         }
         case 'EGG_AUTO_DELETE_TOGGLE': {
@@ -1898,6 +2050,8 @@ startServer(world => {
     gemTraderEntities.forEach(entity => entity.removePlayer(player));
     // Remove player from egg station tracking
     eggStationManager.removePlayer(player);
+    // Remove player from golden machine tracking
+    goldenMachine.removePlayer(player);
     // Remove player from daily chest tracking
     dailyChestController.removePlayer(player);
     
