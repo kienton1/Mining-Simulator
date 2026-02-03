@@ -14,6 +14,9 @@ import {
 
 import type { EventPayloads } from 'hytopia';
 
+/** Set to true to enable verbose movement/input debug logging. */
+const DEBUG_MOVEMENT = false;
+
 export class MiningPlayerEntity extends DefaultPlayerEntity {
   private onLeftClickStartCallback?: () => void;
   private onLeftClickStopCallback?: () => void;
@@ -21,7 +24,6 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
   private wasLeftClickPressed = false;
   private inputSuppressed = false;
   private _inputTickCount = 0;
-  private _movementLoggedOnce = false;
 
   /**
    * Player entities always assign a PlayerController to the entity,
@@ -37,9 +39,9 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
       name: 'Player',
     });
 
-    console.log(`[MiningPlayerEntity] Constructor called for player: ${player.username}`);
-    console.log(`[MiningPlayerEntity] this.controller exists: ${!!this.controller}`);
-    console.log(`[MiningPlayerEntity] this.controller type: ${this.controller?.constructor?.name}`);
+    if (DEBUG_MOVEMENT) {
+      console.log(`[MPE] constructor: ${player.username}, ctrl=${!!this.controller}, type=${this.controller?.constructor?.name}`);
+    }
 
     // Set up controller immediately - controller is always available in constructor
     this.setupMiningController();
@@ -50,28 +52,26 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
    * The controller is always available in the constructor for DefaultPlayerEntity.
    */
   private setupMiningController(): void {
-    const pName = this.player?.username || 'unknown';
-    console.log(`[MPE] setupMiningController: ${pName}, ctrl=${!!this.controller}, on=${typeof this.playerController?.on}`);
+    if (DEBUG_MOVEMENT) {
+      const pName = this.player?.username || 'unknown';
+      console.log(`[MPE] setupMiningController: ${pName}, ctrl=${!!this.controller}, on=${typeof this.playerController?.on}`);
+    }
 
     this.playerController.autoCancelMouseLeftClick = false;
     this.applyStandardAnimations();
 
-    // Movement callbacks with one-time logging
-    const self = this;
-    this.playerController.canWalk = () => {
-      if (!self._movementLoggedOnce) console.log(`[MPE] canWalk called for ${pName}, suppressed=${self.inputSuppressed}`);
-      return !self.inputSuppressed;
-    };
+    // Set up movement control callbacks
+    this.playerController.canWalk = () => !this.inputSuppressed;
     this.playerController.canRun = () => !this.inputSuppressed;
     this.playerController.canJump = () => !this.inputSuppressed;
-    this.playerController.canSwim = () => {
-      if (!self._movementLoggedOnce) { self._movementLoggedOnce = true; }
-      return !this.inputSuppressed;
-    };
+    this.playerController.canSwim = () => !this.inputSuppressed;
 
     // Register input handler
     this.playerController.on(BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT, this._onTickWithPlayerInput);
-    console.log(`[MPE] Event listener registered for ${pName}`);
+
+    if (DEBUG_MOVEMENT) {
+      console.log(`[MPE] Event listener registered for ${this.player?.username}`);
+    }
   }
 
   /**
@@ -157,7 +157,7 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
    * Used for loading screens or other forced pauses.
    */
   setInputSuppressed(suppressed: boolean): void {
-    console.log(`[MPE] setInputSuppressed: ${this.player?.username}, suppressed=${suppressed}`);
+    if (DEBUG_MOVEMENT) console.log(`[MPE] setInputSuppressed: ${this.player?.username}, suppressed=${suppressed}`);
     this.inputSuppressed = suppressed;
     if (suppressed && this.wasLeftClickPressed) {
       this.wasLeftClickPressed = false;
@@ -173,10 +173,11 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
    */
   private _onTickWithPlayerInput = (payload: EventPayloads[BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT]): void => {
     const { input } = payload;
-    this._inputTickCount++;
-    // Log first 3 ticks and then every 300 ticks (~5 sec at 60fps)
-    if (this._inputTickCount <= 3 || this._inputTickCount % 300 === 0) {
-      console.log(`[MPE] _onTickWithPlayerInput: ${this.player?.username}, tick=${this._inputTickCount}, suppressed=${this.inputSuppressed}, w=${input.w}, a=${input.a}, s=${input.s}, d=${input.d}`);
+    if (DEBUG_MOVEMENT) {
+      this._inputTickCount++;
+      if (this._inputTickCount <= 3 || this._inputTickCount % 300 === 0) {
+        console.log(`[MPE] tick: ${this.player?.username}, #${this._inputTickCount}, suppressed=${this.inputSuppressed}, w=${input.w}, a=${input.a}, s=${input.s}, d=${input.d}`);
+      }
     }
 
     if (this.inputSuppressed) {

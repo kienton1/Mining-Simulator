@@ -75,6 +75,9 @@ interface RewardTimerState {
   ready: boolean;
 }
 
+/** Set to true to enable verbose movement/input debug logging. */
+const DEBUG_MOVEMENT = false;
+
 export class GameManager {
   private world: World;
   private playerDataMap: Map<Player, PlayerData> = new Map();
@@ -938,7 +941,7 @@ export class GameManager {
    * Disables input and interactions while loading.
    */
   setPlayerLoading(player: Player, isLoading: boolean): void {
-    console.log(`[GM] setPlayerLoading: ${player.username}, isLoading=${isLoading}`);
+    if (DEBUG_MOVEMENT) console.log(`[GM] setPlayerLoading: ${player.username}, isLoading=${isLoading}`);
     this.playerLoadingStates.set(player, isLoading);
 
     player.setInteractEnabled(!isLoading);
@@ -947,7 +950,7 @@ export class GameManager {
     }
 
     const playerEntity = this.getPlayerEntity(player);
-    console.log(`[GM] setPlayerLoading: ${player.username}, entityFound=${!!playerEntity}, hasSetInputSuppressed=${typeof (playerEntity as any)?.setInputSuppressed}`);
+    if (DEBUG_MOVEMENT) console.log(`[GM] setPlayerLoading: ${player.username}, entityFound=${!!playerEntity}, hasSetInputSuppressed=${typeof (playerEntity as any)?.setInputSuppressed}`);
     if (playerEntity && typeof (playerEntity as any).setInputSuppressed === 'function') {
       (playerEntity as any).setInputSuppressed(isLoading);
     }

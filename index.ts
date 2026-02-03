@@ -694,26 +694,19 @@ startServer(world => {
     
     // Create custom player entity that handles input (like NewGame's GamePlayerEntity)
     // MUST spawn synchronously for camera to attach properly
-    console.log(`[index] Creating MiningPlayerEntity for: ${player.username}`);
     const playerEntity = new MiningPlayerEntity(player);
-    console.log(`[index] Spawning entity for: ${player.username}`);
     playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
-    console.log(`[index] Entity spawned for: ${player.username}, isSpawned=${playerEntity.isSpawned}`);
 
     // Start in loading state until UI and backend data are ready
-    console.log(`[index] Setting loading state TRUE for: ${player.username}`);
     gameManager.setPlayerLoading(player, true);
     const loadingGate = { uiLoaded: false, dataLoaded: false };
     const loadingFallbackTimeout = setTimeout(() => {
       // Failsafe: never keep players stuck in loading.
-      console.log(`[index] Loading fallback timeout fired for: ${player.username}`);
       gameManager.setPlayerLoading(player, false);
     }, 5000);
     const tryFinishLoading = () => {
-      console.log(`[index] tryFinishLoading: ${player.username}, uiLoaded=${loadingGate.uiLoaded}, dataLoaded=${loadingGate.dataLoaded}`);
       if (!loadingGate.uiLoaded || !loadingGate.dataLoaded) return;
       clearTimeout(loadingFallbackTimeout);
-      console.log(`[index] Setting loading state FALSE for: ${player.username} (after 300ms)`);
       setTimeout(() => {
         gameManager.setPlayerLoading(player, false);
       }, 300);

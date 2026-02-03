@@ -700,6 +700,9 @@
 <!-- Included from: ./components/SetupAndEventHandlers.html -->
 
 <script>
+  /** Set to true to enable verbose movement/input debug logging in the UI. */
+  window.DEBUG_MOVEMENT = window.DEBUG_MOVEMENT || false;
+
   // This file owns egg station UI behavior; disable legacy EggModal handlers.
   window.__eggStationUIManaged = true;
 
@@ -954,59 +957,48 @@
    * Debug keyboard input to see what's blocking movement
    */
   function setupKeyboardDebug() {
-    // Log all keydown events
-    window.addEventListener('keydown', (e) => {
-      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
-      if (wasdKeys.includes(e.code)) {
-        console.log('[DEBUG] Keydown:', e.code, {
-          defaultPrevented: e.defaultPrevented,
-          target: e.target?.tagName,
-          targetId: e.target?.id,
-          targetClass: e.target?.className,
-          isTrusted: e.isTrusted
-        });
-      }
-    }, true); // Use capture phase to catch early
+    if (window.DEBUG_MOVEMENT) {
+      window.addEventListener('keydown', (e) => {
+        const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+        if (wasdKeys.includes(e.code)) {
+          console.log('[DEBUG] Keydown:', e.code, {
+            defaultPrevented: e.defaultPrevented,
+            target: e.target?.tagName,
+            targetId: e.target?.id,
+            targetClass: e.target?.className,
+            isTrusted: e.isTrusted
+          });
+        }
+      }, true);
 
-    // Log all keyup events
-    window.addEventListener('keyup', (e) => {
-      const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
-      if (wasdKeys.includes(e.code)) {
-        console.log('[DEBUG] Keyup:', e.code, {
-          defaultPrevented: e.defaultPrevented,
-          target: e.target?.tagName
-        });
-      }
-    }, true);
+      window.addEventListener('keyup', (e) => {
+        const wasdKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+        if (wasdKeys.includes(e.code)) {
+          console.log('[DEBUG] Keyup:', e.code, {
+            defaultPrevented: e.defaultPrevented,
+            target: e.target?.tagName
+          });
+        }
+      }, true);
 
-    // Check if hytopia is available and can receive input
-    if (typeof hytopia !== 'undefined') {
-      console.log('[DEBUG] Hytopia available:', {
-        hasPressInput: typeof hytopia.pressInput === 'function',
-        hasLockPointer: typeof hytopia.lockPointer === 'function'
+      if (typeof hytopia !== 'undefined') {
+        console.log('[DEBUG] Hytopia available:', {
+          hasPressInput: typeof hytopia.pressInput === 'function',
+          hasLockPointer: typeof hytopia.lockPointer === 'function'
+        });
+      } else {
+        console.warn('[DEBUG] Hytopia not available yet');
+      }
+
+      console.log('[DEBUG] Document focus:', {
+        activeElement: document.activeElement?.tagName,
+        activeElementId: document.activeElement?.id,
+        hasFocus: document.hasFocus()
       });
-    } else {
-      console.warn('[DEBUG] Hytopia not available yet');
+
+      window.addEventListener('focus', () => console.log('[DEBUG] Window gained focus'));
+      window.addEventListener('blur', () => console.log('[DEBUG] Window lost focus'));
     }
-
-    // Check document focus
-    console.log('[DEBUG] Document focus:', {
-      activeElement: document.activeElement?.tagName,
-      activeElementId: document.activeElement?.id,
-      hasFocus: document.hasFocus()
-    });
-
-    // Monitor focus changes
-    window.addEventListener('focus', () => {
-      console.log('[DEBUG] Window gained focus');
-      // Ensure document can receive keyboard input
-      if (document.activeElement && document.activeElement.tagName === 'BODY') {
-        document.body.focus();
-      }
-    });
-    window.addEventListener('blur', () => {
-      console.log('[DEBUG] Window lost focus');
-    });
 
     // Ensure body can receive focus for keyboard events
     document.body.setAttribute('tabindex', '-1');
@@ -1142,7 +1134,7 @@
       try {
         lockPointerInProgress = true;
         hytopia.lockPointer(lock, true);
-        console.log('[DEBUG] Pointer lock set to:', lock);
+        if (window.DEBUG_MOVEMENT) console.log('[DEBUG] Pointer lock set to:', lock);
       } catch (err) {
         console.warn('[UI] lockPointer failed', err);
       } finally {
@@ -1152,12 +1144,10 @@
 
     // Try locking pointer initially - Hytopia may require this for keyboard input
     // The maintainInput=true parameter should allow movement even when locked
-    console.log('[DEBUG] Attempting initial pointer lock for keyboard input');
     lockPointerSafe(true);
-    
+
     // If that doesn't work, unlock after a short delay to allow UI interaction
     setTimeout(() => {
-      console.log('[DEBUG] Unlocking pointer after initial lock attempt');
       lockPointerSafe(false);
     }, 100);
 
@@ -1221,7 +1211,7 @@
       if (!pointerLockActiveForTrackpad) {
         pointerLockActiveForTrackpad = true;
         lockPointerSafe(true);
-        console.log('[Trackpad Camera] Pointer locked for trackpad gesture');
+        if (window.DEBUG_MOVEMENT) console.log('[Trackpad Camera] Pointer locked for trackpad gesture');
       }
 
       // Clear any pending unlock timer
@@ -1244,7 +1234,7 @@
       try {
         window.parent.document.dispatchEvent(syntheticEvent);
       } catch (crossOriginErr) {
-        console.log('[Trackpad Camera] Cross-origin dispatch failed, using local document');
+        if (window.DEBUG_MOVEMENT) console.log('[Trackpad Camera] Cross-origin dispatch failed, using local document');
       }
 
       // Also dispatch locally as fallback
@@ -1255,7 +1245,7 @@
         if (pointerLockActiveForTrackpad && !rightMouseHeld) {
           pointerLockActiveForTrackpad = false;
           lockPointerSafe(false);
-          console.log('[Trackpad Camera] Pointer unlocked after trackpad gesture ended');
+          if (window.DEBUG_MOVEMENT) console.log('[Trackpad Camera] Pointer unlocked after trackpad gesture ended');
         }
         trackpadUnlockTimer = null;
       }, TRACKPAD_UNLOCK_DELAY);
@@ -1422,7 +1412,7 @@
 
       wasdState[e.code] = true;
       hytopia.pressInput(wasdToInput[e.code], true);
-      console.log('[WASD] Keydown:', e.code, '->', wasdToInput[e.code]);
+      if (window.DEBUG_MOVEMENT) console.log('[WASD] Keydown:', e.code, '->', wasdToInput[e.code]);
     });
 
     window.addEventListener('keyup', (e) => {
@@ -1430,7 +1420,7 @@
 
       wasdState[e.code] = false;
       hytopia.pressInput(wasdToInput[e.code], false);
-      console.log('[WASD] Keyup:', e.code, '->', wasdToInput[e.code]);
+      if (window.DEBUG_MOVEMENT) console.log('[WASD] Keyup:', e.code, '->', wasdToInput[e.code]);
     });
 
     // Release all WASD on window blur to prevent stuck keys
