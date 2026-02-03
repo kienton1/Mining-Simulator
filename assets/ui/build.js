@@ -55,6 +55,7 @@ includeContent("./components/DailyRewardModal.html");
 includeContent("./components/GoldenMachineModal.html");
 includeContent("./components/PetsModal.html");
 includeContent("./components/AchievementsModal.html");
+includeContent("./components/LeaderboardsModal.html");
 includeContent("./components/MapsModal.html");
 
 // Training prompt

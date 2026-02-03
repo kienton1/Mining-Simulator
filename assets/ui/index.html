@@ -112,6 +112,7 @@
       'rebirth-modal',
       'pets-modal',
       'achievements-modal',
+      'leaderboard-modal',
       'egg-modal',
       'reward-modal',
       'golden-machine-modal',
@@ -2003,6 +2004,7 @@
     const rebirthButton = document.getElementById('rebirth-button');
     const petsButton = document.getElementById('pets-button');
     const achievementsButton = document.getElementById('achievements-button');
+    const leaderboardsButton = document.getElementById('leaderboards-button');
     const mapsButton = document.getElementById('maps-button');
     const minerModal = document.getElementById('miner-modal');
     const pickaxeModal = document.getElementById('pickaxe-modal');
@@ -2010,6 +2012,7 @@
     const petsModal = document.getElementById('pets-modal');
     const goldenMachineModal = document.getElementById('golden-machine-modal');
     const achievementsModal = document.getElementById('achievements-modal');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
     const mapsModal = document.getElementById('maps-modal');
     const eggModal = document.getElementById('egg-modal');
     const rewardModal = document.getElementById('reward-modal');
@@ -2021,6 +2024,10 @@
     const achievementsListEl = document.getElementById('achievements-list');
     const achievementsDetailTitleEl = document.getElementById('achievements-detail-title');
     const achievementsBadgeEl = document.getElementById('achievements-badge');
+    const leaderboardTabsEl = document.getElementById('leaderboard-tabs');
+    const leaderboardListEl = document.getElementById('leaderboard-list');
+    const leaderboardCategoryTitleEl = document.getElementById('leaderboard-category-title');
+    const leaderboardUpdatedEl = document.getElementById('leaderboard-updated');
     const rewardHudEl = document.getElementById('reward-hud');
     const rewardTimerTextEl = document.getElementById('reward-timer-text');
     const rewardButton = document.getElementById('reward-button');
@@ -2032,7 +2039,7 @@
     const rewardMessageEl = document.getElementById('reward-message');
 
     // Array of all modals for closing others when opening one
-    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, goldenMachineModal, achievementsModal, mapsModal, eggModal, rewardModal].filter(Boolean);
+    const allModals = [minerModal, pickaxeModal, rebirthModal, petsModal, goldenMachineModal, achievementsModal, leaderboardModal, mapsModal, eggModal, rewardModal].filter(Boolean);
 
     const minerGridEl = document.getElementById('miner-grid');
     const mapsListEl = document.getElementById('maps-list');
@@ -2137,6 +2144,21 @@
         if (achievementsDetailView) achievementsDetailView.hidden = true;
         hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'achievements' });
         hytopia.sendData({ type: 'REQUEST_ACHIEVEMENTS_STATE' });
+      });
+    }
+
+    // Setup leaderboards button click handler
+    if (leaderboardsButton) {
+      leaderboardsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!leaderboardModal) return;
+        state.leaderboards.loading = true;
+        showModal(leaderboardModal);
+        renderLeaderboardTabs();
+        renderLeaderboardList();
+        hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'leaderboard' });
+        hytopia.sendData({ type: 'REQUEST_LEADERBOARD_STATE' });
       });
     }
 
@@ -2363,6 +2385,12 @@
           petInventoryCap: 50,
           extraLuckPercent: 0,
         },
+      },
+      leaderboards: {
+        activeCategory: 'power',
+        data: {},
+        updatedAt: 0,
+        loading: false,
       },
       reward: {
         durationMs: 15 * 60 * 1000,
@@ -4260,6 +4288,163 @@
       }
     };
 
+    const leaderboardCategories = [
+      { id: 'power', label: 'Power', icon: 'icons/HUDIcons/PowerIcon.png', format: 'big' },
+      { id: 'blocksMined', label: 'Total Blocks Mined', icon: 'icons/HUDIcons/PickaxeIcon.png', format: 'number' },
+      { id: 'rebirths', label: 'Rebirths', icon: 'icons/HUDIcons/RebirthIcon.png', format: 'number' },
+      { id: 'timePlayed', label: 'Time Played', icon: 'icons/HUDIcons/TimerIcon.png', format: 'time' },
+      { id: 'maxCoins', label: 'Highest Total Coins', icon: 'icons/HUDIcons/CoinIcon.png', format: 'number' },
+      { id: 'eggsHatched', label: 'Eggs Hatched', icon: 'icons/HUDIcons/EggIcon.png', format: 'number' },
+    ];
+
+    const leaderboardSuffixes = ['','K','M','B','T','Q','Qn','Sx','Sp','Oc','No','De','UDe','DDe','TDe'];
+
+    const formatBigNumberString = (value) => {
+      if (value === null || value === undefined) return '0';
+      const raw = String(value).trim();
+      if (!raw) return '0';
+      const negative = raw.startsWith('-');
+      const digits = raw.replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+      if (digits.length <= 3) return (negative ? '-' : '') + digits;
+
+      const tier = Math.min(Math.floor((digits.length - 1) / 3), leaderboardSuffixes.length - 1);
+      const suffix = leaderboardSuffixes[tier];
+      const headLen = digits.length - tier * 3;
+      const head = digits.slice(0, headLen);
+      const next = digits.slice(headLen, headLen + 2);
+      let out = head;
+      if (next && Number(next) > 0) {
+        out += `.${next[0]}`;
+      }
+      return (negative ? '-' : '') + out + suffix;
+    };
+
+    const formatLeaderboardValue = (categoryId, value) => {
+      if (categoryId === 'timePlayed') {
+        const ms = Number(value ?? 0);
+        if (!Number.isFinite(ms) || ms <= 0) return '0s';
+        const totalSeconds = Math.floor(ms / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        if (minutes > 0) return `${minutes}m ${seconds}s`;
+        return `${seconds}s`;
+      }
+
+      const num = Number(value ?? 0);
+      if (Number.isFinite(num)) {
+        return formatNumber(num);
+      }
+      return formatBigNumberString(value);
+    };
+
+    const getCurrentPlayerId = () => {
+      const playerIdElement = document.getElementById('playerId');
+      return playerIdElement?.dataset?.playerId || null;
+    };
+
+    const renderLeaderboardTabs = () => {
+      if (!leaderboardTabsEl) return;
+      const cdn = '{{CDN_ASSETS_URL}}';
+      leaderboardTabsEl.innerHTML = '';
+
+      leaderboardCategories.forEach((cat) => {
+        const btn = document.createElement('button');
+        btn.className = 'leaderboard-tab';
+        if (state.leaderboards.activeCategory === cat.id) {
+          btn.classList.add('active');
+        }
+
+        const icon = document.createElement('img');
+        icon.alt = cat.label;
+        icon.src = `${cdn}/${cat.icon}`;
+        btn.appendChild(icon);
+
+        const label = document.createElement('span');
+        label.textContent = cat.label;
+        btn.appendChild(label);
+
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          state.leaderboards.activeCategory = cat.id;
+          renderLeaderboardTabs();
+          renderLeaderboardList();
+        });
+
+        if (typeof window.attachClickSounds === 'function') window.attachClickSounds(btn);
+
+        leaderboardTabsEl.appendChild(btn);
+      });
+    };
+
+    const renderLeaderboardList = () => {
+      if (!leaderboardListEl) return;
+      const activeId = state.leaderboards.activeCategory || 'power';
+      const category = leaderboardCategories.find((cat) => cat.id === activeId) || leaderboardCategories[0];
+      const entries = state.leaderboards.data?.[activeId]?.entries || [];
+
+      if (leaderboardCategoryTitleEl) {
+        leaderboardCategoryTitleEl.textContent = category?.label || 'Leaderboards';
+      }
+
+      if (leaderboardUpdatedEl) {
+        if (state.leaderboards.updatedAt) {
+          const updated = new Date(state.leaderboards.updatedAt);
+          leaderboardUpdatedEl.textContent = `Updated ${updated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else {
+          leaderboardUpdatedEl.textContent = '';
+        }
+      }
+
+      leaderboardListEl.innerHTML = '';
+
+      if (state.leaderboards.loading) {
+        const empty = document.createElement('div');
+        empty.className = 'leaderboard-empty';
+        empty.textContent = 'Loading leaderboard...';
+        leaderboardListEl.appendChild(empty);
+        return;
+      }
+
+      if (!entries || entries.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'leaderboard-empty';
+        empty.textContent = 'No leaderboard data yet.';
+        leaderboardListEl.appendChild(empty);
+        return;
+      }
+
+      const currentPlayerId = getCurrentPlayerId();
+      entries.forEach((entry) => {
+        const row = document.createElement('div');
+        row.className = 'leaderboard-row';
+        if (currentPlayerId && String(entry.playerId) === String(currentPlayerId)) {
+          row.classList.add('leaderboard-row--me');
+        }
+
+        const rank = document.createElement('div');
+        rank.className = 'leaderboard-rank';
+        rank.textContent = `#${entry.rank ?? ''}`;
+
+        const name = document.createElement('div');
+        name.className = 'leaderboard-name';
+        name.textContent = entry.name || 'Unknown';
+
+        const value = document.createElement('div');
+        value.className = 'leaderboard-value';
+        value.textContent = formatLeaderboardValue(activeId, entry.value);
+
+        row.appendChild(rank);
+        row.appendChild(name);
+        row.appendChild(value);
+        leaderboardListEl.appendChild(row);
+      });
+    };
+
     const renderAchievements = () => {
       // Badge on left action button (claimable count)
       const categories = Array.isArray(state.achievements.categories) ? state.achievements.categories : [];
@@ -4771,7 +4956,7 @@
       
       // Prevent clicks inside the modal container from closing
       // But allow close button clicks to work
-      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper');
+      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper, .leaderboard-modal__container');
       if (container) {
         // Remove existing container handler if any
         const existingContainerHandler = modalContainerHandlers.get(container);
@@ -4808,7 +4993,7 @@
       }
       
       // Remove container click listener
-      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper');
+      const container = el.querySelector('.pickaxe-modal__container, .gm-wrapper, .leaderboard-modal__container');
       if (container) {
         const containerHandler = modalContainerHandlers.get(container);
         if (containerHandler) {
@@ -4838,6 +5023,8 @@
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'goldenMachine' });
       } else if (el.id === 'maps-modal') {
         hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'maps' });
+      } else if (el.id === 'leaderboard-modal') {
+        hytopia.sendData({ type: 'MODAL_CLOSED', modalType: 'leaderboard' });
       }
       
       // Check if any modals are still open, if not, remove body.modal-open
@@ -6587,6 +6774,13 @@
           }, 900);
           break;
         }
+        case 'LEADERBOARD_STATE':
+          state.leaderboards.data = data.categories || {};
+          state.leaderboards.updatedAt = Number(data.updatedAt ?? Date.now());
+          state.leaderboards.loading = false;
+          renderLeaderboardTabs();
+          renderLeaderboardList();
+          break;
         case 'ACHIEVEMENTS_STATE':
           state.achievements.categories = data.categories || [];
           state.achievements.bonuses = data.bonuses || state.achievements.bonuses;
@@ -7067,6 +7261,11 @@
       <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/AchievementsIcon.png" alt="Achievements" />
     </span>
     <span id="achievements-badge" class="action-card__badge action-card__badge--achievements"></span>
+  </button>
+  <button id="leaderboards-button" class="action-card action-card--leaderboards">
+    <span class="action-card__icon">
+      <img class="action-card__icon-img" src="{{CDN_ASSETS_URL}}/icons/HUDIcons/LeaderboardsIcon.png" alt="Leaderboards" />
+    </span>
   </button>
   <button id="maps-button" class="action-card action-card--maps">
     <span class="action-card__icon">
@@ -13150,6 +13349,237 @@
 
 
 
+<!-- Included from: ./components/LeaderboardsModal.html -->
+<!-- Leaderboards Modal -->
+<div
+  id="leaderboard-modal"
+  class="hud leaderboard-modal"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="leaderboard-modal__container">
+    <div class="leaderboard-modal__header">
+      <div class="leaderboard-modal__title">LEADERBOARDS</div>
+      <button id="leaderboard-close-btn" class="modal__close" data-close="leaderboard-modal">X</button>
+    </div>
+
+    <div id="leaderboard-tabs" class="leaderboard-modal__tabs"></div>
+
+    <div class="leaderboard-modal__content">
+      <div class="leaderboard-modal__meta">
+        <div id="leaderboard-category-title" class="leaderboard-modal__category-title">Power</div>
+        <div id="leaderboard-updated" class="leaderboard-modal__updated"></div>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-modal__list"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #leaderboard-modal.visible {
+    display: flex !important;
+  }
+
+  .leaderboard-modal__container {
+    width: min(980px, 94vw);
+    height: min(680px, 86vh);
+    background:
+      radial-gradient(circle at top left, rgba(55, 214, 232, 0.15), transparent 55%),
+      radial-gradient(circle at bottom right, rgba(244, 196, 78, 0.15), transparent 60%),
+      linear-gradient(180deg, rgba(14, 20, 34, 0.98), rgba(9, 13, 24, 0.98));
+    border: 3px solid rgba(55, 214, 232, 0.35);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .leaderboard-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 2px solid rgba(55, 214, 232, 0.22);
+    background: linear-gradient(90deg, rgba(12, 18, 32, 0.9), rgba(20, 26, 42, 0.9));
+  }
+
+  .leaderboard-modal__title {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #f8fafc;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .leaderboard-modal__tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 2px solid rgba(244, 196, 78, 0.18);
+    background: rgba(5, 8, 18, 0.55);
+    overflow-x: auto;
+  }
+
+  .leaderboard-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(244, 196, 78, 0.25);
+    background: rgba(20, 26, 42, 0.85);
+    color: #f8fafc;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .leaderboard-tab img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+  }
+
+  .leaderboard-tab:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+    border-color: rgba(55, 214, 232, 0.6);
+  }
+
+  .leaderboard-tab.active {
+    background: linear-gradient(135deg, rgba(55, 214, 232, 0.25), rgba(244, 196, 78, 0.2));
+    border-color: rgba(55, 214, 232, 0.85);
+    color: #ffffff;
+  }
+
+  .leaderboard-modal__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .leaderboard-modal__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .leaderboard-modal__category-title {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #f7d35c;
+    text-transform: uppercase;
+  }
+
+  .leaderboard-modal__updated {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .leaderboard-modal__list {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .leaderboard-row {
+    display: grid;
+    grid-template-columns: 70px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    background: rgba(12, 18, 32, 0.75);
+    box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  .leaderboard-row--me {
+    border-color: rgba(244, 196, 78, 0.9);
+    box-shadow: 0 0 16px rgba(244, 196, 78, 0.3);
+  }
+
+  .leaderboard-rank {
+    font-size: 16px;
+    font-weight: 900;
+    color: #4be7f5;
+  }
+
+  .leaderboard-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #f8fafc;
+  }
+
+  .leaderboard-value {
+    font-size: 15px;
+    font-weight: 900;
+    color: #f7d35c;
+  }
+
+  .leaderboard-empty {
+    margin: auto;
+    text-align: center;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  body.mobile .leaderboard-modal__container {
+    width: 94vw;
+    height: 82vh;
+  }
+
+  body.mobile .leaderboard-modal__title {
+    font-size: 20px;
+  }
+
+  body.mobile .leaderboard-tab {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  body.mobile .leaderboard-modal__category-title {
+    font-size: 14px;
+  }
+
+  body.mobile .leaderboard-row {
+    grid-template-columns: 50px 1fr auto;
+    padding: 10px 12px;
+  }
+
+  body.mobile .leaderboard-rank,
+  body.mobile .leaderboard-name,
+  body.mobile .leaderboard-value {
+    font-size: 12px;
+  }
+</style>
+
+
 <!-- Included from: ./components/MapsModal.html -->
 <!-- Maps Modal -->
 <div
@@ -14041,6 +14471,7 @@
   .ui-root button,
   .ui-root .action-card,
   .ui-root .modal,
+  .ui-root .leaderboard-modal,
   .ui-root .pickaxe-card,
   .ui-root .rebirth-option,
   .ui-root .merchant-ui__item,
@@ -14309,6 +14740,11 @@
   /* Achievements action button accent */
   .action-card--achievements {
     border-color: rgba(250, 204, 21, 0.9);
+  }
+
+  /* Leaderboards action button accent */
+  .action-card--leaderboards {
+    border-color: rgba(56, 189, 248, 0.9);
   }
 
   /* Hide reward action-card on desktop (shown in stats-hud-container instead) */
@@ -18712,6 +19148,10 @@
 
 .action-card--pets {
   border-color: rgba(43, 214, 127, 0.6);
+}
+
+.action-card--leaderboards {
+  border-color: rgba(56, 189, 248, 0.7);
 }
 
 .action-card--maps {

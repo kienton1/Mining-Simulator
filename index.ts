@@ -395,6 +395,88 @@ startServer(world => {
     });
   }
 
+  type LeaderboardCategoryId = 'power' | 'blocksMined' | 'rebirths' | 'timePlayed' | 'maxCoins' | 'eggsHatched';
+
+  const LEADERBOARD_LIMIT = 10;
+
+  const toBigIntSafe = (value: number | string | undefined | null): bigint => {
+    if (typeof value === 'string') {
+      try {
+        return BigInt(value);
+      } catch {
+        return 0n;
+      }
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return BigInt(Math.floor(value));
+    }
+    return 0n;
+  };
+
+  const getLeaderboardValue = (data: any, categoryId: LeaderboardCategoryId): bigint => {
+    switch (categoryId) {
+      case 'power':
+        return toBigIntSafe(data.power);
+      case 'blocksMined':
+        return toBigIntSafe(data.achievementProgress?.blocksMined ?? 0);
+      case 'rebirths':
+        return toBigIntSafe(data.rebirths ?? 0);
+      case 'timePlayed':
+        return toBigIntSafe(data.achievementProgress?.timePlayedMs ?? 0);
+      case 'maxCoins':
+        return toBigIntSafe(data.maxGoldEverHeld ?? 0);
+      case 'eggsHatched':
+        return toBigIntSafe(data.achievementProgress?.eggsHatched ?? 0);
+      default:
+        return 0n;
+    }
+  };
+
+  function sendLeaderboardState(player: any) {
+    const players = PlayerManager.instance.getConnectedPlayers();
+
+    const buildEntries = (categoryId: LeaderboardCategoryId) => {
+      const entries = players
+        .map((p) => {
+          const data = gameManager.getPlayerData(p);
+          if (!data) return null;
+          return {
+            playerId: p.id,
+            name: p.username,
+            value: getLeaderboardValue(data, categoryId),
+          };
+        })
+        .filter(Boolean) as Array<{ playerId: string | number; name: string; value: bigint }>;
+
+      entries.sort((a, b) => {
+        if (a.value === b.value) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.value > b.value ? -1 : 1;
+      });
+
+      return entries.slice(0, LEADERBOARD_LIMIT).map((entry, idx) => ({
+        rank: idx + 1,
+        playerId: entry.playerId,
+        name: entry.name,
+        value: entry.value.toString(),
+      }));
+    };
+
+    player.ui.sendData({
+      type: 'LEADERBOARD_STATE',
+      updatedAt: Date.now(),
+      categories: {
+        power: { entries: buildEntries('power') },
+        blocksMined: { entries: buildEntries('blocksMined') },
+        rebirths: { entries: buildEntries('rebirths') },
+        timePlayed: { entries: buildEntries('timePlayed') },
+        maxCoins: { entries: buildEntries('maxCoins') },
+        eggsHatched: { entries: buildEntries('eggsHatched') },
+      },
+    });
+  }
+
   /**
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
@@ -847,7 +929,7 @@ startServer(world => {
      * Helper function to check if any modal is currently open for the player
      */
     const isAnyModalOpen = (): boolean => {
-      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'egg', 'reward', 'goldenMachine', 'maps', 'merchant', 'mineResetUpgrade', 'gemTrader', 'dailyReward'] as const;
+      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'leaderboard', 'egg', 'reward', 'goldenMachine', 'maps', 'merchant', 'mineResetUpgrade', 'gemTrader', 'dailyReward'] as const;
       const openModals: string[] = [];
       for (const modalType of modalTypes) {
         if (gameManager.getModalState(player, modalType)) {
@@ -1081,7 +1163,7 @@ startServer(world => {
           break;
         case 'MODAL_OPENED':
           console.log(`[ZOOM DEBUG] MODAL_OPENED event received: modalType="${data.modalType}"`);
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'leaderboard' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
             // Check if any modal was already open before setting new state
             console.log(`[ZOOM DEBUG] Valid modalType, checking if any modal was already open...`);
             const wasAnyModalOpen = isAnyModalOpen();
@@ -1110,7 +1192,7 @@ startServer(world => {
           break;
         case 'MODAL_CLOSED':
           console.log(`[ZOOM DEBUG] MODAL_CLOSED event received: modalType="${data.modalType}"`);
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'leaderboard' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
             console.log(`[ZOOM DEBUG] Valid modalType, setting "${data.modalType}" to CLOSED`);
             gameManager.setModalState(player, data.modalType, false);
             // Zoom back to default when all modals are closed
@@ -1128,6 +1210,9 @@ startServer(world => {
           break;
         case 'REQUEST_ACHIEVEMENTS_STATE':
           sendAchievementsState(player);
+          break;
+        case 'REQUEST_LEADERBOARD_STATE':
+          sendLeaderboardState(player);
           break;
         case 'ACHIEVEMENT_CLAIM': {
           const categoryId = String((data as any).categoryId ?? '') as any;

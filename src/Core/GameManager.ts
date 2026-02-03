@@ -58,6 +58,7 @@ interface PlayerModalState {
   rebirthModalOpen: boolean;
   petsModalOpen: boolean;
   achievementsModalOpen: boolean;
+  leaderboardModalOpen: boolean;
   eggModalOpen: boolean;
   rewardModalOpen: boolean;
   goldenMachineModalOpen: boolean;
@@ -272,6 +273,7 @@ export class GameManager {
       rebirthModalOpen: false,
       petsModalOpen: false,
       achievementsModalOpen: false,
+      leaderboardModalOpen: false,
       eggModalOpen: false,
       rewardModalOpen: false,
       mapsModalOpen: false,
@@ -1122,7 +1124,7 @@ export class GameManager {
    * @param modalType - Type of modal to check
    * @returns True if the modal is open, false otherwise
    */
-  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward'): boolean {
+  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'leaderboard' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward'): boolean {
     const modalState = this.playerModalStates.get(player);
     if (!modalState) return false;
 
@@ -1132,6 +1134,7 @@ export class GameManager {
       case 'rebirth': return modalState.rebirthModalOpen;
       case 'pets': return modalState.petsModalOpen;
       case 'achievements': return modalState.achievementsModalOpen;
+      case 'leaderboard': return modalState.leaderboardModalOpen;
       case 'egg': return modalState.eggModalOpen;
       case 'reward': return modalState.rewardModalOpen;
       case 'goldenMachine': return modalState.goldenMachineModalOpen;
@@ -1151,13 +1154,14 @@ export class GameManager {
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'leaderboard' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
       achievementsModalOpen: false,
+      leaderboardModalOpen: false,
       eggModalOpen: false,
       rewardModalOpen: false,
       goldenMachineModalOpen: false,
@@ -1179,6 +1183,8 @@ export class GameManager {
       modalState.petsModalOpen = isOpen;
     } else if (modalType === 'achievements') {
       modalState.achievementsModalOpen = isOpen;
+    } else if (modalType === 'leaderboard') {
+      modalState.leaderboardModalOpen = isOpen;
     } else if (modalType === 'egg') {
       modalState.eggModalOpen = isOpen;
     } else if (modalType === 'reward') {
@@ -1219,6 +1225,7 @@ export class GameManager {
       modalState.rebirthModalOpen = false;
       modalState.petsModalOpen = false;
       modalState.achievementsModalOpen = false;
+      modalState.leaderboardModalOpen = false;
       modalState.eggModalOpen = false;
       modalState.rewardModalOpen = false;
       modalState.goldenMachineModalOpen = false;
@@ -1250,6 +1257,7 @@ export class GameManager {
       modalState.rebirthModalOpen ||
       modalState.petsModalOpen ||
       modalState.achievementsModalOpen ||
+      modalState.leaderboardModalOpen ||
       modalState.eggModalOpen ||
       modalState.rewardModalOpen ||
       modalState.goldenMachineModalOpen
@@ -1260,6 +1268,7 @@ export class GameManager {
         rebirth: modalState.rebirthModalOpen,
         pets: modalState.petsModalOpen,
         achievements: modalState.achievementsModalOpen,
+        leaderboard: modalState.leaderboardModalOpen,
         egg: modalState.eggModalOpen,
         reward: modalState.rewardModalOpen,
         goldenMachine: modalState.goldenMachineModalOpen,
