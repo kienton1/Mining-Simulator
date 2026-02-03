@@ -276,7 +276,7 @@ startServer(world => {
    */
   const goldenMachine = new GoldenMachineEntity(
     world,
-    { x: -12.73, y: 1.72, z: 14.65 },
+    { x: 0.07, y: 1.72, z: -18.57 },
     'models/BuyStations/checkpoint-block.gltf',
     // Decrease size by 2x vs previous tuning
     { proximityRadius: 3.0, modelScale: 1.5 }

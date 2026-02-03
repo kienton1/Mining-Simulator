@@ -21,6 +21,9 @@ import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
 import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
+/** Set to true to enable verbose mining debug logging. */
+const DEBUG_MINING = false;
+
 /**
  * Mining block position key (x,y,z)
  */
@@ -300,26 +303,26 @@ export class MiningSystem {
     const existingState = this.miningStates.get(player);
     if (!existingState) {
       // Player is not in the mine, ignore mining click
-      console.log('[MiningSystem] handleMiningClick: No mining state for player', player.username);
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No mining state for player', player.username);
       return;
     }
 
     // Player is in the mine, proceed with mining
     // Check if blocking modal is open (if callback provided)
     if (isBlockingModalOpen && isBlockingModalOpen()) {
-      console.log('[MiningSystem] handleMiningClick: Blocking modal open');
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Blocking modal open');
       return;
     }
 
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
-      console.log('[MiningSystem] handleMiningClick: No player entity');
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player entity');
       return;
     }
 
     // Check if player.camera exists
     if (!player.camera) {
-      console.log('[MiningSystem] handleMiningClick: No player camera');
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player camera');
       return;
     }
 
@@ -352,7 +355,7 @@ export class MiningSystem {
     // Get player data for power calculation
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
-      console.log('[MiningSystem] handleMiningClick: No player data');
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player data');
       return;
     }
 
@@ -421,7 +424,7 @@ export class MiningSystem {
       
       if (!hitResult) {
         // No hit, clear target
-        console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
+        if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
         state.currentTargetBlock = null;
         return;
       }
@@ -455,7 +458,7 @@ export class MiningSystem {
     
     if (!isInMiningArea) {
       // Block is not in mining area, cannot mine it
-      console.log('[MiningSystem] handleMiningClick: Block not in mining area', resolvedBlockCoordinate, 'bounds:', offsetBounds);
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Block not in mining area', resolvedBlockCoordinate, 'bounds:', offsetBounds);
       state.currentTargetBlock = null;
       return;
     }
@@ -652,7 +655,7 @@ export class MiningSystem {
 
     // Apply More Damage upgrade multiplier and round to integer
     const damage = Math.round(baseDamage * damageMultiplier);
-    console.log('[MiningSystem] Mining! Power:', playerData.power, 'BaseDamage:', baseDamage, 'FinalDamage:', damage, 'Block:', block.oreType, 'HP:', block.currentHP);
+    if (DEBUG_MINING) console.log('[MiningSystem] Mining! Power:', playerData.power, 'BaseDamage:', baseDamage, 'FinalDamage:', damage, 'Block:', block.oreType, 'HP:', block.currentHP);
     
     // Deal damage to shared block
     const blockDestroyed = block.takeDamage(damage);
@@ -695,7 +698,7 @@ export class MiningSystem {
         y: middleY + 0.5, // Center of the middle block
       };
       // Skip debris during auto mining to keep SPS consistent under load.
-      console.log('[MiningSystem] Floor broken! isAutoMining:', isAutoMining, 'minedOre:', minedOre);
+      if (DEBUG_MINING) console.log('[MiningSystem] Floor broken! isAutoMining:', isAutoMining, 'minedOre:', minedOre);
       if (!isAutoMining) {
         this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
       }
@@ -781,7 +784,7 @@ export class MiningSystem {
     isBlockingModalOpen?: () => boolean,
     onBlockDestroyed?: (player: Player) => void
   ): void {
-    console.log('[MiningSystem] startMiningLoop called for player:', player.username);
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop called for player:', player.username);
     // Stop any existing loop
     this.stopMiningLoop(player);
 
@@ -797,11 +800,11 @@ export class MiningSystem {
     const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1);
     const hitIntervalMs = 1000 / effectiveHitRate;
     const maxCatchupHits = Math.max(10, Math.ceil(effectiveHitRate * 5)); // Allow up to ~5s of catch-up
-    console.log('[MiningSystem] startMiningLoop: hitInterval=', hitIntervalMs, 'ms');
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: hitInterval=', hitIntervalMs, 'ms');
 
     // Safety check: ensure hitInterval is a valid number (not Infinity or NaN)
     if (!isFinite(hitIntervalMs) || hitIntervalMs <= 0) {
-      console.log('[MiningSystem] startMiningLoop: Invalid hitInterval, aborting');
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Invalid hitInterval, aborting');
       return; // Don't start mining loop with invalid interval
     }
 
@@ -811,13 +814,13 @@ export class MiningSystem {
       hitCount++;
       const currentState = this.miningStates.get(player);
       if (!currentState) {
-        console.log('[MiningSystem] performHit: No state for player, hit #', hitCount);
+        if (DEBUG_MINING) console.log('[MiningSystem] performHit: No state for player, hit #', hitCount);
         return;
       }
 
       // Log every 5th hit to avoid spam
       if (hitCount <= 3 || hitCount % 10 === 0) {
-        console.log('[MiningSystem] performHit #', hitCount, 'for player:', player.username, 'depth:', currentState.currentDepth);
+        if (DEBUG_MINING) console.log('[MiningSystem] performHit #', hitCount, 'for player:', player.username, 'depth:', currentState.currentDepth);
       }
 
       // Perform mining click (auto-mining mode)
@@ -825,7 +828,7 @@ export class MiningSystem {
     };
 
     // Perform first hit immediately
-    console.log('[MiningSystem] startMiningLoop: Performing first hit');
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Performing first hit');
     performHit();
 
     let lastTick = Date.now();
@@ -851,9 +854,9 @@ export class MiningSystem {
     const currentState = this.miningStates.get(player);
     if (currentState) {
       currentState.miningIntervalId = setInterval(tick, tickIntervalMs);
-      console.log('[MiningSystem] startMiningLoop: Mining interval set up');
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Mining interval set up');
     } else {
-      console.log('[MiningSystem] startMiningLoop: No state after getOrCreateState, cannot set interval!');
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: No state after getOrCreateState, cannot set interval!');
     }
   }
 
@@ -938,10 +941,10 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData
   ): { x: number; y: number; z: number } {
-    console.log('[MiningSystem] preparePlayerMine called for player:', player.username);
+    if (DEBUG_MINING) console.log('[MiningSystem] preparePlayerMine called for player:', player.username);
     const state = this.getOrCreateState(player, pickaxe);
     const center = this.getMineCenter(player);
-    console.log('[MiningSystem] preparePlayerMine: state currentDepth:', state.currentDepth, 'center:', center);
+    if (DEBUG_MINING) console.log('[MiningSystem] preparePlayerMine: state currentDepth:', state.currentDepth, 'center:', center);
 
     // Reset first block mined flag when entering mine (so timer can start on first block)
     this.firstBlockMined.delete(player);
@@ -957,10 +960,10 @@ export class MiningSystem {
    * @param player - Player whose mine to reset
    */
   resetMineToLevel0(player: Player): void {
-    console.log('[MiningSystem] resetMineToLevel0 called for player:', player.username);
+    if (DEBUG_MINING) console.log('[MiningSystem] resetMineToLevel0 called for player:', player.username);
     const state = this.miningStates.get(player);
     if (!state) {
-      console.log('[MiningSystem] resetMineToLevel0: No mining state found!');
+      if (DEBUG_MINING) console.log('[MiningSystem] resetMineToLevel0: No mining state found!');
       return;
     }
 
@@ -1027,10 +1030,10 @@ export class MiningSystem {
    * @param player - Player who left
    */
   cleanupPlayer(player: Player): void {
-    console.log('[MiningSystem] cleanupPlayer called for player:', player.username);
+    if (DEBUG_MINING) console.log('[MiningSystem] cleanupPlayer called for player:', player.username);
     this.stopMiningLoop(player);
     this.miningStates.delete(player);
-    console.log('[MiningSystem] Mining state DELETED for player:', player.username);
+    if (DEBUG_MINING) console.log('[MiningSystem] Mining state DELETED for player:', player.username);
 
     // Remove all offsets for this player (all worlds)
     const keysToDelete: string[] = [];
@@ -1180,14 +1183,14 @@ export class MiningSystem {
 
     let state = this.miningStates.get(player);
     if (state) {
-      console.log('[MiningSystem] getOrCreateState: Existing state found for player:', player.username);
+      if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: Existing state found for player:', player.username);
       // Check if the state's offset matches the current world's offset
       // If not, regenerate the state for the current world
       const currentOffsetKey = `${player.id}:${worldId}`;
       const stateOffsetKey = this.findOffsetKeyForOffset(player, state.offset);
 
       if (stateOffsetKey !== currentOffsetKey || (state.offset.x === 0 && state.offset.z === 0)) {
-        console.log('[MiningSystem] getOrCreateState: Regenerating state for different world');
+        if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: Regenerating state for different world');
         // State is for a different world or legacy state, regenerate for current world
         state.blockMap.clear();
         state.chestMap.clear();
@@ -1206,7 +1209,7 @@ export class MiningSystem {
       return state;
     }
 
-    console.log('[MiningSystem] getOrCreateState: CREATING NEW state for player:', player.username, 'worldId:', worldId);
+    if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: CREATING NEW state for player:', player.username, 'worldId:', worldId);
     const offset = correctOffset;
     state = {
       blockMap: new Map(),
@@ -1222,7 +1225,7 @@ export class MiningSystem {
       winTriggered: false,
     };
     this.miningStates.set(player, state);
-    console.log('[MiningSystem] getOrCreateState: State created and stored');
+    if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: State created and stored');
 
     // Generate initial 20 levels (will generate more ahead as player mines)
     this.generateInitialMiningLevels(player, state, pickaxe);
@@ -2250,7 +2253,7 @@ export class MiningSystem {
     const hexColor = oreData?.color || '#808080';
     const color = this.hexToRgb(hexColor);
 
-    console.log('[MiningSystem] Spawning floor break effect at', center.x, newFloorY + 1.5, center.z, 'color:', hexColor);
+    if (DEBUG_MINING) console.log('[MiningSystem] Spawning floor break effect at', center.x, newFloorY + 1.5, center.z, 'color:', hexColor);
 
     const emitter = new ParticleEmitter({
       position: { x: center.x, y: newFloorY + 1.5, z: center.z },
