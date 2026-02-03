@@ -432,6 +432,18 @@
     -webkit-overflow-scrolling: touch !important;
   }
 
+  /* Ensure all child elements allow touch scrolling */
+  body.mobile .maps-card,
+  body.mobile .maps-card__name,
+  body.mobile .maps-card__info,
+  body.mobile .maps-card__badge,
+  body.mobile .maps-card__multiplier,
+  body.mobile .maps-card__actions,
+  body.mobile .maps-card span,
+  body.mobile .maps-card div {
+    touch-action: pan-y !important;
+  }
+
   /* Mobile-specific responsive styles */
   body.mobile .maps-wrapper {
     margin-top: 20px;
