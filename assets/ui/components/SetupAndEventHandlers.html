@@ -5299,6 +5299,58 @@
       }
     }
 
+    function updateProgressPlayers(players, goalDepth) {
+      const progressPlayersEl = document.getElementById('progress-bar-players');
+      const progressBarEl = document.getElementById('progress-bar');
+      if (!progressPlayersEl || !progressBarEl) return;
+
+      progressPlayersEl.innerHTML = '';
+      const list = Array.isArray(players) ? players : [];
+      if (!list.length) return;
+
+      const currentPlayerId = getCurrentPlayerId();
+      const isMobile = document.body.classList.contains('mobile');
+
+      const hashColor = (text) => {
+        const str = String(text || '');
+        let hash = 0;
+        for (let i = 0; i < str.length; i += 1) {
+          hash = (hash * 31 + str.charCodeAt(i)) | 0;
+        }
+        const hue = Math.abs(hash) % 360;
+        return `hsl(${hue} 70% 55%)`;
+      };
+
+      const maxDepth = Math.max(1, Number(goalDepth) || 1000);
+
+      list.forEach((player, idx) => {
+        if (!player) return;
+        if (currentPlayerId && String(player.playerId) === String(currentPlayerId)) {
+          return;
+        }
+
+        const depth = Math.max(0, Math.min(maxDepth, Number(player.depth ?? 0)));
+        const progress = Math.min(100, (depth / maxDepth) * 100);
+
+        const marker = document.createElement('div');
+        marker.className = 'progress-bar__player';
+        const initial = String(player.name || '?').trim().charAt(0).toUpperCase() || '?';
+        marker.textContent = initial;
+        marker.style.background = hashColor(player.name || player.playerId);
+
+        const stackOffset = (idx % 3) * (isMobile ? 10 : -10);
+        marker.style.setProperty('--stack-offset', `${stackOffset}px`);
+
+        if (isMobile) {
+          marker.style.bottom = `${progress}%`;
+        } else {
+          marker.style.left = `${progress}%`;
+        }
+
+        progressPlayersEl.appendChild(marker);
+      });
+    }
+
     function updateAutoMineButton(enabled) {
       if (!autoMineButton) return;
       if (enabled) {
@@ -6260,6 +6312,9 @@
           break;
         case 'PROGRESS_UPDATE':
           updateProgressBar(data.currentDepth ?? 0, data.goalDepth ?? 1000);
+          break;
+        case 'PROGRESS_PLAYERS_UPDATE':
+          updateProgressPlayers(data.players || [], data.goalDepth ?? 1000);
           break;
         case 'MINING_STATE_UPDATE':
           console.log('[TUTORIAL] MINING_STATE_UPDATE | isInMine:', data.isInMine, '| tutorial phase:', state.tutorial.phase);

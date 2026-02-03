@@ -5999,6 +5999,58 @@
       }
     }
 
+    function updateProgressPlayers(players, goalDepth) {
+      const progressPlayersEl = document.getElementById('progress-bar-players');
+      const progressBarEl = document.getElementById('progress-bar');
+      if (!progressPlayersEl || !progressBarEl) return;
+
+      progressPlayersEl.innerHTML = '';
+      const list = Array.isArray(players) ? players : [];
+      if (!list.length) return;
+
+      const currentPlayerId = getCurrentPlayerId();
+      const isMobile = document.body.classList.contains('mobile');
+
+      const hashColor = (text) => {
+        const str = String(text || '');
+        let hash = 0;
+        for (let i = 0; i < str.length; i += 1) {
+          hash = (hash * 31 + str.charCodeAt(i)) | 0;
+        }
+        const hue = Math.abs(hash) % 360;
+        return `hsl(${hue} 70% 55%)`;
+      };
+
+      const maxDepth = Math.max(1, Number(goalDepth) || 1000);
+
+      list.forEach((player, idx) => {
+        if (!player) return;
+        if (currentPlayerId && String(player.playerId) === String(currentPlayerId)) {
+          return;
+        }
+
+        const depth = Math.max(0, Math.min(maxDepth, Number(player.depth ?? 0)));
+        const progress = Math.min(100, (depth / maxDepth) * 100);
+
+        const marker = document.createElement('div');
+        marker.className = 'progress-bar__player';
+        const initial = String(player.name || '?').trim().charAt(0).toUpperCase() || '?';
+        marker.textContent = initial;
+        marker.style.background = hashColor(player.name || player.playerId);
+
+        const stackOffset = (idx % 3) * (isMobile ? 10 : -10);
+        marker.style.setProperty('--stack-offset', `${stackOffset}px`);
+
+        if (isMobile) {
+          marker.style.bottom = `${progress}%`;
+        } else {
+          marker.style.left = `${progress}%`;
+        }
+
+        progressPlayersEl.appendChild(marker);
+      });
+    }
+
     function updateAutoMineButton(enabled) {
       if (!autoMineButton) return;
       if (enabled) {
@@ -6960,6 +7012,9 @@
           break;
         case 'PROGRESS_UPDATE':
           updateProgressBar(data.currentDepth ?? 0, data.goalDepth ?? 1000);
+          break;
+        case 'PROGRESS_PLAYERS_UPDATE':
+          updateProgressPlayers(data.players || [], data.goalDepth ?? 1000);
           break;
         case 'MINING_STATE_UPDATE':
           console.log('[TUTORIAL] MINING_STATE_UPDATE | isInMine:', data.isInMine, '| tutorial phase:', state.tutorial.phase);
@@ -14392,6 +14447,7 @@
     <div class="progress-bar__outline">
       <div id="progress-bar-fill" class="progress-bar__fill"></div>
       <div id="progress-bar-marker" class="progress-bar__marker"></div>
+      <div id="progress-bar-players" class="progress-bar__players"></div>
     </div>
     <div class="progress-bar__markers">
       <span class="progress-bar__marker-label">0</span>
@@ -17121,6 +17177,30 @@
     left: 0%;
   }
 
+  .progress-bar__players {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .progress-bar__player {
+    position: absolute;
+    top: -12px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #1a3a5c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    transform: translate(-50%, -50%) translateY(var(--stack-offset, 0px));
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  }
+
   .progress-bar__markers {
     display: flex;
     justify-content: space-between;
@@ -18366,6 +18446,16 @@
     transform: translateY(50%);
     transition: bottom 0.3s ease;
     bottom: 0%;
+  }
+
+  body.mobile .progress-bar__player {
+    top: auto;
+    bottom: 0%;
+    left: -10px;
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+    transform: translate(-50%, 50%) translateX(var(--stack-offset, 0px));
   }
 
   /* Position markers to the left of vertical bar on mobile */

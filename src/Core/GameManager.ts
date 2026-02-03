@@ -124,6 +124,10 @@ export class GameManager {
   private readonly REWARD_TICK_MS = 1000;
   private readonly REWARD_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+  // Shared progress bar markers (per-world broadcast)
+  private progressBroadcastInterval?: NodeJS.Timeout;
+  private readonly PROGRESS_BROADCAST_MS = 1000;
+
   // Debounced save timers per player
   private saveTimers: Map<Player, NodeJS.Timeout> = new Map();
   private readonly SAVE_DEBOUNCE_MS = 2000; // Save at most once per 2 seconds per player
@@ -205,6 +209,9 @@ export class GameManager {
 
     // Start periodic save mechanism
     this.startPeriodicSaves();
+
+    // Start per-world progress marker broadcasts
+    this.startProgressBroadcasts();
     
     // Note: UI event handlers are now set up per-player in index.ts
     // This follows the Hytopia SDK pattern of using player.ui.on() instead of world.on()
@@ -423,6 +430,58 @@ export class GameManager {
         }
       }
     }, this.PERIODIC_SAVE_MS);
+  }
+
+  /**
+   * Broadcasts per-world mine progress markers to all connected players
+   * so the UI can show where others are depth-wise.
+   */
+  private startProgressBroadcasts(): void {
+    if (this.progressBroadcastInterval) {
+      clearInterval(this.progressBroadcastInterval);
+    }
+
+    this.progressBroadcastInterval = setInterval(() => {
+      this.broadcastWorldProgress();
+    }, this.PROGRESS_BROADCAST_MS);
+  }
+
+  private broadcastWorldProgress(): void {
+    const players = Array.from(this.playerDataMap.keys());
+    const worldGroups = new Map<string, Player[]>();
+
+    for (const player of players) {
+      const data = this.playerDataMap.get(player);
+      if (!data) continue;
+      const worldId = data.currentWorld || 'island1';
+      if (!worldGroups.has(worldId)) {
+        worldGroups.set(worldId, []);
+      }
+      worldGroups.get(worldId)!.push(player);
+    }
+
+    for (const [worldId, groupPlayers] of worldGroups.entries()) {
+      const entries = groupPlayers
+        .filter((p) => this.isPlayerInMine(p))
+        .map((p) => {
+          const depth = this.miningController?.getCurrentMineLevel(p) ?? 0;
+          return {
+            playerId: p.id,
+            name: p.username,
+            depth: Math.min(1000, Math.max(0, depth)),
+          };
+        })
+        .sort((a, b) => b.depth - a.depth);
+
+      for (const player of groupPlayers) {
+        this.safeSendUI(player, {
+          type: 'PROGRESS_PLAYERS_UPDATE',
+          worldId,
+          goalDepth: 1000,
+          players: entries,
+        });
+      }
+    }
   }
 
   /**
