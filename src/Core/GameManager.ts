@@ -877,6 +877,7 @@ export class GameManager {
    * Disables input and interactions while loading.
    */
   setPlayerLoading(player: Player, isLoading: boolean): void {
+    console.log(`[GM] setPlayerLoading: ${player.username}, isLoading=${isLoading}`);
     this.playerLoadingStates.set(player, isLoading);
 
     player.setInteractEnabled(!isLoading);
@@ -885,6 +886,7 @@ export class GameManager {
     }
 
     const playerEntity = this.getPlayerEntity(player);
+    console.log(`[GM] setPlayerLoading: ${player.username}, entityFound=${!!playerEntity}, hasSetInputSuppressed=${typeof (playerEntity as any)?.setInputSuppressed}`);
     if (playerEntity && typeof (playerEntity as any).setInputSuppressed === 'function') {
       (playerEntity as any).setInputSuppressed(isLoading);
     }
