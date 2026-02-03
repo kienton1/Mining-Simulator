@@ -61,24 +61,24 @@ const ISLAND2_PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: ISLAND2_PET_IDS.BABY_SANDRAY, name: 'Baby Sandray', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.COMMON, multiplier: 5500 },
   { id: ISLAND2_PET_IDS.BABY_TIDEPUP, name: 'Baby Tidepup', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.COMMON, multiplier: 8000 },
   { id: ISLAND2_PET_IDS.BABY_REEFWING, name: 'Baby Reefwing', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.RARE, multiplier: 30000 },
-  { id: ISLAND2_PET_IDS.BABY_KRAKLING, name: 'Baby Krakling', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.EPIC, multiplier: 65000 },
-  { id: ISLAND2_PET_IDS.BABY_GHOSTGULL, name: 'Baby Ghostgull', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.LEGENDARY, multiplier: 150000 },
+  { id: ISLAND2_PET_IDS.BABY_KRAKLING, name: 'Baby Krakling', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.LEGENDARY, multiplier: 65000 },
+  { id: ISLAND2_PET_IDS.BABY_GHOSTGULL, name: 'Baby Ghostgull', eggType: ISLAND2_EGG_TYPE.ABYSSAL as any, rarity: PetRarity.EXTREME, multiplier: 150000 },
 
   // Boardwalk Egg
   { id: ISLAND2_PET_IDS.LIFEGUARD, name: 'Lifeguard', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.COMMON, multiplier: 250 },
   { id: ISLAND2_PET_IDS.BABY_TRISHELL, name: 'Baby TriShell', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.COMMON, multiplier: 450 },
   { id: ISLAND2_PET_IDS.BABY_ROCKHERON, name: 'Baby Rockheron', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.RARE, multiplier: 1000 },
   { id: ISLAND2_PET_IDS.BABY_MADMARINER, name: 'Baby MadMariner', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.EPIC, multiplier: 3000 },
-  { id: ISLAND2_PET_IDS.BABY_TURTE, name: 'Baby Turte', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.EPIC, multiplier: 10000 },
-  { id: ISLAND2_PET_IDS.BABY_SNAPPER, name: 'Baby Snapper', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
+  { id: ISLAND2_PET_IDS.BABY_TURTE, name: 'Baby Turte', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.LEGENDARY, multiplier: 10000 },
+  { id: ISLAND2_PET_IDS.BABY_SNAPPER, name: 'Baby Snapper', eggType: ISLAND2_EGG_TYPE.BOARDWALK as any, rarity: PetRarity.EXTREME, multiplier: 17500 },
 
   // Shipwreck Egg
   { id: ISLAND2_PET_IDS.BABY_CORALCLAD, name: 'Baby Coralclad', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.COMMON, multiplier: 10000 },
   { id: ISLAND2_PET_IDS.BABY_GIGGLECRAB, name: 'Baby Gigglecrab', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.COMMON, multiplier: 17500 },
   { id: ISLAND2_PET_IDS.BABY_SKIFFLET, name: 'Baby Skifflet', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.RARE, multiplier: 50000 },
   { id: ISLAND2_PET_IDS.BABY_EMBERFIN, name: 'Baby Emberfin', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.EPIC, multiplier: 150000 },
-  { id: ISLAND2_PET_IDS.BABY_NEONKELP, name: 'Baby Neonkelp', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.EPIC, multiplier: 280000 },
-  { id: ISLAND2_PET_IDS.BABY_PEARLMAW, name: 'Baby Pearlmaw', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.LEGENDARY, multiplier: 650000 },
+  { id: ISLAND2_PET_IDS.BABY_NEONKELP, name: 'Baby Neonkelp', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.LEGENDARY, multiplier: 280000 },
+  { id: ISLAND2_PET_IDS.BABY_PEARLMAW, name: 'Baby Pearlmaw', eggType: ISLAND2_EGG_TYPE.SHIPWRECK as any, rarity: PetRarity.EXTREME, multiplier: 650000 },
 ];
 
 /**

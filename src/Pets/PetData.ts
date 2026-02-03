@@ -10,6 +10,8 @@ export enum PetRarity {
   RARE = 'rare',
   EPIC = 'epic',
   LEGENDARY = 'legendary',
+  MYTHIC = 'mythic',
+  EXTREME = 'extreme',
 }
 
 export enum EggType {

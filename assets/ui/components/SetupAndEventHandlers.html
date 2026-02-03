@@ -3128,9 +3128,14 @@
 
       const rarityToClass = (rarity) => {
         switch ((rarity || '').toLowerCase()) {
+          case 'extreme': return 'pet-tile--extreme';
+          case 'extremely-legendary': return 'pet-tile--extreme';
+          case 'mythic': return 'pet-tile--mythic';
+          case 'legendary+': return 'pet-tile--mythic';
           case 'legendary': return 'pet-tile--legendary';
           case 'epic': return 'pet-tile--epic';
-          case 'rare': return 'pet-tile--rare';
+          case 'uncommon': return 'pet-tile--uncommon';
+          case 'rare': return 'pet-tile--uncommon';
           default: return 'pet-tile--common';
         }
       };
@@ -3356,9 +3361,14 @@
 
     const gmRarityToClass = (rarity) => {
       switch ((rarity || '').toLowerCase()) {
+        case 'extreme': return 'gm-pet-tile--extreme';
+        case 'extremely-legendary': return 'gm-pet-tile--extreme';
+        case 'mythic': return 'gm-pet-tile--mythic';
+        case 'legendary+': return 'gm-pet-tile--mythic';
         case 'legendary': return 'gm-pet-tile--legendary';
         case 'epic': return 'gm-pet-tile--epic';
-        case 'rare': return 'gm-pet-tile--rare';
+        case 'uncommon': return 'gm-pet-tile--uncommon';
+        case 'rare': return 'gm-pet-tile--uncommon';
         default: return 'gm-pet-tile--common';
       }
     };

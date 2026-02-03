@@ -3828,9 +3828,14 @@
 
       const rarityToClass = (rarity) => {
         switch ((rarity || '').toLowerCase()) {
+          case 'extreme': return 'pet-tile--extreme';
+          case 'extremely-legendary': return 'pet-tile--extreme';
+          case 'mythic': return 'pet-tile--mythic';
+          case 'legendary+': return 'pet-tile--mythic';
           case 'legendary': return 'pet-tile--legendary';
           case 'epic': return 'pet-tile--epic';
-          case 'rare': return 'pet-tile--rare';
+          case 'uncommon': return 'pet-tile--uncommon';
+          case 'rare': return 'pet-tile--uncommon';
           default: return 'pet-tile--common';
         }
       };
@@ -4056,9 +4061,14 @@
 
     const gmRarityToClass = (rarity) => {
       switch ((rarity || '').toLowerCase()) {
+        case 'extreme': return 'gm-pet-tile--extreme';
+        case 'extremely-legendary': return 'gm-pet-tile--extreme';
+        case 'mythic': return 'gm-pet-tile--mythic';
+        case 'legendary+': return 'gm-pet-tile--mythic';
         case 'legendary': return 'gm-pet-tile--legendary';
         case 'epic': return 'gm-pet-tile--epic';
-        case 'rare': return 'gm-pet-tile--rare';
+        case 'uncommon': return 'gm-pet-tile--uncommon';
+        case 'rare': return 'gm-pet-tile--uncommon';
         default: return 'gm-pet-tile--common';
       }
     };
@@ -10200,10 +10210,31 @@
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   }
 
-  .egg-pet-card--common { border-color: rgba(148, 163, 184, 0.5); }
-  .egg-pet-card--rare { border-color: rgba(59, 130, 246, 0.6); }
-  .egg-pet-card--epic { border-color: rgba(168, 85, 247, 0.7); }
-  .egg-pet-card--legendary { border-color: rgba(245, 158, 11, 0.8); }
+  .egg-pet-card--common {
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    border-color: #3b82f6;
+  }
+  .egg-pet-card--uncommon,
+  .egg-pet-card--rare {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: #22c55e;
+  }
+  .egg-pet-card--epic {
+    background: linear-gradient(180deg, #c084fc, #7c3aed);
+    border-color: #a855f7;
+  }
+  .egg-pet-card--legendary {
+    background: linear-gradient(180deg, #facc15, #b45309);
+    border-color: #facc15;
+  }
+  .egg-pet-card--mythic {
+    background: linear-gradient(180deg, #7c3aed, #4c1d95);
+    border-color: #6d28d9;
+  }
+  .egg-pet-card--extreme {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: #ef4444;
+  }
 
   .egg-pet-card.is-auto-delete {
     border-color: rgba(239, 68, 68, 0.7);
@@ -11104,81 +11135,38 @@
     justify-content: center;
   }
 
-  /* Rarity-based styles - common to legendary (1-6) */
-  /* 1st card (common): gray */
-  .reward-pet-card:nth-child(1) .reward-pet-card__thumb {
-    background: rgba(80, 80, 80, 0.5);
-    border: 2px solid rgba(150, 150, 150, 0.6);
+  /* Rarity-based styles */
+  .reward-pet-card--common .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    border: 2px solid #3b82f6;
   }
 
-  /* 2nd card (uncommon): blue */
-  .reward-pet-card:nth-child(2) .reward-pet-card__thumb {
-    background: rgba(40, 60, 90, 0.6);
-    border: 2px solid rgba(100, 180, 255, 0.7);
-    animation: glowPulse2 3s ease-in-out infinite;
-  }
-  @keyframes glowPulse2 {
-    0%, 100% { box-shadow: 0 0 8px rgba(100, 180, 255, 0.4); }
-    50% { box-shadow: 0 0 14px rgba(100, 180, 255, 0.7); }
+  .reward-pet-card--uncommon .reward-pet-card__thumb,
+  .reward-pet-card--rare .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border: 2px solid #22c55e;
   }
 
-  /* 3rd card (rare): purple */
-  .reward-pet-card:nth-child(3) .reward-pet-card__thumb {
-    background: rgba(60, 30, 80, 0.65);
-    border: 2px solid rgba(180, 100, 255, 0.8);
-    animation: glowPulse3 2.5s ease-in-out infinite;
-  }
-  @keyframes glowPulse3 {
-    0%, 100% { box-shadow: 0 0 10px rgba(180, 100, 255, 0.5); }
-    50% { box-shadow: 0 0 18px rgba(180, 100, 255, 0.85); }
+  .reward-pet-card--epic .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #c084fc, #7c3aed);
+    border: 2px solid #a855f7;
   }
 
-  /* 4th card (epic): pink */
-  .reward-pet-card:nth-child(4) .reward-pet-card__thumb {
-    background: rgba(80, 30, 60, 0.7);
-    border: 2px solid rgba(255, 100, 180, 0.85);
-    animation: glowPulse4 2s ease-in-out infinite;
-  }
-  @keyframes glowPulse4 {
-    0%, 100% { box-shadow: 0 0 12px rgba(255, 100, 180, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(255, 100, 180, 0.9); }
+  .reward-pet-card--legendary .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #facc15, #b45309);
+    border: 2px solid #facc15;
   }
 
-  /* 5th card (legendary): gold */
-  .reward-pet-card:nth-child(5) .reward-pet-card__thumb {
-    background: rgba(80, 60, 20, 0.75);
-    border: 2px solid rgba(255, 200, 50, 0.9);
-    animation: glowPulse5 1.8s ease-in-out infinite;
-  }
-  @keyframes glowPulse5 {
-    0%, 100% { box-shadow: 0 0 12px rgba(255, 200, 50, 0.5), 0 0 20px rgba(255, 150, 50, 0.3); }
-    50% { box-shadow: 0 0 20px rgba(255, 200, 50, 0.9), 0 0 30px rgba(255, 150, 50, 0.6); }
+  .reward-pet-card--mythic .reward-pet-card__thumb,
+  .reward-pet-card--legendary\+ .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #7c3aed, #4c1d95);
+    border: 2px solid #6d28d9;
   }
 
-  /* 6th card (mythic): rainbow/prismatic */
-  .reward-pet-card:nth-child(6) .reward-pet-card__thumb {
-    background: rgba(20, 20, 30, 0.85);
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    animation: glowPulse6 1.5s ease-in-out infinite, borderShift6 3s linear infinite;
-  }
-  .reward-pet-card:nth-child(6) .reward-pet-card__thumb::after {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border-radius: 14px;
-    background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bff6b, #6bd9ff, #d96bff, #ff6b6b);
-    background-size: 300% 300%;
-    z-index: -1;
-    animation: borderShift6 3s linear infinite;
-  }
-  @keyframes glowPulse6 {
-    0%, 100% { box-shadow: 0 0 15px rgba(255, 100, 255, 0.6), 0 0 25px rgba(100, 200, 255, 0.4); }
-    50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 100, 200, 0.6); }
-  }
-  @keyframes borderShift6 {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 300% 50%; }
+  .reward-pet-card--extreme .reward-pet-card__thumb,
+  .reward-pet-card--extremely-legendary .reward-pet-card__thumb {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border: 2px solid #ef4444;
   }
 
   .reward-pet-card__thumb img {
@@ -12009,10 +11997,13 @@
     transform: translateY(-2px);
   }
 
-  .gm-pet-tile--common { background: linear-gradient(180deg, #6b7280, #4b5563); }
-  .gm-pet-tile--rare { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
-  .gm-pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); }
+  .gm-pet-tile--common { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+  .gm-pet-tile--uncommon,
+  .gm-pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); }
+  .gm-pet-tile--epic { background: linear-gradient(180deg, #c084fc, #7c3aed); }
   .gm-pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+  .gm-pet-tile--mythic { background: linear-gradient(180deg, #7c3aed, #4c1d95); }
+  .gm-pet-tile--extreme { background: linear-gradient(180deg, #ef4444, #b91c1c); }
 
   .gm-pet-tile__img {
     width: 72%;
@@ -12545,10 +12536,13 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   }
 
-  .pet-tile--common { background: linear-gradient(180deg, #6b7280, #4b5563); border-color: #6b7280; }
-  .pet-tile--rare { background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-color: #3b82f6; }
-  .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); border-color: #a855f7; }
+  .pet-tile--common { background: linear-gradient(180deg, #60a5fa, #2563eb); border-color: #3b82f6; }
+  .pet-tile--uncommon,
+  .pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); border-color: #22c55e; }
+  .pet-tile--epic { background: linear-gradient(180deg, #c084fc, #7c3aed); border-color: #a855f7; }
   .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); border-color: #facc15; }
+  .pet-tile--mythic { background: linear-gradient(180deg, #7c3aed, #4c1d95); border-color: #6d28d9; }
+  .pet-tile--extreme { background: linear-gradient(180deg, #ef4444, #b91c1c); border-color: #ef4444; }
 
   /* Golden variant (tint + small tag) */
   .pet-tile--golden .pet-tile__img-el,
@@ -14982,19 +14976,34 @@
   }
 
   .egg-shop-card--common {
-    border-color: rgba(148, 163, 184, 0.6);
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    border-color: #3b82f6;
   }
 
+  .egg-shop-card--uncommon,
   .egg-shop-card--rare {
-    border-color: rgba(59, 130, 246, 0.7);
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: #22c55e;
   }
 
   .egg-shop-card--epic {
-    border-color: rgba(168, 85, 247, 0.75);
+    background: linear-gradient(180deg, #c084fc, #7c3aed);
+    border-color: #a855f7;
   }
 
   .egg-shop-card--legendary {
-    border-color: rgba(245, 158, 11, 0.8);
+    background: linear-gradient(180deg, #facc15, #b45309);
+    border-color: #facc15;
+  }
+
+  .egg-shop-card--mythic {
+    background: linear-gradient(180deg, #7c3aed, #4c1d95);
+    border-color: #6d28d9;
+  }
+
+  .egg-shop-card--extreme {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: #ef4444;
   }
 
   .pets-list {
@@ -15241,10 +15250,13 @@
     box-sizing: border-box;
   }
 
-  .pet-tile--common { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+  .pet-tile--common { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+  .pet-tile--uncommon,
   .pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); }
-  .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); }
+  .pet-tile--epic { background: linear-gradient(180deg, #c084fc, #7c3aed); }
   .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+  .pet-tile--mythic { background: linear-gradient(180deg, #7c3aed, #4c1d95); }
+  .pet-tile--extreme { background: linear-gradient(180deg, #ef4444, #b91c1c); }
 
   .pet-tile--equipped {
     outline: 4px solid rgba(255, 255, 255, 0.85);
@@ -19077,19 +19089,29 @@
 
   /* Rarity Colors */
   .rarity-common {
-    color: #55ff55; /* Green */
+    color: #3b82f6; /* Blue */
   }
 
+  .rarity-uncommon,
   .rarity-rare {
-    color: #55ffff; /* Cyan */
+    color: #22c55e; /* Green */
   }
 
   .rarity-epic {
-    color: #ff55ff; /* Magenta */
+    color: #a855f7; /* Purple */
   }
 
   .rarity-legendary {
-    color: #ffaa00; /* Orange/Gold */
+    color: #facc15; /* Gold */
+  }
+
+  .rarity-mythic {
+    color: #6d28d9; /* Dark purple */
+  }
+
+  .rarity-extreme,
+  .rarity-extremely-legendary {
+    color: #ef4444; /* Red */
   }
 
 

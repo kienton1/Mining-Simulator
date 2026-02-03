@@ -496,19 +496,34 @@
   }
 
   .egg-shop-card--common {
-    border-color: rgba(148, 163, 184, 0.6);
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    border-color: #3b82f6;
   }
 
+  .egg-shop-card--uncommon,
   .egg-shop-card--rare {
-    border-color: rgba(59, 130, 246, 0.7);
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: #22c55e;
   }
 
   .egg-shop-card--epic {
-    border-color: rgba(168, 85, 247, 0.75);
+    background: linear-gradient(180deg, #c084fc, #7c3aed);
+    border-color: #a855f7;
   }
 
   .egg-shop-card--legendary {
-    border-color: rgba(245, 158, 11, 0.8);
+    background: linear-gradient(180deg, #facc15, #b45309);
+    border-color: #facc15;
+  }
+
+  .egg-shop-card--mythic {
+    background: linear-gradient(180deg, #7c3aed, #4c1d95);
+    border-color: #6d28d9;
+  }
+
+  .egg-shop-card--extreme {
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    border-color: #ef4444;
   }
 
   .pets-list {
@@ -755,10 +770,13 @@
     box-sizing: border-box;
   }
 
-  .pet-tile--common { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+  .pet-tile--common { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+  .pet-tile--uncommon,
   .pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); }
-  .pet-tile--epic { background: linear-gradient(180deg, #a855f7, #6d28d9); }
+  .pet-tile--epic { background: linear-gradient(180deg, #c084fc, #7c3aed); }
   .pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+  .pet-tile--mythic { background: linear-gradient(180deg, #7c3aed, #4c1d95); }
+  .pet-tile--extreme { background: linear-gradient(180deg, #ef4444, #b91c1c); }
 
   .pet-tile--equipped {
     outline: 4px solid rgba(255, 255, 255, 0.85);
@@ -4591,17 +4609,27 @@
 
   /* Rarity Colors */
   .rarity-common {
-    color: #55ff55; /* Green */
+    color: #3b82f6; /* Blue */
   }
 
+  .rarity-uncommon,
   .rarity-rare {
-    color: #55ffff; /* Cyan */
+    color: #22c55e; /* Green */
   }
 
   .rarity-epic {
-    color: #ff55ff; /* Magenta */
+    color: #a855f7; /* Purple */
   }
 
   .rarity-legendary {
-    color: #ffaa00; /* Orange/Gold */
+    color: #facc15; /* Gold */
+  }
+
+  .rarity-mythic {
+    color: #6d28d9; /* Dark purple */
+  }
+
+  .rarity-extreme,
+  .rarity-extremely-legendary {
+    color: #ef4444; /* Red */
   }
