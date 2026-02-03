@@ -435,13 +435,18 @@
     const TRACKPAD_MAX_DELTA = 50;
     const TRACKPAD_UNLOCK_DELAY = 50;
 
+    let lockPointerInProgress = false;
     const lockPointerSafe = (lock) => {
+      if (lockPointerInProgress) return; // Prevent recursion
       if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
       try {
+        lockPointerInProgress = true;
         hytopia.lockPointer(lock, true);
         console.log('[DEBUG] Pointer lock set to:', lock);
       } catch (err) {
         console.warn('[UI] lockPointer failed', err);
+      } finally {
+        lockPointerInProgress = false;
       }
     };
 
@@ -603,12 +608,17 @@
     let arrowPointerLocked = false;
     const ARROW_CAMERA_SPEED = 8; // pixels of synthetic mouse movement per frame
 
+    let lockPointerForArrowsInProgress = false;
     const lockPointerForArrows = (lock) => {
+      if (lockPointerForArrowsInProgress) return; // Prevent recursion
       if (typeof hytopia === 'undefined' || typeof hytopia.lockPointer !== 'function') return;
       try {
+        lockPointerForArrowsInProgress = true;
         hytopia.lockPointer(lock, true);
       } catch (err) {
         console.warn('[ArrowKeys] lockPointer failed', err);
+      } finally {
+        lockPointerForArrowsInProgress = false;
       }
     };
 
@@ -697,6 +707,40 @@
       arrowState.ArrowLeft = false;
       arrowState.ArrowRight = false;
       stopArrowCameraLoop();
+    });
+
+    // WASD key forwarding - manually send WASD input since automatic capture
+    // requires pointer lock which needs a user gesture to initialize
+    const wasdState = { KeyW: false, KeyA: false, KeyS: false, KeyD: false, Space: false };
+    const wasdToInput = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', Space: 'sp' };
+
+    window.addEventListener('keydown', (e) => {
+      if (!(e.code in wasdState) || e.repeat) return;
+      if (document.body.classList.contains('modal-open')) return;
+      // Don't capture if focus is on an input element
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+      wasdState[e.code] = true;
+      hytopia.pressInput(wasdToInput[e.code], true);
+      console.log('[WASD] Keydown:', e.code, '->', wasdToInput[e.code]);
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (!(e.code in wasdState)) return;
+
+      wasdState[e.code] = false;
+      hytopia.pressInput(wasdToInput[e.code], false);
+      console.log('[WASD] Keyup:', e.code, '->', wasdToInput[e.code]);
+    });
+
+    // Release all WASD on window blur to prevent stuck keys
+    window.addEventListener('blur', () => {
+      for (const code of Object.keys(wasdState)) {
+        if (wasdState[code]) {
+          wasdState[code] = false;
+          hytopia.pressInput(wasdToInput[code], false);
+        }
+      }
     });
   }
 

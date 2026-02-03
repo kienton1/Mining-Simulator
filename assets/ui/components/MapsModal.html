@@ -226,6 +226,27 @@
     paint-order: stroke fill;
     position: relative;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .maps-card__multiplier {
+    display: inline-flex;
+    align-items: center;
+    color: #ffd700;
+    font-size: 16px;
+    font-weight: 700;
+    -webkit-text-stroke: 1px #000;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .maps-card__multiplier-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 2px;
   }
 
   .maps-card__info {
@@ -262,8 +283,8 @@
   }
 
   .maps-card__badge--multiplier {
-    background: rgba(255, 215, 0, 0.15);
-    border: 1px solid rgba(255, 215, 0, 0.5);
+    background: transparent;
+    border: none;
     color: #ffd700;
   }
 
@@ -290,77 +311,93 @@
   }
 
   .maps-card__btn {
-    padding: 10px 20px;
-    border-radius: 10px;
-    border: 2px solid;
-    font-size: 14px;
-    font-weight: 700;
+    position: relative;
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+    border-radius: 14px;
+    border: 4px solid #1a1a2e;
+    background: #2d4a6a !important;
     font-family: "Fredoka", sans-serif;
     cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .maps-card__btn--teleport {
-    background: linear-gradient(180deg, #4be7f5, #37d6e8);
-    border-color: rgba(55, 214, 232, 0.9);
-    color: #0b1220;
-    box-shadow: 0 4px 12px rgba(55, 214, 232, 0.3);
-  }
-
-  .maps-card__btn--teleport:hover:not(:disabled) {
-    background: linear-gradient(180deg, #6df0fc, #4be7f5);
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(55, 214, 232, 0.5);
-  }
-
-  .maps-card__btn--teleport:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    filter: grayscale(0.5);
-    transform: none;
-  }
-
-  .maps-card__btn--unlock {
-    background: linear-gradient(180deg, #ffd700, #ffb700);
-    border-color: rgba(255, 215, 0, 0.9);
-    color: #0b1220;
-    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
-  }
-
-  .maps-card__btn--unlock:hover:not(:disabled) {
-    background: linear-gradient(180deg, #ffed4e, #ffd700);
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.5);
-  }
-
-  .maps-card__btn--unlock:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    filter: grayscale(0.5);
-    transform: none;
-  }
-
-  .maps-card__btn-cost {
-    display: inline-flex;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    margin-left: 6px;
-    font-weight: 900;
+    justify-content: flex-end;
+    padding: 0;
+    overflow: visible;
+  }
+
+  /* Inner border effect */
+  .maps-card__btn::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 3px solid rgba(100, 160, 200, 0.5);
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .maps-card__btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  }
+
+  .maps-card__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .maps-card__btn-icon {
-    width: 42px;
-    height: 42px;
-    display: inline-block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+    z-index: 1;
   }
 
-  .maps-card__btn-icon img {
-    width: 100%;
-    height: 100%;
-    display: block;
+  .maps-card__btn-num {
+    font-size: 32px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+    position: relative;
+    z-index: 3;
+    line-height: 1;
   }
+
+  .maps-card__btn-label {
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 3;
+    margin-bottom: 8px;
+  }
+
+  .maps-card__btn--teleport {
+    justify-content: center;
+  }
+
+  .maps-card__btn--teleport .maps-card__btn-label {
+    font-size: 16px;
+    margin-bottom: 0;
+  }
+
+  .maps-card__btn--unlock {
+    justify-content: flex-end;
+  }
+
 
   .maps-empty {
     text-align: center;
@@ -433,14 +470,47 @@
     font-size: 16px;
   }
 
+  body.mobile .maps-card__multiplier {
+    font-size: 14px;
+  }
+
+  body.mobile .maps-card__multiplier-icon {
+    width: 20px;
+    height: 20px;
+  }
+
   body.mobile .maps-card__badge {
     padding: 3px 8px;
     font-size: 9px;
   }
 
   body.mobile .maps-card__btn {
-    padding: 8px 14px;
-    font-size: 12px;
+    width: 90px;
+    height: 90px;
+    border-width: 3px;
+    border-radius: 10px;
+  }
+
+  body.mobile .maps-card__btn::before {
+    inset: 2px;
+    border-width: 2px;
+    border-radius: 7px;
+  }
+
+  body.mobile .maps-card__btn-icon {
+    width: 75px;
+    height: 75px;
+  }
+
+  body.mobile .maps-card__btn-num {
+    font-size: 22px;
+    -webkit-text-stroke: 2px #000;
+  }
+
+  body.mobile .maps-card__btn-label {
+    font-size: 11px;
+    -webkit-text-stroke: 1.5px #000;
+    margin-bottom: 6px;
   }
 </style>
 
@@ -494,26 +564,27 @@
         const trophiesRequired = world.unlockRequirement?.amount || world.winsRequired || 0;
 
         const trophyIcon = `{{CDN_ASSETS_URL}}/icons/HUDIcons/TrophyIcon.png`;
-        const unlockLabel = trophiesRequired > 0
-          ? `Unlock <span class="maps-card__btn-cost"><span class="maps-card__btn-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired}</span>`
-          : 'Unlock';
 
         return `
           <div class="maps-card ${isCurrent ? 'maps-card--current' : ''} ${!isUnlocked ? 'maps-card--locked' : ''}"
                data-id="${world.id}">
-            <div class="maps-card__name">${world.name}</div>
+            <div class="maps-card__name">${world.name}${multiplier > 1 ? `<span class="maps-card__multiplier"><img src="${trophyIcon}" alt="" class="maps-card__multiplier-icon" />x${multiplier}</span>` : ''}</div>
             <div class="maps-card__info">
-              ${multiplier > 1 ? `<span class="maps-card__badge maps-card__badge--multiplier"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>x${multiplier}</span>` : ''}
               ${isCurrent ? '<span class="maps-card__badge maps-card__badge--current">Current</span>' : ''}
-              ${!isUnlocked && trophiesRequired > 0 ? `<span class="maps-card__badge maps-card__badge--locked"><span class="maps-card__badge-icon"><img src="${trophyIcon}" alt="" /></span>${trophiesRequired} Required</span>` : ''}
             </div>
             <div class="maps-card__actions">
               ${isUnlocked && !isCurrent
-                ? `<button class="maps-card__btn maps-card__btn--teleport" data-action="teleport" data-id="${world.id}">Teleport</button>`
+                ? `<button class="maps-card__btn maps-card__btn--teleport" data-action="teleport" data-id="${world.id}">
+                    <span class="maps-card__btn-label">Teleport</span>
+                  </button>`
                 : ''
               }
               ${!isUnlocked
-                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">${unlockLabel}</button>`
+                ? `<button class="maps-card__btn maps-card__btn--unlock" data-action="unlock" data-id="${world.id}">
+                    <img src="${trophyIcon}" alt="" class="maps-card__btn-icon" />
+                    <span class="maps-card__btn-num">${trophiesRequired}</span>
+                    <span class="maps-card__btn-label">Unlock</span>
+                  </button>`
                 : ''
               }
               ${isCurrent ? '<span style="color: #4caf50; font-weight: 700;">You are here</span>' : ''}
