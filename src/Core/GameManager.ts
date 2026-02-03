@@ -32,6 +32,7 @@ import { EggDisplayAnimator } from '../Pets/EggDisplayAnimator';
 import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
 import { DailyRewardSystem } from '../DailyReward/DailyRewardSystem';
+import { LeaderboardManager } from './LeaderboardManager';
 
 /**
  * Game Manager class
@@ -99,6 +100,7 @@ export class GameManager {
   private eggDisplayAnimator: EggDisplayAnimator;
   private tutorialManager: TutorialManager;
   private dailyRewardSystem: DailyRewardSystem;
+  private leaderboardManager: LeaderboardManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
@@ -209,6 +211,9 @@ export class GameManager {
     this.dailyRewardSystem = new DailyRewardSystem();
     this.dailyRewardSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.dailyRewardSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+
+    // Leaderboard manager (initialized async later via initializeLeaderboard())
+    this.leaderboardManager = new LeaderboardManager();
 
     // Start periodic save mechanism
     this.startPeriodicSaves();
@@ -367,6 +372,17 @@ export class GameManager {
   updatePlayerData(player: Player, data: PlayerData): void {
     this.playerDataMap.set(player, data);
     this.scheduleSave(player);
+
+    // Track power high score (power resets on rebirth)
+    const currentPower = BigInt(data.power || '0');
+    const bestPower = BigInt(data.leaderboardHighScores?.bestPower || '0');
+    if (currentPower > bestPower) {
+      if (!data.leaderboardHighScores) data.leaderboardHighScores = {};
+      data.leaderboardHighScores.bestPower = data.power;
+    }
+
+    // Mark dirty for leaderboard (internally deduped and batched)
+    this.leaderboardManager.updatePlayerScores(player, data);
   }
   
   /**
@@ -430,6 +446,8 @@ export class GameManager {
         if (playerData) {
           // Use savePlayerData directly (bypasses debounce for periodic saves)
           await PlayerDataPersistence.savePlayerData(player, playerData);
+          // Keep leaderboard scores fresh (especially timePlayed)
+          this.leaderboardManager.updatePlayerScores(player, playerData);
         }
       }
     }, this.PERIODIC_SAVE_MS);
@@ -686,6 +704,14 @@ export class GameManager {
    */
   getDailyRewardSystem(): DailyRewardSystem {
     return this.dailyRewardSystem;
+  }
+
+  getLeaderboardManager(): LeaderboardManager {
+    return this.leaderboardManager;
+  }
+
+  async initializeLeaderboard(): Promise<void> {
+    await this.leaderboardManager.initialize();
   }
 
   /**
@@ -2398,6 +2424,12 @@ export class GameManager {
     // Clear timed reward state
     this.clearRewardState(player);
 
+    // Final leaderboard snapshot before removing player data
+    const playerDataBeforeCleanup = this.playerDataMap.get(player);
+    if (playerDataBeforeCleanup) {
+      this.leaderboardManager.updatePlayerScores(player, playerDataBeforeCleanup);
+    }
+
     // Save player data before cleanup
     await this.savePlayerData(player);
     
@@ -2449,9 +2481,14 @@ export class GameManager {
     }
     this.saveTimers.clear();
     
+    this.leaderboardManager.cleanup();
     this.trainingController?.cleanup();
     this.miningController?.cleanup();
     this.petVisualManager.cleanup();
+  }
+
+  async asyncCleanup(): Promise<void> {
+    await this.leaderboardManager.forceFlush();
   }
 
   /**

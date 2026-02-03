@@ -115,6 +115,10 @@ startServer(world => {
    */
   const gameManager = new GameManager(world, pickaxeManager);
 
+  gameManager.initializeLeaderboard().catch(err => {
+    console.error('[Leaderboard] Failed to initialize:', err);
+  });
+
   const isAdminPlayer = (player: { username: string; }): boolean => {
     const data = gameManager.getPlayerData(player as any);
     if (data?.isAdmin) return true;
@@ -395,85 +399,25 @@ startServer(world => {
     });
   }
 
-  type LeaderboardCategoryId = 'power' | 'blocksMined' | 'rebirths' | 'timePlayed' | 'maxCoins' | 'eggsHatched';
-
-  const LEADERBOARD_LIMIT = 10;
-
-  const toBigIntSafe = (value: number | string | undefined | null): bigint => {
-    if (typeof value === 'string') {
-      try {
-        return BigInt(value);
-      } catch {
-        return 0n;
-      }
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return BigInt(Math.floor(value));
-    }
-    return 0n;
-  };
-
-  const getLeaderboardValue = (data: any, categoryId: LeaderboardCategoryId): bigint => {
-    switch (categoryId) {
-      case 'power':
-        return toBigIntSafe(data.power);
-      case 'blocksMined':
-        return toBigIntSafe(data.achievementProgress?.blocksMined ?? 0);
-      case 'rebirths':
-        return toBigIntSafe(data.rebirths ?? 0);
-      case 'timePlayed':
-        return toBigIntSafe(data.achievementProgress?.timePlayedMs ?? 0);
-      case 'maxCoins':
-        return toBigIntSafe(data.maxGoldEverHeld ?? 0);
-      case 'eggsHatched':
-        return toBigIntSafe(data.achievementProgress?.eggsHatched ?? 0);
-      default:
-        return 0n;
-    }
-  };
-
   function sendLeaderboardState(player: any) {
-    const players = PlayerManager.instance.getConnectedPlayers();
+    const snapshot = gameManager.getLeaderboardManager().getLeaderboardSnapshot();
+    const categories: Record<string, { entries: any[] }> = {};
 
-    const buildEntries = (categoryId: LeaderboardCategoryId) => {
-      const entries = players
-        .map((p) => {
-          const data = gameManager.getPlayerData(p);
-          if (!data) return null;
-          return {
-            playerId: p.id,
-            name: p.username,
-            value: getLeaderboardValue(data, categoryId),
-          };
-        })
-        .filter(Boolean) as Array<{ playerId: string | number; name: string; value: bigint }>;
-
-      entries.sort((a, b) => {
-        if (a.value === b.value) {
-          return a.name.localeCompare(b.name);
-        }
-        return a.value > b.value ? -1 : 1;
-      });
-
-      return entries.slice(0, LEADERBOARD_LIMIT).map((entry, idx) => ({
-        rank: idx + 1,
-        playerId: entry.playerId,
-        name: entry.name,
-        value: entry.value.toString(),
-      }));
-    };
+    for (const [catId, entries] of Object.entries(snapshot.categories)) {
+      categories[catId] = {
+        entries: (entries as any[]).map((entry: any, idx: number) => ({
+          rank: idx + 1,
+          playerId: entry.playerId,
+          name: entry.name,
+          value: entry.value,
+        })),
+      };
+    }
 
     player.ui.sendData({
       type: 'LEADERBOARD_STATE',
-      updatedAt: Date.now(),
-      categories: {
-        power: { entries: buildEntries('power') },
-        blocksMined: { entries: buildEntries('blocksMined') },
-        rebirths: { entries: buildEntries('rebirths') },
-        timePlayed: { entries: buildEntries('timePlayed') },
-        maxCoins: { entries: buildEntries('maxCoins') },
-        eggsHatched: { entries: buildEntries('eggsHatched') },
-      },
+      updatedAt: snapshot.lastPersistedAt || Date.now(),
+      categories,
     });
   }
 

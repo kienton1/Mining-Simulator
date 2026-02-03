@@ -365,6 +365,14 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
 
       return { blocksMined, powerTrained, coinsEarned, eggsHatched, timePlayedMs };
     })(),
+    leaderboardHighScores: (() => {
+      const lhs = savedData.leaderboardHighScores;
+      if (!lhs || typeof lhs !== 'object') return { bestPower: defaults.leaderboardHighScores?.bestPower ?? '1' };
+      const bestPower = typeof lhs.bestPower === 'string' && /^\d+$/.test(lhs.bestPower)
+        ? lhs.bestPower
+        : (defaults.leaderboardHighScores?.bestPower ?? '1');
+      return { bestPower };
+    })(),
     achievementClaims: (() => {
       const ac = savedData.achievementClaims;
       const base = defaults.achievementClaims ?? {

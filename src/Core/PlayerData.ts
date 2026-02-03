@@ -132,13 +132,17 @@ export interface PlayerData {
     eggsHatched?: number;
     timePlayed?: number;
   };
+
+  leaderboardHighScores?: {
+    bestPower?: string;  // BigInt string - highest power ever achieved
+  };
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 12;
+export const CURRENT_DATA_VERSION = 13;
 
 /**
  * Inventory data structure
@@ -197,6 +201,9 @@ export function createDefaultPlayerData(): PlayerData {
       coinsEarned: 0,
       eggsHatched: 0,
       timePlayed: 0,
+    },
+    leaderboardHighScores: {
+      bestPower: '1',
     },
   };
 }
