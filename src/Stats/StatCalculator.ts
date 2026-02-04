@@ -17,6 +17,8 @@ import {
   type Island2TrainingRockData,
   ISLAND3_TRAINING_ROCK_TIER,
   calculateIsland3TrainingPowerGain,
+  ISLAND4_TRAINING_ROCK_TIER,
+  calculateIsland4TrainingPowerGain,
 } from '../worldData/TrainingRocks';
 // Note: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are deprecated
 // New system uses power-based damage formula and piecewise functions for power gain
@@ -263,13 +265,13 @@ function calculateRock6PowerGain(rebirths: number): number {
  * 
  * Reference: Planning/PowerSystemPlan.md section 4 - Training Rock Balance
  * 
- * @param rockTier - Training rock tier (Island 1, Island 2, or Island 3)
+ * @param rockTier - Training rock tier (Island 1, Island 2, Island 3, or Island 4)
  * @param rebirths - Number of rebirths the player has
- * @param worldId - Optional world ID ('island1', 'island2', or 'island3'), defaults to 'island1'
+ * @param worldId - Optional world ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
  * @returns Power gained per hit
  */
 export function calculatePowerGainPerHit(
-  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER,
+  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER,
   rebirths: number,
   worldId: string = 'island1'
 ): number {
@@ -285,6 +287,13 @@ export function calculatePowerGainPerHit(
   if (worldId === 'island3') {
     if (Object.values(ISLAND3_TRAINING_ROCK_TIER).includes(rockTier as ISLAND3_TRAINING_ROCK_TIER)) {
       return calculateIsland3TrainingPowerGain(rockTier as ISLAND3_TRAINING_ROCK_TIER, rebirths);
+    }
+  }
+
+  // Island 4 uses different formulas
+  if (worldId === 'island4') {
+    if (Object.values(ISLAND4_TRAINING_ROCK_TIER).includes(rockTier as ISLAND4_TRAINING_ROCK_TIER)) {
+      return calculateIsland4TrainingPowerGain(rockTier as ISLAND4_TRAINING_ROCK_TIER, rebirths);
     }
   }
   

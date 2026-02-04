@@ -10,6 +10,7 @@ import { Player } from 'hytopia';
 import { OreType, ORE_DATABASE } from '../Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from '../Mining/Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from '../Mining/Ore/World3OreData';
+import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from '../Mining/Ore/World4OreData';
 import type { InventoryData, PlayerData } from '../Core/PlayerData';
 
 /**
@@ -181,6 +182,10 @@ export class InventoryManager {
       if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
         oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
       }
+      // Try Island 4 database if not found
+      if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+        oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+      }
       
       if (oreData) {
         total += amount * oreData.value * sellValueMultiplier;
@@ -197,7 +202,11 @@ export class InventoryManager {
    * @returns Gold value per unit, or 0 if not found
    */
   getOreValue(oreType: OreType): number {
-    const oreData = ORE_DATABASE[oreType];
+    const oreData =
+      ORE_DATABASE[oreType] ||
+      (oreType in ISLAND2_ORE_DATABASE ? ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE] : undefined) ||
+      (oreType in ISLAND3_ORE_DATABASE ? ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE] : undefined) ||
+      (oreType in ISLAND4_ORE_DATABASE ? ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE] : undefined);
     return oreData ? oreData.value : 0;
   }
 

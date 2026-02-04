@@ -4,6 +4,7 @@ import { WorldRegistry } from '../WorldRegistry';
 import {
   ISLAND2_SHARED_MINE_SHAFT,
   ISLAND3_SHARED_MINE_SHAFT,
+  ISLAND4_SHARED_MINE_SHAFT,
   SHARED_MINE_SHAFT,
 } from '../Core/GameConstants';
 import { EGG_STATIONS } from '../Pets/EggStationsConfig';
@@ -534,7 +535,9 @@ export class TutorialManager {
       ? ISLAND2_SHARED_MINE_SHAFT
       : worldId === 'island3'
         ? ISLAND3_SHARED_MINE_SHAFT
-        : SHARED_MINE_SHAFT;
+        : worldId === 'island4'
+          ? ISLAND4_SHARED_MINE_SHAFT
+          : SHARED_MINE_SHAFT;
     const bounds = shaft.bounds;
     const centerX = (bounds.minX + bounds.maxX) / 2;
     const centerZ = (bounds.minZ + bounds.maxZ) / 2;

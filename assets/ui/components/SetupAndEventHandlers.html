@@ -61,9 +61,19 @@
     };
     
     // Handle very large numbers (same structure as formatNumber)
+    if (value >= 1e42) {
+      const num = value / 1e42;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'TDe');
+      return formatWithMax3Digits(num, 'TDe');
+    }
+    if (value >= 1e39) {
+      const num = value / 1e39;
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'TDe');
+      return formatWithMax3Digits(num, 'DDe');
+    }
     if (value >= 1e36) {
       const num = value / 1e36;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'UDe');
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'DDe');
       return formatWithMax3Digits(num, 'UDe');
     }
     if (value >= 1e33) {
@@ -104,11 +114,11 @@
     if (value >= 1e15) {
       const num = value / 1e15;
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Qn');
-      return formatWithMax3Digits(num, 'Q');
+      return formatWithMax3Digits(num, 'Qd');
     }
     if (value >= 1e12) {
       const num = value / 1e12;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Q');
+      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Qd');
       return formatWithMax3Digits(num, 'T');
     }
     if (value >= 1e9) {
@@ -154,9 +164,19 @@
     };
     
     // Handle very large numbers
+    if (value >= 1e42) {
+      const num = value / 1e42;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+      return formatWithSuffix(num, 'TDe');
+    }
+    if (value >= 1e39) {
+      const num = value / 1e39;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+      return formatWithSuffix(num, 'DDe');
+    }
     if (value >= 1e36) {
       const num = value / 1e36;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'DDe');
       return formatWithSuffix(num, 'UDe');
     }
     if (value >= 1e33) {
@@ -197,11 +217,11 @@
     if (value >= 1e15) {
       const num = value / 1e15;
       if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
-      return formatWithSuffix(num, 'Q');
+      return formatWithSuffix(num, 'Qd');
     }
     if (value >= 1e12) {
       const num = value / 1e12;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qd');
       return formatWithSuffix(num, 'T');
     }
     if (value >= 1e9) {
@@ -3656,7 +3676,7 @@
       { id: 'eggsHatched', label: 'Eggs Hatched', icon: 'icons/HUDIcons/EggIcon.png', format: 'number' },
     ];
 
-    const leaderboardSuffixes = ['','K','M','B','T','Q','Qn','Sx','Sp','Oc','No','De','UDe','DDe','TDe'];
+    const leaderboardSuffixes = ['','K','M','B','T','Qd','Qn','Sx','Sp','Oc','No','De','UDe','DDe','TDe'];
 
     const formatBigNumberString = (value) => {
       if (value === null || value === undefined) return '0';

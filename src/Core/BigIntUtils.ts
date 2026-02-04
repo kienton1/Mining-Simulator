@@ -105,10 +105,10 @@ export function bigIntToNumber(value: bigint): number {
 }
 
 /**
- * Formats a BigInt value as a string with K/M/B/T/Qa/Qi suffixes for display
- * 
+ * Formats a BigInt value as a string with K/M/B/T/Qd/Qn/Sx/Sp/Oc/No/De/UDe/DDe/TDe suffixes for display
+ *
  * Handles negative values correctly and provides rounding for cleaner display.
- * 
+ *
  * @param value - BigInt value to format
  * @returns Formatted string (e.g., "1.5K", "2.3M", "1.2B", "5.4T")
  */
@@ -117,51 +117,48 @@ export function formatBigInt(value: bigint): string {
   const absValue = isNegative ? -value : value;
   const str = absValue.toString();
   const len = str.length;
-  
+
   // Zero or very small values
   if (len <= 3) {
     return isNegative ? `-${str}` : str;
   }
-  
-  // Helper to format with suffix and one decimal place
-  const formatWithSuffix = (numStr: string, suffix: string): string => {
-    const wholeLen = numStr.length - 3;
-    if (wholeLen <= 0) {
-      return isNegative ? `-${numStr}${suffix}` : `${numStr}${suffix}`;
-    }
-    
-    const wholePart = numStr.slice(0, wholeLen);
-    const decimalDigit = numStr.slice(wholeLen, wholeLen + 1);
-    
+
+  const suffixes: { pow: number; suffix: string }[] = [
+    { pow: 42, suffix: 'TDe' },
+    { pow: 39, suffix: 'DDe' },
+    { pow: 36, suffix: 'UDe' },
+    { pow: 33, suffix: 'De' },
+    { pow: 30, suffix: 'No' },
+    { pow: 27, suffix: 'Oc' },
+    { pow: 24, suffix: 'Sp' },
+    { pow: 21, suffix: 'Sx' },
+    { pow: 18, suffix: 'Qn' },
+    { pow: 15, suffix: 'Qd' },
+    { pow: 12, suffix: 'T' },
+    { pow: 9, suffix: 'B' },
+    { pow: 6, suffix: 'M' },
+    { pow: 3, suffix: 'K' },
+  ];
+
+  const formatWithSuffix = (pow: number, suffix: string): string => {
+    const wholeLen = len - pow;
+    const wholePart = str.slice(0, wholeLen);
+    const decimalDigit = str.slice(wholeLen, wholeLen + 1);
+
     let formatted = wholePart;
     if (decimalDigit && decimalDigit !== '0') {
       formatted += `.${decimalDigit}`;
     }
-    
+
     const result = formatted + suffix;
     return isNegative ? `-${result}` : result;
   };
-  
-  // Quadrillion (Qi) - 15+ digits
-  if (len > 15) {
-    return formatWithSuffix(str, 'Qi');
+
+  for (const { pow, suffix } of suffixes) {
+    if (len > pow) {
+      return formatWithSuffix(pow, suffix);
+    }
   }
-  
-  // Quadrillion (Qa) - 12+ digits
-  if (len > 12) {
-    return formatWithSuffix(str, 'Qa');
-  }
-  
-  // Trillion (T) - 9+ digits
-  if (len > 9) {
-    return formatWithSuffix(str, 'T');
-  }
-  
-  // Billions - 6+ digits
-  if (len > 6) {
-    return formatWithSuffix(str, 'B');
-  }
-  
-  // Millions - 3+ digits (but len > 3 from check above)
-  return formatWithSuffix(str, 'M');
+
+  return isNegative ? `-${str}` : str;
 }

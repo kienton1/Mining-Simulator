@@ -15,11 +15,12 @@ import { getBonuses } from '../Achievements/Achievements';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
+import { ISLAND4_ORE_TYPE } from './Ore/World4OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
 /** Set to true to enable verbose mining debug logging. */
 const DEBUG_MINING = false;
@@ -96,6 +97,7 @@ export class MiningSystem {
    * Island 1 ores: Block IDs 16-39 from map.json
    * Island 2 ores: Block IDs 45-68 from map.json
    * Island 3 ores: Block IDs 73-96 from map.json
+   * Island 4 ores: Block IDs 103-122 from map.json
    */
   private readonly ORE_TO_BLOCK_ID: Map<string, number> = new Map([
     // Island 1 ores (OreType)
@@ -173,6 +175,27 @@ export class MiningSystem {
     ['cinderop', 94],      // Cinderop
     ['coreflare', 95],     // Coreflare
     ['darkglow', 96],      // Darkglow
+    // Island 4 ores (Snow) - Block IDs 103-122 from map.json
+    [ISLAND4_ORE_TYPE.FROSTBRICK, 103],         // Frostbrick
+    [ISLAND4_ORE_TYPE.SNOWSPICE, 109],          // Snowspice
+    [ISLAND4_ORE_TYPE.TINSEL_LEAD, 110],        // Tinsel Lead
+    [ISLAND4_ORE_TYPE.EVERGREEN_CRYSTAL, 104],  // Evergreen Crystal
+    [ISLAND4_ORE_TYPE.ICICLE_STEEL, 111],       // Icicle Steel
+    [ISLAND4_ORE_TYPE.CANDYCANE_VEIN, 112],     // Candycane Vein
+    [ISLAND4_ORE_TYPE.HEARTHFIRE_CRYSTAL, 113], // Hearthfire Crystal
+    [ISLAND4_ORE_TYPE.STARFLARE, 105],          // Starflare
+    [ISLAND4_ORE_TYPE.NORTHSTAR_PLATINUM, 114], // Northstar Platinum
+    [ISLAND4_ORE_TYPE.TWINKLEITE, 115],         // Twinkleite
+    [ISLAND4_ORE_TYPE.SNOWMOON_ORE, 116],       // Snowmoon Ore
+    [ISLAND4_ORE_TYPE.COAL_OF_YULE, 106],       // Coal of Yule
+    [ISLAND4_ORE_TYPE.RUDOLPHS_EYE, 117],       // Rudolph's Eye
+    [ISLAND4_ORE_TYPE.YULETIDE_EMBERSTONE, 118], // Yuletide Emberstone
+    [ISLAND4_ORE_TYPE.JINGLEVOLT_ORE, 119],     // Jinglevolt Ore
+    [ISLAND4_ORE_TYPE.MOLTEN_COCOA_STONE, 107], // Molten Cocoa Stone
+    [ISLAND4_ORE_TYPE.CANDLELIGHT_CRYSTAL, 120], // Candlelight Crystal
+    [ISLAND4_ORE_TYPE.AURORALIGHT_ORE, 121],    // Auroralight Ore
+    [ISLAND4_ORE_TYPE.FIRESNOW_CORE, 122],      // Firesnow Core
+    [ISLAND4_ORE_TYPE.SUGARPLUM_QUARTZ, 108],   // Sugarplum Quartz
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
@@ -1165,7 +1188,7 @@ export class MiningSystem {
    * World-aware: Supports both Island 1 and Island 2 ores
    * 
    * @param oreType - Ore type as string (ore type name)
-   * @param worldId - World ID ('island1' or 'island2'), defaults to 'island1'
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
    * @returns Block type ID for the ore
    */
   private getBlockIdForOreType(oreType: string, worldId: string = 'island1'): number {
@@ -1264,7 +1287,14 @@ export class MiningSystem {
     // Simple grid allocation using spacing to avoid overlap
     // Start from index 1 so nobody uses the origin/shared area
     // Island 2 and Island 3 use different grid regions to avoid overlap with Island 1
-    const baseOffsetX = worldId === 'island2' ? 10000 : worldId === 'island3' ? 20000 : 0;
+    const baseOffsetX =
+      worldId === 'island2'
+        ? 10000
+        : worldId === 'island3'
+          ? 20000
+          : worldId === 'island4'
+            ? 30000
+            : 0;
     const index = instanceIndex;
     const spacing = MINE_INSTANCE_SPACING;
     const gridWidth = 16; // gives plenty of room before wrapping
@@ -1285,6 +1315,9 @@ export class MiningSystem {
     }
     if (worldId === 'island3') {
       return ISLAND3_MINING_AREA_BOUNDS;
+    }
+    if (worldId === 'island4') {
+      return ISLAND4_MINING_AREA_BOUNDS;
     }
     return MINING_AREA_BOUNDS;
   }
@@ -1319,7 +1352,7 @@ export class MiningSystem {
    */
   private getWorldNumberFromId(worldId: string): 1 | 2 | 3 {
     if (worldId === 'island2') return 2;
-    if (worldId === 'island3') return 3;
+    if (worldId === 'island3' || worldId === 'island4') return 3;
     return 1;
   }
 
@@ -1417,7 +1450,7 @@ export class MiningSystem {
 
   /**
    * Generates an ore type based on depth and luck using the NEW LINEAR SCALING SYSTEM
-   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
+   * World-aware: Uses Island 1, Island 2, Island 3, or Island 4 ore database based on player's world
    * 
    * Uses OreGenerator which:
    * - Filters ores by firstDepth (ores only spawn at their unlock depth or deeper)
@@ -1454,14 +1487,14 @@ export class MiningSystem {
 
   /**
    * Calculates the HP for an ore at a given depth using NEW LINEAR SCALING SYSTEM
-   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
+   * World-aware: Uses Island 1, Island 2, Island 3, or Island 4 ore database based on player's world
    * 
    * Uses linear interpolation from firstHealth to lastHealth based on depth
    * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
    * 
    * @param oreType - Type of ore as string
    * @param depth - Current mining depth (should be positive)
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    * @returns Calculated HP with linear depth scaling
    */
   private calculateOreHP(oreType: string, depth: number, worldId: string): number {
@@ -1805,7 +1838,7 @@ export class MiningSystem {
    * 
    * @param depth - Y coordinate (depth) to generate walls at
    * @param offset - World-space offset for this mine instance
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private generateMineShaftWalls(depth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -1814,7 +1847,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     
     // Generate inner box (layer 1) - solid walls around the mining area
     const innerMinX = bounds.minX - 1 + offset.x;
@@ -1870,7 +1905,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     const ceilingLayers = 10;
     const startY = MINE_DEPTH_START + 1; // lowered by one to sit closer to the floor
     const floorY = MINE_DEPTH_START; // Floor level
@@ -2005,7 +2042,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -2014,7 +2051,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     
     // Mining area bounds (with offset) - this area should NOT be filled
     const miningMinX = bounds.minX + offset.x;
@@ -2056,7 +2095,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor to delete
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private deleteBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;

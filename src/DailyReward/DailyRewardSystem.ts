@@ -383,11 +383,23 @@ export class DailyRewardSystem {
    * Formats a currency amount with appropriate suffix (K, M, B, T, etc.)
    */
   private formatCurrency(amount: number): string {
-    if (amount >= 1e15) return (amount / 1e15).toFixed(1).replace(/\.0$/, '') + 'Q';
-    if (amount >= 1e12) return (amount / 1e12).toFixed(1).replace(/\.0$/, '') + 'T';
-    if (amount >= 1e9) return (amount / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
-    if (amount >= 1e6) return (amount / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (amount >= 1e3) return (amount / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+    const formatWithSuffix = (divisor: number, suffix: string): string =>
+      (amount / divisor).toFixed(1).replace(/\.0$/, '') + suffix;
+
+    if (amount >= 1e42) return formatWithSuffix(1e42, 'TDe');
+    if (amount >= 1e39) return formatWithSuffix(1e39, 'DDe');
+    if (amount >= 1e36) return formatWithSuffix(1e36, 'UDe');
+    if (amount >= 1e33) return formatWithSuffix(1e33, 'De');
+    if (amount >= 1e30) return formatWithSuffix(1e30, 'No');
+    if (amount >= 1e27) return formatWithSuffix(1e27, 'Oc');
+    if (amount >= 1e24) return formatWithSuffix(1e24, 'Sp');
+    if (amount >= 1e21) return formatWithSuffix(1e21, 'Sx');
+    if (amount >= 1e18) return formatWithSuffix(1e18, 'Qn');
+    if (amount >= 1e15) return formatWithSuffix(1e15, 'Qd');
+    if (amount >= 1e12) return formatWithSuffix(1e12, 'T');
+    if (amount >= 1e9) return formatWithSuffix(1e9, 'B');
+    if (amount >= 1e6) return formatWithSuffix(1e6, 'M');
+    if (amount >= 1e3) return formatWithSuffix(1e3, 'K');
     return amount.toString();
   }
 

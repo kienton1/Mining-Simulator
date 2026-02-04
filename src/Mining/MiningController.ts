@@ -13,6 +13,7 @@ import { GameManager } from '../Core/GameManager';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
+import { ISLAND4_ORE_TYPE, ISLAND4_ORE_DATABASE } from './Ore/World4OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
 import { getSwingsPerSecond } from '../Stats/StatCalculator';
@@ -50,6 +51,10 @@ export class MiningController {
     if (oreType in ISLAND3_ORE_DATABASE) {
       return ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
     }
+    // Try Island 4 database if not found
+    if (oreType in ISLAND4_ORE_DATABASE) {
+      return ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+    }
     return null;
   }
 
@@ -58,7 +63,7 @@ export class MiningController {
    */
   private getWorldNumberFromId(worldId: string): 1 | 2 | 3 {
     if (worldId === 'island2') return 2;
-    if (worldId === 'island3') return 3;
+    if (worldId === 'island3' || worldId === 'island4') return 3;
     return 1;
   }
 

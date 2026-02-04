@@ -863,6 +863,118 @@
       "isCustom": true,
       "isMultiTexture": true,
       "isLiquid": false
+    },
+    {
+      "id": 109,
+      "name": "Snowspice",
+      "textureUri": "blocks/Snowspice",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 110,
+      "name": "Tinsel_Lead",
+      "textureUri": "blocks/Tinsel_Lead",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 111,
+      "name": "Icicle_Steel",
+      "textureUri": "blocks/Icicle_Steel",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 112,
+      "name": "Candycane_Vein",
+      "textureUri": "blocks/Candycane_Vein",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 113,
+      "name": "Hearthfire_Crystal",
+      "textureUri": "blocks/Hearthfire_Crystal",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 114,
+      "name": "Northstar_Platinum",
+      "textureUri": "blocks/Northstar_Platinum",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 115,
+      "name": "Twinkleite",
+      "textureUri": "blocks/Twinkleite",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 116,
+      "name": "Snowmoon_Ore",
+      "textureUri": "blocks/Snowmoon_Ore",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 117,
+      "name": "Rudolphs_Eye",
+      "textureUri": "blocks/Rudolphs_Eye",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 118,
+      "name": "Yuletide_Emberstone",
+      "textureUri": "blocks/Yuletide_Emberstone",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 119,
+      "name": "Jinglevolt_Ore",
+      "textureUri": "blocks/Jinglevolt_Ore",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 120,
+      "name": "Candlelight_Crystal",
+      "textureUri": "blocks/Candlelight_Crystal",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 121,
+      "name": "Auroralight_Ore",
+      "textureUri": "blocks/Auroralight_Ore",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
+    },
+    {
+      "id": 122,
+      "name": "Firesnow_Core",
+      "textureUri": "blocks/Firesnow_Core",
+      "isCustom": true,
+      "isMultiTexture": true,
+      "isLiquid": false
     }
   ],
   "blocks": {

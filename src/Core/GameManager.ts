@@ -15,7 +15,7 @@ import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
 import { OreType } from '../Mining/Ore/World1OreData';
-import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT, ISLAND3_MINING_AREA_BOUNDS, ISLAND3_SHARED_MINE_SHAFT } from './GameConstants';
+import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT, ISLAND3_MINING_AREA_BOUNDS, ISLAND3_SHARED_MINE_SHAFT, ISLAND4_MINING_AREA_BOUNDS, ISLAND4_SHARED_MINE_SHAFT } from './GameConstants';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
@@ -1649,11 +1649,17 @@ export class GameManager {
                 z: bestRockLocation.position.z + 0.1,
               };
             })()
-          : {
-              x: bestRockLocation.position.x, // Same X as the ore block
-              y: 1.75, // Fixed Y position
-              z: -9.27, // Fixed Z position (forward of the ore blocks)
-            };
+        : worldId === 'island4'
+          ? {
+              x: Math.round(bestRockLocation.position.x * 10) / 10,
+              y: 1.75,
+              z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
+            }
+        : {
+            x: bestRockLocation.position.x, // Same X as the ore block
+            y: 1.75, // Fixed Y position
+            z: -9.27, // Fixed Z position (forward of the ore blocks)
+          };
 
       const playerEntity = this.getPlayerEntity(player);
       if (playerEntity && autoState) {
@@ -1765,11 +1771,17 @@ export class GameManager {
                             z: bestRockLocation.position.z + 0.1,
                           };
                         })()
-                      : {
-                          x: bestRockLocation.position.x,
+                    : worldId === 'island4'
+                      ? {
+                          x: Math.round(bestRockLocation.position.x * 10) / 10,
                           y: 1.75,
-                          z: -9.27,
-                        };
+                          z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
+                        }
+                    : {
+                        x: bestRockLocation.position.x,
+                        y: 1.75,
+                        z: -9.27,
+                      };
                   autoState.lastAutoTrainPosition = newStandPosition;
 
                 }
@@ -2186,10 +2198,11 @@ export class GameManager {
     }
 
     // Get upgrade cost based on world (use WorldManager if available, otherwise default)
-    // Hardcoded values: island1: 2M, island2: 750B, island3: 2Q
+    // Hardcoded values: island1: 2M, island2: 750B, island3: 2Q, island4: 100Sx
     const UPGRADE_COST =
       currentWorld === 'island2' ? 750_000_000_000 :
       currentWorld === 'island3' ? 2_000_000_000_000_000 :
+      currentWorld === 'island4' ? 100_000_000_000_000_000_000_000 :
       2_000_000;
     
     if (playerData.gold < UPGRADE_COST) {
@@ -2662,8 +2675,63 @@ export class GameManager {
   }
 
   /**
+   * Builds the shared mine shaft for Island 4 (Snow World)
+   */
+  buildSharedMineShaftForIsland4(): void {
+    const bounds = ISLAND4_MINING_AREA_BOUNDS;
+    const topY = ISLAND4_SHARED_MINE_SHAFT.topY;
+    const bottomY = ISLAND4_SHARED_MINE_SHAFT.bottomY + 1; // carve down to bottomY inclusive
+    const wallMinX = bounds.minX - 1;
+    const wallMaxX = bounds.maxX + 1;
+    const wallMinZ = bounds.minZ - 1;
+    const wallMaxZ = bounds.maxZ + 1;
+    const snowId = 100; // snow block for island 4
+    const voidId = 2; // coal-block (black)
+
+    // Carve interior to air
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        for (let y = topY; y >= bottomY; y--) {
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, 0);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Build snow walls around the hole for all carved depths
+    for (let y = topY; y >= bottomY; y--) {
+      for (let x = wallMinX; x <= wallMaxX; x++) {
+        for (let z = wallMinZ; z <= wallMaxZ; z++) {
+          const isWall = x === wallMinX || x === wallMaxX || z === wallMinZ || z === wallMaxZ;
+          if (!isWall) continue;
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, snowId);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Place void floor across the whole mining area one level below carve depth
+    const voidY = bottomY - 1;
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        try {
+          this.world.chunkLattice.setBlock({ x, y: voidY, z }, voidId);
+        } catch (err) {
+
+        }
+      }
+    }
+  }
+
+  /**
    * Starts per-player watcher that teleports them to their personal mine when they reach the shaft bottom
-   * Checks Island 1, Island 2, and Island 3 mineshafts
+   * Checks Island 1, Island 2, Island 3, and Island 4 mineshafts
    */
   startMineEntranceWatch(player: Player): void {
     // Clear existing
@@ -2721,6 +2789,22 @@ export class GameManager {
         pos.z >= shaft3.bounds.minZ && pos.z <= shaft3.bounds.maxZ;
 
       if (inBounds3 && pos.y <= shaft3.teleportThresholdY) {
+        const last = this.mineEntranceCooldowns.get(player) ?? 0;
+        if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
+          return;
+        }
+        this.mineEntranceCooldowns.set(player, now);
+        this.enterPersonalMine(player);
+        return;
+      }
+
+      // Check Island 4 mineshaft
+      const shaft4 = ISLAND4_SHARED_MINE_SHAFT;
+      const inBounds4 =
+        pos.x >= shaft4.bounds.minX && pos.x <= shaft4.bounds.maxX &&
+        pos.z >= shaft4.bounds.minZ && pos.z <= shaft4.bounds.maxZ;
+
+      if (inBounds4 && pos.y <= shaft4.teleportThresholdY) {
         const last = this.mineEntranceCooldowns.get(player) ?? 0;
         if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
           return;
