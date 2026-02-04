@@ -3901,13 +3901,20 @@
               : ``);
         }
 
-        const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+        const fallbackPetImageUri = `ui/pets/${pet.basePetId || pet.petId}.png`;
+        const petImageUri = pet.imageUri || fallbackPetImageUri;
         if (petDetailImgEl) {
+          petDetailImgEl.dataset.fallback = '';
           petDetailImgEl.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           petDetailImgEl.style.display = 'block';
           petDetailImgEl.classList.toggle('pet-img--golden', Boolean(pet.isGolden));
           if (petDetailEmojiEl) petDetailEmojiEl.style.display = 'none';
           petDetailImgEl.onerror = () => {
+            if (petImageUri !== fallbackPetImageUri && petDetailImgEl.dataset.fallback !== '1') {
+              petDetailImgEl.dataset.fallback = '1';
+              petDetailImgEl.src = `{{CDN_ASSETS_URL}}/${fallbackPetImageUri}`;
+              return;
+            }
             petDetailImgEl.style.display = 'none';
             if (petDetailEmojiEl) {
               petDetailEmojiEl.style.display = 'block';
@@ -3918,10 +3925,16 @@
           petDetailImageEl.innerHTML = '';
           const img = document.createElement('img');
           img.alt = pet.name || pet.petId || 'Pet';
+          img.dataset.fallback = '';
           img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
           img.className = 'pet-detail__img-el';
           if (pet.isGolden) img.classList.add('pet-img--golden');
           img.onerror = () => {
+            if (petImageUri !== fallbackPetImageUri && img.dataset.fallback !== '1') {
+              img.dataset.fallback = '1';
+              img.src = `{{CDN_ASSETS_URL}}/${fallbackPetImageUri}`;
+              return;
+            }
             petDetailImageEl.textContent = '🐾';
           };
           petDetailImageEl.appendChild(img);
@@ -3969,9 +3982,16 @@
         const img = document.createElement('img');
         img.className = 'pet-tile__img-el';
         img.alt = pet.name || pet.petId || 'Pet';
-        const petImageUri = pet.imageUri || `ui/pets/${pet.petId}.png`;
+        const fallbackPetImageUri = `ui/pets/${pet.basePetId || pet.petId}.png`;
+        const petImageUri = pet.imageUri || fallbackPetImageUri;
+        img.dataset.fallback = '';
         img.src = `{{CDN_ASSETS_URL}}/${petImageUri}`;
         img.onerror = () => {
+          if (petImageUri !== fallbackPetImageUri && img.dataset.fallback !== '1') {
+            img.dataset.fallback = '1';
+            img.src = `{{CDN_ASSETS_URL}}/${fallbackPetImageUri}`;
+            return;
+          }
           img.style.display = 'none';
           imgWrap.textContent = '🐾';
         };
@@ -4045,6 +4065,8 @@
       state.goldenMachine.chance = 0;
       state.goldenMachine.pending = false;
       state.goldenMachine.pendingToken = null;
+      state.goldenMachine.pendingSpinId = null;
+      state.goldenMachine.isSpinning = false;
       state.goldenMachine.status = '';
       state.goldenMachine.lastResult = null;
       // Hard reset DOM visibility so we always start on pets (never wheel).
@@ -4073,12 +4095,16 @@
       }
     };
 
+
+    const GM_WHEEL_FROM_DEG = -90;
+    const GM_WHEEL_POINTER_OFFSET = -GM_WHEEL_FROM_DEG;
+
     const gmShowWheelPending = (chance) => {
       if (!gmWheelEl || !gmWheelDiskEl) return;
       const greenDeg = Math.max(0, Math.min(360, Number(chance || 0) * 3.6));
       gmWheelDiskEl.style.transition = 'none';
       gmWheelDiskEl.style.transform = 'rotate(0deg)';
-      gmWheelDiskEl.style.background = `conic-gradient(from -90deg, #22c55e 0deg, #22c55e ${greenDeg}deg, #ef4444 ${greenDeg}deg, #ef4444 360deg)`;
+      gmWheelDiskEl.style.background = `conic-gradient(from ${GM_WHEEL_FROM_DEG}deg, #22c55e 0deg, #22c55e ${greenDeg}deg, #ef4444 ${greenDeg}deg, #ef4444 360deg)`;
       // Reflow to ensure subsequent transition runs
       gmWheelDiskEl.getBoundingClientRect();
       if (gmWheelTextEl) gmWheelTextEl.textContent = 'Rolling...';
@@ -4169,6 +4195,40 @@
 
 
 
+
+
+    const gmSpinWheelToAngle = (targetAngle, spinId) => {
+      if (!gmWheelDiskEl) {
+        if (spinId) {
+          hytopia.sendData({ type: 'GOLDEN_MACHINE_SPIN_RESULT', spinId });
+        }
+        return;
+      }
+
+      const mod360 = (deg) => ((deg % 360) + 360) % 360;
+      const normalizedTarget = mod360(Number(targetAngle) || 0);
+      const spins = 6 + Math.floor(Math.random() * 3);
+      const targetRotation = spins * 360 + normalizedTarget + GM_WHEEL_POINTER_OFFSET;
+
+      let finished = false;
+      const onEnd = () => {
+        if (finished) return;
+        finished = true;
+        gmWheelDiskEl.removeEventListener('transitionend', onEnd);
+        if (gmWheelTextEl) gmWheelTextEl.textContent = 'Rolling...';
+        if (spinId) {
+          hytopia.sendData({ type: 'GOLDEN_MACHINE_SPIN_RESULT', spinId });
+        }
+      };
+
+      gmWheelDiskEl.style.transition = 'transform 3.2s cubic-bezier(0.12, 0.85, 0.15, 1)';
+      gmWheelDiskEl.style.transform = `rotate(${targetRotation}deg)`;
+      if (gmWheelTextEl) gmWheelTextEl.textContent = 'Spinning...';
+
+      gmWheelDiskEl.addEventListener('transitionend', onEnd);
+      setTimeout(onEnd, 3600);
+    };
+
     const renderGoldenMachine = () => {
       if (!gmModal) return;
       const gm = state.goldenMachine || {};
@@ -4186,7 +4246,6 @@
       if (gmCraftAllBtn) gmCraftAllBtn.disabled = inWheel || gm.pending || gm.view !== 'merge';
 
       if (inWheel) {
-        gmShowWheelPending(chance);
         return;
       }
 
@@ -4726,6 +4785,7 @@
         state.goldenMachine.status = '';
         state.goldenMachine.view = 'wheel';
         renderGoldenMachine();
+        gmShowWheelPending(state.goldenMachine.chance);
         hytopia.sendData({ type: 'GOLDEN_MACHINE_CRAFT', instanceIds: ids });
       });
     }
@@ -6767,7 +6827,7 @@
           // Egg modal also displays pet inventory count, so refresh it too
           renderEggStation();
           // Golden machine depends on pet list too; refresh it if open / in proximity.
-          if (state.goldenMachine?.inProximity || (gmModal && gmModal.classList.contains('visible'))) {
+          if ((state.goldenMachine?.inProximity || (gmModal && gmModal.classList.contains('visible'))) && state.goldenMachine?.view !== 'wheel') {
             renderGoldenMachine();
           }
           break;
@@ -6776,6 +6836,29 @@
             console.log('[UI] Pet action failed:', data.message);
           }
           break;
+        
+        case 'GOLDEN_MACHINE_SPIN_START': {
+          if (!data.success) {
+            state.goldenMachine.pending = false;
+            state.goldenMachine.view = state.goldenMachine.basePetId ? 'merge' : 'select';
+            state.goldenMachine.status = data.message || 'Failed.';
+            renderGoldenMachine();
+            break;
+          }
+
+          const chance = Number(data.chance ?? state.goldenMachine.chance ?? 0);
+          const spinId = String(data.spinId ?? '');
+          const targetAngle = Number(data.targetAngle ?? 0);
+
+          state.goldenMachine.view = 'wheel';
+          state.goldenMachine.pendingSpinId = spinId;
+          state.goldenMachine.isSpinning = true;
+          state.goldenMachine.status = '';
+          renderGoldenMachine();
+          gmShowWheelPending(chance);
+          setTimeout(() => gmSpinWheelToAngle(targetAngle, spinId), 50);
+          break;
+        }
         case 'GOLDEN_MACHINE_RESULT': {
           if (!data.success) {
             state.goldenMachine.pending = false;
@@ -6787,14 +6870,24 @@
           }
 
           const didWin = Boolean(data.didWin);
-          const chance = Number(data.chance ?? state.goldenMachine.chance ?? 0);
           state.goldenMachine.pending = false;
           state.goldenMachine.status = '';
           state.goldenMachine.pendingToken = data.token || null;
-          state.goldenMachine.view = 'wheel';
-          renderGoldenMachine();
-          // Let DOM update before spinning
-          setTimeout(() => gmSpinWheel(didWin, chance), 50);
+          state.goldenMachine.pendingSpinId = null;
+          state.goldenMachine.isSpinning = false;
+
+          if (gmWheelTextEl) gmWheelTextEl.textContent = didWin ? 'SUCCESS!' : 'FAILED!';
+
+          if (didWin && state.goldenMachine.pendingToken) {
+            hytopia.sendData({ type: 'GOLDEN_MACHINE_CLAIM', token: state.goldenMachine.pendingToken });
+            break;
+          }
+
+          setTimeout(() => {
+            gmReset();
+            renderGoldenMachine();
+            hytopia.sendData({ type: 'REQUEST_PET_STATE' });
+          }, 900);
           break;
         }
         case 'GOLDEN_MACHINE_CLAIM_RESULT': {
@@ -12547,7 +12640,7 @@
   /* Golden variant (tint + small tag) */
   .pet-tile--golden .pet-tile__img-el,
   .pet-img--golden {
-    filter: sepia(1) saturate(3) hue-rotate(10deg) brightness(1.08);
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.55));
   }
 
   .pet-tile--golden::after {

@@ -5,7 +5,7 @@
 
 import type { PetId } from './PetData';
 import { PET_IDS } from './PetDatabase';
-import { getBasePetIdFromAnyPetId } from './PetUpgrades';
+import { getBasePetIdFromAnyPetId, isGoldenPetId } from './PetUpgrades';
 
 export type PetModelInfo = {
   modelFolder: string;
@@ -15,6 +15,22 @@ export type PetModelInfo = {
   modelPath?: string;
   /** Optional direct texture path under assets (bypasses models/Pets/.../Textures). */
   texturePath?: string;
+};
+
+export type PetTextureInfo = {
+  uri: string | null;
+  isGoldenTexture: boolean;
+};
+
+const PET_GOLDEN_TEXTURE_SUFFIX = '_GOLDEN';
+const PET_GOLDEN_IMAGE_SUFFIX = '_golden';
+
+const withGoldenSuffix = (value: string, suffix = PET_GOLDEN_TEXTURE_SUFFIX): string => {
+  const dot = value.lastIndexOf('.');
+  if (dot === -1) {
+    return `${value}${suffix}`;
+  }
+  return `${value.slice(0, dot)}${suffix}${value.slice(dot)}`;
 };
 
 const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
@@ -128,14 +144,36 @@ export function getPetModelUri(petId: PetId): string | null {
   return `models/Pets/${info.modelFolder}/${info.gltfFile}`;
 }
 
-export function getPetTextureUri(petId: PetId): string | null {
+export function getPetTextureInfo(petId: PetId): PetTextureInfo {
   const info = getPetModelInfo(petId);
-  if (!info) return null;
-  if (info.texturePath) return info.texturePath;
-  return `models/Pets/${info.modelFolder}/Textures/${info.textureFile}`;
+  if (!info) return { uri: null, isGoldenTexture: false };
+
+  const isGolden = isGoldenPetId(petId);
+  if (info.texturePath) {
+    return { uri: info.texturePath, isGoldenTexture: false };
+  }
+
+  if (isGolden) {
+    return {
+      uri: `models/Pets/${info.modelFolder}/Textures/${withGoldenSuffix(info.textureFile)}`,
+      isGoldenTexture: true,
+    };
+  }
+
+  return {
+    uri: `models/Pets/${info.modelFolder}/Textures/${info.textureFile}`,
+    isGoldenTexture: false,
+  };
+}
+
+export function getPetTextureUri(petId: PetId): string | null {
+  return getPetTextureInfo(petId).uri;
 }
 
 export function getPetImageUri(petId: PetId): string | null {
   const basePetId = getBasePetIdFromAnyPetId(petId);
+  if (isGoldenPetId(petId)) {
+    return `ui/pets/${basePetId}${PET_GOLDEN_IMAGE_SUFFIX}.png`;
+  }
   return `ui/pets/${basePetId}.png`;
 }

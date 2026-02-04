@@ -19,7 +19,7 @@ import type { World, Vector3Like, Player, PlayerEntity } from 'hytopia';
 
 import type { PetId } from './PetData';
 import { getPetDefinition } from './PetDatabase';
-import { getPetModelUri, getPetTextureUri, getPetModelInfo } from './PetVisuals';
+import { getPetModelUri, getPetTextureInfo, getPetModelInfo } from './PetVisuals';
 import { getModelScaleForHeight } from './PetModelHeights';
 import { isGoldenPetId } from './PetUpgrades';
 import {
@@ -115,7 +115,8 @@ export class MiningPetEntity extends Entity {
 
   constructor(options: MiningPetEntityOptions) {
     const modelUri = getPetModelUri(options.petId);
-    const textureUri = getPetTextureUri(options.petId);
+    const textureInfo = getPetTextureInfo(options.petId);
+    const textureUri = textureInfo.uri;
     const modelInfo = getPetModelInfo(options.petId);
 
     // Calculate proper scale for uniform height
@@ -162,8 +163,8 @@ export class MiningPetEntity extends Entity {
       entityOptions.modelTextureUri = textureUri;
     }
 
-    // Golden variant tint (client-side should also tint thumbnails).
-    if (isGoldenPetId(options.petId)) {
+    // Golden variant tint when no dedicated golden texture exists.
+    if (isGoldenPetId(options.petId) && !textureInfo.isGoldenTexture) {
       entityOptions.tintColor = { r: 255, g: 215, b: 0 };
     }
 

@@ -10,11 +10,20 @@ const databasePath = path.join(rootDir, 'src', 'Pets', 'PetDatabase.ts');
 const visualsPath = path.join(rootDir, 'src', 'Pets', 'PetVisuals.ts');
 
 const THUMBNAIL_SIZE = 256;
+const GOLDEN_TEXTURE_SUFFIX = '_GOLDEN';
+const GOLDEN_THUMB_SUFFIX = '_golden';
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+};
+
+const withGoldenSuffix = (value, suffix = GOLDEN_TEXTURE_SUFFIX) => {
+  const ext = path.extname(value);
+  const base = ext ? value.slice(0, -ext.length) : value;
+  if (base.toUpperCase().endsWith(suffix)) return value;
+  return `${base}${suffix}${ext}`;
 };
 
 const parsePetIds = (filePath) => {
@@ -243,6 +252,16 @@ const main = async () => {
       const outputPath = path.join(outputDir, `${petId}.png`);
       await canvas.screenshot({ path: outputPath, omitBackground: true });
       console.log(`[pet-thumbnails] Wrote ${outputPath}`);
+
+      const goldenTexturePath = texturePath ? withGoldenSuffix(texturePath) : null;
+      if (goldenTexturePath && goldenTexturePath !== texturePath && fs.existsSync(goldenTexturePath)) {
+        const goldenTextureUrl = pathToFileURL(goldenTexturePath).href;
+        await page.evaluate((mUrl, tUrl) => window.renderPet(mUrl, tUrl), modelUrl, goldenTextureUrl);
+
+        const goldenOutputPath = path.join(outputDir, `${petId}${GOLDEN_THUMB_SUFFIX}.png`);
+        await canvas.screenshot({ path: goldenOutputPath, omitBackground: true });
+        console.log(`[pet-thumbnails] Wrote ${goldenOutputPath}`);
+      }
     }
   } finally {
     await browser.close();

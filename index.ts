@@ -47,6 +47,7 @@ import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { EggType } from './src/Pets/PetData';
 import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
 import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, isGoldenPetId, PET_MAX_TIER } from './src/Pets/PetUpgrades';
+import { getPetImageUri } from './src/Pets/PetVisuals';
 import { addCoinsEarned, addEggsHatched, addTimePlayedMs, buildAchievementsUIState, claimAchievement, getBonuses } from './src/Achievements/Achievements';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
@@ -362,7 +363,7 @@ startServer(world => {
         tier,
         stars: getStarsForTier(tier),
         maxTier: PET_MAX_TIER,
-        imageUri: `ui/pets/${basePetId}.png`,
+        imageUri: getPetImageUri(p.petId) ?? `ui/pets/${basePetId}.png`,
         equipped: p.equipped,
         slotIndex: p.slotIndex,
         name: def?.name ?? p.petId,
