@@ -2125,8 +2125,12 @@
     const eggModalTitleEl = document.getElementById('egg-modal-title');
     const eggStationNameEl = document.getElementById('egg-station-name');
     const eggStationCostEl = document.getElementById('egg-station-cost');
-    const eggStationGoldEl = document.getElementById('egg-station-gold');
-    const eggStationInvEl = document.getElementById('egg-station-inv');
+    const eggStationGoldEl =
+      document.getElementById('egg-station-gold') ||
+      document.getElementById('egg-header-gold');
+    const eggStationInvEl =
+      document.getElementById('egg-station-inv') ||
+      document.getElementById('egg-header-pets');
     const eggStationStatusEl = document.getElementById('egg-station-status');
     const eggOpen1Btn = document.getElementById('egg-open-1');
     const eggOpen3Btn = document.getElementById('egg-open-3');
@@ -6449,6 +6453,7 @@
           if (gemsValueEl) gemsValueEl.textContent = formatNumber(state.gems);
           if (trophiesValueEl) trophiesValueEl.textContent = formatNumber(state.trophies);
           if (rebirthsValueEl) rebirthsValueEl.textContent = formatNumber(state.rebirths);
+          renderEggStation();
           // Update rebirth badge when power changes
           updateRebirthBadge();
           // Re-render rebirth options if modal is visible so buttons update in real-time
@@ -6460,6 +6465,7 @@
         case 'GOLD_STATS':
           state.gold = data.gold ?? 0;
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
+          renderEggStation();
           console.log('[UI] Updated gold stats:', state.gold);
           break;
         case 'GEMS_STATS':

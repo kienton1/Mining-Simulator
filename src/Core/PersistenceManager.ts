@@ -367,11 +367,23 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     })(),
     leaderboardHighScores: (() => {
       const lhs = savedData.leaderboardHighScores;
-      if (!lhs || typeof lhs !== 'object') return { bestPower: defaults.leaderboardHighScores?.bestPower ?? '1' };
+      const defaultBestPower = defaults.leaderboardHighScores?.bestPower ?? '1';
+      const defaultBestCoins = defaults.leaderboardHighScores?.bestCoins ?? '0';
+      if (!lhs || typeof lhs !== 'object') return { bestPower: defaultBestPower, bestCoins: defaultBestCoins };
+
       const bestPower = typeof lhs.bestPower === 'string' && /^\d+$/.test(lhs.bestPower)
         ? lhs.bestPower
-        : (defaults.leaderboardHighScores?.bestPower ?? '1');
-      return { bestPower };
+        : defaultBestPower;
+
+      const bestCoinsFromLhs = typeof lhs.bestCoins === 'string' && /^\d+$/.test(lhs.bestCoins)
+        ? lhs.bestCoins
+        : undefined;
+      const bestCoinsFromMax = typeof savedData.maxGoldEverHeld === 'number' && !isNaN(savedData.maxGoldEverHeld) && savedData.maxGoldEverHeld >= 0
+        ? String(Math.floor(savedData.maxGoldEverHeld))
+        : undefined;
+      const bestCoins = bestCoinsFromLhs ?? bestCoinsFromMax ?? defaultBestCoins;
+
+      return { bestPower, bestCoins };
     })(),
     achievementClaims: (() => {
       const ac = savedData.achievementClaims;

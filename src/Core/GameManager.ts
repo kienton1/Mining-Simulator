@@ -381,6 +381,21 @@ export class GameManager {
       data.leaderboardHighScores.bestPower = data.power;
     }
 
+    // Track coins high score (coins can be spent, so store highest ever)
+    const currentGold = Math.max(0, Math.floor(Number(data.gold ?? 0) || 0));
+    const maxGoldEver = Math.max(0, Math.floor(Number(data.maxGoldEverHeld ?? 0) || 0));
+    if (currentGold > maxGoldEver) {
+      data.maxGoldEverHeld = currentGold;
+    }
+    const bestCoins = toBigInt(data.leaderboardHighScores?.bestCoins || '0');
+    const currentCoins = toBigInt(currentGold);
+    const maxCoins = toBigInt(data.maxGoldEverHeld ?? 0);
+    const coinsHigh = currentCoins > maxCoins ? currentCoins : maxCoins;
+    if (coinsHigh > bestCoins) {
+      if (!data.leaderboardHighScores) data.leaderboardHighScores = {};
+      data.leaderboardHighScores.bestCoins = bigIntToString(coinsHigh);
+    }
+
     // Mark dirty for leaderboard (internally deduped and batched)
     this.leaderboardManager.updatePlayerScores(player, data);
   }

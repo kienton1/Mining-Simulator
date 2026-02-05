@@ -129,12 +129,19 @@ export class LeaderboardManager {
     const currentPower = toBigIntSafe(data.power);
     const powerValue = bestPower > currentPower ? bestPower : currentPower;
 
+    // For coins, use the best-ever coins (high-score) so spending doesn't drop the ranking
+    const bestCoins = toBigIntSafe(data.leaderboardHighScores?.bestCoins);
+    const currentCoins = toBigIntSafe(data.gold ?? 0);
+    const maxGoldEver = toBigIntSafe(data.maxGoldEverHeld ?? 0);
+    const coinsHigh = bestCoins > currentCoins ? bestCoins : currentCoins;
+    const coinsValue = coinsHigh > maxGoldEver ? coinsHigh : maxGoldEver;
+
     const scores: [LeaderboardCategoryId, bigint][] = [
       ['power', powerValue],
       ['blocksMined', toBigIntSafe(data.achievementProgress?.blocksMined ?? 0)],
       ['rebirths', toBigIntSafe(data.rebirths ?? 0)],
       ['timePlayed', toBigIntSafe(data.achievementProgress?.timePlayedMs ?? 0)],
-      ['maxCoins', toBigIntSafe(data.maxGoldEverHeld ?? 0)],
+      ['maxCoins', coinsValue],
       ['eggsHatched', toBigIntSafe(data.achievementProgress?.eggsHatched ?? 0)],
     ];
 

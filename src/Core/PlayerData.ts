@@ -135,6 +135,7 @@ export interface PlayerData {
 
   leaderboardHighScores?: {
     bestPower?: string;  // BigInt string - highest power ever achieved
+    bestCoins?: string;  // BigInt string - highest coins ever held
   };
 }
 
@@ -142,7 +143,7 @@ export interface PlayerData {
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 13;
+export const CURRENT_DATA_VERSION = 14;
 
 /**
  * Inventory data structure
@@ -204,6 +205,7 @@ export function createDefaultPlayerData(): PlayerData {
     },
     leaderboardHighScores: {
       bestPower: '1',
+      bestCoins: '0',
     },
   };
 }
