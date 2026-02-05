@@ -12,6 +12,10 @@ const visualsPath = path.join(rootDir, 'src', 'Pets', 'PetVisuals.ts');
 const THUMBNAIL_SIZE = 256;
 const GOLDEN_TEXTURE_SUFFIX = '_GOLDEN';
 const GOLDEN_THUMB_SUFFIX = '_golden';
+const ONLY_PET_IDS = (process.env.PET_THUMB_ONLY || '')
+  .split(',')
+  .map((id) => id.trim().toLowerCase())
+  .filter(Boolean);
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
@@ -218,6 +222,9 @@ const main = async () => {
     }
 
     for (const [constName, petId] of petIds.entries()) {
+      if (ONLY_PET_IDS.length > 0 && !ONLY_PET_IDS.includes(String(petId).toLowerCase())) {
+        continue;
+      }
       const mapping = modelMap.get(constName);
       if (!mapping) {
         console.warn(`[pet-thumbnails] Missing model mapping for ${constName}.`);

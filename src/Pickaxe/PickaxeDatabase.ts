@@ -67,9 +67,6 @@ function parseCost(costStr: string | number): number {
   } else if (upper.endsWith('QD')) {
     const num = parseFloat(upper.replace('QD', '').replace(/,/g, ''));
     return num * 1e15; // 1 quadrillion = 10^15
-  } else if (upper.endsWith('Q') && !upper.match(/Q[DN]/)) {
-    const num = parseFloat(upper.replace('Q', '').replace(/,/g, ''));
-    return num * 1e15; // Legacy Q = quadrillion
   } else if (upper.endsWith('T')) {
     const num = parseFloat(upper.replace('T', '').replace(/,/g, ''));
     return num * 1e12; // 1 trillion = 10^12

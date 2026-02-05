@@ -86,43 +86,13 @@ export class EggStationLabelManager {
       station.eggType === EggType.SHIPWRECK ? 'Shipwreck Egg' :
       station.eggType === EggType.SAND ? 'Sand Egg' :
       station.eggType === EggType.SNOW ? 'Snow Egg' :
-      'Lava Egg';
+      station.eggType === EggType.LAVA ? 'Lava Egg' :
+      station.eggType === EggType.SWEETS ? 'Sweets Egg' :
+      station.eggType === EggType.ORNAMENT ? 'Ornament Egg' :
+      'Winter Egg';
 
     const costGold = EGG_DEFINITIONS[station.eggType]?.costGold ?? 0;
-    
-    // Format cost with proper suffixes (K, M, B, T) with max 2 decimal places
-    let costText: string;
-    if (costGold >= 1e12) {
-      // Trillions
-      const trillions = costGold / 1e12;
-      const formatted = trillions % 1 === 0
-        ? trillions.toFixed(0)
-        : trillions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
-      costText = `${formatted}T Gold`;
-    } else if (costGold >= 1e9) {
-      // Billions
-      const billions = costGold / 1e9;
-      const formatted = billions % 1 === 0 
-        ? billions.toFixed(0)
-        : billions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
-      costText = `${formatted}B Gold`;
-    } else if (costGold >= 1e6) {
-      // Millions
-      const millions = costGold / 1e6;
-      const formatted = millions % 1 === 0
-        ? millions.toFixed(0)
-        : millions.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
-      costText = `${formatted}M Gold`;
-    } else if (costGold >= 1000) {
-      // Thousands
-      const thousands = costGold / 1000;
-      const formatted = thousands % 1 === 0
-        ? thousands.toFixed(0)
-        : thousands.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
-      costText = `${formatted}K Gold`;
-    } else {
-      costText = `${costGold} Gold`;
-    }
+    const costText = `${this.formatNumber(costGold)} Gold`;
 
     // Use direct positioning like the working training system
     // Position the UI above the egg station
@@ -147,6 +117,91 @@ export class EggStationLabelManager {
     ui.load(this.world);
     this.sceneUIs.set(station.id, ui);
     return ui;
+  }
+
+  private formatNumber(value: number): string {
+    if (value < 0) return '-' + this.formatNumber(-value);
+    if (value === 0) return '0';
+
+    const formatWithSuffix = (num: number, suffix: string): string => {
+      const with1Dec = num.toFixed(1);
+      if (with1Dec.endsWith('.0')) return Math.round(num).toString() + suffix;
+      const with2Dec = num.toFixed(2);
+      if (with2Dec.endsWith('.00')) return Math.round(num).toString() + suffix;
+      return with2Dec.replace(/\.?0+$/, '') + suffix;
+    };
+
+    if (value >= 1e42) {
+      const num = value / 1e42;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+      return formatWithSuffix(num, 'TDe');
+    }
+    if (value >= 1e39) {
+      const num = value / 1e39;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+      return formatWithSuffix(num, 'DDe');
+    }
+    if (value >= 1e36) {
+      const num = value / 1e36;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'DDe');
+      return formatWithSuffix(num, 'UDe');
+    }
+    if (value >= 1e33) {
+      const num = value / 1e33;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+      return formatWithSuffix(num, 'De');
+    }
+    if (value >= 1e30) {
+      const num = value / 1e30;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
+      return formatWithSuffix(num, 'No');
+    }
+    if (value >= 1e27) {
+      const num = value / 1e27;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
+      return formatWithSuffix(num, 'Oc');
+    }
+    if (value >= 1e24) {
+      const num = value / 1e24;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
+      return formatWithSuffix(num, 'Sp');
+    }
+    if (value >= 1e21) {
+      const num = value / 1e21;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
+      return formatWithSuffix(num, 'Sx');
+    }
+    if (value >= 1e18) {
+      const num = value / 1e18;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
+      return formatWithSuffix(num, 'Qn');
+    }
+    if (value >= 1e15) {
+      const num = value / 1e15;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
+      return formatWithSuffix(num, 'Qd');
+    }
+    if (value >= 1e12) {
+      const num = value / 1e12;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qd');
+      return formatWithSuffix(num, 'T');
+    }
+    if (value >= 1e9) {
+      const num = value / 1e9;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
+      return formatWithSuffix(num, 'B');
+    }
+    if (value >= 1e6) {
+      const num = value / 1e6;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
+      return formatWithSuffix(num, 'M');
+    }
+    if (value >= 1e3) {
+      const num = value / 1e3;
+      if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
+      return formatWithSuffix(num, 'K');
+    }
+    return Math.round(value).toString();
   }
 
   private updateLabelPosition(station: EggStationDefinition): void {

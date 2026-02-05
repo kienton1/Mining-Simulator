@@ -62,22 +62,22 @@ export const ISLAND4_CONFIG: WorldConfig = {
     },
   },
 
-  // Egg Station Positions (not used for Island 4)
+  // Egg Station Positions (relative to mine center, same offsets as other worlds)
   eggStations: {
-    abyssal: {
-      x: -921,
-      y: 1,
-      z: 6,
+    sweets: {
+      x: -934,
+      y: 2,
+      z: 17,
     },
-    boardwalk: {
-      x: -921,
-      y: 1,
-      z: 8,
+    ornament: {
+      x: -934,
+      y: 2,
+      z: 13,
     },
-    shipwreck: {
-      x: -921,
-      y: 1,
-      z: 10,
+    winter: {
+      x: -934,
+      y: 2,
+      z: 9,
     },
   },
 

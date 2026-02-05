@@ -202,6 +202,20 @@ export class EggStationController {
         return 'Boardwalk Egg';
       case EggType.SHIPWRECK:
         return 'Shipwreck Egg';
+      case EggType.SWEETS:
+        return 'Sweets Egg';
+      case EggType.ORNAMENT:
+        return 'Ornament Egg';
+      case EggType.WINTER:
+        return 'Winter Egg';
+      case EggType.SAND:
+        return 'Sand Egg';
+      case EggType.SNOW:
+        return 'Snow Egg';
+      case EggType.LAVA:
+        return 'Lava Egg';
+      default:
+        return 'Egg';
     }
   }
 }

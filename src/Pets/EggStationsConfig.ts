@@ -90,4 +90,30 @@ export const EGG_STATIONS: EggStationDefinition[] = [
     worldId: 'island3',
     position: { x: -600, y: 2, z: 4 },
   },
+
+  // World 4 (Island 4 / Snow World) Egg Stations
+  {
+    id: 'egg-station-sweets',
+    name: 'Sweets Egg Station',
+    eggType: EggType.SWEETS,
+    defaultOpenCount: 1,
+    worldId: 'island4',
+    position: { x: -934, y: 2, z: 17 },
+  },
+  {
+    id: 'egg-station-ornament',
+    name: 'Ornament Egg Station',
+    eggType: EggType.ORNAMENT,
+    defaultOpenCount: 3,
+    worldId: 'island4',
+    position: { x: -934, y: 2, z: 13 },
+  },
+  {
+    id: 'egg-station-winter',
+    name: 'Winter Egg Station',
+    eggType: EggType.WINTER,
+    defaultOpenCount: 1,
+    worldId: 'island4',
+    position: { x: -934, y: 2, z: 9 },
+  },
 ];

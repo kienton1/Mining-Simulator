@@ -33,6 +33,10 @@ const EGG_CONFIGS: EggConfig[] = [
   { name: 'sand-egg', modelUri: 'models/Eggs/SandEgg.gltf', position: { x: -600, y: 2, z: 12 } },
   { name: 'snow-egg', modelUri: 'models/Eggs/SnowEgg.gltf', position: { x: -600, y: 2, z: 8 } },
   { name: 'lava-egg', modelUri: 'models/Eggs/LavaEgg.gltf', position: { x: -600, y: 2, z: 4 } },
+  // Island 4
+  { name: 'sweets-egg', modelUri: 'models/Eggs/SweetsEgg.gltf', position: { x: -934, y: 2, z: 17 } },
+  { name: 'ornament-egg', modelUri: 'models/Eggs/OrnamentEgg.gltf', position: { x: -934, y: 2, z: 13 } },
+  { name: 'winter-egg', modelUri: 'models/Eggs/WinterEgg.gltf', position: { x: -934, y: 2, z: 9 } },
 ];
 
 export class EggDisplayAnimator {

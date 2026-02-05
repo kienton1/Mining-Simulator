@@ -30,6 +30,11 @@ export enum EggType {
   SNOW = 'snow',
   LAVA = 'lava',
 
+  // World 4 (Island 4 / Snow World) Eggs
+  SWEETS = 'sweets',
+  ORNAMENT = 'ornament',
+  WINTER = 'winter',
+
   // Timed reward egg (15 minute reward)
   REWARD_15 = 'reward_15',
 }

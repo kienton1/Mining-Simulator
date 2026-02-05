@@ -33,6 +33,11 @@ export const EGG_DEFINITIONS: Record<EggType, EggDefinition> = {
   [EggType.SNOW]: { eggType: EggType.SNOW, costGold: 1_000_000_000_000 },
   [EggType.LAVA]: { eggType: EggType.LAVA, costGold: 100_000_000_000_000 },
 
+  // World 4 (Island 4 / Snow World) Eggs
+  [EggType.SWEETS]: { eggType: EggType.SWEETS, costGold: 50_000_000_000_000_000 }, // 50Qd
+  [EggType.ORNAMENT]: { eggType: EggType.ORNAMENT, costGold: 1_000_000_000_000_000_000 }, // 1Qn
+  [EggType.WINTER]: { eggType: EggType.WINTER, costGold: 15_000_000_000_000_000_000 }, // 15Qn
+
   // Timed reward egg (15 minute reward)
   [EggType.REWARD_15]: { eggType: EggType.REWARD_15, costGold: 0 },
 };
@@ -106,6 +111,37 @@ export const PET_IDS = {
   BABY_FIERY_ZOMBIE: 'baby_fiery_zombie',
   BABY_PHOENIX: 'baby_phoenix',
   BABY_SCORCHING_MAGMA: 'baby_scorching_magma',
+
+  // World 4 (Island 4 / Snow World) - Sweets Egg
+  BABY_GINGERBREAD: 'baby_gingerbread',
+  BABY_SUGARPLUM: 'baby_sugarplum',
+  BABY_PEPPERMINT_SWIRL: 'baby_peppermint_swirl',
+  BABY_FROSTED_COOKIE: 'baby_frosted_cookie',
+  BABY_HOT_COCOA: 'baby_hot_cocoa',
+  BABY_CINNAMON_ROLL: 'baby_cinnamon_roll',
+  BABY_CANDY_CANE: 'baby_candy_cane',
+
+  // World 4 (Island 4 / Snow World) - Ornament Egg
+  BABY_BAUBLE: 'baby_bauble',
+  BABY_TINSEL: 'baby_tinsel',
+  BABY_SNOWGLOBE: 'baby_snowglobe',
+  BABY_STARSHINE: 'baby_starshine',
+  BABY_BELLRING: 'baby_bellring',
+  BABY_GARLAND: 'baby_garland',
+  BABY_GLOWORB: 'baby_gloworb',
+  BABY_NORTHSTAR: 'baby_northstar',
+  BABY_JINGLE: 'baby_jingle',
+
+  // World 4 (Island 4 / Snow World) - Winter Egg
+  BABY_SNOWBALL: 'baby_snowball',
+  BABY_FROSTPAW: 'baby_frostpaw',
+  BABY_SNOWPUFF: 'baby_snowpuff',
+  BABY_ICEWHISKER: 'baby_icewhisker',
+  BABY_FLURRY: 'baby_flurry',
+  BABY_CHILLTAIL: 'baby_chilltail',
+  BABY_POWDERFLAKE: 'baby_powderflake',
+  BABY_SNOWBUN: 'baby_snowbun',
+  BABY_FROSTBEAN: 'baby_frostbean',
 
   // Timed reward pets (15 minute reward)
   BLUE_BAT: 'blue_bat',
@@ -184,6 +220,37 @@ const PET_DEFINITIONS_ARRAY: PetDefinition[] = [
   { id: PET_IDS.BABY_FIERY_ZOMBIE, name: 'Baby Fiery Zombie', eggType: EggType.LAVA, rarity: PetRarity.EPIC, multiplier: 10000 },
   { id: PET_IDS.BABY_PHOENIX, name: 'Baby Phoenix', eggType: EggType.LAVA, rarity: PetRarity.LEGENDARY, multiplier: 17500 },
   { id: PET_IDS.BABY_SCORCHING_MAGMA, name: 'Baby Scorching Magma', eggType: EggType.LAVA, rarity: PetRarity.EXTREME, multiplier: 30000 },
+
+  // World 4 (Island 4 / Snow World) - Sweets Egg
+  { id: PET_IDS.BABY_GINGERBREAD, name: 'Baby Gingerbread', eggType: EggType.SWEETS, rarity: PetRarity.COMMON, multiplier: 3000 },
+  { id: PET_IDS.BABY_SUGARPLUM, name: 'Baby Sugarplum', eggType: EggType.SWEETS, rarity: PetRarity.COMMON, multiplier: 4000 },
+  { id: PET_IDS.BABY_PEPPERMINT_SWIRL, name: 'Baby Peppermint Swirl', eggType: EggType.SWEETS, rarity: PetRarity.RARE, multiplier: 6000 },
+  { id: PET_IDS.BABY_FROSTED_COOKIE, name: 'Baby Frosted Cookie', eggType: EggType.SWEETS, rarity: PetRarity.EPIC, multiplier: 13500 },
+  { id: PET_IDS.BABY_HOT_COCOA, name: 'Baby Hot Cocoa', eggType: EggType.SWEETS, rarity: PetRarity.LEGENDARY, multiplier: 30000 },
+  { id: PET_IDS.BABY_CINNAMON_ROLL, name: 'Baby Cinnamon Roll', eggType: EggType.SWEETS, rarity: PetRarity.MYTHIC, multiplier: 50000 },
+  { id: PET_IDS.BABY_CANDY_CANE, name: 'Baby Candy Cane', eggType: EggType.SWEETS, rarity: PetRarity.EXTREME, multiplier: 125000 },
+
+  // World 4 (Island 4 / Snow World) - Ornament Egg
+  { id: PET_IDS.BABY_BAUBLE, name: 'Baby Bauble', eggType: EggType.ORNAMENT, rarity: PetRarity.COMMON, multiplier: 5000 },
+  { id: PET_IDS.BABY_TINSEL, name: 'Baby Tinsel', eggType: EggType.ORNAMENT, rarity: PetRarity.COMMON, multiplier: 6000 },
+  { id: PET_IDS.BABY_SNOWGLOBE, name: 'Baby Snowglobe', eggType: EggType.ORNAMENT, rarity: PetRarity.COMMON, multiplier: 8000 },
+  { id: PET_IDS.BABY_STARSHINE, name: 'Baby Starshine', eggType: EggType.ORNAMENT, rarity: PetRarity.RARE, multiplier: 10000 },
+  { id: PET_IDS.BABY_BELLRING, name: 'Baby Bellring', eggType: EggType.ORNAMENT, rarity: PetRarity.EPIC, multiplier: 17500 },
+  { id: PET_IDS.BABY_GARLAND, name: 'Baby Garland', eggType: EggType.ORNAMENT, rarity: PetRarity.LEGENDARY, multiplier: 45000 },
+  { id: PET_IDS.BABY_GLOWORB, name: 'Baby Gloworb', eggType: EggType.ORNAMENT, rarity: PetRarity.MYTHIC, multiplier: 70000 },
+  { id: PET_IDS.BABY_NORTHSTAR, name: 'Baby Northstar', eggType: EggType.ORNAMENT, rarity: PetRarity.EXTREME, multiplier: 100000 },
+  { id: PET_IDS.BABY_JINGLE, name: 'Baby Jingle', eggType: EggType.ORNAMENT, rarity: PetRarity.EXTREME, multiplier: 175000 },
+
+  // World 4 (Island 4 / Snow World) - Winter Egg
+  { id: PET_IDS.BABY_SNOWBALL, name: 'Baby Snowball', eggType: EggType.WINTER, rarity: PetRarity.COMMON, multiplier: 10000 },
+  { id: PET_IDS.BABY_FROSTPAW, name: 'Baby Frostpaw', eggType: EggType.WINTER, rarity: PetRarity.COMMON, multiplier: 12000 },
+  { id: PET_IDS.BABY_SNOWPUFF, name: 'Baby Snowpuff', eggType: EggType.WINTER, rarity: PetRarity.COMMON, multiplier: 15000 },
+  { id: PET_IDS.BABY_ICEWHISKER, name: 'Baby Icewhisker', eggType: EggType.WINTER, rarity: PetRarity.RARE, multiplier: 20000 },
+  { id: PET_IDS.BABY_FLURRY, name: 'Baby Flurry', eggType: EggType.WINTER, rarity: PetRarity.EPIC, multiplier: 30000 },
+  { id: PET_IDS.BABY_CHILLTAIL, name: 'Baby Chilltail', eggType: EggType.WINTER, rarity: PetRarity.LEGENDARY, multiplier: 75000 },
+  { id: PET_IDS.BABY_POWDERFLAKE, name: 'Baby Powderflake', eggType: EggType.WINTER, rarity: PetRarity.MYTHIC, multiplier: 140000 },
+  { id: PET_IDS.BABY_SNOWBUN, name: 'Baby Snowbun', eggType: EggType.WINTER, rarity: PetRarity.EXTREME, multiplier: 200000 },
+  { id: PET_IDS.BABY_FROSTBEAN, name: 'Baby Frostbean', eggType: EggType.WINTER, rarity: PetRarity.EXTREME, multiplier: 300000 },
 
   // Timed reward pets (15 minute reward)
   { id: PET_IDS.BLUE_BAT, name: 'Blue Bat', eggType: EggType.REWARD_15, rarity: PetRarity.COMMON, multiplier: 50 },
@@ -308,6 +375,39 @@ export const EGG_LOOT_TABLES: Record<EggType, EggLootEntry[]> = {
     { petId: PET_IDS.BABY_SCORCHING_MAGMA, weight: 0.03 }, // 0.03%
   ],
 
+  // World 4 (Island 4 / Snow World) Eggs
+  [EggType.SWEETS]: [
+    { petId: PET_IDS.BABY_GINGERBREAD, weight: 43.875 }, // 43.875%
+    { petId: PET_IDS.BABY_SUGARPLUM, weight: 30.0 }, // 30%
+    { petId: PET_IDS.BABY_PEPPERMINT_SWIRL, weight: 20.0 }, // 20%
+    { petId: PET_IDS.BABY_FROSTED_COOKIE, weight: 6.0 }, // 6%
+    { petId: PET_IDS.BABY_HOT_COCOA, weight: 0.10 }, // 0.10%
+    { petId: PET_IDS.BABY_CINNAMON_ROLL, weight: 0.02 }, // 0.02%
+    { petId: PET_IDS.BABY_CANDY_CANE, weight: 0.005 }, // 0.005%
+  ],
+  [EggType.ORNAMENT]: [
+    { petId: PET_IDS.BABY_BAUBLE, weight: 28.015 }, // 28.015%
+    { petId: PET_IDS.BABY_TINSEL, weight: 25.0 }, // 25%
+    { petId: PET_IDS.BABY_SNOWGLOBE, weight: 23.0 }, // 23%
+    { petId: PET_IDS.BABY_STARSHINE, weight: 18.0 }, // 18%
+    { petId: PET_IDS.BABY_BELLRING, weight: 5.60 }, // 5.60%
+    { petId: PET_IDS.BABY_GARLAND, weight: 0.25 }, // 0.25%
+    { petId: PET_IDS.BABY_GLOWORB, weight: 0.10 }, // 0.10%
+    { petId: PET_IDS.BABY_NORTHSTAR, weight: 0.03 }, // 0.03%
+    { petId: PET_IDS.BABY_JINGLE, weight: 0.005 }, // 0.005%
+  ],
+  [EggType.WINTER]: [
+    { petId: PET_IDS.BABY_SNOWBALL, weight: 28.675 }, // 28.675%
+    { petId: PET_IDS.BABY_FROSTPAW, weight: 25.0 }, // 25%
+    { petId: PET_IDS.BABY_SNOWPUFF, weight: 23.0 }, // 23%
+    { petId: PET_IDS.BABY_ICEWHISKER, weight: 18.0 }, // 18%
+    { petId: PET_IDS.BABY_FLURRY, weight: 5.0 }, // 5%
+    { petId: PET_IDS.BABY_CHILLTAIL, weight: 0.20 }, // 0.20%
+    { petId: PET_IDS.BABY_POWDERFLAKE, weight: 0.10 }, // 0.10%
+    { petId: PET_IDS.BABY_SNOWBUN, weight: 0.02 }, // 0.02%
+    { petId: PET_IDS.BABY_FROSTBEAN, weight: 0.005 }, // 0.005%
+  ],
+
   // Timed reward pets (15 minute reward)
   [EggType.REWARD_15]: [
     { petId: PET_IDS.BLUE_BAT, weight: 39.99 }, // 39.99%
@@ -350,4 +450,3 @@ export function rollPetId(eggType: EggType, rng: () => number = Math.random): Pe
 
   return table[table.length - 1].petId;
 }
-

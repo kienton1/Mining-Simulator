@@ -1495,6 +1495,9 @@ startServer(world => {
             eggTypeStr === 'sand' ? EggType.SAND :
             eggTypeStr === 'snow' ? EggType.SNOW :
             eggTypeStr === 'lava' ? EggType.LAVA :
+            eggTypeStr === 'sweets' ? EggType.SWEETS :
+            eggTypeStr === 'ornament' ? EggType.ORNAMENT :
+            eggTypeStr === 'winter' ? EggType.WINTER :
             EggType.STONE;
           const count = Math.max(1, Math.min(50, Number(data.count ?? 1) || 1));
 

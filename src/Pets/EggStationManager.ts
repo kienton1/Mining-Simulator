@@ -87,8 +87,10 @@ export class EggStationManager {
         groupName = 'Island 1 Eggs';
       } else if (centerX > -350) {
         groupName = 'Island 2 Eggs';
-      } else {
+      } else if (centerX > -750) {
         groupName = 'Island 3 Eggs';
+      } else {
+        groupName = 'Island 4 Eggs';
       }
 
       groups.push({
