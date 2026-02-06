@@ -2399,6 +2399,15 @@
       return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
     };
 
+    // Mobile format: mm:ss
+    const formatRewardTimeMobile = (remainingMs) => {
+      const ms = Math.max(0, Number(remainingMs) || 0);
+      const totalSeconds = Math.ceil(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
     const renderRewardPets = () => {
       if (!rewardPetsGridEl) return;
       rewardPetsGridEl.innerHTML = '';
@@ -2456,6 +2465,18 @@
       } else {
         const remaining = state.reward.remainingMs ?? state.reward.durationMs;
         rewardTimerTextEl.textContent = formatRewardTime(remaining);
+      }
+      // Update mobile reward timer
+      const mobileRewardTimer = document.querySelector('.action-card__timer--reward');
+      const mobileRewardButton = document.getElementById('reward-action-button');
+      if (mobileRewardTimer && mobileRewardButton) {
+        mobileRewardButton.classList.toggle('reward-ready', ready);
+        if (ready) {
+          mobileRewardTimer.textContent = 'READY';
+        } else {
+          const remaining = state.reward.remainingMs ?? state.reward.durationMs;
+          mobileRewardTimer.textContent = formatRewardTimeMobile(remaining);
+        }
       }
     };
 
