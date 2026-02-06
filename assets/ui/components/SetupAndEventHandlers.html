@@ -5438,14 +5438,12 @@
         marker.textContent = initial;
         marker.style.background = hashColor(player.name || player.playerId);
 
-        const stackOffset = (idx % 3) * (isMobile ? 10 : -10);
+        // Stack players vertically (negative = upward) for horizontal progress bar
+        const stackOffset = (idx % 3) * -10;
         marker.style.setProperty('--stack-offset', `${stackOffset}px`);
 
-        if (isMobile) {
-          marker.style.bottom = `${progress}%`;
-        } else {
-          marker.style.left = `${progress}%`;
-        }
+        // Use left for horizontal layout (both desktop and mobile now)
+        marker.style.left = `${progress}%`;
 
         progressPlayersEl.appendChild(marker);
       });
@@ -6483,10 +6481,16 @@
           applyTutorialHighlights();
           break;
         case 'MINE_RESET_TIMER':
-          // Update mine reset timer display (compact format, icon added via CSS)
+          // Update mine reset timer display
           if (mineResetTimerEl && mineResetTimerTextEl) {
             if (data.timeRemaining !== null && data.timeRemaining !== undefined) {
-              mineResetTimerTextEl.textContent = data.timeRemaining;
+              // On mobile, use progressive text format "Mine Resets In xx:xx"
+              const isMobile = document.body.classList.contains('mobile');
+              if (isMobile) {
+                mineResetTimerTextEl.textContent = `Mine Resets In ${data.timeRemaining}`;
+              } else {
+                mineResetTimerTextEl.textContent = data.timeRemaining;
+              }
               mineResetTimerEl.classList.add('visible');
             } else {
               mineResetTimerEl.classList.remove('visible');

@@ -6158,14 +6158,12 @@
         marker.textContent = initial;
         marker.style.background = hashColor(player.name || player.playerId);
 
-        const stackOffset = (idx % 3) * (isMobile ? 10 : -10);
+        // Stack players vertically (negative = upward) for horizontal progress bar
+        const stackOffset = (idx % 3) * -10;
         marker.style.setProperty('--stack-offset', `${stackOffset}px`);
 
-        if (isMobile) {
-          marker.style.bottom = `${progress}%`;
-        } else {
-          marker.style.left = `${progress}%`;
-        }
+        // Use left for horizontal layout (both desktop and mobile now)
+        marker.style.left = `${progress}%`;
 
         progressPlayersEl.appendChild(marker);
       });
@@ -7203,10 +7201,16 @@
           applyTutorialHighlights();
           break;
         case 'MINE_RESET_TIMER':
-          // Update mine reset timer display (compact format, icon added via CSS)
+          // Update mine reset timer display
           if (mineResetTimerEl && mineResetTimerTextEl) {
             if (data.timeRemaining !== null && data.timeRemaining !== undefined) {
-              mineResetTimerTextEl.textContent = data.timeRemaining;
+              // On mobile, use progressive text format "Mine Resets In xx:xx"
+              const isMobile = document.body.classList.contains('mobile');
+              if (isMobile) {
+                mineResetTimerTextEl.textContent = `Mine Resets In ${data.timeRemaining}`;
+              } else {
+                mineResetTimerTextEl.textContent = data.timeRemaining;
+              }
               mineResetTimerEl.classList.add('visible');
             } else {
               mineResetTimerEl.classList.remove('visible');
@@ -18372,6 +18376,13 @@
     transform: scale(1.44);
   }
 
+  /* Faster touch response on mobile */
+  body.mobile .action-card,
+  body.mobile .stat-hud,
+  body.mobile .auto-btn {
+    touch-action: manipulation;
+  }
+
   /* Tutorial Progressive Text */
   #tutorial-text-container {
     position: fixed;
@@ -18508,41 +18519,62 @@
     font-size: 30px;
   }
 
-  /* Stats HUD - mobile compact icon style (similar to Pets repo) */
+  /* Stats HUD - mobile single column, right-aligned, no backgrounds */
   body.mobile .stats-hud-container {
     position: fixed;
-    top: calc(12px + env(safe-area-inset-top));
-    right: calc(12px + env(safe-area-inset-right));
-    transform: none;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
-    max-width: 200px;
-    justify-content: flex-end;
+    top: calc(8px + env(safe-area-inset-top));
+    right: calc(8px + env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    max-width: none;
+    transform: none;  /* Reset the translateY(-50%) from base styles */
   }
 
+  /* Strip backgrounds - just icon + value */
   body.mobile .stat-hud {
     min-width: auto;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border-width: 2px;
-    gap: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    gap: 1px;
     flex-direction: row-reverse;
+    justify-content: flex-end;
+    overflow: visible;  /* Reset overflow: hidden from base styles */
+    height: 24px;
+  }
+
+  body.mobile .stat-hud::before {
+    display: none;
   }
 
   body.mobile .stat-hud__value {
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
     text-shadow:
-      0 0 4px rgba(255, 215, 0, 0.4),
-      0 1px 2px rgba(0, 0, 0, 0.8);
+      0 0 6px rgba(0, 0, 0, 0.9),
+      0 1px 3px rgba(0, 0, 0, 1);
   }
 
   body.mobile .stat-hud__icon {
-    font-size: 16px;
-    width: 20px;
-    height: 20px;
-    margin-left: 0;
-    margin-right: 0;
+    width: 26px;
+    height: 48px;
+    margin: 0;  /* Reset margin-left: 12px from base styles */
+  }
+
+  body.mobile .stat-hud__icon-img {
+    width: 48px;
+    height: 48px;
+    transform: scale(1);  /* Reset the 2.5x scale from base styles */
+  }
+
+  body.mobile .coin-icon--hud {
+    width: 48px;
+    height: 48px;
   }
 
   /* Hide HUD elements when modals are open */
@@ -18564,86 +18596,74 @@
     opacity: 0.65;
   }
 
-  /* Progress Bar (Depth) - mobile vertical style on right side */
+  /* Progress Bar (Depth) - mobile horizontal at bottom */
   body.mobile .progress-bar {
     position: fixed;
-    bottom: auto;
-    left: auto;
-    right: calc(10px + env(safe-area-inset-right));
-    top: 50%;
-    transform: translateY(-50%);
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: calc(8px + env(safe-area-inset-left));
+    right: calc(8px + env(safe-area-inset-right));
+    top: auto;
+    transform: none;
     padding: 0;
     width: auto;
     height: auto;
-    z-index: 1000;
   }
 
   body.mobile .progress-bar__container {
     max-width: none;
-    margin: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
   }
 
   body.mobile .progress-bar__outline {
-    width: 20px;
-    height: 140px;
-    border-width: 3px;
-    border-radius: 10px;
-    position: relative;
-    background: rgba(11, 15, 26, 0.9);
-    border-color: rgba(82, 196, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 16px;
+    border-width: 2px;
+    border-radius: 8px;
   }
 
   body.mobile .progress-bar__fill {
     position: absolute;
-    top: auto;
+    top: 0;
     bottom: 0;
     left: 0;
-    right: 0;
-    width: 100%;
-    height: 0%;
-    background: linear-gradient(0deg, #4caf50 0%, #66bb6a 50%, #81c784 100%);
-    border-radius: 7px;
-    transition: height 0.3s ease;
+    width: 0%;
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #4caf50 0%, #66bb6a 50%, #81c784 100%);
+    transition: width 0.3s ease;
   }
 
   body.mobile .progress-bar__marker {
     position: absolute;
-    top: auto;
-    left: -4px;
-    width: 28px;
-    height: 16px;
+    top: -4px;
+    left: 0%;
+    width: 16px;
+    height: 24px;
     border-radius: 8px;
     border-width: 2px;
-    transform: translateY(50%);
-    transition: bottom 0.3s ease;
-    bottom: 0%;
+    transform: translateX(-50%);
+    transition: left 0.3s ease;
   }
 
   body.mobile .progress-bar__player {
-    top: auto;
-    bottom: 0%;
-    left: -10px;
-    width: 22px;
-    height: 22px;
-    font-size: 10px;
-    transform: translate(-50%, 50%) translateX(var(--stack-offset, 0px));
+    top: -8px;
+    left: 0%;
+    bottom: auto;
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+    transform: translateX(-50%) translateY(var(--stack-offset, 0px));
   }
 
-  /* Position markers to the left of vertical bar on mobile */
   body.mobile .progress-bar__markers {
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: row;
     justify-content: space-between;
-    position: absolute;
-    right: 100%;
-    margin-right: 6px;
-    top: 0;
-    bottom: 0;
-    height: 100%;
+    position: relative;
+    right: auto;
+    margin-top: 4px;
+    height: auto;
     padding: 0;
   }
 
@@ -18652,7 +18672,6 @@
     line-height: 1;
     color: rgba(255, 255, 255, 0.8);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    text-align: right;
   }
 
   /* Depth bar - mobile positioning (legacy, may not be used) */
@@ -18670,15 +18689,16 @@
     font-size: 11px;
   }
 
-  /* Auto controls - mobile positioning (bottom center) */
+  /* Auto controls - mobile vertical stack above depth bar */
   body.mobile .auto-controls {
+    position: fixed;
+    bottom: calc(50px + env(safe-area-inset-bottom));
+    right: calc(8px + env(safe-area-inset-right));
+    left: auto;
     top: auto;
-    right: auto;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    flex-direction: row;
-    gap: 8px;
+    transform: none;
+    flex-direction: column;
+    gap: 6px;
   }
 
   /* Hide reward from stats-hud-container on mobile */
@@ -18694,45 +18714,97 @@
 
   body.mobile .auto-btn {
     padding: 8px 14px;
-    font-size: 12px;
+    font-size: 11px;
     border-radius: 8px;
+    min-width: 85px;
   }
 
   /* To Surface button - mobile positioning */
   body.mobile .to-surface-btn {
-    top: calc(12px + env(safe-area-inset-top));
-    padding: 10px 18px;
-    font-size: 13px;
+    top: calc(8px + env(safe-area-inset-top));
+    padding: 8px 16px;
+    font-size: 12px;
   }
 
-  /* Mine Reset Timer - mobile positioning (bottom right, compact) */
+  body.mobile #to-surface-button {
+    padding: 8px 16px;
+    font-size: 12px;
+    top: calc(8px + env(safe-area-inset-top));
+  }
+
+  /* Mine Reset Timer - mobile positioning (top center under To Surface) */
   body.mobile .mine-reset-timer {
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    right: calc(12px + env(safe-area-inset-right));
+    position: fixed;
+    top: calc(48px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: auto;
+    right: auto;
+    z-index: 1002;  /* Ensure above other UI elements */
+  }
+
+  body.mobile .mine-reset-timer.visible {
+    opacity: 1;
   }
 
   body.mobile .mine-reset-timer__text {
-    padding: 5px 10px;
-    font-size: 12px;
-    border-width: 2px;
-    border-radius: 6px;
+    padding: 0;
+    font-family: "Fredoka", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-shadow:
+      -2px -2px 0 #000,
+      -2px -1px 0 #000,
+      -2px  0px 0 #000,
+      -2px  1px 0 #000,
+      -2px  2px 0 #000,
+      -1px -2px 0 #000,
+      -1px -1px 0 #000,
+      -1px  0px 0 #000,
+      -1px  1px 0 #000,
+      -1px  2px 0 #000,
+       0px -2px 0 #000,
+       0px -1px 0 #000,
+       0px  1px 0 #000,
+       0px  2px 0 #000,
+       1px -2px 0 #000,
+       1px -1px 0 #000,
+       1px  0px 0 #000,
+       1px  1px 0 #000,
+       1px  2px 0 #000,
+       2px -2px 0 #000,
+       2px -1px 0 #000,
+       2px  0px 0 #000,
+       2px  1px 0 #000,
+       2px  2px 0 #000,
+       0  3px 6px rgba(0, 0, 0, 0.5);
   }
 
   body.mobile .mine-reset-timer__text::before {
-    font-size: 10px;
+    display: none;
   }
 
-  /* Mining Depth Counter - mobile positioning (above progress bar on right) */
+  /* Mining Depth Counter - mobile positioning (above depth bar at bottom) */
   body.mobile .mining-depth-counter {
-    right: calc(10px + env(safe-area-inset-right));
-    top: calc(50% - 100px);
+    position: fixed;
+    bottom: calc(45px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    right: auto;
+    top: auto;
   }
 
   body.mobile .mining-depth-counter__text {
-    padding: 3px 8px;
-    font-size: 10px;
-    border-width: 1px;
-    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-width: 2px;
+    border-radius: 6px;
+    background: rgba(11, 15, 26, 0.85);
   }
 
   /* ============================================
@@ -19281,6 +19353,20 @@
   .rarity-extreme,
   .rarity-extremely-legendary {
     color: #ef4444; /* Red */
+  }
+
+  /* Pet Labels - mobile styles */
+  body.mobile .pet-label-container {
+    transform: scale(0.7);
+  }
+
+  body.mobile .pet-name {
+    font-size: 13px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+  }
+
+  body.mobile .pet-rarity {
+    font-size: 9px;
   }
 
 
