@@ -2821,9 +2821,12 @@
       const gold = Number(state.gold || 0);
       const owned = Number(state.pets.ownedCount || 0);
       const cap = Number(state.pets.ownedCap || 0);
+      const autoDelete = new Set(Array.isArray(state.eggStation.autoDeletePets) ? state.eggStation.autoDeletePets : []);
+      const eggPets = Array.isArray(state.eggStation.eggPets) ? state.eggStation.eggPets : [];
+      const allAutoDelete = eggPets.length > 0 && eggPets.every((pet) => autoDelete.has(pet?.petId || pet?.id));
 
       // Storage check (each hatch yields 1 pet)
-      if (cap > 0 && owned + count > cap) {
+      if (!allAutoDelete && cap > 0 && owned + count > cap) {
         if (state.eggStation.autoEnabled) stopEggAuto();
         if (eggStationStatusEl) eggStationStatusEl.textContent = 'Pet storage is full!';
         return;

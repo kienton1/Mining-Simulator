@@ -66,7 +66,11 @@ export class HatchingSystem {
     const eqCount = Array.isArray(data.equippedPets) ? data.equippedPets.length : 0;
     const ownedCount = invCount + eqCount;
     const cap = getBonuses(data).petInventoryCap ?? invCount + eqCount;
-    if (ownedCount + count > cap) {
+    const autoDeleteSet = this.getAutoDeleteSet(data);
+    const lootTable = getEggLootTable(eggType) || [];
+    const allAutoDelete = lootTable.length > 0 && lootTable.every((entry) => autoDeleteSet.has(entry.petId));
+    const requiredSlots = allAutoDelete ? 0 : count;
+    if (ownedCount + requiredSlots > cap) {
       return { canHatch: false, message: `Pet capacity full (${ownedCount}/${cap})` };
     }
 
