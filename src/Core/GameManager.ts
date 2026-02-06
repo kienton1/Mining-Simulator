@@ -1885,6 +1885,12 @@ export class GameManager {
     if (this.hasActiveMineResetTimer(player)) {
       this.updateMineResetTimerUI(player);
     }
+
+    // Snap pets to the player's new surface position to avoid fall-through after teleport
+    const equippedPets = Array.isArray(playerData?.equippedPets) ? (playerData?.equippedPets ?? []) : [];
+    if (this.petVisualManager && equippedPets.length > 0) {
+      this.petVisualManager.syncEquippedPets(player, equippedPets);
+    }
   }
 
   /**
@@ -2368,17 +2374,27 @@ export class GameManager {
     if (!playerEntity) return;
 
     // Use setPosition method if available (like TrainingController does)
+    let didTeleport = false;
     if (typeof (playerEntity as any).setPosition === 'function') {
       (playerEntity as any).setPosition(position);
-      return;
+      didTeleport = true;
     }
 
     // Fallback: try rigidBody.setPosition
     const rigidBody = (playerEntity as any).rawRigidBody;
-    if (rigidBody && typeof rigidBody.setPosition === 'function') {
+    if (!didTeleport && rigidBody && typeof rigidBody.setPosition === 'function') {
       rigidBody.setPosition(position);
-    } else {
+      didTeleport = true;
+    }
 
+    // Reset velocity so players don't keep falling after teleport (fixes falling-through-world issue)
+    if (rigidBody) {
+      if (typeof rigidBody.setLinvel === 'function') {
+        rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      if (typeof rigidBody.setAngvel === 'function') {
+        rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
     }
   }
 

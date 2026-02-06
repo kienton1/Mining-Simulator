@@ -15,7 +15,7 @@ import { getBonuses } from '../Achievements/Achievements';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
-import { ISLAND4_ORE_TYPE } from './Ore/World4OreData';
+import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from './Ore/World4OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
@@ -2288,7 +2288,8 @@ export class MiningSystem {
     // Get ore color from appropriate database
     const oreData = ORE_DATABASE[oreType as OreType] ||
                     ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE] ||
-                    ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+                    ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE] ||
+                    ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
     const hexColor = oreData?.color || '#808080';
     const color = this.hexToRgb(hexColor);
 

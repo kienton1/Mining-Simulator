@@ -634,6 +634,9 @@ export class MiningController {
       if (!oreEntry) {
         oreEntry = Object.entries(ISLAND3_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
       }
+      if (!oreEntry) {
+        oreEntry = Object.entries(ISLAND4_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
+      }
       if (oreEntry) {
         const oreType = oreEntry[0];
         const oreData = this.getOreData(oreType);

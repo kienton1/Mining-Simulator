@@ -644,6 +644,8 @@ export class TrainingController {
           z: -9.27, // Fixed Z position (forward of the ore blocks, Island 1)
         };
     playerEntity.setPosition(standPosition);
+    // Keep pets snapped to the player after teleporting to a training rock
+    this.gameManager.syncEquippedPets(player);
 
     // Face north (positive Z direction) when training
     // Identity quaternion (0 degrees rotation)
@@ -1218,6 +1220,8 @@ export class TrainingController {
             z: -9.27,
           };
     playerEntity.setPosition(standPosition);
+    // Keep pets snapped to the player after teleporting to a training rock
+    this.gameManager.syncEquippedPets(player);
 
     // Face north (positive Z direction) when training
     // Identity quaternion (0 degrees rotation)

@@ -18,10 +18,10 @@ import {
 import type { World, Vector3Like, Player, PlayerEntity } from 'hytopia';
 
 import type { PetId } from './PetData';
-import { getPetDefinition } from './PetDatabase';
+import { getPetDefinition, PET_IDS } from './PetDatabase';
 import { getPetModelUri, getPetTextureInfo, getPetModelInfo } from './PetVisuals';
 import { getModelScaleForHeight } from './PetModelHeights';
-import { isGoldenPetId } from './PetUpgrades';
+import { getBasePetIdFromAnyPetId, isGoldenPetId } from './PetUpgrades';
 import {
   PET_FORMATION_BEHIND_DISTANCE,
   PET_FORMATION_SIDE_OFFSET,
@@ -120,9 +120,13 @@ export class MiningPetEntity extends Entity {
     const modelInfo = getPetModelInfo(options.petId);
 
     // Calculate proper scale for uniform height
-    const modelScale = modelInfo
+    let modelScale = modelInfo
       ? getModelScaleForHeight(modelInfo.modelFolder)
       : 0.35;
+    const basePetId = getBasePetIdFromAnyPetId(options.petId);
+    if (basePetId === PET_IDS.LARRY_THE_SKELETON) {
+      modelScale *= 3;
+    }
 
     // Get animations for this model
     let idleAnimations: string[] = [];
