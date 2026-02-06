@@ -353,44 +353,32 @@ export function calculateMiningDamage(power: number): number {
 
 /**
  * World numbers for swing rate calculations.
+ * Supports any positive integer world index (1, 2, 3, 4, ...).
  */
-export type WorldNumber = 1 | 2 | 3;
+export type WorldNumber = number;
 
 /**
  * Calculates swings per second (SPS) from speed and world.
  *
- * Formulae:
- * World 1: 2 + 0.05 * (s ** 1.15)
- * World 2: 1 + 0.048 * (s ** 1.01)
- * World 3: 0.4 + 0.271 * (s ** 0.264)
+ * Formula:
+ * rate(s, w) = (2 + 0.117 * s) * e^(-0.9 * (w - 1))
  *
- * SPS is capped at 16.
+ * SPS is capped at 9.
  *
  * @param speed - Player speed stat (s >= 0)
- * @param world - World number (1, 2, or 3)
+ * @param world - World number (1, 2, 3, 4, ...)
  * @returns Swings per second (capped)
  */
 export function getSwingsPerSecond(speed: number, world: WorldNumber): number {
   const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
-  const resolvedWorld: WorldNumber = world === 2 || world === 3 ? world : 1;
+  const resolvedWorld = Number.isFinite(world) ? Math.max(1, Math.floor(world)) : 1;
   let rawSps = 0;
 
-  switch (resolvedWorld) {
-    case 1:
-      rawSps = 2 + 0.05 * Math.pow(safeSpeed, 1.15);
-      break;
-    case 2:
-      rawSps = 1 + 0.048 * Math.pow(safeSpeed, 1.01);
-      break;
-    case 3:
-      rawSps = 0.4 + 0.271 * Math.pow(safeSpeed, 0.264);
-      break;
-    default:
-      rawSps = 2 + 0.05 * Math.pow(safeSpeed, 1.15);
-      break;
-  }
+  // Dynamic rate equation across worlds:
+  // rate(s, w) = (2 + 0.117 * s) * e^(-0.9 * (w - 1))
+  rawSps = (2 + 0.117 * safeSpeed) * Math.exp(-1.3 * (resolvedWorld - 1));
 
-  const clamped = Math.min(16, Math.max(0, rawSps));
+  const clamped = Math.min(9, Math.max(0, rawSps));
   return Number.isFinite(clamped) ? clamped : 0;
 }
 

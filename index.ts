@@ -1524,7 +1524,6 @@ startServer(world => {
             success: true,
             eggType,
             count,
-            goldSpent: hatchRes.goldSpent ?? 0,
             results,
           });
           // Achievements: eggs hatched progress

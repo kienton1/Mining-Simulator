@@ -356,23 +356,21 @@ export class MiningSystem {
     // Calculate minimum time between hits (in milliseconds)
     // Formula: SPS = getSwingsPerSecond(speed, world)
     const worldId = this.getPlayerWorldId(player);
-    if (!isAutoMining) {
-      const worldNumber = this.getWorldNumberFromId(worldId);
-      const pd = this.getPlayerDataCallback?.(player);
-      const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
-      const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1); // swings per second
-      const minTimeBetweenHits = Math.max(1, Math.ceil(1000 / effectiveHitRate)); // milliseconds between hits
-      // Helpful debug (can be noisy if enabled elsewhere):
-      // console.log('[MiningSystem] SPS calc:', { worldId, worldNumber, speed: pickaxe.miningSpeed, effectiveHitRate, minTimeBetweenHits });
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const pd = this.getPlayerDataCallback?.(player);
+    const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
+    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1); // swings per second
+    const minTimeBetweenHits = Math.max(1, Math.ceil(1000 / effectiveHitRate)); // milliseconds between hits
+    // Helpful debug (can be noisy if enabled elsewhere):
+    // console.log('[MiningSystem] SPS calc:', { worldId, worldNumber, speed: pickaxe.miningSpeed, effectiveHitRate, minTimeBetweenHits });
 
-      const currentTime = Date.now();
-      const timeSinceLastHit = currentTime - state.lastHitTime;
+    const currentTime = Date.now();
+    const timeSinceLastHit = currentTime - state.lastHitTime;
 
-      // If not enough time has passed, ignore this click (prevents spam clicking)
-      if (timeSinceLastHit < minTimeBetweenHits) {
-        // Click too soon - rate limit enforced
-        return;
-      }
+    // If not enough time has passed, ignore this click (prevents spam clicking)
+    if (timeSinceLastHit < minTimeBetweenHits) {
+      // Click too soon - rate limit enforced
+      return;
     }
 
     // Get player data for power calculation
@@ -1349,10 +1347,14 @@ export class MiningSystem {
 
   /**
    * Maps world IDs to numeric world indices for SPS curves.
+   * Supports any world like "island4", "world5", etc. Defaults to 1.
    */
-  private getWorldNumberFromId(worldId: string): 1 | 2 | 3 {
-    if (worldId === 'island2') return 2;
-    if (worldId === 'island3' || worldId === 'island4') return 3;
+  private getWorldNumberFromId(worldId: string): number {
+    const match = String(worldId || '').match(/(\d+)/);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+    }
     return 1;
   }
 

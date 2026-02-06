@@ -34,7 +34,7 @@ export type AchievementsUICategory = {
   items: AchievementsUIItem[];
 };
 
-const BASE_PET_EQUIP_CAP = 8;
+const BASE_PET_EQUIP_CAP = 5;
 const BASE_PET_INV_CAP = 50;
 
 function roman(n: number): string {

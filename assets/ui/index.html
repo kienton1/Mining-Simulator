@@ -6812,11 +6812,6 @@
               currentEggHatch.confettiFired = true;
             }
           }
-          if (typeof data.goldSpent === 'number') {
-            // GOLD_STATS will also come from server, this just keeps UI snappy if it arrives late
-            state.gold = Math.max(0, state.gold - data.goldSpent);
-            if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
-          }
           renderEggStation();
           break;
         }

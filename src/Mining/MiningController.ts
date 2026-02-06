@@ -59,11 +59,35 @@ export class MiningController {
   }
 
   /**
-   * Maps world IDs to numeric world indices for SPS curves.
+   * Finds an ore type key by its display name across all world databases.
    */
-  private getWorldNumberFromId(worldId: string): 1 | 2 | 3 {
-    if (worldId === 'island2') return 2;
-    if (worldId === 'island3' || worldId === 'island4') return 3;
+  private findOreTypeByName(name: string): string | null {
+    const findIn = (db: Record<string, { name: string }>): string | null => {
+      for (const [key, data] of Object.entries(db)) {
+        if (data?.name === name) return key;
+      }
+      return null;
+    };
+
+    return (
+      findIn(ORE_DATABASE) ||
+      findIn(ISLAND2_ORE_DATABASE as Record<string, { name: string }>) ||
+      findIn(ISLAND3_ORE_DATABASE as Record<string, { name: string }>) ||
+      findIn(ISLAND4_ORE_DATABASE as Record<string, { name: string }>) ||
+      null
+    );
+  }
+
+  /**
+   * Maps world IDs to numeric world indices for SPS curves.
+   * Supports any world like "island4", "world5", etc. Defaults to 1.
+   */
+  private getWorldNumberFromId(worldId: string): number {
+    const match = String(worldId || '').match(/(\d+)/);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+    }
     return 1;
   }
 
@@ -368,7 +392,7 @@ export class MiningController {
     const animSpeedMultiplier = Math.min(swingsPerSecond, MAX_MINING_ANIMATION_SPEED);
 
     // Start mining animation on player entity with speed scaled to pickaxe
-    const playerEntity = this.gameManager.getPlayerEntity(player);
+    const playerEntity = this.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
       (playerEntity as any).startMiningAnimation(animSpeedMultiplier);
     }
@@ -512,7 +536,7 @@ export class MiningController {
     this.miningSystem.stopMiningLoop(player);
     
     // Stop mining animation and return to holding pose (Hyground style)
-    const playerEntity = this.gameManager.getPlayerEntity(player);
+    const playerEntity = this.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).stopMiningAnimation === 'function') {
       (playerEntity as any).stopMiningAnimation();
     }
@@ -626,19 +650,8 @@ export class MiningController {
     // World-aware: Check both Island 1 and Island 2 databases
     let oreColor: string | null = null;
     if (!isChest && currentOreName) {
-      // Find ore type from name in both databases
-      let oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      if (!oreEntry) {
-        oreEntry = Object.entries(ISLAND2_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      }
-      if (!oreEntry) {
-        oreEntry = Object.entries(ISLAND3_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      }
-      if (!oreEntry) {
-        oreEntry = Object.entries(ISLAND4_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      }
-      if (oreEntry) {
-        const oreType = oreEntry[0];
+      const oreType = this.findOreTypeByName(currentOreName);
+      if (oreType) {
         const oreData = this.getOreData(oreType);
         if (oreData) {
           // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)

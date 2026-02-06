@@ -14,7 +14,7 @@ export const ISLAND3_CONFIG: WorldConfig = {
   // Unlock Requirements
   unlockRequirement: {
     type: 'trophies',
-    amount: 100, // Unlock with 100 trophies
+    amount: 500, // Unlock with 500 trophies (5 completions worth)
   },
 
   // Trophy Multiplier

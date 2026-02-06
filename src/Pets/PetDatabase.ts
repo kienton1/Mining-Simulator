@@ -15,7 +15,7 @@ import {
 } from './PetUpgrades';
 
 export const PET_INVENTORY_CAPACITY = 50;
-export const PET_EQUIP_CAPACITY = 8;
+export const PET_EQUIP_CAPACITY = 5;
 
 export const EGG_DEFINITIONS: Record<EggType, EggDefinition> = {
   // World 1 (Island 1) Eggs

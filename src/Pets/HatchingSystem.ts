@@ -77,7 +77,7 @@ export class HatchingSystem {
     return { canHatch: true };
   }
 
-  hatch(player: Player, eggType: EggType, count: number): { success: boolean; message?: string; results?: PetId[]; goldSpent?: number } {
+  hatch(player: Player, eggType: EggType, count: number): { success: boolean; message?: string; results?: PetId[] } {
     const data = this.getPlayerData(player);
     if (!data) return { success: false, message: 'Player data not found' };
 
@@ -119,7 +119,7 @@ export class HatchingSystem {
     // Update client gold display (optional, but consistent with other systems)
     player.ui.sendData({ type: 'GOLD_STATS', gold: data.gold });
 
-    return { success: true, results, goldSpent: totalCost };
+    return { success: true, results };
   }
 }
 
