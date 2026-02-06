@@ -30,6 +30,8 @@ import {
   PlayerUIEvent,
   CollisionGroup,
   PlayerManager,
+  World,
+  type WorldMap,
 } from 'hytopia';
 import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
@@ -37,6 +39,9 @@ import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from './s
 import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE, type Island4OreData } from './src/Mining/Ore/World4OreData';
 
 import * as worldMap from './assets/map.json';
+import { WorldLoadBalancer } from './src/Core/WorldLoadBalancer';
+import { WorldStateManager, type PerWorldManagers } from './src/Core/WorldStateManager';
+import { WORLD_INSTANCE_CONFIG } from './src/config/WorldInstanceConfig';
 import { GameManager } from './src/Core/GameManager';
 import { PickaxeManager } from './src/Pickaxe/PickaxeManager';
 import { MiningPlayerEntity } from './src/Core/MiningPlayerEntity';
@@ -66,11 +71,12 @@ import { DailyChestController } from './src/DailyReward/DailyChestController';
 
 /**
  * startServer is always the entry point for our game.
- * It accepts a single function where we should do any
- * setup necessary for our game. The init function is
- * passed a World instance which is the default
- * world created by the game server on startup.
- * 
+ *
+ * This game uses the WorldLoadBalancer pattern for multi-world support.
+ * Players are distributed across world instances using a least-populated-first
+ * algorithm. New worlds are created when existing ones reach capacity (10 players).
+ * Empty worlds are shut down after a 30-second grace period (keeping at least 1 active).
+ *
  * Documentation: https://github.com/hytopiagg/sdk/blob/main/docs/server.startserver.md
  */
 
@@ -81,7 +87,13 @@ const ADMIN_USERNAMES = new Set(
     .filter(Boolean)
 );
 
-startServer(world => {
+/**
+ * Initialize a world instance with all game components.
+ * This function is called by the WorldLoadBalancer for each new world.
+ */
+function initializeWorld(world: World): void {
+  console.log(`[MINING_SIMULATOR] Initializing world ${world.id}: ${world.name}`);
+
   /**
    * Enable debug rendering of the physics simulation.
    * This will overlay lines in-game representing colliders,
@@ -92,7 +104,7 @@ startServer(world => {
    * It is intended for development environments only and
    * debugging physics.
    */
-  
+
   world.simulation.enableDebugRendering(false);
   if ((world.simulation as any).enableDebugRaycasting) {
     (world.simulation as any).enableDebugRaycasting(false);
@@ -131,15 +143,15 @@ startServer(world => {
   };
 
   /**
-   * Load our map.
+   * Map loading is handled by WorldLoadBalancer.createWorld()
+   * The map is passed when creating the world to avoid Rapier physics race conditions.
    * Map structure:
    * - Cobbled-deepslate clusters = Training rocks (practice area)
    * - Gold block area = Mine entrance (mining area)
    * See Planning/mapStructure.md for details
    */
-  world.loadMap(worldMap);
 
-  // Start egg display animations (must be after loadMap so entities exist)
+  // Start egg display animations (map is already loaded by WorldLoadBalancer)
   gameManager.startEggDisplayAnimator();
 
   // Carve shared mine shaft (10-block drop) for all players - Island 1 (Original)
@@ -2323,10 +2335,55 @@ startServer(world => {
    * Play some peaceful ambient music to
    * set the mood!
    */
-  
+
   new Audio({
     uri: 'audio/music/alt-music-3.mp3',
     loop: true,
     volume: 0.1,
   }).play(world);
+
+  // Register this world with the WorldStateManager for per-world lookups
+  const managers: PerWorldManagers = {
+    gameManager,
+    pickaxeManager,
+    merchantEntities,
+    mineResetUpgradeNPCs,
+    gemTraderEntities,
+    eggStationManager,
+    goldenMachine,
+    dailyChestController,
+    dailyChestLabelManager,
+    eggStationLabelManager,
+    shopLabelManager,
+  };
+  WorldStateManager.instance.registerWorld(world.id, managers);
+
+  console.log(`[MINING_SIMULATOR] World ${world.id} initialization complete`);
+}
+
+/**
+ * Server entry point - Uses WorldLoadBalancer for multi-world support.
+ *
+ * Key behaviors:
+ * - Players join the world with the fewest players (least-populated-first)
+ * - New worlds are created when all existing worlds are at capacity
+ * - Empty worlds are shut down after a 30-second grace period
+ * - At least 1 world is always kept active
+ */
+startServer(() => {
+  console.log('[MINING_SIMULATOR] Server starting...');
+  console.log(`[MINING_SIMULATOR] Max players per world: ${WORLD_INSTANCE_CONFIG.MAX_PLAYERS_PER_WORLD}`);
+  console.log(`[MINING_SIMULATOR] Min active worlds: ${WORLD_INSTANCE_CONFIG.MIN_ACTIVE_WORLDS}`);
+  console.log(`[MINING_SIMULATOR] Empty world grace period: ${WORLD_INSTANCE_CONFIG.EMPTY_WORLD_GRACE_PERIOD_MS}ms`);
+
+  // Create the WorldLoadBalancer with the world map
+  const worldLoadBalancer = new WorldLoadBalancer(worldMap as unknown as WorldMap);
+
+  // Initialize with our world setup function
+  worldLoadBalancer.initialize(initializeWorld);
+
+  // Start the cleanup loop for empty worlds
+  worldLoadBalancer.startCleanupLoop();
+
+  console.log('[MINING_SIMULATOR] WorldLoadBalancer initialized and running');
 });
