@@ -10,6 +10,7 @@ import { Player, SceneUI, World } from 'hytopia';
 import { EggType } from './PetData';
 import type { GameManager } from '../Core/GameManager';
 import { PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { getBonuses } from '../Achievements/Achievements';
 
 export interface EggStationLocation {
   id: string;
@@ -168,6 +169,9 @@ export class EggStationController {
         const gold = playerData?.gold ?? 0;
         const invCount = Array.isArray(playerData?.petInventory) ? playerData!.petInventory!.length : 0;
         const eqCount = Array.isArray(playerData?.equippedPets) ? playerData!.equippedPets!.length : 0;
+        const bonuses = playerData ? getBonuses(playerData) : null;
+        const petInventoryCap = bonuses?.petInventoryCap ?? PET_INVENTORY_CAPACITY;
+        const petEquippedCap = bonuses?.petEquipCap ?? PET_EQUIP_CAPACITY;
 
         const eggCost = this.gameManager.getHatchingSystem().getEggCostGold(station.eggType);
 
@@ -180,9 +184,9 @@ export class EggStationController {
           costGold: eggCost,
           gold,
           petInventoryCount: invCount,
-          petInventoryCapacity: PET_INVENTORY_CAPACITY,
+          petInventoryCapacity: petInventoryCap,
           equippedCount: eqCount,
-          equippedCapacity: PET_EQUIP_CAPACITY,
+          equippedCapacity: petEquippedCap,
         });
       }
     }

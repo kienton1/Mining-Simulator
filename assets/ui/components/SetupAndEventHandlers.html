@@ -243,6 +243,13 @@
     return Math.round(value).toString();
   }
 
+  function formatStatNumber(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return String(value);
+    if (Math.abs(num) >= 1000) return formatNumber(num);
+    return num.toFixed(2).replace(/\.?0+$/, '');
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     console.log('[UI] DOMContentLoaded, setting up UI');
     setupMobileButtons();
@@ -4481,24 +4488,24 @@
         pickaxeDetailStats.innerHTML = '';
         
         // Speed (display as percentage increase, e.g., "+5 Speed" means +5% speed)
-        const speed = pickaxe.miningSpeed ? Math.round(pickaxe.miningSpeed) : 0;
+        const speed = pickaxe.miningSpeed ?? 0;
         const speedStat = document.createElement('div');
         speedStat.className = 'pickaxe-stat pickaxe-stat--speed';
-        speedStat.textContent = `+${speed} Speed`;
+        speedStat.textContent = `+${formatStatNumber(speed)} Speed`;
         pickaxeDetailStats.appendChild(speedStat);
         
         // Luck bonus
-        const luckBonus = pickaxe.luckBonus ? (pickaxe.luckBonus * 100).toFixed(0) : '0';
+        const luckBonus = pickaxe.luckBonus ? (pickaxe.luckBonus * 100) : 0;
         const luckStat = document.createElement('div');
         luckStat.className = 'pickaxe-stat pickaxe-stat--luck';
-        luckStat.textContent = `+${luckBonus}% Ore Luck`;
+        luckStat.textContent = `+${formatStatNumber(luckBonus)}% Ore Luck`;
         pickaxeDetailStats.appendChild(luckStat);
         
         // Sell Value Multiplier
-        const sellMultiplier = pickaxe.sellValueMultiplier ? pickaxe.sellValueMultiplier.toFixed(2) : '1.00';
+        const sellMultiplier = pickaxe.sellValueMultiplier ?? 1;
         const sellStat = document.createElement('div');
         sellStat.className = 'pickaxe-stat pickaxe-stat--sell';
-        sellStat.textContent = `${sellMultiplier}× Sell Value`;
+        sellStat.textContent = `x${formatStatNumber(sellMultiplier)} Sell Value`;
         pickaxeDetailStats.appendChild(sellStat);
       }
 

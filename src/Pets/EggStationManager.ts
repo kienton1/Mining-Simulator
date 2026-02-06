@@ -14,6 +14,7 @@ import { World, Player } from 'hytopia';
 import type { GameManager } from '../Core/GameManager';
 import { EggType } from './PetData';
 import { EGG_DEFINITIONS, getEggLootTable, getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { getBonuses } from '../Achievements/Achievements';
 
 export interface EggStationDefinition {
   id: string;
@@ -167,6 +168,9 @@ export class EggStationManager {
       const invCount = Array.isArray(playerData?.petInventory) ? playerData!.petInventory!.length : 0;
       const equippedCount = Array.isArray(playerData?.equippedPets) ? playerData!.equippedPets!.length : 0;
       const ownedCount = invCount + equippedCount;
+      const bonuses = playerData ? getBonuses(playerData) : null;
+      const petInventoryCap = bonuses?.petInventoryCap ?? PET_INVENTORY_CAPACITY;
+      const petEquippedCap = bonuses?.petEquipCap ?? PET_EQUIP_CAPACITY;
       const autoDeletePets = Array.isArray(playerData?.autoDeletePets)
         ? playerData!.autoDeletePets!.filter(isPetId)
         : [];
@@ -197,9 +201,9 @@ export class EggStationManager {
         player: {
           gold,
           petInventoryCount: ownedCount,
-          petInventoryCap: PET_INVENTORY_CAPACITY,
+          petInventoryCap: petInventoryCap,
           petEquippedCount: equippedCount,
-          petEquippedCap: PET_EQUIP_CAPACITY,
+          petEquippedCap: petEquippedCap,
           autoDeletePets,
         },
       });

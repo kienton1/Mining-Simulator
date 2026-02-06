@@ -739,19 +739,19 @@
       // Build stats HTML
       let statsHtml = '';
       if (pickaxe.power) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Power</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--power">+${formatNumber(pickaxe.power)}</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Power</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--power">+${formatStatNumber(pickaxe.power)}</span></div>`;
       }
       if (pickaxe.damage) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Damage</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--damage">+${formatNumber(pickaxe.damage)}</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Damage</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--damage">+${formatStatNumber(pickaxe.damage)}</span></div>`;
       }
       if (pickaxe.luck) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Luck</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--luck">+${pickaxe.luck}%</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Luck</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--luck">+${formatStatNumber(pickaxe.luck)}%</span></div>`;
       }
       if (pickaxe.speed) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Speed</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--speed">+${pickaxe.speed}%</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Speed</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--speed">+${formatStatNumber(pickaxe.speed)}%</span></div>`;
       }
       if (pickaxe.sellMultiplier) {
-        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Sell Bonus</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--sell">x${pickaxe.sellMultiplier}</span></div>`;
+        statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Sell Bonus</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--sell">x${formatStatNumber(pickaxe.sellMultiplier)}</span></div>`;
       }
       if (!pickaxe.owned) {
         statsHtml += `<div class="pickaxe-stat-row"><span class="pickaxe-stat-row__label">Cost</span><span class="pickaxe-stat-row__value pickaxe-stat-row__value--cost">${window.coinIconHtml('coin-icon--inline')} ${formatNumber(pickaxe.cost)}</span></div>`;
@@ -783,12 +783,26 @@
       }
     }
 
+    function trimTrailingZeros(value) {
+      return value.replace(/\.?0+$/, "");
+    }
+
     function formatNumber(num) {
-      if (num >= 1e12) return (num / 1e12).toFixed(1) + "T";
-      if (num >= 1e9) return (num / 1e9).toFixed(1) + "B";
-      if (num >= 1e6) return (num / 1e6).toFixed(1) + "M";
-      if (num >= 1e3) return (num / 1e3).toFixed(1) + "K";
-      return num.toString();
+      const value = Number(num);
+      if (!Number.isFinite(value)) return String(num);
+
+      const abs = Math.abs(value);
+      const sign = value < 0 ? "-" : "";
+
+      if (abs >= 1e12) return sign + trimTrailingZeros((abs / 1e12).toFixed(1)) + "T";
+      if (abs >= 1e9) return sign + trimTrailingZeros((abs / 1e9).toFixed(1)) + "B";
+      if (abs >= 1e6) return sign + trimTrailingZeros((abs / 1e6).toFixed(1)) + "M";
+      if (abs >= 1e3) return sign + trimTrailingZeros((abs / 1e3).toFixed(1)) + "K";
+      return sign + trimTrailingZeros(abs.toFixed(2));
+    }
+
+    function formatStatNumber(num) {
+      return formatNumber(num);
     }
 
     // Event listeners
