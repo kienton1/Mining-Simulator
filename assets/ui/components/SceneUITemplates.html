@@ -1,0 +1,344 @@
+<!--
+  SceneUI Templates
+  Registers templates for training:prompt, egg:prompt, and shop:prompt
+  These are used by the server to create floating UI elements attached to world objects
+-->
+
+<script>
+  // Register SceneUI templates as soon as hytopia is available
+  // This ensures templates are available when server creates SceneUIs
+  (function registerSceneUITemplates() {
+    if (window.__trainingSceneTemplatesRegistered) return;
+
+    // Wait for hytopia to be available
+    if (typeof hytopia === 'undefined') {
+      setTimeout(registerSceneUITemplates, 10);
+      return;
+    }
+
+    window.__trainingSceneTemplatesRegistered = true;
+    if (!window.__sceneUiReadySent && typeof hytopia?.sendData === 'function') {
+      window.__sceneUiReadySent = true;
+      hytopia.sendData({ type: 'SCENE_UI_READY' });
+    }
+
+    // Training rock prompt template
+    // Uses playerStates dictionary for player-specific visibility
+    // Two-mode display: 'far' mode shows rock info, 'close' mode shows interaction prompt
+    hytopia.registerSceneUITemplate('training:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-training-prompt'; // Start hidden until player state is checked
+
+      // Create content container for mode-based rendering
+      const content = document.createElement('div');
+      content.className = 'scene-training-prompt__content';
+      root.appendChild(content);
+
+      const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      const powerIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/PowerIcon.png` : 'icons/HUDIcons/PowerIcon.png';
+      const rebirthIconSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/RebirthIcon.png` : 'icons/HUDIcons/RebirthIcon.png';
+
+      const getStatValue = text => String(text || '').trim().split(/\s+/)[0] || '0';
+
+      const renderFarMode = (requirementText, rebirthText, powerGainText) => `
+        <div class="scene-training-prompt__copy">
+          <div class="scene-training-prompt__requirement">
+            <span class="scene-training-prompt__stat-value">${getStatValue(requirementText || '0 Required')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${powerIconSrc}" alt="power">
+          </div>
+          <div class="scene-training-prompt__or">OR</div>
+          <div class="scene-training-prompt__rebirth">
+            <span class="scene-training-prompt__stat-value">${getStatValue(rebirthText || '0 Rebirths')}</span>
+            <img class="scene-training-prompt__stat-icon" src="${rebirthIconSrc}" alt="rebirth">
+          </div>
+          <div class="scene-training-prompt__power-gain">${powerGainText || '+1 Power'}</div>
+        </div>
+      `;
+
+      // Helper to get current player ID from DOM (set by PlayerId.html component)
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      // Handle state updates
+      onState(state => {
+        const data = state || {};
+
+        // Check player-specific visibility using playerStates dictionary
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+
+        console.log('[TrainingUI] State update received:', {
+          currentPlayerId,
+          playerStatesKeys: Object.keys(playerStates),
+          playerStates: JSON.stringify(playerStates),
+        });
+
+        if (currentPlayerId) {
+          const playerState = playerStates[currentPlayerId];
+          console.log('[TrainingUI] Player state for', currentPlayerId, ':', playerState);
+
+          // Only show if this player's state says visible
+          if (playerState?.visible === true) {
+            root.classList.add('visible');
+            root.style.display = 'flex';
+
+            // Toggle locked state based on player's canTrain
+            if (playerState.canTrain === false) {
+              root.classList.add('locked');
+            } else {
+              root.classList.remove('locked');
+            }
+
+            // Determine mode (far or close)
+            const mode = playerState.mode || 'far';
+            console.log('[TrainingUI] Mode for player', currentPlayerId, ':', mode, '(raw:', playerState.mode, ')');
+
+            // Remove existing mode classes
+            root.classList.remove('mode-far', 'mode-close');
+            root.classList.add('mode-' + mode);
+            console.log('[TrainingUI] Applied classes:', root.className);
+
+            // Render content based on mode
+            if (mode === 'close') {
+              console.log('[TrainingUI] Rendering CLOSE mode content');
+              // Close mode - show interaction key + "Train" text
+              content.innerHTML = `
+                <div class="scene-training-prompt__interaction">
+                  <div class="scene-training-prompt__key">E</div>
+                  <div class="scene-training-prompt__action">Train</div>
+                </div>
+              `;
+              } else {
+                console.log('[TrainingUI] Rendering FAR mode content');
+                // Far mode - show rock info (icon, requirements, power gain)
+                const requirementText = data.requirementText || '0 Required';
+                const rebirthText = data.rebirthText || '0 Rebirths';
+                const powerGainText = data.powerGainText || '+1 Power';
+
+                content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+              }
+            } else if (playerState && playerState.visible === false) {
+              root.classList.remove('visible');
+              root.style.display = 'none';
+            } else {
+            // Not close to the rock: show far-mode details
+            root.classList.add('visible');
+            root.style.display = 'flex';
+            root.classList.remove('locked');
+            root.classList.remove('mode-far', 'mode-close');
+            root.classList.add('mode-far');
+
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
+
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
+          } else {
+            // Fallback: use global visible flag if no playerStates (backwards compatibility)
+            if (data.visible === false) {
+              root.classList.remove('visible');
+            root.style.display = 'none';
+          } else {
+            root.classList.add('visible');
+            root.style.display = 'flex';
+
+            // Default to far mode for backwards compatibility
+            root.classList.remove('mode-far', 'mode-close');
+            root.classList.add('mode-far');
+
+              const requirementText = data.requirementText || '0 Required';
+              const rebirthText = data.rebirthText || '0 Rebirths';
+              const powerGainText = data.powerGainText || '+1 Power';
+
+              content.innerHTML = renderFarMode(requirementText, rebirthText, powerGainText);
+            }
+
+          // Toggle locked state
+          if (data.canTrain === false) {
+            root.classList.add('locked');
+          } else {
+            root.classList.remove('locked');
+          }
+        }
+      });
+
+      return root;
+    });
+
+    // Egg station prompt template
+    hytopia.registerSceneUITemplate('egg:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-egg-prompt visible';
+
+      const icon = document.createElement('div');
+      icon.className = 'scene-egg-prompt__icon';
+      icon.textContent = '\uD83E\uDD5A'; // 🥚
+      root.appendChild(icon);
+
+      const copy = document.createElement('div');
+      copy.className = 'scene-egg-prompt__copy';
+      root.appendChild(copy);
+
+      const title = document.createElement('div');
+      title.className = 'scene-egg-prompt__title';
+      title.textContent = 'Egg';
+      copy.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-egg-prompt__subtitle';
+      subtitle.textContent = 'Open eggs here';
+      copy.appendChild(subtitle);
+
+      const cost = document.createElement('div');
+      cost.className = 'scene-egg-prompt__cost';
+      const cdnBase = (window.CDN_ASSETS_URL || '').replace(/\/$/, '');
+      const coinSrc = cdnBase ? `${cdnBase}/icons/HUDIcons/CoinIcon.png` : 'icons/HUDIcons/CoinIcon.png';
+      cost.innerHTML = `0 <img class="coin-icon coin-icon--inline" src="${coinSrc}" alt="coin">`;
+      copy.appendChild(cost);
+
+      onState(state => {
+        const data = state || {};
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) {
+          subtitle.textContent = data.subtitle;
+          // Hide subtitle if empty so this looks like the reference (name + cost only).
+          subtitle.style.display = data.subtitle ? 'block' : 'none';
+        }
+        if (data.costText !== undefined) {
+          const costLabel = data.costText.replace(/\s*[Gg]old\s*$/, '');
+          cost.innerHTML = `${costLabel} <img class="coin-icon coin-icon--inline" src="${coinSrc}" alt="coin">`;
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
+    // Shop prompt template (merchant, gem trader, timer upgrade)
+    hytopia.registerSceneUITemplate('shop:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-shop-prompt visible';
+
+      const title = document.createElement('div');
+      title.className = 'scene-shop-prompt__title';
+      title.textContent = 'Shop';
+      root.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'scene-shop-prompt__subtitle';
+      subtitle.textContent = 'Interact to open';
+      root.appendChild(subtitle);
+
+      onState(state => {
+        const data = state || {};
+        if (data.title !== undefined) title.textContent = data.title;
+        if (data.subtitle !== undefined) subtitle.textContent = data.subtitle;
+
+        if (data.kind) {
+          root.classList.remove('scene-shop-prompt--ore', 'scene-shop-prompt--timer', 'scene-shop-prompt--upgrades');
+          root.classList.add(`scene-shop-prompt--${data.kind}`);
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
+    // Daily chest prompt template - shows "Daily Reward" + countdown/Ready!
+    hytopia.registerSceneUITemplate('daily-chest:prompt', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'scene-daily-chest-prompt visible';
+
+      const title = document.createElement('div');
+      title.className = 'scene-daily-chest-prompt__title';
+      title.textContent = 'Daily Reward';
+      root.appendChild(title);
+
+      const timer = document.createElement('div');
+      timer.className = 'scene-daily-chest-prompt__timer';
+      timer.textContent = 'Ready!';
+      root.appendChild(timer);
+
+      // Helper to get current player ID from DOM
+      function getCurrentPlayerId() {
+        const playerIdElement = document.getElementById('playerId');
+        return playerIdElement?.dataset?.playerId;
+      }
+
+      onState(state => {
+        const data = state || {};
+
+        if (data.title !== undefined) title.textContent = data.title;
+
+        // Check player-specific state
+        const currentPlayerId = getCurrentPlayerId();
+        const playerStates = data.playerStates || {};
+
+        if (currentPlayerId && playerStates[currentPlayerId]) {
+          const playerState = playerStates[currentPlayerId];
+          timer.textContent = playerState.timerText || 'Ready!';
+
+          if (playerState.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        } else if (data.timerText !== undefined) {
+          timer.textContent = data.timerText;
+          if (data.isReady) {
+            timer.classList.add('ready');
+            timer.classList.remove('waiting');
+          } else {
+            timer.classList.add('waiting');
+            timer.classList.remove('ready');
+          }
+        }
+
+        if (data.visible === false) root.classList.remove('visible');
+        else root.classList.add('visible');
+      });
+
+      return root;
+    });
+
+    // Pet label template - shows name and rarity above pets
+    hytopia.registerSceneUITemplate('pet-label', (_id, onState) => {
+      const root = document.createElement('div');
+      root.className = 'pet-label-container';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'pet-name';
+      nameEl.textContent = 'Pet';
+      root.appendChild(nameEl);
+
+      const rarityEl = document.createElement('div');
+      rarityEl.className = 'pet-rarity rarity-common';
+      rarityEl.textContent = 'Common';
+      root.appendChild(rarityEl);
+
+      onState(state => {
+        const data = state || {};
+        if (data.name !== undefined) {
+          nameEl.textContent = data.name;
+        }
+        if (data.rarity !== undefined) {
+          const rarityLower = String(data.rarity).toLowerCase();
+          rarityEl.textContent = data.rarity.charAt(0).toUpperCase() + data.rarity.slice(1);
+          rarityEl.className = 'pet-rarity rarity-' + rarityLower;
+        }
+      });
+
+      return root;
+    });
+
+  })();
+</script>

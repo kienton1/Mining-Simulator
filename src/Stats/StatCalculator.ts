@@ -17,6 +17,8 @@ import {
   type Island2TrainingRockData,
   ISLAND3_TRAINING_ROCK_TIER,
   calculateIsland3TrainingPowerGain,
+  ISLAND4_TRAINING_ROCK_TIER,
+  calculateIsland4TrainingPowerGain,
 } from '../worldData/TrainingRocks';
 // Note: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are deprecated
 // New system uses power-based damage formula and piecewise functions for power gain
@@ -39,7 +41,8 @@ function calculateRock1PowerGain(rebirths: number): number {
   if (x >= 1 && x <= 36) {
     return Math.floor((x + 4) / 5);
   } else if (x > 36 && x <= 457) {
-    return Math.floor((x + 7) / 6);
+    // Clamp to avoid a drop at the 36->37 boundary.
+    return Math.max(Math.floor((x + 7) / 6), 8);
   } else if (x >= 2510) {
     return Math.floor(x / 10 + 0.5);
   } else {
@@ -62,23 +65,32 @@ function calculateRock1PowerGain(rebirths: number): number {
  */
 function calculateRock2PowerGain(rebirths: number): number {
   const x = rebirths;
-  
+
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
-  if (x === 0) {
-    return 1;
-  }
-  
+  if (x === 0) return 2;
+
+  // Early game tuned to match your table (+3 power column)
   if (x >= 1 && x < 57) {
-    // For low rebirth counts, ensure minimum of 1 power gain
-    // Formula: floor(x / 5) but with minimum of 1 to ensure progression
-    return Math.max(1, Math.floor((x + 6) / 5));
-  } else if (x >= 57 && x < 2510) {
+    if (x <= 10) return 2;     // matches: 1->2, 6->2
+    if (x <= 20) return 3;     // matches: 11->3, 16->3
+    if (x <= 30) return 5;     // matches: 21->5, 26->5
+    if (x <= 40) return 6;     // matches: 31->6, 36->6
+    if (x <= 46) return 8;     // matches: 41->8
+
+    // 47..56: ramp up so it can naturally reach 11 at 57 (next bracket)
+    // 47-51 => 9 (matches 47->9)
+    // 52-56 => 10
+    return 9 + Math.floor((x - 47) / 5);
+  }
+
+  // Your existing mid/late game logic
+  if (x >= 57 && x < 2510) {
     return Math.floor(0.15 * x + 2.5);
   } else if (x >= 2510) {
     return Math.floor(0.15 * x + 2);
-  } else {
-    return 1; // x < 1 (shouldn't reach here, but return 1 as minimum)
   }
+
+  return 2;
 }
 
 /**
@@ -93,15 +105,17 @@ function calculateRock3PowerGain(rebirths: number): number {
   
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
   if (x === 0) {
-    return 1;
+    return 8;
   }
   
   if (x >= 1 && x <= 47) {
-    return Math.floor(0.8 * x + 7);
+    return Math.floor(0.8 * x + 8);
   } else if (x > 47 && x < 2510) {
-    return Math.floor(0.75 * x + 8);
+    return Math.floor(0.75 * x + 9);
   } else if (x >= 2510) {
-    return Math.floor(0.75 * x);
+    // Clamp to avoid a drop at the 2509->2510 boundary.
+    const minAt2510 = Math.floor(0.75 * 2509 + 9);
+    return Math.max(Math.floor(0.75 * x), minAt2510);
   } else {
     return 0; // x < 1 (shouldn't reach here due to x=0 check above)
   }
@@ -129,7 +143,7 @@ function calculateRock4PowerGain(rebirths: number): number {
   
   // Special case: x = 0 returns minimum power gain (1) for power-unlocked rocks
   if (x === 0) {
-    return 1;
+    return 23;
   }
   
   if (x <= 457) {
@@ -205,7 +219,7 @@ function calculateRock5PowerGain(rebirths: number): number {
 const ROCK6_KNOTS: Array<[number, number]> = [
   [1, 620], [6, 650], [11, 680], [16, 710], [21, 740], [26, 770], [31, 800],
   [36, 830], [41, 860], [47, 900], [57, 970], [77, 1120], [97, 1270], [117, 1420],
-  [137, 1570], [157, 1720], [207, 2000], [257, 2150], [307, 1849], [357, 2141],
+  [137, 1570], [157, 1720], [207, 2000], [257, 2150], [307, 2150], [357, 2150],
   [457, 2724], [2510, 14683], [3760, 21980], [6260, 36564], [12760, 74480],
   [20260, 118200], [59040, 344400], [79040, 461100], [119040, 694400],
   [129040, 752800], [209040, 1200000], [400040, 2300000],
@@ -221,7 +235,7 @@ const ROCK6_KNOTS: Array<[number, number]> = [
 function calculateRock6PowerGain(rebirths: number): number {
   const x = rebirths;
   
-  if (x < 1) return 620; // Minimum value
+  if (x < 1) return 50; // Minimum value
   if (x >= 400040) {
     return 5.75 * x - 100230;
   }
@@ -251,13 +265,13 @@ function calculateRock6PowerGain(rebirths: number): number {
  * 
  * Reference: Planning/PowerSystemPlan.md section 4 - Training Rock Balance
  * 
- * @param rockTier - Training rock tier (Island 1, Island 2, or Island 3)
+ * @param rockTier - Training rock tier (Island 1, Island 2, Island 3, or Island 4)
  * @param rebirths - Number of rebirths the player has
- * @param worldId - Optional world ID ('island1', 'island2', or 'island3'), defaults to 'island1'
+ * @param worldId - Optional world ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
  * @returns Power gained per hit
  */
 export function calculatePowerGainPerHit(
-  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER,
+  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER,
   rebirths: number,
   worldId: string = 'island1'
 ): number {
@@ -273,6 +287,13 @@ export function calculatePowerGainPerHit(
   if (worldId === 'island3') {
     if (Object.values(ISLAND3_TRAINING_ROCK_TIER).includes(rockTier as ISLAND3_TRAINING_ROCK_TIER)) {
       return calculateIsland3TrainingPowerGain(rockTier as ISLAND3_TRAINING_ROCK_TIER, rebirths);
+    }
+  }
+
+  // Island 4 uses different formulas
+  if (worldId === 'island4') {
+    if (Object.values(ISLAND4_TRAINING_ROCK_TIER).includes(rockTier as ISLAND4_TRAINING_ROCK_TIER)) {
+      return calculateIsland4TrainingPowerGain(rockTier as ISLAND4_TRAINING_ROCK_TIER, rebirths);
     }
   }
   
@@ -331,14 +352,58 @@ export function calculateMiningDamage(power: number): number {
 }
 
 /**
- * Gets mining speed from pickaxe
+ * World numbers for swing rate calculations.
+ * Supports any positive integer world index (1, 2, 3, 4, ...).
+ */
+export type WorldNumber = number;
+
+/**
+ * Calculates swings per second (SPS) from speed and world.
+ *
+ * Formula:
+ * rate(s, w) = (2 + 0.117 * s) * e^(-0.9 * (w - 1))
+ *
+ * SPS is capped at 9.
+ *
+ * @param speed - Player speed stat (s >= 0)
+ * @param world - World number (1, 2, 3, 4, ...)
+ * @returns Swings per second (capped)
+ */
+export function getSwingsPerSecond(speed: number, world: WorldNumber): number {
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const resolvedWorld = Number.isFinite(world) ? Math.max(1, Math.floor(world)) : 1;
+  let rawSps = 0;
+
+  // Dynamic rate equation across worlds:
+  // rate(s, w) = (2 + 0.117 * s) * e^(-0.9 * (w - 1))
+  rawSps = (2 + 0.117 * safeSpeed) * Math.exp(-1.3 * (resolvedWorld - 1));
+
+  const clamped = Math.min(9, Math.max(0, rawSps));
+  return Number.isFinite(clamped) ? clamped : 0;
+}
+
+/**
+ * Calculates total swings in a given time window.
+ *
+ * @param speed - Player speed stat
+ * @param world - World number (1, 2, or 3)
+ * @param seconds - Duration in seconds
+ * @returns Total swings in the window
+ */
+export function getSwingsInWindow(speed: number, world: WorldNumber, seconds: number): number {
+  const safeSeconds = Number.isFinite(seconds) ? seconds : 0;
+  return getSwingsPerSecond(speed, world) * safeSeconds;
+}
+
+/**
+ * Gets mining speed stat from pickaxe
  * 
  * Formula: MiningSpeed = PickaxeMiningSpeed
  * 
  * Reference: gameOverview.txt section 10.3
  * 
  * @param pickaxe - Player's current pickaxe
- * @returns Mining speed (swings per second)
+ * @returns Mining speed stat (Speed)
  */
 export function getMiningSpeed(pickaxe: PickaxeData): number {
   return pickaxe.miningSpeed;

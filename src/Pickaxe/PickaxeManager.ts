@@ -370,7 +370,7 @@ export class PickaxeManager {
             playerEntity,
             anchorName,
             { x: 0, y: 0, z: 0 }, // Position relative to anchor - centered in hand
-            { x: 0, y: 0.707, z: 0, w: 0.707 } // 90 degree rotation around Y axis
+            { x: 0.7071, y: -0.7071, z: 0.7071, w: -0.7071 }
           );
           attached = true;
           break;

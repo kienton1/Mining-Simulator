@@ -13,7 +13,11 @@ import { GameManager } from '../Core/GameManager';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
+import { ISLAND4_ORE_TYPE, ISLAND4_ORE_DATABASE } from './Ore/World4OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
+import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
+import { getSwingsPerSecond } from '../Stats/StatCalculator';
+import { addBlocksMined, getBonuses } from '../Achievements/Achievements';
 
 /**
  * Mining Controller class
@@ -47,7 +51,44 @@ export class MiningController {
     if (oreType in ISLAND3_ORE_DATABASE) {
       return ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
     }
+    // Try Island 4 database if not found
+    if (oreType in ISLAND4_ORE_DATABASE) {
+      return ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+    }
     return null;
+  }
+
+  /**
+   * Finds an ore type key by its display name across all world databases.
+   */
+  private findOreTypeByName(name: string): string | null {
+    const findIn = (db: Record<string, { name: string }>): string | null => {
+      for (const [key, data] of Object.entries(db)) {
+        if (data?.name === name) return key;
+      }
+      return null;
+    };
+
+    return (
+      findIn(ORE_DATABASE) ||
+      findIn(ISLAND2_ORE_DATABASE as Record<string, { name: string }>) ||
+      findIn(ISLAND3_ORE_DATABASE as Record<string, { name: string }>) ||
+      findIn(ISLAND4_ORE_DATABASE as Record<string, { name: string }>) ||
+      null
+    );
+  }
+
+  /**
+   * Maps world IDs to numeric world indices for SPS curves.
+   * Supports any world like "island4", "world5", etc. Defaults to 1.
+   */
+  private getWorldNumberFromId(worldId: string): number {
+    const match = String(worldId || '').match(/(\d+)/);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+    }
+    return 1;
   }
 
   constructor(world: World, gameManager: GameManager) {
@@ -69,7 +110,10 @@ export class MiningController {
     // Set callback to get miner ore luck bonus
     this.miningSystem.setGetMinerOreLuckBonusCallback((player) => {
       const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
-      return equippedMiner?.oreLuckBonus ?? 0;
+      const minerLuck = equippedMiner?.oreLuckBonus ?? 0;
+      const pd = this.gameManager.getPlayerData(player);
+      const extraLuck = pd ? (getBonuses(pd).extraLuckPercent ?? 0) : 0;
+      return minerLuck + extraLuck;
     });
     // Set callback to get combined damage multiplier (for chest HP initialization)
     this.miningSystem.setGetCombinedDamageMultiplierCallback((player: Player) => {
@@ -82,7 +126,9 @@ export class MiningController {
       
       // Convert multipliers to percentages, add them together, then convert back
       const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-      const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+      const pd = this.gameManager.getPlayerData(player);
+      const achDamagePercent = pd ? ((getBonuses(pd).damageMultiplier - 1.0) * 100) : 0;
+      const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
       return 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
     });
     // Set callback for when a chest is broken (to award gems)
@@ -138,7 +184,8 @@ export class MiningController {
     
     // Convert multipliers to percentages, add them together, then convert back
     const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
+    const achDamagePercent = ((getBonuses(playerData).damageMultiplier - 1.0) * 100) || 0;
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
     const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
 
     // Handle single click mining
@@ -175,7 +222,7 @@ export class MiningController {
         }
       },
       damageMultiplier,
-      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
+      undefined // Modal check is done at entry point, not per-tick
     );
   }
 
@@ -270,8 +317,8 @@ export class MiningController {
         return;
       }
 
-      // Check if this is the unminable gold block - trigger win automatically
-      if (blockInfo.chestType === 'Unminable Gold Block') {
+      // Check if this is the win block - trigger win automatically
+      if (blockInfo.chestType === 'Congratulations') {
         const miningState = this.miningSystem.getMiningState(player);
         if (miningState && !miningState.winTriggered) {
           // Trigger win condition automatically when reaching the gold block
@@ -310,10 +357,11 @@ export class MiningController {
         );
       } else {
         const oreData = this.getOreData(blockInfo.oreType);
+        const displayName = blockInfo.chestType === 'Congratulations' ? 'Congratulations' : (oreData?.name || null);
         this.sendMiningUpdateEvent(
           player,
           0, // No damage, just detection
-          oreData?.name || null,
+          displayName,
           blockInfo.blockHP,
           blockInfo.maxHP,
           false,
@@ -333,43 +381,76 @@ export class MiningController {
    * @param player - Player who is mining
    */
   startMiningLoop(player: Player): void {
-    // Start mining animation on player entity (Hyground style)
-    const playerEntity = this.gameManager.getPlayerEntity(player);
+    console.log('[MiningController] startMiningLoop called for player:', player.username);
+
+    // Calculate animation speed multiplier (used for both initial start and restart on block break)
+    const pickaxeForAnim = this.gameManager.getPlayerPickaxe(player);
+    const playerDataForAnim = this.gameManager.getPlayerData(player);
+    const worldId = playerDataForAnim?.currentWorld || 'island1';
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const speedStat = pickaxeForAnim?.miningSpeed ?? 0;
+    const swingsPerSecond = getSwingsPerSecond(speedStat, worldNumber);
+    const animSpeedMultiplier = Math.min(swingsPerSecond, MAX_MINING_ANIMATION_SPEED);
+
+    // Start mining animation on player entity with speed scaled to pickaxe
+    const playerEntity = this.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).startMiningAnimation === 'function') {
-      (playerEntity as any).startMiningAnimation();
+      (playerEntity as any).startMiningAnimation(animSpeedMultiplier);
     }
-    
+
     // First check if player is in the mine - if not, do nothing
     const initialMiningState = this.miningSystem.getMiningState(player);
     if (!initialMiningState) {
       // Player is not in the mine, cannot start mining loop
-      return;
+      console.log('[MiningController] No mining state for player - THIS IS THE PROBLEM');
+      console.log('[MiningController] Attempting to create mining state now...');
+      // Try to create the state by calling preparePlayerMine
+      const pickaxe = this.gameManager.getPlayerPickaxe(player);
+      if (pickaxe) {
+        const entryPos = this.miningSystem.preparePlayerMine(player, pickaxe);
+        console.log('[MiningController] Created mining state, entry position:', entryPos);
+        // Now try again
+        const retryState = this.miningSystem.getMiningState(player);
+        if (!retryState) {
+          console.log('[MiningController] Still no mining state after retry, giving up');
+          return;
+        }
+        console.log('[MiningController] Mining state now exists, continuing...');
+      } else {
+        console.log('[MiningController] No pickaxe, cannot create mining state');
+        return;
+      }
+    } else {
+      console.log('[MiningController] Mining state exists, currentDepth:', initialMiningState.currentDepth);
     }
 
-    // Player is in the mine, proceed with mining
-    // Don't start mining if a blocking modal is open
-    if (this.gameManager.isBlockingModalOpen(player)) {
-      return;
-    }
+    // Note: Modal check is NOT done here because:
+    // - For manual mining, the left-click handler in index.ts already checks isBlockingModalOpen
+    // - For auto-mining, the user explicitly requested mining, so modals shouldn't block it
 
     // Get More Damage multiplier from upgrade system (e.g., 1.2 = +20%)
     const moreDamageMultiplier = this.gameManager.getGemTraderUpgradeSystem().getMoreDamageMultiplier(player);
-    
+
     // Get miner damage bonus percentage (e.g., 10 = +10%)
     const equippedMiner = this.gameManager.getMinerShop().getEquippedMiner(player);
     const minerDamageBonus = equippedMiner?.damageBonus ?? 0;
-    
-    // Convert multipliers to percentages, add them together, then convert back
-    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
-    const totalDamagePercent = moreDamagePercent + minerDamageBonus; // Add percentages
-    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
+
+    // Get player data first (needed for achievement bonuses)
     const playerData = this.gameManager.getPlayerData(player);
     if (!playerData) {
+      console.log('[MiningController] No player data, aborting');
       return;
     }
 
+    // Convert multipliers to percentages, add them together, then convert back
+    const moreDamagePercent = (moreDamageMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
+    const achDamagePercent = ((getBonuses(playerData).damageMultiplier - 1.0) * 100) || 0;
+    const totalDamagePercent = moreDamagePercent + minerDamageBonus + achDamagePercent; // Add percentages
+    const damageMultiplier = 1.0 + (totalDamagePercent / 100); // Convert back to multiplier
+
     const pickaxe = this.gameManager.getPlayerPickaxe(player);
     if (!pickaxe) {
+      console.log('[MiningController] No pickaxe, aborting');
       return;
     }
 
@@ -413,7 +494,18 @@ export class MiningController {
         }
       },
       damageMultiplier,
-      () => this.gameManager.isBlockingModalOpen(player) // Check modal state
+      undefined, // Modal check is done at entry point, not per-tick
+      (p: Player) => {
+        // Block destroyed callback - stop and restart mining animation for visual reset
+        const pEntity = this.getPlayerEntity(p);
+        if (pEntity && typeof (pEntity as any).stopMiningAnimation === 'function') {
+          (pEntity as any).stopMiningAnimation();
+          // Immediately restart since we're in a mining loop
+          if (typeof (pEntity as any).startMiningAnimation === 'function') {
+            (pEntity as any).startMiningAnimation(animSpeedMultiplier);
+          }
+        }
+      }
     );
 
     // Send initial progress update and mining state
@@ -445,7 +537,7 @@ export class MiningController {
     this.miningSystem.stopMiningLoop(player);
     
     // Stop mining animation and return to holding pose (Hyground style)
-    const playerEntity = this.gameManager.getPlayerEntity(player);
+    const playerEntity = this.getPlayerEntity(player);
     if (playerEntity && typeof (playerEntity as any).stopMiningAnimation === 'function') {
       (playerEntity as any).stopMiningAnimation();
     }
@@ -537,6 +629,14 @@ export class MiningController {
     oreMined: string | null = null,
     oreMinedColor: string | null = null
   ): void {
+    // Achievements: count blocks mined when an ore block is destroyed (not chests)
+    if (oreMined) {
+      const pd = this.gameManager.getPlayerData(player);
+      if (pd) {
+        addBlocksMined(pd, 1);
+        this.gameManager.updatePlayerData(player, pd);
+      }
+    }
     // Calculate sell value for ores (if not a chest)
     let sellValue: number | null = null;
     let finalGemReward: number | null = null;
@@ -551,16 +651,8 @@ export class MiningController {
     // World-aware: Check both Island 1 and Island 2 databases
     let oreColor: string | null = null;
     if (!isChest && currentOreName) {
-      // Find ore type from name in both databases
-      let oreEntry = Object.entries(ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      if (!oreEntry) {
-        oreEntry = Object.entries(ISLAND2_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      }
-      if (!oreEntry) {
-        oreEntry = Object.entries(ISLAND3_ORE_DATABASE).find(([_, data]) => data.name === currentOreName);
-      }
-      if (oreEntry) {
-        const oreType = oreEntry[0];
+      const oreType = this.findOreTypeByName(currentOreName);
+      if (oreType) {
         const oreData = this.getOreData(oreType);
         if (oreData) {
           // Use the selling system's combined multiplier (includes pickaxe, More Coins upgrade, and miner bonus)

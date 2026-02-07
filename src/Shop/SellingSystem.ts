@@ -10,9 +10,11 @@ import { Player } from 'hytopia';
 import { OreType, ORE_DATABASE, type OreData } from '../Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from '../Mining/Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from '../Mining/Ore/World3OreData';
+import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE, type Island4OreData } from '../Mining/Ore/World4OreData';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
+import { getBonuses } from '../Achievements/Achievements';
 
 /**
  * Callback to get the More Coins multiplier from upgrade system
@@ -106,12 +108,16 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    // Achievements: coins bonus percent (additive)
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     const sellMultiplier = this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
 
     // Calculate total value before clearing (with combined multiplier)
@@ -135,7 +141,7 @@ export class SellingSystem {
       if (!amount) continue;
       
       // Try Island 1 database first
-      let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
+      let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
       // Try Island 2 database if not found
       if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
         oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -143,6 +149,9 @@ export class SellingSystem {
       // Try Island 3 database if not found
       if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
         oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+      }
+      if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+        oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
       }
       
       if (oreData && amount > 0) {
@@ -187,12 +196,15 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     const sellMultiplier = this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
 
     let totalGold = 0;
@@ -201,12 +213,15 @@ export class SellingSystem {
     for (const oreType of oreTypes) {
       const amount = this.inventoryManager.getOreCount(player, oreType);
       if (amount > 0) {
-        let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
+        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
         if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
           oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
         }
         if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
           oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+        }
+        if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+          oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
         }
         if (oreData) {
           const value = amount * oreData.value * sellMultiplier;
@@ -254,12 +269,15 @@ export class SellingSystem {
       return 0;
     }
 
-    let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
+    let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
     if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
       oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
     }
     if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
       oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+    }
+    if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+      oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
     }
     if (!oreData) {
       return 0;
@@ -274,12 +292,15 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     const sellMultiplier = this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
 
     const baseValue = sellAmount * oreData.value;
@@ -310,14 +331,15 @@ export class SellingSystem {
   private calculateCombinedCoinMultiplier(
     pickaxeMultiplier: number,
     moreCoinsMultiplier: number,
-    minerCoinBonusPercent: number
+    minerCoinBonusPercent: number,
+    achievementCoinBonusPercent: number
   ): number {
     // Convert multipliers to percentages
     const pickaxePercent = (pickaxeMultiplier - 1.0) * 100; // e.g., 1.5 -> 50%
     const moreCoinsPercent = (moreCoinsMultiplier - 1.0) * 100; // e.g., 1.2 -> 20%
     
     // Add all percentages together
-    const totalPercent = pickaxePercent + moreCoinsPercent + minerCoinBonusPercent;
+    const totalPercent = pickaxePercent + moreCoinsPercent + minerCoinBonusPercent + achievementCoinBonusPercent;
     
     // Convert back to multiplier: 1.0 + (totalPercent / 100)
     return 1.0 + (totalPercent / 100);
@@ -345,12 +367,15 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     return this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
   }
 
@@ -378,12 +403,15 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     const sellMultiplier = this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
 
     let totalValue = this.inventoryManager.calculateTotalValue(player, sellMultiplier);
@@ -415,12 +443,15 @@ export class SellingSystem {
     
     // Get miner coin bonus percentage (e.g., 15 = +15%)
     const minerCoinBonus = this.getMinerCoinBonusCallback?.(player) ?? 0;
+
+    const achCoinsPercent = (getBonuses(playerData).coinMultiplier - 1.0) * 100;
     
     // Calculate combined multiplier by adding all percentages
     const sellMultiplier = this.calculateCombinedCoinMultiplier(
       pickaxeMultiplier,
       moreCoinsMultiplier,
-      minerCoinBonus
+      minerCoinBonus,
+      achCoinsPercent
     );
 
     let total = 0;
@@ -428,12 +459,15 @@ export class SellingSystem {
     for (const oreType of oreTypes) {
       const amount = this.inventoryManager.getOreCount(player, oreType);
       if (amount > 0) {
-        let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
+        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
         if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
           oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
         }
         if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
           oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+        }
+        if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+          oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
         }
         if (oreData) {
           total += amount * oreData.value * sellMultiplier;

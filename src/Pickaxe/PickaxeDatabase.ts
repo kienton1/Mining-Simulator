@@ -7,7 +7,7 @@
  * Stats converted:
  * - Coin% → Sell Value Multiplier (+50% = 1.5x, +100% = 2.0x, etc.)
  * - Ore Luck% → Luck Bonus (5% = 0.05)
- * - Speed → Mining Speed (swings per second)
+ * - Speed → Mining Speed (Speed stat used to derive swings per second)
  * - Cost → Purchase cost in coins
  */
 
@@ -67,9 +67,6 @@ function parseCost(costStr: string | number): number {
   } else if (upper.endsWith('QD')) {
     const num = parseFloat(upper.replace('QD', '').replace(/,/g, ''));
     return num * 1e15; // 1 quadrillion = 10^15
-  } else if (upper.endsWith('Q') && !upper.match(/Q[DN]/)) {
-    const num = parseFloat(upper.replace('Q', '').replace(/,/g, ''));
-    return num * 1e15; // Legacy Q = quadrillion
   } else if (upper.endsWith('T')) {
     const num = parseFloat(upper.replace('T', '').replace(/,/g, ''));
     return num * 1e12; // 1 trillion = 10^12
@@ -112,7 +109,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 2,
     name: 'Iron',
-    miningSpeed: 8, // +8 Speed
+    miningSpeed: 10, // +8 Speed
     luckBonus: luckPercentToDecimal(1), // +1% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(20), // +20% Coins = 1.2x
     cost: 500,
@@ -128,7 +125,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 4,
     name: 'Diamond',
-    miningSpeed: 20, // +20 Speed
+    miningSpeed: 25, // +20 Speed
     luckBonus: luckPercentToDecimal(5), // +5% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(50), // +50% Coins = 1.5x
     cost: parseCost('10K'), // 10K
@@ -136,7 +133,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 5,
     name: 'Blossom', // Petal Pickaxe renamed
-    miningSpeed: 25, // +25 Speed
+    miningSpeed: 30, // +25 Speed
     luckBonus: luckPercentToDecimal(5), // +5% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(70), // +70% Coins = 1.7x
     cost: parseCost('40K'), // 40K
@@ -144,7 +141,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 6,
     name: 'Sunstone', // Sunstone Pickaxe
-    miningSpeed: 30, // +30 Speed
+    miningSpeed: 35, // +30 Speed
     luckBonus: luckPercentToDecimal(5), // +5% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(90), // +90% Coins = 1.9x
     cost: parseCost('250K'), // 250K
@@ -152,7 +149,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 7,
     name: 'Venomstrike', // Toxic Fang renamed
-    miningSpeed: 45, // +45 Speed
+    miningSpeed: 50, // +45 Speed
     luckBonus: luckPercentToDecimal(5), // +5% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(110), // +110% Coins = 2.1x
     cost: parseCost('1M'), // 1M
@@ -162,7 +159,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 8,
     name: 'Aurora Spire', // Solar Spire renamed
-    miningSpeed: 60, // +60 Speed
+    miningSpeed: 65, // +60 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(130), // +130% Coins = 2.3x
     cost: parseCost('10M'), // 10M
@@ -170,7 +167,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 9,
     name: 'Frostcore', // Glacier Core renamed
-    miningSpeed: 70, // +70 Speed
+    miningSpeed: 75, // +70 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(150), // +150% Coins = 2.5x
     cost: parseCost('30M'), // 30M
@@ -178,7 +175,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 10,
     name: 'Violet Wing', // Amethyst Wing renamed
-    miningSpeed: 85, // +85 Speed
+    miningSpeed: 90, // +85 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(200), // +200% Coins = 3.0x
     cost: parseCost('150M'), // 150M
@@ -186,7 +183,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 11,
     name: 'Crystal Breaker', // Gemstone Smasher renamed
-    miningSpeed: 100, // +100 Speed
+    miningSpeed: 105, // +100 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(250), // +250% Coins = 3.5x
     cost: parseCost('750M'), // 750M
@@ -194,7 +191,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 12,
     name: 'Quill', // Pencil Pickaxe renamed
-    miningSpeed: 120, // +120 Speed
+    miningSpeed: 125, // +120 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(300), // +300% Coins = 4.0x
     cost: parseCost('5B'), // 5B
@@ -202,7 +199,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 13,
     name: 'Demolisher', // Sledgehammer renamed
-    miningSpeed: 150, // +150 Speed
+    miningSpeed: 155, // +150 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(350), // +350% Coins = 4.5x
     cost: parseCost('25B'), // 25B
@@ -210,7 +207,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 14,
     name: 'Timber Crusher', // Wood Smasher renamed
-    miningSpeed: 170, // +170 Speed
+    miningSpeed: 175, // +170 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(400), // +400% Coins = 5.0x
     cost: parseCost('100B'), // 100B
@@ -218,7 +215,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 15,
     name: 'Jester\u2019s Mallet', // Clown Hammer renamed (using curly apostrophe to match texture filename)
-    miningSpeed: 200, // +200 Speed
+    miningSpeed: 205, // +200 Speed
     luckBonus: luckPercentToDecimal(10), // +10% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(450), // +450% Coins = 5.5x
     cost: parseCost('750B'), // 750B
@@ -228,7 +225,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 16,
     name: 'Glacial Shard', // Ice Cube Pickaxe renamed
-    miningSpeed: 300, // +300 Speed
+    miningSpeed: 305, // +300 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(500), // +500% Coins = 6.0x
     cost: parseCost('5T'), // 5T
@@ -236,7 +233,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 17,
     name: 'Shatterblade', // Fragment Pickaxe renamed
-    miningSpeed: 400, // +400 Speed
+    miningSpeed: 405, // +400 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(600), // +600% Coins = 7.0x
     cost: parseCost('20T'), // 20T
@@ -244,7 +241,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 18,
     name: 'Voidrend', // Voidpiercer renamed
-    miningSpeed: 500, // +500 Speed
+    miningSpeed: 505, // +500 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(700), // +700% Coins = 8.0x
     cost: parseCost('75T'), // 75T
@@ -252,7 +249,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 19,
     name: 'Toxinspike', // Venomspike renamed
-    miningSpeed: 600, // +600 Speed
+    miningSpeed: 605, // +600 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(800), // +800% Coins = 9.0x
     cost: parseCost('150T'), // 150T
@@ -260,7 +257,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 20,
     name: 'Bonegrinder', // Skullcrusher renamed
-    miningSpeed: 700, // +700 Speed
+    miningSpeed: 705, // +700 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(900), // +900% Coins = 10.0x
     cost: parseCost('600T'), // 600T
@@ -268,7 +265,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 21,
     name: 'Frostbite Shard', // Frostfang Shard renamed
-    miningSpeed: 850, // +850 Speed
+    miningSpeed: 855, // +850 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(1000), // +1000% Coins = 11.0x
     cost: parseCost('10Qd'), // 10Qd
@@ -276,7 +273,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 22,
     name: 'Pixel Blade', // Pixel Pickaxe renamed
-    miningSpeed: 1000, // +1000 Speed
+    miningSpeed: 1005, // +1000 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(1200), // +1200% Coins = 13.0x
     cost: parseCost('75Qd'), // 75Qd
@@ -284,7 +281,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 23,
     name: 'Inferno Scythe', // Hell Fire Scythe renamed
-    miningSpeed: 1250, // +1250 Speed
+    miningSpeed: 1255, // +1250 Speed
     luckBonus: luckPercentToDecimal(15), // +15% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(1500), // +1500% Coins = 16.0x
     cost: parseCost('500Qd'), // 500Qd
@@ -294,7 +291,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 24,
     name: 'Prybar', // Crowbar renamed
-    miningSpeed: 1500, // +1500 Speed
+    miningSpeed: 1505, // +1500 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(2000), // +2000% Coins = 21.0x
     cost: parseCost('2.5Qn'), // 2.5Qn
@@ -302,7 +299,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 25,
     name: 'Crimson Blade', // Crimson Saber renamed
-    miningSpeed: 2000, // +2000 Speed
+    miningSpeed: 2005, // +2000 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(2500), // +2500% Coins = 26.0x
     cost: parseCost('10Qn'), // 10Qn
@@ -310,7 +307,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 26,
     name: 'Frozen Edge', // Ice Pickaxe renamed
-    miningSpeed: 3000, // +3000 Speed
+    miningSpeed: 3005, // +3000 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(3000), // +3000% Coins = 31.0x
     cost: parseCost('25Qn'), // 25Qn
@@ -318,7 +315,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 27,
     name: 'Skullgrinder Prime', // Skullcrusher Prime renamed
-    miningSpeed: 4500, // +4500 Speed
+    miningSpeed: 4505, // +4500 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(3500), // +3500% Coins = 36.0x
     cost: parseCost('75Qn'), // 75Qn
@@ -326,7 +323,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 28,
     name: 'Gemstone Destroyer', // Gemstone Crusher renamed
-    miningSpeed: 7000, // +7000 Speed
+    miningSpeed: 7005, // +7000 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(4500), // +4500% Coins = 46.0x
     cost: parseCost('500Qn'), // 500Qn
@@ -334,7 +331,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 29,
     name: 'Thornspike', // Sproutspike renamed
-    miningSpeed: 10000, // +10000 Speed
+    miningSpeed: 10005, // +10000 Speed
     luckBonus: luckPercentToDecimal(20), // +20% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(6000), // +6000% Coins = 61.0x
     cost: parseCost('7.5Sx'), // 7.5Sx
@@ -342,7 +339,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 30,
     name: 'Frost Cube', // Frost cube renamed
-    miningSpeed: 12500, // +12500 Speed
+    miningSpeed: 12505, // +12500 Speed
     luckBonus: luckPercentToDecimal(25), // +25% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(7500), // +7500% Coins = 76.0x
     cost: parseCost('500Sx'), // 500Sx
@@ -350,7 +347,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 31,
     name: 'Twin Flame Scythe', // Twin Fire Scythe renamed
-    miningSpeed: 17500, // +17500 Speed
+    miningSpeed: 17505, // +17500 Speed
     luckBonus: luckPercentToDecimal(25), // +25% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(9000), // +9000% Coins = 91.0x
     cost: parseCost('1.55Sp'), // 1.55Sp
@@ -360,7 +357,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 32,
     name: 'Voidrend Prime', // Super Void Piercer renamed
-    miningSpeed: 22500, // +22500 Speed
+    miningSpeed: 22505, // +22500 Speed
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(12000), // +12000% Coins = 121.0x
     cost: parseCost('5Sp'), // 5Sp
@@ -368,7 +365,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 33,
     name: 'Toxic Reaper', // Keep original name
-    miningSpeed: 30000, // +30000 Speed
+    miningSpeed: 30005, // +30000 Speed
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(15000), // +15000% Coins = 151.0x
     cost: parseCost('20Sp'), // 20Sp
@@ -376,7 +373,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 34,
     name: 'Toxic Pixel', // Keep original name
-    miningSpeed: 40000, // +40000 Speed
+    miningSpeed: 40005, // +40000 Speed
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(20000), // +20000% Coins = 201.0x
     cost: parseCost('50Sp'), // 50Sp
@@ -384,7 +381,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 35,
     name: 'Emberhorn Cleaver', // Keep original name
-    miningSpeed: 55000, // +55000 Speed
+    miningSpeed: 55005, // +55000 Speed
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(25000), // +25000% Coins = 251.0x
     cost: parseCost('375Sp'), // 375Sp
@@ -392,7 +389,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 36,
     name: 'Crystal Cleaver', // Keep original name
-    miningSpeed: 70000, // +70000 Speed
+    miningSpeed: 70005, // +70000 Speed
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(35000), // +35000% Coins = 351.0x
     cost: parseCost('2.5Oc'), // 2.5Oc
@@ -400,7 +397,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 37,
     name: 'Radiant Reaper', // Keep original name
-    miningSpeed: 70000, // +70000 Speed (same as Crystal Cleaver)
+    miningSpeed: 70005, // +70000 Speed (same as Crystal Cleaver)
     luckBonus: luckPercentToDecimal(30), // +30% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(45000), // +45000% Coins = 451.0x
     cost: parseCost('15Oc'), // 15Oc
@@ -408,7 +405,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 38,
     name: 'Mailbox Pickaxe', // Keep original name
-    miningSpeed: 100000, // +100000 Speed
+    miningSpeed: 100005, // +100000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(67500), // +67500% Coins = 676.0x
     cost: parseCost('17.5Oc'), // 17.5Oc
@@ -416,7 +413,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 39,
     name: 'Crescent Hammer', // Keep original name
-    miningSpeed: 120000, // +120000 Speed
+    miningSpeed: 120005, // +120000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(85000), // +85000% Coins = 851.0x
     cost: parseCost('75Oc'), // 75Oc
@@ -426,7 +423,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 40,
     name: 'Stormfury Pickaxe', // Keep original name
-    miningSpeed: 140000, // +140000 Speed
+    miningSpeed: 140005, // +140000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(100000), // +100000% Coins = 1001.0x
     cost: parseCost('350Oc'), // 350Oc
@@ -434,7 +431,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 41,
     name: 'Skybreaker Pickaxe', // Keep original name
-    miningSpeed: 160000, // +160000 Speed
+    miningSpeed: 160005, // +160000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(120000), // +120000% Coins = 1201.0x
     cost: parseCost('1.5No'), // 1.5No
@@ -442,7 +439,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 42,
     name: 'Neon Purple Pickaxe', // Keep original name
-    miningSpeed: 225000, // +225000 Speed
+    miningSpeed: 225005, // +225000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(150000), // +150000% Coins = 1501.0x
     cost: parseCost('4No'), // 4No
@@ -450,7 +447,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 43,
     name: 'Lumina Pickaxe', // Keep original name
-    miningSpeed: 275000, // +275000 Speed
+    miningSpeed: 275005, // +275000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(185000), // +185000% Coins = 1851.0x
     cost: parseCost('15No'), // 15No
@@ -458,7 +455,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 44,
     name: 'Abyssal Twin Edge', // Keep original name
-    miningSpeed: 325000, // +325000 Speed
+    miningSpeed: 325005, // +325000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(225000), // +225000% Coins = 2251.0x
     cost: parseCost('50No'), // 50No
@@ -466,7 +463,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 45,
     name: 'Inferno Cleaver', // Keep original name
-    miningSpeed: 400000, // +400000 Speed
+    miningSpeed: 400005, // +400000 Speed
     luckBonus: luckPercentToDecimal(35), // +35% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(275000), // +275000% Coins = 2751.0x
     cost: parseCost('200No'), // 200No
@@ -474,7 +471,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 46,
     name: 'Neon Crystal', // Keep original name
-    miningSpeed: 500000, // +500000 Speed
+    miningSpeed: 500005, // +500000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(350000), // +350000% Coins = 3501.0x
     cost: parseCost('25De'), // 25De
@@ -482,7 +479,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 47,
     name: 'Star Scepter', // Star Septer renamed (fixed spelling)
-    miningSpeed: 625000, // +625000 Speed
+    miningSpeed: 625005, // +625000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(400000), // +400000% Coins = 4001.0x
     cost: parseCost('100De'), // 100De
@@ -492,7 +489,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 48,
     name: 'Ancient Scythe', // Old Scythe renamed
-    miningSpeed: 785000, // +785000 Speed
+    miningSpeed: 785005, // +785000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(450000), // +450000% Coins = 4501.0x
     cost: parseCost('500De'), // 500De
@@ -500,7 +497,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 49,
     name: 'Plunger', // Keep original name
-    miningSpeed: 1000000, // +1000000 Speed
+    miningSpeed: 1000005, // +1000000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(500000), // +500000% Coins = 5001.0x
     cost: parseCost('3.5UDe'), // 3.5UDe
@@ -508,7 +505,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 50,
     name: 'Fire Axe', // Keep original name
-    miningSpeed: 1500000, // +1500000 Speed
+    miningSpeed: 1500005, // +1500000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(600000), // +600000% Coins = 6001.0x
     cost: parseCost('10UDe'), // 10UDe
@@ -516,7 +513,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 51,
     name: 'Double Axe', // Keep original name
-    miningSpeed: 2000000, // +2000000 Speed
+    miningSpeed: 2000005, // +2000000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(700000), // +700000% Coins = 7001.0x
     cost: parseCost('35UDe'), // 35UDe
@@ -524,7 +521,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 52,
     name: 'Skyforge', // Keep original name
-    miningSpeed: 3000000, // +3000000 Speed
+    miningSpeed: 3000005, // +3000000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(800000), // +800000% Coins = 8001.0x
     cost: parseCost('100UDe'), // 100UDe
@@ -532,7 +529,7 @@ export const PICKAXE_DATABASE: PickaxeData[] = [
   {
     tier: 53,
     name: 'Thunderstrike', // Keep original name
-    miningSpeed: 4000000, // +4000000 Speed
+    miningSpeed: 4000005, // +4000000 Speed
     luckBonus: luckPercentToDecimal(40), // +40% Ore Luck
     sellValueMultiplier: coinPercentToMultiplier(1000000), // +1000000% Coins = 10001.0x
     cost: parseCost('300UDe'), // 300UDe

@@ -10,6 +10,8 @@ export enum PetRarity {
   RARE = 'rare',
   EPIC = 'epic',
   LEGENDARY = 'legendary',
+  MYTHIC = 'mythic',
+  EXTREME = 'extreme',
 }
 
 export enum EggType {
@@ -27,6 +29,14 @@ export enum EggType {
   SAND = 'sand',
   SNOW = 'snow',
   LAVA = 'lava',
+
+  // World 4 (Island 4 / Snow World) Eggs
+  SWEETS = 'sweets',
+  ORNAMENT = 'ornament',
+  WINTER = 'winter',
+
+  // Timed reward egg (15 minute reward)
+  REWARD_15 = 'reward_15',
 }
 
 /**

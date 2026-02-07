@@ -153,7 +153,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.SEAGLASSIUM,
     rarity: 14,  // 1 in 14
     value: 100000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 130000,
     lastDepth: 1000,
     lastHealth: 125000000,
@@ -165,7 +165,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.SHELLCHROMITE,
     rarity: 16,  // 1 in 16
     value: 250000,
-    firstDepth: 25,
+    firstDepth: 5,
     firstHealth: 1070000,
     lastDepth: 1000,
     lastHealth: 200000000,
@@ -179,7 +179,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.TURTLITE,
     rarity: 22,  // 1 in 22
     value: 650000,
-    firstDepth: 30,
+    firstDepth: 5,
     firstHealth: 1000000,
     lastDepth: 1000,
     lastHealth: 290000000,
@@ -191,7 +191,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.PRISMARINE,
     rarity: 33,  // 1 in 33
     value: 2500000,
-    firstDepth: 70,
+    firstDepth: 20,
     firstHealth: 6000000,
     lastDepth: 1000,
     lastHealth: 400000000,
@@ -203,7 +203,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.OPALSTONE,
     rarity: 50,  // 1 in 50
     value: 4000000,
-    firstDepth: 80,
+    firstDepth: 20,
     firstHealth: 10000000,
     lastDepth: 1000,
     lastHealth: 603000000,
@@ -215,7 +215,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.AZURITE,
     rarity: 100,  // 1 in 100
     value: 7500000,
-    firstDepth: 80,
+    firstDepth: 20,
     firstHealth: 12000000,
     lastDepth: 1000,
     lastHealth: 800000000,
@@ -227,7 +227,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.MANGROVITE,
     rarity: 100,  // 1 in 100
     value: 19000000,
-    firstDepth: 80,
+    firstDepth: 20,
     firstHealth: 15000000,
     lastDepth: 1000,
     lastHealth: 1000000000,
@@ -239,7 +239,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.BASALTITE,
     rarity: 100,  // 1 in 100
     value: 15000000,
-    firstDepth: 120,
+    firstDepth: 20,
     firstHealth: 35000000,
     lastDepth: 1000,
     lastHealth: 1200000000,
@@ -253,7 +253,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.REEFIUM,
     rarity: 20,  // 1 in 20
     value: 25000000,
-    firstDepth: 250,
+    firstDepth: 100,
     firstHealth: 110000000,
     lastDepth: 1000,
     lastHealth: 1300000000,
@@ -303,7 +303,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.TRENCHITE,
     rarity: 285,  // 1 in 285
     value: 100000000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 300000000,
     lastDepth: 1000,
     lastHealth: 2500000000,
@@ -315,7 +315,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.STORMIUM,
     rarity: 33,  // 1 in 33
     value: 150000000,
-    firstDepth: 300,
+    firstDepth: 200,
     firstHealth: 350000000,
     lastDepth: 1000,
     lastHealth: 2000000000,
@@ -327,7 +327,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.LAVASTONE,
     rarity: 333,  // 1 in 333
     value: 200000000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 325000000,
     lastDepth: 1000,
     lastHealth: 2800000000,
@@ -339,7 +339,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.WRECKITE,
     rarity: 100,  // 1 in 100
     value: 250000000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 1000000000,
     lastDepth: 1000,
     lastHealth: 3500000000,
@@ -353,7 +353,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.BIOLUMITE,
     rarity: 370,  // 1 in 370
     value: 300000000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 362000000,
     lastDepth: 1000,
     lastHealth: 3400000000,
@@ -365,7 +365,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.OCEANIUM,
     rarity: 200,  // 1 in 200
     value: 400000000,
-    firstDepth: 350,
+    firstDepth: 200,
     firstHealth: 700000000,
     lastDepth: 1000,
     lastHealth: 3500000000,
@@ -377,7 +377,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.PALMITITE,
     rarity: 400,  // 1 in 400
     value: 400000000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 450000000,
     lastDepth: 1000,
     lastHealth: 3700000000,
@@ -389,7 +389,7 @@ export const ISLAND2_ORE_DATABASE: Record<ISLAND2_ORE_TYPE, Island2OreData> = {
     type: ISLAND2_ORE_TYPE.TRADEWINDITE,
     rarity: 1000,  // 1 in 1000
     value: 1750000000,
-    firstDepth: 500,
+    firstDepth: 200,
     firstHealth: 2200000000,
     lastDepth: 1000,
     lastHealth: 7000000000,

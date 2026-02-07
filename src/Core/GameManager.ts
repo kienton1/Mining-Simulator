@@ -15,7 +15,7 @@ import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
 import { TrainingController } from '../Surface/Training/TrainingController';
 import { MiningController } from '../Mining/MiningController';
 import { OreType } from '../Mining/Ore/World1OreData';
-import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT, ISLAND3_MINING_AREA_BOUNDS, ISLAND3_SHARED_MINE_SHAFT } from './GameConstants';
+import { MINING_AREA_BOUNDS, SHARED_MINE_SHAFT, MINE_DEPTH_START, ISLAND2_MINING_AREA_BOUNDS, ISLAND2_SHARED_MINE_SHAFT, ISLAND3_MINING_AREA_BOUNDS, ISLAND3_SHARED_MINE_SHAFT, ISLAND4_MINING_AREA_BOUNDS, ISLAND4_SHARED_MINE_SHAFT } from './GameConstants';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import { SellingSystem } from '../Shop/SellingSystem';
 import { PickaxeShop } from '../Shop/PickaxeShop';
@@ -25,8 +25,14 @@ import { PickaxeManager } from '../Pickaxe/PickaxeManager';
 import { PlayerDataPersistence } from './PersistenceManager';
 import { PetManager } from '../Pets/PetManager';
 import { HatchingSystem } from '../Pets/HatchingSystem';
+import { EggType, type PetId } from '../Pets/PetData';
+import { getEggLootTable, getPetDefinition } from '../Pets/PetDatabase';
+import { PetVisualManager } from '../Pets/PetVisualManager';
+import { EggDisplayAnimator } from '../Pets/EggDisplayAnimator';
 import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
+import { DailyRewardSystem } from '../DailyReward/DailyRewardSystem';
+import { LeaderboardManager } from './LeaderboardManager';
 
 /**
  * Game Manager class
@@ -52,10 +58,26 @@ interface PlayerModalState {
   pickaxeModalOpen: boolean;
   rebirthModalOpen: boolean;
   petsModalOpen: boolean;
+  achievementsModalOpen: boolean;
+  leaderboardModalOpen: boolean;
   eggModalOpen: boolean;
+  rewardModalOpen: boolean;
+  goldenMachineModalOpen: boolean;
   mapsModalOpen: boolean;
+  merchantModalOpen: boolean;
+  mineResetUpgradeModalOpen: boolean;
+  gemTraderModalOpen: boolean;
+  dailyRewardModalOpen: boolean;
   lastModalOpenTime: number; // Timestamp when modal was last opened (to prevent race conditions)
 }
+
+interface RewardTimerState {
+  startTime: number | null;
+  ready: boolean;
+}
+
+/** Set to true to enable verbose movement/input debug logging. */
+const DEBUG_MOVEMENT = false;
 
 export class GameManager {
   private world: World;
@@ -74,18 +96,43 @@ export class GameManager {
   private pickaxeManager: PickaxeManager;
   private petManager: PetManager;
   private hatchingSystem: HatchingSystem;
+  private petVisualManager: PetVisualManager;
+  private eggDisplayAnimator: EggDisplayAnimator;
   private tutorialManager: TutorialManager;
+  private dailyRewardSystem: DailyRewardSystem;
+  private leaderboardManager: LeaderboardManager;
   private mineEntranceIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineEntranceCooldowns: Map<Player, number> = new Map();
   private readonly MINE_ENTRANCE_COOLDOWN_MS = 1500;
   
   // Mine reset timer system (per-player)
-  private mineResetTimers: Map<Player, NodeJS.Timeout> = new Map();
-  private mineResetTimerIntervals: Map<Player, NodeJS.Timeout> = new Map();
   private mineResetStartTimes: Map<Player, number> = new Map();
+  private mineResetDurations: Map<Player, number> = new Map();
+  private mineResetTickInterval?: NodeJS.Timeout;
+  private mineResetQueue: Player[] = [];
+  private mineResetQueued: Set<Player> = new Set();
+  private readonly MINE_RESET_TICK_MS = 1000;
+  private readonly MINE_RESET_RESET_BATCH = 2;
   private readonly MINE_RESET_DURATION_MS = 120000; // 2 minutes
   private readonly MINE_RESET_DURATION_UPGRADED_MS = 300000; // 5 minutes (upgraded)
   
+  // Timed reward system (per-player)
+  private rewardStates: Map<Player, RewardTimerState> = new Map();
+  private rewardTickInterval?: NodeJS.Timeout;
+  private rewardPetsCache?: Array<{
+    petId: PetId;
+    name: string;
+    rarity: string;
+    chance: number;
+    multiplier: number;
+  }>;
+  private readonly REWARD_TICK_MS = 1000;
+  private readonly REWARD_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Shared progress bar markers (per-world broadcast)
+  private progressBroadcastInterval?: NodeJS.Timeout;
+  private readonly PROGRESS_BROADCAST_MS = 1000;
+
   // Debounced save timers per player
   private saveTimers: Map<Player, NodeJS.Timeout> = new Map();
   private readonly SAVE_DEBOUNCE_MS = 2000; // Save at most once per 2 seconds per player
@@ -93,6 +140,14 @@ export class GameManager {
   // Periodic save interval
   private periodicSaveInterval?: NodeJS.Timeout;
   private readonly PERIODIC_SAVE_MS = 30000; // Save all players every 30 seconds
+
+  private safeSendUI(player: Player, data: object): void {
+    try {
+      player.ui.sendData(data);
+    } catch (error) {
+      console.warn('[GameManager] Failed to send UI data:', error);
+    }
+  }
 
   /**
    * Creates a new GameManager instance
@@ -114,7 +169,9 @@ export class GameManager {
     // Pet system
     this.petManager = new PetManager();
     this.hatchingSystem = new HatchingSystem(this.petManager);
-    
+    this.petVisualManager = new PetVisualManager(world);
+    this.eggDisplayAnimator = new EggDisplayAnimator(world);
+
     // Set up callbacks for inventory and shop systems
     this.inventoryManager.setGetPlayerDataCallback((player) => this.getPlayerData(player));
     this.inventoryManager.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
@@ -146,14 +203,34 @@ export class GameManager {
     this.trainingController = new TrainingController(world, this);
     // Initialize mining system
     this.miningController = new MiningController(world, this);
+
     // Initialize tutorial system
     this.tutorialManager = new TutorialManager(this);
-    
+
+    // Initialize daily reward system
+    this.dailyRewardSystem = new DailyRewardSystem();
+    this.dailyRewardSystem.setGetPlayerDataCallback((player) => this.getPlayerData(player));
+    this.dailyRewardSystem.setUpdatePlayerDataCallback((player, data) => this.updatePlayerData(player, data));
+
+    // Leaderboard manager (initialized async later via initializeLeaderboard())
+    this.leaderboardManager = new LeaderboardManager();
+
     // Start periodic save mechanism
     this.startPeriodicSaves();
+
+    // Start per-world progress marker broadcasts
+    this.startProgressBroadcasts();
     
     // Note: UI event handlers are now set up per-player in index.ts
     // This follows the Hytopia SDK pattern of using player.ui.on() instead of world.on()
+  }
+
+  /**
+   * Starts the egg display animator.
+   * Should be called after world.loadMap() so entities are available.
+   */
+  startEggDisplayAnimator(): void {
+    this.eggDisplayAnimator.start();
   }
 
   /**
@@ -163,15 +240,18 @@ export class GameManager {
    * @param player - Player whose mine to initialize
    */
   initializePlayerMine(player: Player): void {
+    console.log('[GameManager] initializePlayerMine called for player:', player.username);
     const pickaxe = this.getPlayerPickaxe(player);
     if (!pickaxe) {
       // Can't initialize mine without a pickaxe, skip for now
       // This should rarely happen as pickaxe is attached during join
+      console.log('[GameManager] initializePlayerMine: No pickaxe for player:', player.username);
       return;
     }
 
     const miningSystem = this.miningController?.getMiningSystem();
     if (!miningSystem) {
+      console.log('[GameManager] initializePlayerMine: No mining system');
       return;
     }
 
@@ -179,6 +259,7 @@ export class GameManager {
     // We access the private method through a workaround - call preparePlayerMine
     // which internally calls getOrCreateState, but we don't need the return value
     miningSystem.preparePlayerMine(player, pickaxe);
+    console.log('[GameManager] initializePlayerMine: Mine prepared for player:', player.username);
   }
 
   /**
@@ -206,12 +287,21 @@ export class GameManager {
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
+      achievementsModalOpen: false,
+      leaderboardModalOpen: false,
       eggModalOpen: false,
+      rewardModalOpen: false,
       mapsModalOpen: false,
+      goldenMachineModalOpen: false,
+      merchantModalOpen: false,
+      mineResetUpgradeModalOpen: false,
+      gemTraderModalOpen: false,
+      dailyRewardModalOpen: false,
       lastModalOpenTime: 0,
     });
     
     this.trainingController?.registerPlayer(player);
+    this.tutorialManager.registerPlayer(player);
     return playerData;
   }
 
@@ -282,6 +372,32 @@ export class GameManager {
   updatePlayerData(player: Player, data: PlayerData): void {
     this.playerDataMap.set(player, data);
     this.scheduleSave(player);
+
+    // Track power high score (power resets on rebirth)
+    const currentPower = BigInt(data.power || '0');
+    const bestPower = BigInt(data.leaderboardHighScores?.bestPower || '0');
+    if (currentPower > bestPower) {
+      if (!data.leaderboardHighScores) data.leaderboardHighScores = {};
+      data.leaderboardHighScores.bestPower = data.power;
+    }
+
+    // Track coins high score (coins can be spent, so store highest ever)
+    const currentGold = Math.max(0, Math.floor(Number(data.gold ?? 0) || 0));
+    const maxGoldEver = Math.max(0, Math.floor(Number(data.maxGoldEverHeld ?? 0) || 0));
+    if (currentGold > maxGoldEver) {
+      data.maxGoldEverHeld = currentGold;
+    }
+    const bestCoins = toBigInt(data.leaderboardHighScores?.bestCoins || '0');
+    const currentCoins = toBigInt(currentGold);
+    const maxCoins = toBigInt(data.maxGoldEverHeld ?? 0);
+    const coinsHigh = currentCoins > maxCoins ? currentCoins : maxCoins;
+    if (coinsHigh > bestCoins) {
+      if (!data.leaderboardHighScores) data.leaderboardHighScores = {};
+      data.leaderboardHighScores.bestCoins = bigIntToString(coinsHigh);
+    }
+
+    // Mark dirty for leaderboard (internally deduped and batched)
+    this.leaderboardManager.updatePlayerScores(player, data);
   }
   
   /**
@@ -345,9 +461,63 @@ export class GameManager {
         if (playerData) {
           // Use savePlayerData directly (bypasses debounce for periodic saves)
           await PlayerDataPersistence.savePlayerData(player, playerData);
+          // Keep leaderboard scores fresh (especially timePlayed)
+          this.leaderboardManager.updatePlayerScores(player, playerData);
         }
       }
     }, this.PERIODIC_SAVE_MS);
+  }
+
+  /**
+   * Broadcasts per-world mine progress markers to all connected players
+   * so the UI can show where others are depth-wise.
+   */
+  private startProgressBroadcasts(): void {
+    if (this.progressBroadcastInterval) {
+      clearInterval(this.progressBroadcastInterval);
+    }
+
+    this.progressBroadcastInterval = setInterval(() => {
+      this.broadcastWorldProgress();
+    }, this.PROGRESS_BROADCAST_MS);
+  }
+
+  private broadcastWorldProgress(): void {
+    const players = Array.from(this.playerDataMap.keys());
+    const worldGroups = new Map<string, Player[]>();
+
+    for (const player of players) {
+      const data = this.playerDataMap.get(player);
+      if (!data) continue;
+      const worldId = data.currentWorld || 'island1';
+      if (!worldGroups.has(worldId)) {
+        worldGroups.set(worldId, []);
+      }
+      worldGroups.get(worldId)!.push(player);
+    }
+
+    for (const [worldId, groupPlayers] of worldGroups.entries()) {
+      const entries = groupPlayers
+        .filter((p) => this.isPlayerInMine(p))
+        .map((p) => {
+          const depth = this.miningController?.getCurrentMineLevel(p) ?? 0;
+          return {
+            playerId: p.id,
+            name: p.username,
+            depth: Math.min(1000, Math.max(0, depth)),
+          };
+        })
+        .sort((a, b) => b.depth - a.depth);
+
+      for (const player of groupPlayers) {
+        this.safeSendUI(player, {
+          type: 'PROGRESS_PLAYERS_UPDATE',
+          worldId,
+          goalDepth: 1000,
+          players: entries,
+        });
+      }
+    }
   }
 
   /**
@@ -376,7 +546,7 @@ export class GameManager {
 
   /**
    * Adds gold to player
-   * 
+   *
    * @param player - Player to add gold to
    * @param amount - Amount of gold to add
    */
@@ -385,6 +555,8 @@ export class GameManager {
     if (data) {
       data.gold += amount;
       this.updatePlayerData(player, data);
+      // Track max gold for daily reward
+      this.dailyRewardSystem.updateMaxCurrencyIfNeeded(player, data.gold, data.gems);
       // Send gold update to UI
       player.ui.sendData({
         type: 'GOLD_STATS',
@@ -395,7 +567,7 @@ export class GameManager {
 
   /**
    * Adds gems to player
-   * 
+   *
    * @param player - Player to add gems to
    * @param amount - Amount of gems to add
    */
@@ -404,6 +576,8 @@ export class GameManager {
     if (data) {
       data.gems += amount;
       this.updatePlayerData(player, data);
+      // Track max gems for daily reward
+      this.dailyRewardSystem.updateMaxCurrencyIfNeeded(player, data.gold, data.gems);
       // Send gems update to UI
       player.ui.sendData({
         type: 'GEMS_STATS',
@@ -453,6 +627,7 @@ export class GameManager {
    */
   addOreToInventory(player: Player, oreType: string, amount: number): void {
     this.inventoryManager.addOre(player, oreType as any, amount);
+    this.tutorialManager.onOreMined(player, amount);
   }
 
   /**
@@ -515,10 +690,43 @@ export class GameManager {
   }
 
   /**
+   * Gets the pet visual manager instance
+   */
+  getPetVisualManager(): PetVisualManager {
+    return this.petVisualManager;
+  }
+
+  /**
+   * Syncs the equipped pets for a player (spawns pet entities that follow the player)
+   */
+  syncEquippedPets(player: Player): void {
+    const playerData = this.getPlayerData(player);
+    if (!playerData) return;
+
+    const equippedPets = Array.isArray(playerData.equippedPets) ? playerData.equippedPets : [];
+    this.petVisualManager.syncEquippedPets(player, equippedPets);
+  }
+
+  /**
    * Gets the tutorial manager instance
    */
   getTutorialManager(): TutorialManager {
     return this.tutorialManager;
+  }
+
+  /**
+   * Gets the daily reward system instance
+   */
+  getDailyRewardSystem(): DailyRewardSystem {
+    return this.dailyRewardSystem;
+  }
+
+  getLeaderboardManager(): LeaderboardManager {
+    return this.leaderboardManager;
+  }
+
+  async initializeLeaderboard(): Promise<void> {
+    await this.leaderboardManager.initialize();
   }
 
   /**
@@ -752,11 +960,21 @@ export class GameManager {
 
   /**
    * Called after the player's UI has loaded so we can send initial HUD data
-   * 
+   *
    * @param player - Player whose UI finished loading
    */
   onPlayerUILoaded(player: Player): void {
+    // Send INIT message with player ID for Scene UI player-specific filtering
+    player.ui.sendData({
+      type: 'INIT',
+      payload: {
+        playerId: player.id,
+      },
+    });
     this.sendPowerStatsToUI(player);
+    this.sendRewardConfigUI(player);
+    this.resetRewardTimer(player);
+    this.tutorialManager.onPlayerUILoaded(player);
   }
 
   /**
@@ -764,11 +982,8 @@ export class GameManager {
    * Disables input and interactions while loading.
    */
   setPlayerLoading(player: Player, isLoading: boolean): void {
+    if (DEBUG_MOVEMENT) console.log(`[GM] setPlayerLoading: ${player.username}, isLoading=${isLoading}`);
     this.playerLoadingStates.set(player, isLoading);
-    player.ui.sendData({
-      type: 'LOADING_SCREEN',
-      visible: isLoading,
-    });
 
     player.setInteractEnabled(!isLoading);
     if (isLoading) {
@@ -776,6 +991,7 @@ export class GameManager {
     }
 
     const playerEntity = this.getPlayerEntity(player);
+    if (DEBUG_MOVEMENT) console.log(`[GM] setPlayerLoading: ${player.username}, entityFound=${!!playerEntity}, hasSetInputSuppressed=${typeof (playerEntity as any)?.setInputSuppressed}`);
     if (playerEntity && typeof (playerEntity as any).setInputSuppressed === 'function') {
       (playerEntity as any).setInputSuppressed(isLoading);
     }
@@ -795,7 +1011,7 @@ export class GameManager {
       power: data.power,
       gold: data.gold,
       gems: data.gems || 0,
-      wins: data.wins || 0,
+      trophies: data.trophies || 0,
       rebirths: data.rebirths,
     });
   }
@@ -816,6 +1032,10 @@ export class GameManager {
     this.playerAutoStates.set(player, autoState);
 
     if (autoState.autoMineEnabled) {
+      // Clear any stale modal states that might block mining
+      // This handles cases where modals were open but UI didn't send MODAL_CLOSED
+      this.clearBlockingModalStates(player);
+
       // Disable auto train when enabling auto mine
       // Always stop auto train first to clear any intervals/state before starting auto mine
       // This prevents race conditions where the interval might still fire after teleporting
@@ -844,10 +1064,11 @@ export class GameManager {
    * @param player - Player to start auto mine for
    */
   private startAutoMine(player: Player): void {
+    console.log('[GameManager] startAutoMine called for player:', player.username);
 
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
-
+      console.log('[GameManager] startAutoMine: No player entity');
       return;
     }
 
@@ -855,9 +1076,10 @@ export class GameManager {
     const mineCenter = miningSystem?.getMineCenter(player);
     const centerX = mineCenter?.x ?? (MINING_AREA_BOUNDS.minX + MINING_AREA_BOUNDS.maxX) / 2;
     const centerZ = mineCenter?.z ?? (MINING_AREA_BOUNDS.minZ + MINING_AREA_BOUNDS.maxZ) / 2;
-    
+
     // Get current depth from mining system
     const miningState = this.miningController?.getMiningState(player);
+    console.log('[GameManager] startAutoMine: miningState exists?', !!miningState, 'currentDepth:', miningState?.currentDepth);
     const currentDepth = miningState?.currentDepth ?? MINING_AREA_BOUNDS.y;
 
     // Teleport player to center of mining area at current depth
@@ -871,6 +1093,7 @@ export class GameManager {
 
     // Mark player as in the mine (enables mining and raycasting)
     this.setPlayerInMine(player, true);
+    this.tutorialManager.onEnterMine(player);
 
     // Update UI to show player is in mine
     player.ui.sendData({
@@ -888,25 +1111,30 @@ export class GameManager {
 
     // Wait a moment for teleport, then start mining
     setTimeout(() => {
+      console.log('[GameManager] startAutoMine: 500ms timeout fired for player:', player.username);
       const autoState = this.playerAutoStates.get(player);
       if (!autoState?.autoMineEnabled) {
-
+        console.log('[GameManager] startAutoMine: autoMineEnabled is false, aborting');
         return;
       }
 
       // Start mining loop
       if (!this.miningController) {
-
+        console.log('[GameManager] startAutoMine: No mining controller');
         return;
       }
-      
+
       if (this.miningController.isPlayerMining(player)) {
-
+        console.log('[GameManager] startAutoMine: Player already mining');
         return;
       }
+
+      // Check mining state before calling startMiningLoop
+      const stateCheck = this.miningController.getMiningState(player);
+      console.log('[GameManager] startAutoMine: About to call startMiningLoop. Mining state exists?', !!stateCheck);
 
       this.miningController.startMiningLoop(player);
-
+      console.log('[GameManager] startAutoMine: startMiningLoop called');
     }, 500);
 
     // Check periodically if player needs to be recentered after falling down a level
@@ -993,23 +1221,61 @@ export class GameManager {
   }
 
   /**
+   * Gets the open state of a specific modal for a player
+   *
+   * @param player - Player to check
+   * @param modalType - Type of modal to check
+   * @returns True if the modal is open, false otherwise
+   */
+  getModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'leaderboard' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward'): boolean {
+    const modalState = this.playerModalStates.get(player);
+    if (!modalState) return false;
+
+    switch (modalType) {
+      case 'miner': return modalState.minerModalOpen;
+      case 'pickaxe': return modalState.pickaxeModalOpen;
+      case 'rebirth': return modalState.rebirthModalOpen;
+      case 'pets': return modalState.petsModalOpen;
+      case 'achievements': return modalState.achievementsModalOpen;
+      case 'leaderboard': return modalState.leaderboardModalOpen;
+      case 'egg': return modalState.eggModalOpen;
+      case 'reward': return modalState.rewardModalOpen;
+      case 'goldenMachine': return modalState.goldenMachineModalOpen;
+      case 'maps': return modalState.mapsModalOpen;
+      case 'merchant': return modalState.merchantModalOpen;
+      case 'mineResetUpgrade': return modalState.mineResetUpgradeModalOpen;
+      case 'gemTrader': return modalState.gemTraderModalOpen;
+      case 'dailyReward': return modalState.dailyRewardModalOpen;
+      default: return false;
+    }
+  }
+
+  /**
    * Sets modal open state for a player
    * 
    * @param player - Player to update
    * @param modalType - Type of modal ('pickaxe' or 'rebirth')
    * @param isOpen - Whether the modal is open
    */
-  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'egg' | 'maps', isOpen: boolean): void {
+  setModalState(player: Player, modalType: 'miner' | 'pickaxe' | 'rebirth' | 'pets' | 'achievements' | 'leaderboard' | 'egg' | 'reward' | 'goldenMachine' | 'maps' | 'merchant' | 'mineResetUpgrade' | 'gemTrader' | 'dailyReward', isOpen: boolean): void {
     const modalState = this.playerModalStates.get(player) || {
       minerModalOpen: false,
       pickaxeModalOpen: false,
       rebirthModalOpen: false,
       petsModalOpen: false,
+      achievementsModalOpen: false,
+      leaderboardModalOpen: false,
       eggModalOpen: false,
+      rewardModalOpen: false,
+      goldenMachineModalOpen: false,
       mapsModalOpen: false,
+      merchantModalOpen: false,
+      mineResetUpgradeModalOpen: false,
+      gemTraderModalOpen: false,
+      dailyRewardModalOpen: false,
       lastModalOpenTime: 0,
     };
-    
+
     if (modalType === 'miner') {
       modalState.minerModalOpen = isOpen;
     } else if (modalType === 'pickaxe') {
@@ -1018,18 +1284,61 @@ export class GameManager {
       modalState.rebirthModalOpen = isOpen;
     } else if (modalType === 'pets') {
       modalState.petsModalOpen = isOpen;
+    } else if (modalType === 'achievements') {
+      modalState.achievementsModalOpen = isOpen;
+    } else if (modalType === 'leaderboard') {
+      modalState.leaderboardModalOpen = isOpen;
     } else if (modalType === 'egg') {
       modalState.eggModalOpen = isOpen;
+    } else if (modalType === 'reward') {
+      modalState.rewardModalOpen = isOpen;
+    } else if (modalType === 'goldenMachine') {
+      modalState.goldenMachineModalOpen = isOpen;
     } else if (modalType === 'maps') {
       modalState.mapsModalOpen = isOpen;
+    } else if (modalType === 'merchant') {
+      modalState.merchantModalOpen = isOpen;
+    } else if (modalType === 'mineResetUpgrade') {
+      modalState.mineResetUpgradeModalOpen = isOpen;
+    } else if (modalType === 'gemTrader') {
+      modalState.gemTraderModalOpen = isOpen;
+    } else if (modalType === 'dailyReward') {
+      modalState.dailyRewardModalOpen = isOpen;
     }
-    
+
     // Update timestamp when opening a modal (to prevent race conditions with clicks)
     if (isOpen) {
       modalState.lastModalOpenTime = Date.now();
     }
-    
+
     this.playerModalStates.set(player, modalState);
+  }
+
+  /**
+   * Clears all blocking modal states for a player
+   * Called when auto-mine is enabled or mine timer expires to ensure clean state
+   *
+   * @param player - Player to clear modal states for
+   */
+  clearBlockingModalStates(player: Player): void {
+    const modalState = this.playerModalStates.get(player);
+    if (modalState) {
+      modalState.minerModalOpen = false;
+      modalState.pickaxeModalOpen = false;
+      modalState.rebirthModalOpen = false;
+      modalState.petsModalOpen = false;
+      modalState.achievementsModalOpen = false;
+      modalState.leaderboardModalOpen = false;
+      modalState.eggModalOpen = false;
+      modalState.rewardModalOpen = false;
+      modalState.goldenMachineModalOpen = false;
+      modalState.merchantModalOpen = false;
+      modalState.mineResetUpgradeModalOpen = false;
+      modalState.gemTraderModalOpen = false;
+      modalState.dailyRewardModalOpen = false;
+      // Don't touch mapsModalOpen as it's not a blocking modal for mining
+      console.log('[GameManager] Cleared all blocking modal states for player:', player.username);
+    }
   }
 
   /**
@@ -1043,25 +1352,41 @@ export class GameManager {
   isBlockingModalOpen(player: Player): boolean {
     const modalState = this.playerModalStates.get(player);
     if (!modalState) return false;
-    
+
     // Check if modal is currently open
     if (
       modalState.minerModalOpen ||
       modalState.pickaxeModalOpen ||
       modalState.rebirthModalOpen ||
       modalState.petsModalOpen ||
-      modalState.eggModalOpen
+      modalState.achievementsModalOpen ||
+      modalState.leaderboardModalOpen ||
+      modalState.eggModalOpen ||
+      modalState.rewardModalOpen ||
+      modalState.goldenMachineModalOpen
     ) {
+      console.log('[GameManager] isBlockingModalOpen: TRUE - modals:', {
+        miner: modalState.minerModalOpen,
+        pickaxe: modalState.pickaxeModalOpen,
+        rebirth: modalState.rebirthModalOpen,
+        pets: modalState.petsModalOpen,
+        achievements: modalState.achievementsModalOpen,
+        leaderboard: modalState.leaderboardModalOpen,
+        egg: modalState.eggModalOpen,
+        reward: modalState.rewardModalOpen,
+        goldenMachine: modalState.goldenMachineModalOpen,
+      });
       return true;
     }
-    
+
     // Check if modal was opened very recently (within 200ms) to prevent race conditions
     // This handles the case where the click happens before the server receives MODAL_OPENED
     const timeSinceModalOpen = Date.now() - modalState.lastModalOpenTime;
     if (timeSinceModalOpen < 200) {
+      console.log('[GameManager] isBlockingModalOpen: TRUE - modal opened recently (', timeSinceModalOpen, 'ms ago)');
       return true;
     }
-    
+
     return false;
   }
 
@@ -1099,46 +1424,51 @@ export class GameManager {
       autoState.autoMineInterval = undefined;
 
     }
-    
+
     // Stop mining loop if active
     if (this.miningController?.isPlayerMining(player)) {
 
       this.miningController.stopMiningLoop(player);
     }
+
+    // Stop block detection to clear the mining UI
+    this.miningController?.stopBlockDetection(player);
   }
 
   /**
    * Handles player win condition (reaching depth 1000)
-   * Increments wins, teleports to surface, resets mines, and resets timer
+   * Increments trophies, teleports to surface, resets mines, and resets timer
    *
    * @param player - Player who reached the win condition
    */
   handlePlayerWin(player: Player): void {
+    console.log('[GameManager] handlePlayerWin for player:', player.username);
+
+    // Clear any stale modal states
+    this.clearBlockingModalStates(player);
+
     const playerData = this.getPlayerData(player);
     if (!playerData) {
       return;
     }
 
-    // Increment wins based on current world (island1=1, island2=100, island3=1000)
-    let winMultiplier = 1;
-    if (playerData.currentWorld === 'island2') {
-      winMultiplier = 100;
-    } else if (playerData.currentWorld === 'island3') {
-      winMultiplier = 1000;
-    }
-    playerData.wins += winMultiplier;
+    // Increment trophies based on current world's trophy multiplier
+    const worldId = playerData.currentWorld || 'island1';
+    const worldConfig = WorldRegistry.getWorldConfig(worldId);
+    const winMultiplier = worldConfig?.trophyMultiplier ?? 1;
+    playerData.trophies += winMultiplier;
     this.updatePlayerData(player, playerData);
 
-    // Update UI with new wins count
+    // Update UI with new trophies count
     this.sendPowerStatsToUI(player);
 
     // Stop auto modes and mining
     const autoState = this.playerAutoStates.get(player);
+    const wasAutoMineEnabled = Boolean(autoState?.autoMineEnabled);
     if (autoState) {
       if (autoState.autoMineEnabled) {
+        // Stop the loop but keep auto-mine enabled so it can resume after reset.
         this.stopAutoMine(player);
-        autoState.autoMineEnabled = false;
-        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
       }
       if (autoState.autoTrainEnabled) {
         this.stopAutoTrain(player);
@@ -1154,8 +1484,6 @@ export class GameManager {
     this.miningController?.stopBlockDetection(player);
 
     // Teleport to the surface of the world the player was mining in
-    const worldId = playerData.currentWorld || 'island1';
-    const worldConfig = WorldRegistry.getWorldConfig(worldId);
     const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
     this.teleportPlayer(player, spawnPoint);
 
@@ -1172,7 +1500,7 @@ export class GameManager {
     this.stopMineResetTimer(player);
 
     // Update UI
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINING_STATE_UPDATE',
       isInMine: false,
     });
@@ -1187,8 +1515,17 @@ export class GameManager {
     // Send win notification
     player.ui.sendData({
       type: 'PLAYER_WIN',
-      wins: playerData.wins,
+      trophies: playerData.trophies,
     });
+
+    // If auto-mine was enabled, resume it after the win reset.
+    if (wasAutoMineEnabled) {
+      setTimeout(() => {
+        const stateNow = this.playerAutoStates.get(player);
+        if (!stateNow?.autoMineEnabled) return;
+        this.startAutoMine(player);
+      }, 1200);
+    }
   }
 
   /**
@@ -1246,6 +1583,12 @@ export class GameManager {
       return;
     }
 
+    // If player is already training on a lower-tier rock, stop it before auto-train takes over.
+    // This prevents velocity monitoring from disabling auto-train after the teleport.
+    if (this.trainingController?.isPlayerTraining(player)) {
+      this.trainingController.stopTraining(player);
+    }
+
     // First, teleport player to a position within the training rock bounds
     // This is required because startTraining checks proximity before teleporting
     // Calculate a position within the bounds (center of the bounds area)
@@ -1268,7 +1611,16 @@ export class GameManager {
     // Teleport player to be within bounds first
 
     this.teleportPlayer(player, initialTeleportPosition);
-    
+
+    // Mark player as not in the mine (they're on the surface training)
+    this.setPlayerInMine(player, false);
+
+    // Update UI to clear the mining display
+    player.ui.sendData({
+      type: 'MINING_STATE_UPDATE',
+      isInMine: false,
+    });
+
     // Wait a moment for teleport to complete, then start training
     setTimeout(() => {
       const autoState = this.playerAutoStates.get(player);
@@ -1279,7 +1631,7 @@ export class GameManager {
 
       // Now use the same function as holding E - this will teleport to exact position and start training
       // startTraining will teleport to: x: rock.position.x, y: 1.75, z: -9.27
-      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
       
       if (!trainingStarted) {
 
@@ -1288,11 +1640,41 @@ export class GameManager {
 
       // Store position to detect if player leaves training area
       // Use the same teleport position that startTraining uses
-      const standPosition = {
-        x: bestRockLocation.position.x, // Same X as the ore block
-        y: 1.75, // Fixed Y position
-        z: -9.27, // Fixed Z position (forward of the ore blocks)
-      };
+      const worldId = playerData.currentWorld || 'island1';
+      const standPosition = worldId === 'island2'
+        ? {
+            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+            y: 1.75,
+            z: bestRockLocation.position.z + 0.1,
+          }
+        : worldId === 'island3'
+          ? (() => {
+              if (bestRockLocation.bounds) {
+                const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                return {
+                  x: Math.round(centerX * 10) / 10,
+                  y: 1.75,
+                  z: Math.round(centerZ * 10) / 10,
+                };
+              }
+              return {
+                x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                y: 1.75,
+                z: bestRockLocation.position.z + 0.1,
+              };
+            })()
+        : worldId === 'island4'
+          ? {
+              x: Math.round(bestRockLocation.position.x * 10) / 10,
+              y: 1.75,
+              z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
+            }
+        : {
+            x: bestRockLocation.position.x, // Same X as the ore block
+            y: 1.75, // Fixed Y position
+            z: -9.27, // Fixed Z position (forward of the ore blocks)
+          };
 
       const playerEntity = this.getPlayerEntity(player);
       if (playerEntity && autoState) {
@@ -1325,22 +1707,6 @@ export class GameManager {
             // Removed space bar check to prevent input interference
           );
 
-          // Check velocity if available
-          let hasVelocityMovement = false;
-          try {
-            const velocity = (playerEnt as any).velocity;
-            if (velocity) {
-              const vx = velocity.x || 0;
-              const vy = velocity.y || 0;
-              const vz = velocity.z || 0;
-              const horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
-              const verticalVelocity = Math.abs(vy);
-              hasVelocityMovement = horizontalVelocity > 0.1 || verticalVelocity > 0.1;
-            }
-          } catch (e) {
-            // Velocity not available, use position-based check
-          }
-
           // Check position distance
           const currentPos = playerEnt.position;
           const dx = currentPos.x - autoState.lastAutoTrainPosition.x;
@@ -1348,10 +1714,10 @@ export class GameManager {
           const dz = currentPos.z - autoState.lastAutoTrainPosition.z;
           const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
           const verticalDistance = Math.abs(dy);
-          const hasPositionMovement = horizontalDistance > 0.3 || verticalDistance > 0.3;
+          const hasPositionMovement = horizontalDistance > 1.0 || verticalDistance > 1.0;
 
-          // If ANY movement detected (input, velocity, or position), turn off auto-train immediately
-          if (hasMovementInput || hasVelocityMovement || hasPositionMovement) {
+          // If ANY movement detected (input or large position drift), turn off auto-train immediately
+          if (hasMovementInput || hasPositionMovement) {
 
             this.toggleAutoTrain(player);
             return; // Stop checking - auto-train is being turned off
@@ -1394,13 +1760,43 @@ export class GameManager {
               setTimeout(() => {
                 if (!autoState?.autoTrainEnabled) return;
                 
-                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation);
+                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
                 if (trainingStarted) {
-                  const newStandPosition = {
-                    x: bestRockLocation.position.x,
-                    y: 1.75,
-                    z: -9.27,
-                  };
+                  const worldId = playerData.currentWorld || 'island1';
+                  const newStandPosition = worldId === 'island2'
+                    ? {
+                        x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                        y: 1.75,
+                        z: bestRockLocation.position.z + 0.1,
+                      }
+                    : worldId === 'island3'
+                      ? (() => {
+                          if (bestRockLocation.bounds) {
+                            const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
+                            const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
+                            return {
+                              x: Math.round(centerX * 10) / 10,
+                              y: 1.75,
+                              z: Math.round(centerZ * 10) / 10,
+                            };
+                          }
+                          return {
+                            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
+                            y: 1.75,
+                            z: bestRockLocation.position.z + 0.1,
+                          };
+                        })()
+                    : worldId === 'island4'
+                      ? {
+                          x: Math.round(bestRockLocation.position.x * 10) / 10,
+                          y: 1.75,
+                          z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
+                        }
+                    : {
+                        x: bestRockLocation.position.x,
+                        y: 1.75,
+                        z: -9.27,
+                      };
                   autoState.lastAutoTrainPosition = newStandPosition;
 
                 }
@@ -1486,8 +1882,14 @@ export class GameManager {
 
     // Ensure timer UI is still visible if timer is running
     // This ensures the timer stays visible when returning to surface
-    if (this.mineResetTimers.has(player)) {
+    if (this.hasActiveMineResetTimer(player)) {
       this.updateMineResetTimerUI(player);
+    }
+
+    // Snap pets to the player's new surface position to avoid fall-through after teleport
+    const equippedPets = Array.isArray(playerData?.equippedPets) ? (playerData?.equippedPets ?? []) : [];
+    if (this.petVisualManager && equippedPets.length > 0) {
+      this.petVisualManager.syncEquippedPets(player, equippedPets);
     }
   }
 
@@ -1509,7 +1911,7 @@ export class GameManager {
 
     // Mark player as in the mine (enables mining and raycasting)
     this.setPlayerInMine(player, true);
-    this.tutorialManager.handleEnteredMine(player);
+    this.tutorialManager.onEnterMine(player);
 
     player.ui.sendData({
       type: 'MINING_STATE_UPDATE',
@@ -1518,7 +1920,7 @@ export class GameManager {
 
     // Ensure timer UI is visible if timer is running
     // This ensures the timer stays visible when re-entering the mine
-    if (this.mineResetTimers.has(player)) {
+    if (this.hasActiveMineResetTimer(player)) {
       this.updateMineResetTimerUI(player);
     }
 
@@ -1539,54 +1941,65 @@ export class GameManager {
    * 
    * @param player - Player who mined their first block
    */
-  startMineResetTimer(player: Player): void {
-    // Don't start if timer already running
-    if (this.mineResetTimers.has(player)) {
-      return;
-    }
-
-    // Check if player has the upgrade for the current world
-    const playerData = this.getPlayerData(player);
-    const currentWorld = playerData?.currentWorld || 'island1';
-    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
-
-    const startTime = Date.now();
-    this.mineResetStartTimes.set(player, startTime);
-
-    // Update UI immediately
-    this.updateMineResetTimerUI(player);
-
-    // Update timer display every second
-    const updateInterval = setInterval(() => {
-      this.updateMineResetTimerUI(player);
-    }, 1000);
-    this.mineResetTimerIntervals.set(player, updateInterval);
-
-    // Set expiration timer
-    const expirationTimer = setTimeout(() => {
-      this.onMineResetTimerExpired(player);
-    }, duration);
-    this.mineResetTimers.set(player, expirationTimer);
+  private hasActiveMineResetTimer(player: Player): boolean {
+    return this.mineResetStartTimes.has(player) || this.mineResetQueued.has(player);
   }
 
-  /**
-   * Updates the mine reset timer UI for a player
-   * 
-   * @param player - Player to update UI for
-   */
-  private updateMineResetTimerUI(player: Player): void {
-    const startTime = this.mineResetStartTimes.get(player);
-    if (!startTime) return;
+  private ensureMineResetTickRunning(): void {
+    if (this.mineResetTickInterval) return;
+    this.mineResetTickInterval = setInterval(() => {
+      this.tickMineResetTimers();
+    }, this.MINE_RESET_TICK_MS);
+  }
 
-    // Get the correct duration based on upgrade for current world
-    const playerData = this.getPlayerData(player);
-    const currentWorld = playerData?.currentWorld || 'island1';
-    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
+  private stopMineResetTickIfIdle(): void {
+    if (this.mineResetTickInterval && this.mineResetStartTimes.size === 0 && this.mineResetQueue.length === 0) {
+      clearInterval(this.mineResetTickInterval);
+      this.mineResetTickInterval = undefined;
+    }
+  }
 
-    const elapsed = Date.now() - startTime;
-    const remaining = Math.max(0, duration - elapsed);
+  private queueMineReset(player: Player): void {
+    if (this.mineResetQueued.has(player)) return;
+    this.mineResetQueued.add(player);
+    this.mineResetQueue.push(player);
+  }
+
+  private processMineResetQueue(): void {
+    if (!this.mineResetQueue.length) return;
+
+    const batchSize = Math.min(this.MINE_RESET_RESET_BATCH, this.mineResetQueue.length);
+    for (let i = 0; i < batchSize; i += 1) {
+      const player = this.mineResetQueue.shift();
+      if (!player) break;
+      this.mineResetQueued.delete(player);
+      this.onMineResetTimerExpired(player);
+    }
+  }
+
+  private tickMineResetTimers(): void {
+    const now = Date.now();
+    for (const [player, startTime] of this.mineResetStartTimes.entries()) {
+      const duration = this.mineResetDurations.get(player) ?? this.MINE_RESET_DURATION_MS;
+      const remaining = duration - (now - startTime);
+
+      if (remaining <= 0) {
+        this.queueMineReset(player);
+        this.mineResetStartTimes.delete(player);
+        this.mineResetDurations.delete(player);
+        this.sendMineResetTimerUI(player, 0);
+        continue;
+      }
+
+      this.sendMineResetTimerUI(player, remaining);
+    }
+
+    this.processMineResetQueue();
+    this.stopMineResetTickIfIdle();
+  }
+
+  private sendMineResetTimerUI(player: Player, remainingMs: number): void {
+    const remaining = Math.max(0, remainingMs);
     const seconds = Math.ceil(remaining / 1000);
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -1598,6 +2011,176 @@ export class GameManager {
       timeRemaining: timeString,
       secondsRemaining: seconds,
     });
+  }
+
+  startMineResetTimer(player: Player): void {
+    // Don't start if timer already running
+    if (this.hasActiveMineResetTimer(player)) {
+      return;
+    }
+
+    // Check if player has the upgrade for the current world
+    const playerData = this.getPlayerData(player);
+    const currentWorld = playerData?.currentWorld || 'island1';
+    const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
+    const duration = hasUpgrade ? this.MINE_RESET_DURATION_UPGRADED_MS : this.MINE_RESET_DURATION_MS;
+
+    const startTime = Date.now();
+    this.mineResetStartTimes.set(player, startTime);
+    this.mineResetDurations.set(player, duration);
+
+    // Update UI immediately
+    this.updateMineResetTimerUI(player);
+    this.ensureMineResetTickRunning();
+  }
+
+  /**
+   * Updates the mine reset timer UI for a player
+   * 
+   * @param player - Player to update UI for
+   */
+  private updateMineResetTimerUI(player: Player): void {
+    const startTime = this.mineResetStartTimes.get(player);
+    if (!startTime) return;
+
+    const duration = this.mineResetDurations.get(player) ?? this.MINE_RESET_DURATION_MS;
+    const elapsed = Date.now() - startTime;
+    const remaining = Math.max(0, duration - elapsed);
+    this.sendMineResetTimerUI(player, remaining);
+  }
+
+  // === Timed Reward Timer (15 minute reward) ===
+  private ensureRewardTickRunning(): void {
+    if (this.rewardTickInterval) return;
+    this.rewardTickInterval = setInterval(() => {
+      this.tickRewardTimers();
+    }, this.REWARD_TICK_MS);
+  }
+
+  private stopRewardTickIfIdle(): void {
+    if (!this.rewardTickInterval) return;
+    const hasActive = Array.from(this.rewardStates.values()).some((state) => state.startTime !== null && !state.ready);
+    if (!hasActive) {
+      clearInterval(this.rewardTickInterval);
+      this.rewardTickInterval = undefined;
+    }
+  }
+
+  private getRewardState(player: Player): RewardTimerState {
+    let state = this.rewardStates.get(player);
+    if (!state) {
+      state = { startTime: Date.now(), ready: false };
+      this.rewardStates.set(player, state);
+    }
+    return state;
+  }
+
+  private getRewardRemainingMs(state: RewardTimerState, now: number): number {
+    if (!state.startTime || state.ready) return 0;
+    const elapsed = now - state.startTime;
+    return Math.max(0, this.REWARD_DURATION_MS - elapsed);
+  }
+
+  private tickRewardTimers(): void {
+    const now = Date.now();
+    for (const [player, state] of this.rewardStates.entries()) {
+      if (state.ready || state.startTime === null) continue;
+      const remaining = this.getRewardRemainingMs(state, now);
+      if (remaining <= 0) {
+        state.ready = true;
+        state.startTime = null;
+        this.sendRewardTimerUI(player, 0, true);
+        continue;
+      }
+      this.sendRewardTimerUI(player, remaining, false);
+    }
+    this.stopRewardTickIfIdle();
+  }
+
+  private sendRewardTimerUI(player: Player, remainingMs: number, ready: boolean): void {
+    this.safeSendUI(player, {
+      type: 'REWARD_TIMER',
+      remainingMs: Math.max(0, remainingMs),
+      ready: Boolean(ready),
+    });
+  }
+
+  private buildRewardPetsCache(): Array<{ petId: PetId; name: string; rarity: string; chance: number; multiplier: number }> {
+    if (this.rewardPetsCache) return this.rewardPetsCache;
+    const table = getEggLootTable(EggType.REWARD_15) ?? [];
+    let totalWeight = 0;
+    for (const entry of table) {
+      if (entry.weight > 0) totalWeight += entry.weight;
+    }
+    this.rewardPetsCache = table.map((entry) => {
+      const def = getPetDefinition(entry.petId);
+      const chance = totalWeight > 0 ? (entry.weight / totalWeight) * 100 : 0;
+      return {
+        petId: entry.petId,
+        name: def?.name ?? entry.petId,
+        rarity: def?.rarity ?? 'common',
+        chance,
+        multiplier: def?.multiplier ?? 0,
+      };
+    });
+    return this.rewardPetsCache;
+  }
+
+  sendRewardConfigUI(player: Player): void {
+    const pets = this.buildRewardPetsCache();
+    this.safeSendUI(player, {
+      type: 'REWARD_CONFIG',
+      durationMs: this.REWARD_DURATION_MS,
+      pets,
+    });
+  }
+
+  updateRewardTimerUI(player: Player): void {
+    const state = this.getRewardState(player);
+    const remaining = this.getRewardRemainingMs(state, Date.now());
+    if (remaining <= 0 && !state.ready) {
+      state.ready = true;
+      state.startTime = null;
+      this.sendRewardTimerUI(player, 0, true);
+      return;
+    }
+    this.sendRewardTimerUI(player, remaining, state.ready);
+    if (!state.ready) {
+      this.ensureRewardTickRunning();
+    }
+  }
+
+  resetRewardTimer(player: Player): void {
+    const state = this.getRewardState(player);
+    state.startTime = Date.now();
+    state.ready = false;
+    this.sendRewardTimerUI(player, this.REWARD_DURATION_MS, false);
+    this.ensureRewardTickRunning();
+  }
+
+  isRewardReady(player: Player): boolean {
+    const state = this.rewardStates.get(player);
+    return Boolean(state?.ready);
+  }
+
+  claimTimedReward(player: Player): { success: boolean; message?: string; results?: PetId[] } {
+    const state = this.rewardStates.get(player);
+    if (!state || !state.ready) {
+      return { success: false, message: 'Reward not ready yet.' };
+    }
+
+    const hatchRes = this.hatchingSystem.hatch(player, EggType.REWARD_15, 1);
+    if (!hatchRes.success) {
+      return { success: false, message: hatchRes.message ?? 'Failed to claim reward.' };
+    }
+
+    this.resetRewardTimer(player);
+    return { success: true, results: hatchRes.results ?? [] };
+  }
+
+  clearRewardState(player: Player): void {
+    this.rewardStates.delete(player);
+    this.stopRewardTickIfIdle();
   }
 
   /**
@@ -1636,10 +2219,11 @@ export class GameManager {
     }
 
     // Get upgrade cost based on world (use WorldManager if available, otherwise default)
-    // For now, use hardcoded values
+    // Hardcoded values: island1: 2M, island2: 750B, island3: 2Q, island4: 100Sx
     const UPGRADE_COST =
-      currentWorld === 'island3' ? 2_000_000_000_000_000 :
       currentWorld === 'island2' ? 750_000_000_000 :
+      currentWorld === 'island3' ? 2_000_000_000_000_000 :
+      currentWorld === 'island4' ? 100_000_000_000_000_000_000_000 :
       2_000_000;
     
     if (playerData.gold < UPGRADE_COST) {
@@ -1673,6 +2257,10 @@ export class GameManager {
    * @param player - Player whose timer expired
    */
   private onMineResetTimerExpired(player: Player): void {
+    console.log('[GameManager] onMineResetTimerExpired for player:', player.username);
+
+    // Clear any stale modal states (UI might not send MODAL_CLOSED when state changes)
+    this.clearBlockingModalStates(player);
 
     // Stop timer updates
     this.stopMineResetTimer(player);
@@ -1680,39 +2268,50 @@ export class GameManager {
     // Check if player is in the mine
     const isInMine = this.isPlayerInMine(player);
 
-    // Stop auto modes and mining
+    // Check if player is currently training - if so, don't interrupt their training
+    const isTraining = this.trainingController?.isPlayerTraining(player) ?? false;
+
+    // Stop auto modes and mining (but not if player is training)
     const autoState = this.playerAutoStates.get(player);
+    const wasAutoMineEnabled = Boolean(autoState?.autoMineEnabled);
+    console.log('[GameManager] onMineResetTimerExpired - isTraining:', isTraining, 'autoTrainEnabled:', autoState?.autoTrainEnabled, 'isInMine:', isInMine);
     if (autoState) {
       if (autoState.autoMineEnabled) {
+        // Stop the current loop, but keep auto-mine enabled so we can resume after reset.
         this.stopAutoMine(player);
-        autoState.autoMineEnabled = false;
-        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: false });
       }
-      if (autoState.autoTrainEnabled) {
+      // Don't stop auto-train if player is currently training
+      if (autoState.autoTrainEnabled && !isTraining) {
         this.stopAutoTrain(player);
         autoState.autoTrainEnabled = false;
         player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
       }
     }
 
-    // Stop mining if active
-    this.miningController?.stopMiningLoop(player);
-    // Stop block detection so mining UI clears when timer boots player out
-    this.miningController?.stopBlockDetection(player);
+    // Stop mining if active (but not if player is training - they use the same animation)
+    if (!isTraining) {
+      this.miningController?.stopMiningLoop(player);
+      // Stop block detection so mining UI clears when timer boots player out
+      this.miningController?.stopBlockDetection(player);
+    }
 
     // Only teleport if player is in the mine (they need to be moved out)
     // If they're not in the mine, we don't need to teleport them
-    if (isInMine) {
+    // Also skip teleport if player is training - they're on the surface at a training rock
+    if (isInMine && !isTraining) {
       // Get player's current world to teleport to the correct surface
       const playerData = this.getPlayerData(player);
       const currentWorldId = playerData?.currentWorld || 'island1';
       const worldConfig = WorldRegistry.getWorldConfig(currentWorldId);
       const spawnPoint = worldConfig?.spawnPoint || { x: 0, y: 10, z: 0 };
-      
+
       // Teleport to surface of the current world
       this.teleportPlayer(player, spawnPoint);
 
       // Mark player as not in the mine (disables mining and raycasting)
+      this.setPlayerInMine(player, false);
+    } else if (isInMine && isTraining) {
+      // Player is training on surface but isInMine flag was stale - just clear the flag
       this.setPlayerInMine(player, false);
     }
 
@@ -1736,6 +2335,15 @@ export class GameManager {
         isInMine: false,
       });
     }
+
+    // If auto-mine was enabled, resume it after the reset so idle mining continues.
+    if (wasAutoMineEnabled && !isTraining) {
+      setTimeout(() => {
+        const stateNow = this.playerAutoStates.get(player);
+        if (!stateNow?.autoMineEnabled) return;
+        this.startAutoMine(player);
+      }, 1200);
+    }
   }
 
   /**
@@ -1744,19 +2352,15 @@ export class GameManager {
    * @param player - Player to stop timer for
    */
   stopMineResetTimer(player: Player): void {
-    const timer = this.mineResetTimers.get(player);
-    if (timer) {
-      clearTimeout(timer);
-      this.mineResetTimers.delete(player);
-    }
-
-    const interval = this.mineResetTimerIntervals.get(player);
-    if (interval) {
-      clearInterval(interval);
-      this.mineResetTimerIntervals.delete(player);
-    }
-
     this.mineResetStartTimes.delete(player);
+    this.mineResetDurations.delete(player);
+
+    if (this.mineResetQueued.has(player)) {
+      this.mineResetQueued.delete(player);
+      this.mineResetQueue = this.mineResetQueue.filter((queuedPlayer) => queuedPlayer !== player);
+    }
+
+    this.stopMineResetTickIfIdle();
   }
 
   /**
@@ -1770,17 +2374,27 @@ export class GameManager {
     if (!playerEntity) return;
 
     // Use setPosition method if available (like TrainingController does)
+    let didTeleport = false;
     if (typeof (playerEntity as any).setPosition === 'function') {
       (playerEntity as any).setPosition(position);
-      return;
+      didTeleport = true;
     }
 
     // Fallback: try rigidBody.setPosition
     const rigidBody = (playerEntity as any).rawRigidBody;
-    if (rigidBody && typeof rigidBody.setPosition === 'function') {
+    if (!didTeleport && rigidBody && typeof rigidBody.setPosition === 'function') {
       rigidBody.setPosition(position);
-    } else {
+      didTeleport = true;
+    }
 
+    // Reset velocity so players don't keep falling after teleport (fixes falling-through-world issue)
+    if (rigidBody) {
+      if (typeof rigidBody.setLinvel === 'function') {
+        rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      if (typeof rigidBody.setAngvel === 'function') {
+        rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
     }
   }
 
@@ -1851,6 +2465,15 @@ export class GameManager {
     // Stop mine reset timer
     this.stopMineResetTimer(player);
 
+    // Clear timed reward state
+    this.clearRewardState(player);
+
+    // Final leaderboard snapshot before removing player data
+    const playerDataBeforeCleanup = this.playerDataMap.get(player);
+    if (playerDataBeforeCleanup) {
+      this.leaderboardManager.updatePlayerScores(player, playerDataBeforeCleanup);
+    }
+
     // Save player data before cleanup
     await this.savePlayerData(player);
     
@@ -1863,6 +2486,8 @@ export class GameManager {
 
     this.trainingController?.cleanupPlayer(player);
     this.miningController?.cleanupPlayer(player);
+    this.petVisualManager.cleanupPlayer(player);
+    this.tutorialManager.cleanupPlayer(player);
     this.playerDataMap.delete(player);
     this.playerAutoStates.delete(player);
     this.playerInMineStates.delete(player);
@@ -1883,6 +2508,16 @@ export class GameManager {
       clearInterval(this.periodicSaveInterval);
       this.periodicSaveInterval = undefined;
     }
+
+    if (this.mineResetTickInterval) {
+      clearInterval(this.mineResetTickInterval);
+      this.mineResetTickInterval = undefined;
+    }
+
+    if (this.rewardTickInterval) {
+      clearInterval(this.rewardTickInterval);
+      this.rewardTickInterval = undefined;
+    }
     
     // Clear all save timers
     for (const timer of this.saveTimers.values()) {
@@ -1890,8 +2525,14 @@ export class GameManager {
     }
     this.saveTimers.clear();
     
+    this.leaderboardManager.cleanup();
     this.trainingController?.cleanup();
     this.miningController?.cleanup();
+    this.petVisualManager.cleanup();
+  }
+
+  async asyncCleanup(): Promise<void> {
+    await this.leaderboardManager.forceFlush();
   }
 
   /**
@@ -2065,8 +2706,63 @@ export class GameManager {
   }
 
   /**
+   * Builds the shared mine shaft for Island 4 (Snow World)
+   */
+  buildSharedMineShaftForIsland4(): void {
+    const bounds = ISLAND4_MINING_AREA_BOUNDS;
+    const topY = ISLAND4_SHARED_MINE_SHAFT.topY;
+    const bottomY = ISLAND4_SHARED_MINE_SHAFT.bottomY + 1; // carve down to bottomY inclusive
+    const wallMinX = bounds.minX - 1;
+    const wallMaxX = bounds.maxX + 1;
+    const wallMinZ = bounds.minZ - 1;
+    const wallMaxZ = bounds.maxZ + 1;
+    const snowId = 100; // snow block for island 4
+    const voidId = 2; // coal-block (black)
+
+    // Carve interior to air
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        for (let y = topY; y >= bottomY; y--) {
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, 0);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Build snow walls around the hole for all carved depths
+    for (let y = topY; y >= bottomY; y--) {
+      for (let x = wallMinX; x <= wallMaxX; x++) {
+        for (let z = wallMinZ; z <= wallMaxZ; z++) {
+          const isWall = x === wallMinX || x === wallMaxX || z === wallMinZ || z === wallMaxZ;
+          if (!isWall) continue;
+          try {
+            this.world.chunkLattice.setBlock({ x, y, z }, snowId);
+          } catch (err) {
+
+          }
+        }
+      }
+    }
+
+    // Place void floor across the whole mining area one level below carve depth
+    const voidY = bottomY - 1;
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+        try {
+          this.world.chunkLattice.setBlock({ x, y: voidY, z }, voidId);
+        } catch (err) {
+
+        }
+      }
+    }
+  }
+
+  /**
    * Starts per-player watcher that teleports them to their personal mine when they reach the shaft bottom
-   * Checks Island 1, Island 2, and Island 3 mineshafts
+   * Checks Island 1, Island 2, Island 3, and Island 4 mineshafts
    */
   startMineEntranceWatch(player: Player): void {
     // Clear existing
@@ -2132,6 +2828,22 @@ export class GameManager {
         this.enterPersonalMine(player);
         return;
       }
+
+      // Check Island 4 mineshaft
+      const shaft4 = ISLAND4_SHARED_MINE_SHAFT;
+      const inBounds4 =
+        pos.x >= shaft4.bounds.minX && pos.x <= shaft4.bounds.maxX &&
+        pos.z >= shaft4.bounds.minZ && pos.z <= shaft4.bounds.maxZ;
+
+      if (inBounds4 && pos.y <= shaft4.teleportThresholdY) {
+        const last = this.mineEntranceCooldowns.get(player) ?? 0;
+        if (now - last < this.MINE_ENTRANCE_COOLDOWN_MS) {
+          return;
+        }
+        this.mineEntranceCooldowns.set(player, now);
+        this.enterPersonalMine(player);
+        return;
+      }
     }, 250);
 
     this.mineEntranceIntervals.set(player, interval);
@@ -2162,22 +2874,28 @@ export class GameManager {
       return { success: false, message: 'World already unlocked' };
     }
 
-    // Check unlock requirement
-    if (worldConfig.unlockRequirement.type === 'wins') {
-      if (playerData.wins < worldConfig.unlockRequirement.amount) {
-        return { 
-          success: false, 
-          message: `Need ${worldConfig.unlockRequirement.amount} wins to unlock this world` 
+    // Check unlock requirement (trophies)
+    let cost = 0;
+    if (worldConfig.unlockRequirement.type === 'trophies') {
+      cost = worldConfig.unlockRequirement.amount ?? 0;
+      if (playerData.trophies < cost) {
+        return {
+          success: false,
+          message: `Need ${cost} trophies to unlock this world`,
         };
       }
     }
 
-    // Unlock the world
+    // Unlock the world + spend trophies
     if (!unlockedWorlds.includes(worldId)) {
       unlockedWorlds.push(worldId);
       playerData.unlockedWorlds = unlockedWorlds;
-      this.updatePlayerData(player, playerData);
     }
+    if (cost > 0) {
+      playerData.trophies = Math.max(0, (playerData.trophies ?? 0) - cost);
+    }
+    this.updatePlayerData(player, playerData);
+    this.sendPowerStatsToUI(player);
 
     return { success: true };
   }
@@ -2190,6 +2908,10 @@ export class GameManager {
    * @returns True if teleported successfully, false otherwise
    */
   teleportToWorld(player: Player, worldId: string): { success: boolean; message?: string } {
+    if (!worldId) {
+      return { success: false, message: 'World id missing' };
+    }
+
     const playerData = this.getPlayerData(player);
     if (!playerData) {
       return { success: false, message: 'Player data not found' };
@@ -2214,6 +2936,9 @@ export class GameManager {
     // Show loading screen and suppress input during world switch
     this.setPlayerLoading(player, true);
 
+    // Stop training if player is currently training (prevents training loop from snapping them back)
+    this.trainingController?.stopTraining(player);
+
     // Stop mining and block detection when leaving current mines
     this.miningController?.stopMiningLoop(player);
     this.miningController?.stopBlockDetection(player);
@@ -2231,32 +2956,40 @@ export class GameManager {
     this.stopMineResetTimer(player);
 
     // Hide timer and depth HUD when changing worlds (timer hasn't started yet)
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINE_RESET_TIMER',
       timeRemaining: null, // This will hide the timer UI
     });
     
     // Reset depth counter display (will show again when player enters mines)
-    player.ui.sendData({
+    this.safeSendUI(player, {
       type: 'MINING_DEPTH_COUNTER',
       depth: 0,
     });
 
-    // Update current world first so mine generation uses the correct world
-    playerData.currentWorld = worldId;
-    this.updatePlayerData(player, playerData);
+    try {
+      // Clear old mine while still in the current world (prevents orphaned mines)
+      this.miningController?.getMiningSystem().resetMineToLevel0(player);
 
-    // Generate mine for the new world before teleporting
-    this.initializePlayerMine(player);
+      // Update current world first so mine generation uses the correct world
+      playerData.currentWorld = worldId;
+      this.updatePlayerData(player, playerData);
+      this.tutorialManager.onWorldChanged(player);
 
-    // Teleport player to spawn point
-    const spawnPoint = worldConfig.spawnPoint;
-    this.teleportPlayer(player, spawnPoint);
+      // Generate mine for the new world before teleporting
+      this.initializePlayerMine(player);
 
-    // Allow time for mine generation/rendering before removing the loading screen
-    setTimeout(() => {
+      // Teleport player to spawn point
+      const spawnPoint = worldConfig.spawnPoint;
+      this.teleportPlayer(player, spawnPoint);
+
+      // Backend work is done; remove loading immediately
       this.setPlayerLoading(player, false);
-    }, 1500);
+    } catch (error) {
+      console.error('[GameManager] teleportToWorld failed:', error);
+      this.setPlayerLoading(player, false);
+      return { success: false, message: 'Teleport failed' };
+    }
 
     return { success: true };
   }

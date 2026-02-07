@@ -7,16 +7,23 @@
  * Reference: Planning/gameOverview.txt section 6.1, 6.2
  */
 
-import { World, Player, Entity, RigidBodyType } from 'hytopia';
-import { calculateMiningDamage } from '../Stats/StatCalculator';
+import { World, Player, Entity, RigidBodyType, ParticleEmitter, ColliderShape } from 'hytopia';
+import { calculateMiningDamage, getSwingsPerSecond } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
+import { getBonuses } from '../Achievements/Achievements';
 import { OreType, ORE_DATABASE } from './Ore/World1OreData';
+import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
+import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
+import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from './Ore/World4OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BASE_SWING_RATE, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+
+/** Set to true to enable verbose mining debug logging. */
+const DEBUG_MINING = false;
 
 /**
  * Mining block position key (x,y,z)
@@ -26,25 +33,31 @@ type BlockPositionKey = string;
 /**
  * Mining state for a player
  */
+/** Level content type for entity pooling */
+interface LevelContent {
+  type: 'ore' | 'chest';
+  value: string; // Ore type name or ChestType value
+}
+
 interface MiningState {
   /** Map of block positions to their MineBlock instances */
   blockMap: Map<BlockPositionKey, MineBlock>;
-  
+
   /** Map of chest positions to their ChestBlock instances */
   chestMap: Map<BlockPositionKey, ChestBlock>;
-  
+
   /** Currently targeted block position (if any) */
   currentTargetBlock: BlockPositionKey | null;
-  
+
   /** Last hit timestamp (for cooldown) */
   lastHitTime: number;
-  
+
   /** Mining cooldown interval ID */
   miningIntervalId?: NodeJS.Timeout;
-  
+
   /** Current mining depth/level (Y coordinate) */
   currentDepth: number;
-  
+
   /** Set of depths that have been generated */
   generatedDepths: Set<number>;
 
@@ -62,6 +75,30 @@ interface MiningState {
 
   /** Whether win condition has been triggered (prevents multiple triggers) */
   winTriggered?: boolean;
+
+  /** Single BlockEntity representing the mine floor (7×3×7 block) - optimized approach */
+  mineFloorEntity?: Entity;
+
+  /** Whether the current level is a chest (for texture handling) */
+  currentLevelIsChest?: boolean;
+
+  /** Type of current chest (if currentLevelIsChest is true) */
+  currentChestType?: ChestType;
+
+  /** Current ore type for the floor entity (for texture tracking) */
+  currentOreType?: string;
+
+  /** Pool of floor entities, one per ore type - for instant texture display */
+  oreEntityPool: Map<string, Entity>;
+
+  /** Pool of chest entities (basic and golden) - for instant chest display */
+  chestEntityPool: Map<ChestType, Entity>;
+
+  /** Sequence of ore/chest types for generated levels: mineLevel -> content type */
+  levelSequence: Map<number, LevelContent>;
+
+  /** Next occurrence index for each ore type (for efficient repositioning) */
+  nextOccurrence: Map<string, number>;
 }
 
 /**
@@ -90,6 +127,7 @@ export class MiningSystem {
    * Island 1 ores: Block IDs 16-39 from map.json
    * Island 2 ores: Block IDs 45-68 from map.json
    * Island 3 ores: Block IDs 73-96 from map.json
+   * Island 4 ores: Block IDs 103-122 from map.json
    */
   private readonly ORE_TO_BLOCK_ID: Map<string, number> = new Map([
     // Island 1 ores (OreType)
@@ -167,6 +205,27 @@ export class MiningSystem {
     ['cinderop', 94],      // Cinderop
     ['coreflare', 95],     // Coreflare
     ['darkglow', 96],      // Darkglow
+    // Island 4 ores (Snow) - Block IDs 103-122 from map.json
+    [ISLAND4_ORE_TYPE.FROSTBRICK, 103],         // Frostbrick
+    [ISLAND4_ORE_TYPE.SNOWSPICE, 109],          // Snowspice
+    [ISLAND4_ORE_TYPE.TINSEL_LEAD, 110],        // Tinsel Lead
+    [ISLAND4_ORE_TYPE.EVERGREEN_CRYSTAL, 104],  // Evergreen Crystal
+    [ISLAND4_ORE_TYPE.ICICLE_STEEL, 111],       // Icicle Steel
+    [ISLAND4_ORE_TYPE.CANDYCANE_VEIN, 112],     // Candycane Vein
+    [ISLAND4_ORE_TYPE.HEARTHFIRE_CRYSTAL, 113], // Hearthfire Crystal
+    [ISLAND4_ORE_TYPE.STARFLARE, 105],          // Starflare
+    [ISLAND4_ORE_TYPE.NORTHSTAR_PLATINUM, 114], // Northstar Platinum
+    [ISLAND4_ORE_TYPE.TWINKLEITE, 115],         // Twinkleite
+    [ISLAND4_ORE_TYPE.SNOWMOON_ORE, 116],       // Snowmoon Ore
+    [ISLAND4_ORE_TYPE.COAL_OF_YULE, 106],       // Coal of Yule
+    [ISLAND4_ORE_TYPE.RUDOLPHS_EYE, 117],       // Rudolph's Eye
+    [ISLAND4_ORE_TYPE.YULETIDE_EMBERSTONE, 118], // Yuletide Emberstone
+    [ISLAND4_ORE_TYPE.JINGLEVOLT_ORE, 119],     // Jinglevolt Ore
+    [ISLAND4_ORE_TYPE.MOLTEN_COCOA_STONE, 107], // Molten Cocoa Stone
+    [ISLAND4_ORE_TYPE.CANDLELIGHT_CRYSTAL, 120], // Candlelight Crystal
+    [ISLAND4_ORE_TYPE.AURORALIGHT_ORE, 121],    // Auroralight Ore
+    [ISLAND4_ORE_TYPE.FIRESNOW_CORE, 122],      // Firesnow Core
+    [ISLAND4_ORE_TYPE.SUGARPLUM_QUARTZ, 108],   // Sugarplum Quartz
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
@@ -190,6 +249,12 @@ export class MiningSystem {
   
   /** Maximum mining distance */
   private readonly MAX_MINING_DISTANCE = 250;
+
+  /** Initial mine levels to generate when (re)building a mine */
+  private readonly INITIAL_MINE_LEVELS = 40;
+
+  /** Mine levels to clear on reset (keeps deeper levels for perf) */
+  private readonly RESET_CLEAR_MINE_LEVELS = 80;
 
   /** Whether to spawn manual debug markers for raycasts */
   private readonly DEBUG_RAYCAST_MARKERS_ENABLED = false; // Disabled - causes collision issues
@@ -262,7 +327,7 @@ export class MiningSystem {
   /**
    * Sets callback for when player reaches the win condition
    *
-   * @param callback - Function called when player wins (player)
+   * @param callback - Function called when player reaches the bottom (player)
    */
   setWinCallback(callback: (player: Player) => void): void {
     this.onWinCallback = callback;
@@ -284,46 +349,54 @@ export class MiningSystem {
     onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
     isBlockingModalOpen?: () => boolean,
-    isAutoMining: boolean = false
+    isAutoMining: boolean = false,
+    onBlockDestroyed?: (player: Player) => void
   ): void {
     // First check if player is in the mine - if not, do nothing
     const existingState = this.miningStates.get(player);
     if (!existingState) {
       // Player is not in the mine, ignore mining click
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No mining state for player', player.username);
       return;
     }
 
     // Player is in the mine, proceed with mining
     // Check if blocking modal is open (if callback provided)
     if (isBlockingModalOpen && isBlockingModalOpen()) {
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Blocking modal open');
       return;
     }
 
     const playerEntity = this.getPlayerEntity(player);
     if (!playerEntity) {
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player entity');
       return;
     }
-    
+
     // Check if player.camera exists
     if (!player.camera) {
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player camera');
       return;
     }
 
     // Use existing mining state (we already verified it exists above)
     const state = existingState;
 
-    // RATE LIMITING: Enforce swing rate based on pickaxe mining speed
+    // RATE LIMITING: Enforce swing rate based on speed + world curve
     // Calculate minimum time between hits (in milliseconds)
-    // Base rate is 2.0 swings/second (BASE_SWING_RATE)
-    // Pickaxe speed is a percentage increase (e.g., 5.0 = +5%, 30.0 = +30%)
-    // Formula: EffectiveRate = BaseRate × (1 + SpeedBonus / 100)
-    const speedMultiplier = 1 + (pickaxe.miningSpeed / 100);
-    const effectiveHitRate = BASE_SWING_RATE * speedMultiplier; // swings per second
-    const minTimeBetweenHits = 1000 / effectiveHitRate; // milliseconds between hits
-    
+    // Formula: SPS = getSwingsPerSecond(speed, world)
+    const worldId = this.getPlayerWorldId(player);
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const pd = this.getPlayerDataCallback?.(player);
+    const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
+    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1); // swings per second
+    const minTimeBetweenHits = Math.max(1, Math.ceil(1000 / effectiveHitRate)); // milliseconds between hits
+    // Helpful debug (can be noisy if enabled elsewhere):
+    // console.log('[MiningSystem] SPS calc:', { worldId, worldNumber, speed: pickaxe.miningSpeed, effectiveHitRate, minTimeBetweenHits });
+
     const currentTime = Date.now();
     const timeSinceLastHit = currentTime - state.lastHitTime;
-    
+
     // If not enough time has passed, ignore this click (prevents spam clicking)
     if (timeSinceLastHit < minTimeBetweenHits) {
       // Click too soon - rate limit enforced
@@ -333,64 +406,100 @@ export class MiningSystem {
     // Get player data for power calculation
     const playerData = this.getPlayerDataCallback?.(player);
     if (!playerData) {
-
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: No player data');
       return;
     }
 
-    // Perform raycast from player's feet straight down
-    // This allows the player to look around while mining the block they're standing on
-    const playerFeetPosition = {
-      x: playerEntity.position.x,
-      y: playerEntity.position.y, // Player's feet position
-      z: playerEntity.position.z,
-    };
+    // PlayerData.power is stored as a string (BigInt-friendly in JSON). Coerce once for damage calcs.
+    const powerNumRaw = Number(playerData.power || 0);
+    const powerNum = Number.isFinite(powerNumRaw) ? powerNumRaw : 0;
 
-    // Raycast straight down to check what block the player is standing on
-    const direction = { x: 0, y: -1, z: 0 }; // Straight down
+    let resolvedBlockCoordinate: { x: number; y: number; z: number };
+    let hitDepth: number;
 
-    // Draw manual debug markers so the player can see the ray in-game
-    this.drawRaycastDebugLine(playerFeetPosition, direction, 5); // Only need to check a few blocks down
+    if (isAutoMining) {
+      const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
+      const topY = this.mineLevelToTopY(currentMineLevel);
+      const center = this.getMineCenter(player);
+      resolvedBlockCoordinate = {
+        x: Math.floor(center.x),
+        y: topY,
+        z: Math.floor(center.z),
+      };
+      hitDepth = resolvedBlockCoordinate.y;
+    } else {
+      // Perform raycast from player's feet straight down
+      // This allows the player to look around while mining the block they're standing on
+      const playerFeetPosition = {
+        x: playerEntity.position.x,
+        y: playerEntity.position.y, // Player's feet position
+        z: playerEntity.position.z,
+      };
 
-    // Perform raycast straight down from player's feet
-    // Exclude player's own rigid body to prevent self-hits
-    const hitResult = this.world.simulation.raycast(
-      playerFeetPosition,
-      direction,
-      5, // Only need to check a few blocks below feet
-      {
-        filterExcludeRigidBody: (playerEntity as any).rawRigidBody,
+      // Raycast straight down to check what block the player is standing on
+      const direction = { x: 0, y: -1, z: 0 }; // Straight down
+
+      const petRigidBodyHandles = this.getPetRigidBodyHandles();
+      // Prefer colliderMap-based filtering if available: it's the most reliable way
+      // to ensure mining raycasts only hit voxel blocks (and never pets/other entities).
+      const colliderMap = (this.world.simulation as any)?.colliderMap;
+
+      // Draw manual debug markers so the player can see the ray in-game
+      // Increased so mining still works reliably if the player is slightly above the block (step-up, jitter, etc.)
+      this.drawRaycastDebugLine(playerFeetPosition, direction, 30);
+
+      // Perform raycast straight down from player's feet
+      // Exclude player's own rigid body to prevent self-hits
+      const hitResult = this.world.simulation.raycast(
+        playerFeetPosition,
+        direction,
+        30, // Increased: allow mining when slightly above the block
+        {
+          filterExcludeRigidBody: (playerEntity as any).rawRigidBody,
+          filterPredicate: (collider) => {
+            const handle = (collider as any)?.handle;
+
+            // If colliderMap exists, only allow colliders that represent voxel blocks.
+            // This prevents pets (and any other entities) from blocking mining rays.
+            if (colliderMap?.getColliderHandleBlockType && typeof handle === 'number') {
+              return !!colliderMap.getColliderHandleBlockType(handle);
+            }
+
+            // Fallback: exclude pet rigid bodies by handle.
+            const parentHandle = (collider as any).parent?.();
+            if (typeof parentHandle === 'number' && petRigidBodyHandles.has(parentHandle)) return false;
+            return true;
+          },
+        }
+      );
+      
+      if (!hitResult) {
+        // No hit, clear target
+        if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Raycast returned no hit at position', playerFeetPosition);
+        state.currentTargetBlock = null;
+        return;
       }
-    );
-    
-    if (!hitResult) {
-      // No hit, clear target
-      state.currentTargetBlock = null;
-      return;
-    }
 
-    // Check if hit block is a mining block
-    const hitBlock = hitResult.hitBlock;
-    const hitPoint = hitResult.hitPoint;
-    const blockGlobalCoordinate = hitBlock?.globalCoordinate;
-    
-    if (!blockGlobalCoordinate && !hitPoint) {
-      return;
+      // Check if hit block is a mining block
+      const hitBlock = hitResult.hitBlock;
+      const hitPoint = hitResult.hitPoint;
+      const blockGlobalCoordinate = hitBlock?.globalCoordinate;
+      
+      if (!blockGlobalCoordinate && !hitPoint) {
+        return;
+      }
+      
+      const rawCoordinate = blockGlobalCoordinate ?? hitPoint!;
+      resolvedBlockCoordinate = {
+        x: Math.floor(rawCoordinate.x),
+        y: Math.floor(rawCoordinate.y),
+        z: Math.floor(rawCoordinate.z),
+      };
+      hitDepth = resolvedBlockCoordinate.y;
     }
-    
-    const rawCoordinate = blockGlobalCoordinate ?? hitPoint!;
-    const resolvedBlockCoordinate = {
-      x: Math.floor(rawCoordinate.x),
-      y: Math.floor(rawCoordinate.y),
-      z: Math.floor(rawCoordinate.z),
-    };
-
-    // Get player's current depth (floor of Y position)
-    const playerDepth = Math.floor(playerEntity.position.y);
-    const hitDepth = resolvedBlockCoordinate.y;
     
     // Check if block is within the mining area bounds (X and Z)
     // Only blocks in the mining area can take damage
-    const worldId = this.getPlayerWorldId(player);
     const offsetBounds = this.getOffsetBounds(state.offset, worldId);
     const isInMiningArea = 
       resolvedBlockCoordinate.x >= offsetBounds.minX &&
@@ -400,6 +509,7 @@ export class MiningSystem {
     
     if (!isInMiningArea) {
       // Block is not in mining area, cannot mine it
+      if (DEBUG_MINING) console.log('[MiningSystem] handleMiningClick: Block not in mining area', resolvedBlockCoordinate, 'bounds:', offsetBounds);
       state.currentTargetBlock = null;
       return;
     }
@@ -407,7 +517,7 @@ export class MiningSystem {
     // Check if player is mining the level they're standing on
     // Player should only be able to mine blocks within their current mine level (3 blocks tall)
     const currentMineLevel = this.yCoordinateToMineLevel(state.currentDepth);
-    const isMiningCurrentLevel = this.isYCoordinateInMineLevel(hitDepth, currentMineLevel);
+    const isMiningCurrentLevel = isAutoMining ? true : this.isYCoordinateInMineLevel(hitDepth, currentMineLevel);
     
     if (!isMiningCurrentLevel) {
       // Can't mine blocks that aren't in the current mine level
@@ -422,9 +532,9 @@ export class MiningSystem {
       this.ensureLevelsAheadOfPlayer(player, state, currentPickaxe);
     }
 
-    // Check if this mine level has a chest, unminable gold block, or a normal ore block
+    // Check if this mine level has a chest, win block, or a normal ore block
     // Use mine level for the key so all 3 Y coordinates share the same block
-    const hitMineLevel = this.yCoordinateToMineLevel(hitDepth);
+    const hitMineLevel = isAutoMining ? currentMineLevel : this.yCoordinateToMineLevel(hitDepth);
     const chestKey = `chest_level_${hitMineLevel}`;
     const miningAreaKey = `mining_area_level_${hitMineLevel}`;
     const unminableGoldKey = `unminable_gold_level_${hitMineLevel}`;
@@ -433,7 +543,7 @@ export class MiningSystem {
     const unminableGoldBlock = state.blockMap.get(unminableGoldKey);
 
     if (unminableGoldBlock) {
-      // This is the unminable gold block at depth 1000
+      // This is the win block at depth 1000
       // Win condition is now triggered automatically by block detection, not by mining
       state.currentTargetBlock = unminableGoldKey;
 
@@ -441,7 +551,7 @@ export class MiningSystem {
       player.ui.sendData({
         type: 'MINING_UPDATE',
         damage: 0,
-        currentOreName: 'Unminable Gold Block',
+        currentOreName: 'Congratulations',
         blockHP: unminableGoldBlock.currentHP,
         maxHP: unminableGoldBlock.maxHP,
         isChest: false,
@@ -458,7 +568,7 @@ export class MiningSystem {
       state.currentTargetBlock = chestKey;
       
       // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
-      const baseDamage = calculateMiningDamage(playerData.power);
+      const baseDamage = calculateMiningDamage(powerNum);
       
       // Apply More Damage upgrade multiplier and round to integer
       const damage = Math.round(baseDamage * damageMultiplier);
@@ -512,39 +622,25 @@ export class MiningSystem {
           maxZ: mineBounds.maxZ,
           y: middleY + 0.5, // Center of the middle block
         };
-        // Use stone ore type for neutral brown debris color (or could use a custom chest color)
-        this.debrisManager.spawnDebris(OreType.STONE, areaBounds, 20);
+        // Skip debris during auto mining to keep SPS consistent under load.
+        if (!isAutoMining) {
+          // Use stone ore type for neutral brown debris color (or could use a custom chest color)
+          this.debrisManager.spawnDebris(OreType.STONE, areaBounds, 20);
+        }
         
         // Remove chest from map
         state.chestMap.delete(chestKey);
         state.currentTargetBlock = null;
-        
-        // Remove all chest blocks in the mining area at all 3 Y coordinates of this mine level from the world
-        let removedCount = 0;
-        const worldId = this.getPlayerWorldId(player);
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-        for (const yCoord of levelYCoords) {
-          for (const basePosition of miningPositions) {
-            const blockPosition = {
-              x: basePosition.x + state.offset.x,
-              y: yCoord,
-              z: basePosition.z + state.offset.z,
-            };
-            try {
-              this.world.chunkLattice.setBlock(blockPosition, 0);
-              removedCount++;
-            } catch (error) {
-
-            }
-          }
-        }
 
         // Player falls down to next mine level (drop 3 Y levels)
         const nextMineLevel = hitMineLevel + 1;
         const nextTopY = this.mineLevelToTopY(nextMineLevel);
         state.currentDepth = nextTopY;
-        
-        // Generate blocks ahead of player if needed (keep 20 levels ahead)
+
+        // Transition floor entity to next level (2 operations instead of ~294 setBlock calls)
+        this.transitionFloorEntityToNextLevel(player, state, nextMineLevel, pickaxe);
+
+        // Generate blocks ahead of player if needed (keep 20 levels ahead - walls only)
         this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
         
         // Teleport player down to next mine level (position on top of the 3-block level)
@@ -563,12 +659,15 @@ export class MiningSystem {
           // Fallback: try to set position directly on entity if rigidBody method doesn't work
 
         }
+
+        // Notify callback that block was destroyed (for animation reset)
+        onBlockDestroyed?.(player);
       }
-      
+
       state.lastHitTime = Date.now();
       return; // Chest handled, exit early
     }
-    
+
     // Normal ore block mining (existing logic)
     // Get shared block for entire mining area at this mine level
     // All levels are pre-generated, so this should always exist
@@ -586,10 +685,11 @@ export class MiningSystem {
     state.currentTargetBlock = miningAreaKey;
 
     // Calculate base damage (REBALANCED: damage comes from Power only, not pickaxe)
-    const baseDamage = calculateMiningDamage(playerData.power);
-    
+    const baseDamage = calculateMiningDamage(powerNum);
+
     // Apply More Damage upgrade multiplier and round to integer
     const damage = Math.round(baseDamage * damageMultiplier);
+    if (DEBUG_MINING) console.log('[MiningSystem] Mining! Power:', playerData.power, 'BaseDamage:', baseDamage, 'FinalDamage:', damage, 'Block:', block.oreType, 'HP:', block.currentHP);
     
     // Deal damage to shared block
     const blockDestroyed = block.takeDamage(damage);
@@ -631,38 +731,25 @@ export class MiningSystem {
         maxZ: mineBounds.maxZ,
         y: middleY + 0.5, // Center of the middle block
       };
-      this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
-      
+      // Skip debris during auto mining to keep SPS consistent under load.
+      if (DEBUG_MINING) console.log('[MiningSystem] Floor broken! isAutoMining:', isAutoMining, 'minedOre:', minedOre);
+      if (!isAutoMining) {
+        this.debrisManager.spawnDebris(minedOre, areaBounds, 20);
+      }
+
       // Remove shared block from map
       state.blockMap.delete(miningAreaKey);
       state.currentTargetBlock = null;
-      
-      // Remove all blocks in the mining area at all 3 Y coordinates of this mine level from the world
-      // All blocks break at the same time (all 3 layers)
-      let removedCount = 0;
-      const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-      for (const yCoord of levelYCoords) {
-        for (const basePosition of miningPositions) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: yCoord,
-            z: basePosition.z + state.offset.z,
-          };
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, 0);
-            removedCount++;
-          } catch (error) {
-
-          }
-        }
-      }
 
       // Player falls down to next mine level (drop 3 Y levels)
       const nextMineLevel = hitMineLevel + 1;
       const nextTopY = this.mineLevelToTopY(nextMineLevel);
       state.currentDepth = nextTopY;
-      
-      // Generate blocks ahead of player if needed (keep 20 levels ahead)
+
+      // Transition floor entity to next level (2 operations instead of ~294 setBlock calls)
+      this.transitionFloorEntityToNextLevel(player, state, nextMineLevel, pickaxe);
+
+      // Generate blocks ahead of player if needed (keep 20 levels ahead - walls only)
       this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
       
       // Teleport player down to next mine level (position on top of the 3-block level)
@@ -672,7 +759,10 @@ export class MiningSystem {
         y: nextTopY + 1, // Position player on top of next level
         z: center.z,
       };
-      
+
+      // Spawn floor break particle effect
+      this.spawnFloorBreakEffect(player, minedOre, nextTopY);
+
       // Use setPosition on the rigid body to move the player
       const rigidBody = (playerEntity as any).rawRigidBody;
       if (rigidBody && rigidBody.setPosition) {
@@ -682,7 +772,10 @@ export class MiningSystem {
         // The player will fall naturally due to physics, but we can at least set the position
 
       }
-      
+
+      // Notify callback that block was destroyed (for animation reset)
+      onBlockDestroyed?.(player);
+
       // No need to generate levels ahead - all 1000 levels are already generated!
     }
 
@@ -705,47 +798,82 @@ export class MiningSystem {
     onOreMined: (player: Player, oreType: string, amount: number) => void,
     onDamageDealt: (player: Player, damage: number, currentOre: string | null, blockHP: number, maxHP: number, isChest?: boolean, chestType?: string | null, gemReward?: number | null) => void,
     damageMultiplier: number = 1.0,
-    isBlockingModalOpen?: () => boolean
+    isBlockingModalOpen?: () => boolean,
+    onBlockDestroyed?: (player: Player) => void
   ): void {
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop called for player:', player.username);
     // Stop any existing loop
     this.stopMiningLoop(player);
 
     // Ensure state exists and initial level is generated
     this.getOrCreateState(player, pickaxe);
 
-    // Get mining speed (hits per second)
-    // Base rate is 2.0 swings/second (BASE_SWING_RATE)
-    // Pickaxe speed is a percentage increase (e.g., 5.0 = +5%, 30.0 = +30%)
-    // Formula: EffectiveRate = BaseRate × (1 + SpeedBonus / 100)
-    const speedMultiplier = 1 + (pickaxe.miningSpeed / 100);
-    const effectiveHitRate = BASE_SWING_RATE * speedMultiplier;
-    const hitInterval = 1000 / effectiveHitRate; // Convert to milliseconds
-    
-    // Safety check: ensure hitInterval is a valid number (not Infinity or NaN)
-    if (!isFinite(hitInterval) || hitInterval <= 0) {
+    // Get mining speed (hits per second) from speed + world curve
+    // Formula: SPS = getSwingsPerSecond(speed, world)
+    const worldId = this.getPlayerWorldId(player);
+    const worldNumber = this.getWorldNumberFromId(worldId);
+    const pd = this.getPlayerDataCallback?.(player);
+    const miningSpeedMult = pd ? (getBonuses(pd).miningSpeedMultiplier ?? 1) : 1;
+    const effectiveHitRate = getSwingsPerSecond(pickaxe.miningSpeed, worldNumber) * (Number.isFinite(miningSpeedMult) && miningSpeedMult > 0 ? miningSpeedMult : 1);
+    const hitIntervalMs = 1000 / effectiveHitRate;
+    const maxCatchupHits = Math.max(10, Math.ceil(effectiveHitRate * 5)); // Allow up to ~5s of catch-up
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: hitInterval=', hitIntervalMs, 'ms');
 
+    // Safety check: ensure hitInterval is a valid number (not Infinity or NaN)
+    if (!isFinite(hitIntervalMs) || hitIntervalMs <= 0) {
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Invalid hitInterval, aborting');
       return; // Don't start mining loop with invalid interval
     }
 
     // Perform mining hits at regular intervals
+    let hitCount = 0;
     const performHit = () => {
+      hitCount++;
       const currentState = this.miningStates.get(player);
       if (!currentState) {
-
+        if (DEBUG_MINING) console.log('[MiningSystem] performHit: No state for player, hit #', hitCount);
         return;
       }
 
+      // Log every 5th hit to avoid spam
+      if (hitCount <= 3 || hitCount % 10 === 0) {
+        if (DEBUG_MINING) console.log('[MiningSystem] performHit #', hitCount, 'for player:', player.username, 'depth:', currentState.currentDepth);
+      }
+
       // Perform mining click (auto-mining mode)
-      this.handleMiningClick(player, pickaxe, onOreMined, onDamageDealt, damageMultiplier, isBlockingModalOpen, true);
+      this.handleMiningClick(player, pickaxe, onOreMined, onDamageDealt, damageMultiplier, isBlockingModalOpen, true, onBlockDestroyed);
     };
 
     // Perform first hit immediately
+    if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Performing first hit');
     performHit();
+
+    let lastTick = Date.now();
+    let accumulatorMs = 0;
+    const tickIntervalMs = Math.max(16, Math.min(100, Math.floor(hitIntervalMs / 2)));
+
+    const tick = () => {
+      const now = Date.now();
+      const dt = now - lastTick;
+      lastTick = now;
+      accumulatorMs += dt;
+
+      // Allow multiple hits in one tick to catch up after lag, but cap to avoid spirals.
+      let loops = 0;
+      while (accumulatorMs >= hitIntervalMs && loops < maxCatchupHits) {
+        accumulatorMs -= hitIntervalMs;
+        performHit();
+        loops++;
+      }
+    };
 
     // Set up interval for continuous hits
     const currentState = this.miningStates.get(player);
     if (currentState) {
-      currentState.miningIntervalId = setInterval(performHit, hitInterval);
+      currentState.miningIntervalId = setInterval(tick, tickIntervalMs);
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: Mining interval set up');
+    } else {
+      if (DEBUG_MINING) console.log('[MiningSystem] startMiningLoop: No state after getOrCreateState, cannot set interval!');
     }
   }
 
@@ -830,12 +958,14 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData
   ): { x: number; y: number; z: number } {
+    if (DEBUG_MINING) console.log('[MiningSystem] preparePlayerMine called for player:', player.username);
     const state = this.getOrCreateState(player, pickaxe);
     const center = this.getMineCenter(player);
-    
+    if (DEBUG_MINING) console.log('[MiningSystem] preparePlayerMine: state currentDepth:', state.currentDepth, 'center:', center);
+
     // Reset first block mined flag when entering mine (so timer can start on first block)
     this.firstBlockMined.delete(player);
-    
+
     return { x: center.x, y: state.currentDepth + 1, z: center.z };
   }
 
@@ -847,54 +977,85 @@ export class MiningSystem {
    * @param player - Player whose mine to reset
    */
   resetMineToLevel0(player: Player): void {
+    if (DEBUG_MINING) console.log('[MiningSystem] resetMineToLevel0 called for player:', player.username);
     const state = this.miningStates.get(player);
-    if (!state) return;
+    if (!state) {
+      if (DEBUG_MINING) console.log('[MiningSystem] resetMineToLevel0: No mining state found!');
+      return;
+    }
 
     const startTime = Date.now();
 
-    // Clear all mining blocks (walls stay permanent)
-    // Clear from mine level 0 down to level 333 (334 mine levels, approximately 1000 Y coordinates)
-    const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-    const maxMineLevelToClear = 333;
-    for (let mineLevel = 0; mineLevel <= maxMineLevelToClear; mineLevel++) {
-      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
-      for (const yCoord of levelYCoords) {
-        for (const basePosition of miningPositions) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: yCoord,
-            z: basePosition.z + state.offset.z,
-          };
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, 0); // Set to air
-          } catch (error) {
-            // Silently fail
-          }
+    // Initialize new fields for legacy states that may not have them
+    if (!state.oreEntityPool) state.oreEntityPool = new Map();
+    if (!state.chestEntityPool) state.chestEntityPool = new Map();
+    if (!state.levelSequence) state.levelSequence = new Map();
+    if (!state.nextOccurrence) state.nextOccurrence = new Map();
+
+    // Despawn the old floor entity if it exists (legacy single-entity approach)
+    if (state.mineFloorEntity) {
+      try {
+        if (state.mineFloorEntity.isSpawned) {
+          state.mineFloorEntity.despawn();
         }
+      } catch (error) {
+        // Entity might already be despawned
       }
+      state.mineFloorEntity = undefined;
     }
 
-    // Reset state
+    // Despawn all ore entity pool entities
+    for (const entity of state.oreEntityPool.values()) {
+      try {
+        if (entity.isSpawned) {
+          entity.despawn();
+        }
+      } catch (error) {
+        // Entity might already be despawned
+      }
+    }
+    state.oreEntityPool.clear();
+
+    // Despawn all chest entity pool entities
+    for (const entity of state.chestEntityPool.values()) {
+      try {
+        if (entity.isSpawned) {
+          entity.despawn();
+        }
+      } catch (error) {
+        // Entity might already be despawned
+      }
+    }
+    state.chestEntityPool.clear();
+
+    // Clear level sequence and next occurrence tracking
+    state.levelSequence.clear();
+    state.nextOccurrence.clear();
+
+    // Reset state (no floor blocks to clear - we use entity pool now)
     state.blockMap.clear();
     state.chestMap.clear();
     state.generatedDepths.clear();
     state.currentDepth = MINE_DEPTH_START;
     state.deepestGeneratedDepth = MINE_DEPTH_START;
     state.currentTargetBlock = null;
-    state.winTriggered = false; // Reset win trigger flag
+    state.winTriggered = false;
+    state.currentLevelIsChest = undefined;
+    state.currentChestType = undefined;
+    state.currentOreType = undefined;
     // DON'T reset ceilingBuilt or bottomFloorDepth - walls stay permanent
 
     // Reset first block mined flag (so timer can start again on next entry)
     this.firstBlockMined.delete(player);
 
-    // Regenerate initial 20 levels with new ores (will generate more ahead as player mines)
+    // Regenerate initial levels with new ores and create new floor entity
     const pickaxe = this.getPlayerPickaxe(player);
     if (pickaxe) {
       this.generateInitialMiningLevels(player, state, pickaxe);
     }
 
     const elapsed = Date.now() - startTime;
-
+    if (DEBUG_MINING) console.log('[MiningSystem] resetMineToLevel0 completed in', elapsed, 'ms');
   }
 
   /**
@@ -914,9 +1075,53 @@ export class MiningSystem {
    * @param player - Player who left
    */
   cleanupPlayer(player: Player): void {
+    if (DEBUG_MINING) console.log('[MiningSystem] cleanupPlayer called for player:', player.username);
     this.stopMiningLoop(player);
+
+    // Despawn all entities before deleting state
+    const state = this.miningStates.get(player);
+    if (state) {
+      // Despawn legacy single floor entity
+      if (state.mineFloorEntity) {
+        try {
+          if (state.mineFloorEntity.isSpawned) {
+            state.mineFloorEntity.despawn();
+          }
+        } catch (error) {
+          // Entity might already be despawned
+        }
+      }
+
+      // Despawn all ore entity pool entities (if pool exists)
+      if (state.oreEntityPool) {
+        for (const entity of state.oreEntityPool.values()) {
+          try {
+            if (entity.isSpawned) {
+              entity.despawn();
+            }
+          } catch (error) {
+            // Entity might already be despawned
+          }
+        }
+      }
+
+      // Despawn all chest entity pool entities (if pool exists)
+      if (state.chestEntityPool) {
+        for (const entity of state.chestEntityPool.values()) {
+          try {
+            if (entity.isSpawned) {
+              entity.despawn();
+            }
+          } catch (error) {
+            // Entity might already be despawned
+          }
+        }
+      }
+    }
+
     this.miningStates.delete(player);
-    
+    if (DEBUG_MINING) console.log('[MiningSystem] Mining state DELETED for player:', player.username);
+
     // Remove all offsets for this player (all worlds)
     const keysToDelete: string[] = [];
     for (const key of this.mineOffsets.keys()) {
@@ -927,7 +1132,7 @@ export class MiningSystem {
     for (const key of keysToDelete) {
       this.mineOffsets.delete(key);
     }
-    
+
     this.firstBlockMined.delete(player);
   }
 
@@ -944,7 +1149,7 @@ export class MiningSystem {
     player: Player,
     pickaxe: PickaxeData
   ): {
-    oreType: OreType | null;
+    oreType: string | null;
     isChest: boolean;
     chestType: string | null;
     blockHP: number;
@@ -968,11 +1173,11 @@ export class MiningSystem {
     const unminableGoldBlock = state.blockMap.get(unminableGoldKey);
 
     if (unminableGoldBlock) {
-      // This is the unminable gold block at depth 1000
+      // This is the win block at depth 1000
       return {
         oreType: null, // Not a regular ore
         isChest: false,
-        chestType: 'Unminable Gold Block', // Special type for UI
+        chestType: 'Congratulations', // Special type for UI
         blockHP: unminableGoldBlock.currentHP,
         maxHP: unminableGoldBlock.maxHP,
         gemReward: null,
@@ -984,7 +1189,9 @@ export class MiningSystem {
       // Initialize HP if not already initialized (needs player damage to calculate)
       // Check if maxHP is 0 (indicates HP hasn't been initialized yet)
       if (chest.maxHP === 0) {
-        const baseDamage = calculateMiningDamage(playerData.power);
+        const powerNumRaw = Number(playerData.power || 0);
+        const powerNum = Number.isFinite(powerNumRaw) ? powerNumRaw : 0;
+        const baseDamage = calculateMiningDamage(powerNum);
         // Get combined damage multiplier (includes More Damage upgrade and miner damage bonus)
         const damageMultiplier = this.getCombinedDamageMultiplierCallback?.(player) ?? 1.0;
         const finalDamage = Math.round(baseDamage * damageMultiplier);
@@ -1045,11 +1252,63 @@ export class MiningSystem {
    * World-aware: Supports both Island 1 and Island 2 ores
    * 
    * @param oreType - Ore type as string (ore type name)
-   * @param worldId - World ID ('island1' or 'island2'), defaults to 'island1'
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
    * @returns Block type ID for the ore
    */
   private getBlockIdForOreType(oreType: string, worldId: string = 'island1'): number {
     return this.ORE_TO_BLOCK_ID.get(oreType) ?? this.MINING_BLOCK_TYPE_ID;
+  }
+
+  /**
+   * Gets the texture URI for a given ore type
+   * Used for the single BlockEntity floor approach
+   *
+   * @param oreType - The ore type to get texture for
+   * @returns Texture URI string for the ore block
+   */
+  private getOreTextureUri(oreType: string): string {
+    const blockId = this.ORE_TO_BLOCK_ID.get(oreType);
+    if (blockId === undefined) {
+      console.log('[MiningSystem] getOreTextureUri: No blockId for oreType', oreType, '- using fallback');
+      return 'blocks/stone.png'; // Fallback
+    }
+
+    const blockType = this.world.blockTypeRegistry.getBlockType(blockId);
+    if (blockType && blockType.textureUri) {
+      const textureUri = blockType.textureUri;
+      // Multi-texture folders need to reference a specific face
+      // Use +y (top face) which shows the ore pattern
+      if (!textureUri.endsWith('.png')) {
+        const resolvedTexture = `${textureUri}/+y.png`;
+        console.log('[MiningSystem] getOreTextureUri:', oreType, '-> blockId:', blockId, '-> texture:', resolvedTexture);
+        return resolvedTexture;
+      }
+      console.log('[MiningSystem] getOreTextureUri:', oreType, '-> blockId:', blockId, '-> texture:', textureUri);
+      return textureUri;
+    }
+
+    console.log('[MiningSystem] getOreTextureUri: No blockType for blockId', blockId, '- using fallback');
+    return 'blocks/stone.png'; // Fallback
+  }
+
+  /**
+   * Gets the texture URI for a chest type
+   *
+   * @param chestType - The chest type (BASIC or GOLDEN)
+   * @returns Texture URI string for the chest block
+   */
+  private getChestTextureUri(chestType: ChestType): string {
+    const blockId = chestType === ChestType.BASIC
+      ? this.BASIC_CHEST_BLOCK_TYPE_ID
+      : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
+
+    const blockType = this.world.blockTypeRegistry.getBlockType(blockId);
+    if (blockType && blockType.textureUri) {
+      return blockType.textureUri;
+    }
+
+    // Fallback - use a visible texture
+    return chestType === ChestType.BASIC ? 'blocks/gold-block.png' : 'blocks/diamond-block.png';
   }
 
   /**
@@ -1060,15 +1319,69 @@ export class MiningSystem {
   private getOrCreateState(player: Player, pickaxe: PickaxeData): MiningState {
     const worldId = this.getPlayerWorldId(player);
     const correctOffset = this.getOrCreateOffset(player, worldId);
-    
+
     let state = this.miningStates.get(player);
     if (state) {
+      if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: Existing state found for player:', player.username);
+
+      // Initialize new fields for legacy states that may not have them
+      if (!state.oreEntityPool) state.oreEntityPool = new Map();
+      if (!state.chestEntityPool) state.chestEntityPool = new Map();
+      if (!state.levelSequence) state.levelSequence = new Map();
+      if (!state.nextOccurrence) state.nextOccurrence = new Map();
+
       // Check if the state's offset matches the current world's offset
       // If not, regenerate the state for the current world
       const currentOffsetKey = `${player.id}:${worldId}`;
       const stateOffsetKey = this.findOffsetKeyForOffset(player, state.offset);
-      
+
       if (stateOffsetKey !== currentOffsetKey || (state.offset.x === 0 && state.offset.z === 0)) {
+        if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: Regenerating state for different world');
+
+        // Despawn the old floor entity before regenerating for new world
+        if (state.mineFloorEntity) {
+          try {
+            if (state.mineFloorEntity.isSpawned) {
+              state.mineFloorEntity.despawn();
+            }
+          } catch (error) {
+            // Entity might already be despawned
+          }
+          state.mineFloorEntity = undefined;
+        }
+
+        // Despawn all ore entity pool entities (if pool exists)
+        if (state.oreEntityPool) {
+          for (const entity of state.oreEntityPool.values()) {
+            try {
+              if (entity.isSpawned) {
+                entity.despawn();
+              }
+            } catch (error) {
+              // Entity might already be despawned
+            }
+          }
+          state.oreEntityPool.clear();
+        }
+
+        // Despawn all chest entity pool entities (if pool exists)
+        if (state.chestEntityPool) {
+          for (const entity of state.chestEntityPool.values()) {
+            try {
+              if (entity.isSpawned) {
+                entity.despawn();
+              }
+            } catch (error) {
+              // Entity might already be despawned
+            }
+          }
+          state.chestEntityPool.clear();
+        }
+
+        // Clear level sequence and next occurrence tracking (if they exist)
+        if (state.levelSequence) state.levelSequence.clear();
+        if (state.nextOccurrence) state.nextOccurrence.clear();
+
         // State is for a different world or legacy state, regenerate for current world
         state.blockMap.clear();
         state.chestMap.clear();
@@ -1079,14 +1392,18 @@ export class MiningSystem {
         state.ceilingBuilt = false;
         state.bottomFloorDepth = null;
         state.winTriggered = false;
+        state.currentLevelIsChest = undefined;
+        state.currentChestType = undefined;
+        state.currentOreType = undefined;
         // Reset first block mined flag so timer starts when player mines first block in new world
         this.resetFirstBlockMined(player);
-        // Regenerate initial 20 levels with new offset (will generate more ahead as player mines)
+        // Regenerate initial 20 levels with new offset and new floor entity
         this.generateInitialMiningLevels(player, state, pickaxe);
       }
       return state;
     }
 
+    if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: CREATING NEW state for player:', player.username, 'worldId:', worldId);
     const offset = correctOffset;
     state = {
       blockMap: new Map(),
@@ -1100,12 +1417,17 @@ export class MiningSystem {
       ceilingBuilt: false,
       bottomFloorDepth: null,
       winTriggered: false,
+      oreEntityPool: new Map(),
+      chestEntityPool: new Map(),
+      levelSequence: new Map(),
+      nextOccurrence: new Map(),
     };
     this.miningStates.set(player, state);
+    if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: State created and stored');
 
     // Generate initial 20 levels (will generate more ahead as player mines)
     this.generateInitialMiningLevels(player, state, pickaxe);
-    
+
     return state;
   }
 
@@ -1140,7 +1462,14 @@ export class MiningSystem {
     // Simple grid allocation using spacing to avoid overlap
     // Start from index 1 so nobody uses the origin/shared area
     // Island 2 and Island 3 use different grid regions to avoid overlap with Island 1
-    const baseOffsetX = worldId === 'island2' ? 10000 : worldId === 'island3' ? 20000 : 0;
+    const baseOffsetX =
+      worldId === 'island2'
+        ? 10000
+        : worldId === 'island3'
+          ? 20000
+          : worldId === 'island4'
+            ? 30000
+            : 0;
     const index = instanceIndex;
     const spacing = MINE_INSTANCE_SPACING;
     const gridWidth = 16; // gives plenty of room before wrapping
@@ -1162,6 +1491,9 @@ export class MiningSystem {
     if (worldId === 'island3') {
       return ISLAND3_MINING_AREA_BOUNDS;
     }
+    if (worldId === 'island4') {
+      return ISLAND4_MINING_AREA_BOUNDS;
+    }
     return MINING_AREA_BOUNDS;
   }
 
@@ -1171,6 +1503,36 @@ export class MiningSystem {
   private getPlayerWorldId(player: Player): string {
     const playerData = this.getPlayerDataCallback?.(player);
     return playerData?.currentWorld || 'island1';
+  }
+
+  /**
+   * Collect rigid body handles for pets so mining raycasts ignore them.
+   */
+  private getPetRigidBodyHandles(): Set<number> {
+    const handles = new Set<number>();
+    const entities = this.world.entityManager.getAllEntities();
+    for (const entity of entities) {
+      if (entity.tag === 'pet') {
+        const handle = (entity as any).rawRigidBody?.handle;
+        if (typeof handle === 'number') {
+          handles.add(handle);
+        }
+      }
+    }
+    return handles;
+  }
+
+  /**
+   * Maps world IDs to numeric world indices for SPS curves.
+   * Supports any world like "island4", "world5", etc. Defaults to 1.
+   */
+  private getWorldNumberFromId(worldId: string): number {
+    const match = String(worldId || '').match(/(\d+)/);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+    }
+    return 1;
   }
 
   /**
@@ -1267,7 +1629,7 @@ export class MiningSystem {
 
   /**
    * Generates an ore type based on depth and luck using the NEW LINEAR SCALING SYSTEM
-   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
+   * World-aware: Uses Island 1, Island 2, Island 3, or Island 4 ore database based on player's world
    * 
    * Uses OreGenerator which:
    * - Filters ores by firstDepth (ores only spawn at their unlock depth or deeper)
@@ -1304,14 +1666,14 @@ export class MiningSystem {
 
   /**
    * Calculates the HP for an ore at a given depth using NEW LINEAR SCALING SYSTEM
-   * World-aware: Uses Island 1 or Island 2 ore database based on player's world
+   * World-aware: Uses Island 1, Island 2, Island 3, or Island 4 ore database based on player's world
    * 
    * Uses linear interpolation from firstHealth to lastHealth based on depth
    * Formula: HP = FirstHealth + ((CurrentDepth - FirstDepth) / (LastDepth - FirstDepth)) × (LastHealth - FirstHealth)
    * 
    * @param oreType - Type of ore as string
    * @param depth - Current mining depth (should be positive)
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    * @returns Calculated HP with linear depth scaling
    */
   private calculateOreHP(oreType: string, depth: number, worldId: string): number {
@@ -1327,6 +1689,8 @@ export class MiningSystem {
    * Each mine level is 3 blocks tall (7x3x7)
    * Called when player first logs in or mine is reset
    *
+   * NEW: Uses entity pooling - one entity per ore type, repositioned as player mines
+   *
    * @param player - Player who owns this mining state
    * @param state - Player's mining state
    * @param pickaxe - Player's pickaxe (for ore generation with current luck)
@@ -1338,18 +1702,25 @@ export class MiningSystem {
   ): void {
     // Get world ID once for this method
     const worldId = this.getPlayerWorldId(player);
-    
+
     // Build overhead ceiling once
     if (!state.ceilingBuilt) {
       this.buildMineCeiling(state, worldId);
       state.ceilingBuilt = true;
     }
 
-    // Generate all 1000 mine levels upfront (level 0 to 999)
-    // Each mine level is 3 blocks tall, so 1000 levels = 3000 blocks deep
-    const levelsToGenerate = 1000;
+    // Initialize entity pool if not already done
+    if (state.oreEntityPool.size === 0 && state.chestEntityPool.size === 0) {
+      this.initializeOreEntityPool(player, state, pickaxe, worldId);
+    }
+
+    // Generate a limited number of levels upfront for performance
+    // With entity pooling:
+    // - levelSequence already populated by initializeOreEntityPool
+    // - Generate MineBlock/ChestBlock objects for HP tracking
+    // - Generate walls only
+    const levelsToGenerate = this.INITIAL_MINE_LEVELS;
     for (let mineLevel = 0; mineLevel < levelsToGenerate; mineLevel++) {
-      const topY = this.mineLevelToTopY(mineLevel); // Top Y coordinate of this mine level
       const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel); // All 3 Y coordinates
       const absoluteDepth = mineLevel + 1; // 1, 2, 3, ..., 1000 (for ore generation)
 
@@ -1358,111 +1729,30 @@ export class MiningSystem {
         state.generatedDepths.add(yCoord);
       }
 
+      // Get what's at this level from the level sequence
+      const levelContent = state.levelSequence.get(mineLevel);
+
       // Check if this is the win level (mine level 999 = depth 1000)
       if (mineLevel === 999) {
-        // Generate unminable gold block instead of normal ore/chest
+        // Create a win block for HP tracking (infinite HP, no damage taken)
         const miningAreaKey = `unminable_gold_level_${mineLevel}`;
-
-        // Create an unminable gold block (infinite HP, no damage taken)
-        // Use appropriate gold ore type based on world
         const goldOreType = worldId === 'island2' ? 'sunstonite' : OreType.GOLD;
-        const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER); // Infinite HP
+        const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER);
         state.blockMap.set(miningAreaKey, goldBlock);
-
-        // Generate the 7x7x1 gold block (only middle Y coordinate of the 3-block level)
-        const middleY = levelYCoords[1]; // Middle Y coordinate of the 3-block level
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-
-        for (const basePosition of miningPositions) {
-          const blockPosition = {
-            x: basePosition.x + state.offset.x,
-            y: middleY,
-            z: basePosition.z + state.offset.z,
-          };
-
-          try {
-            this.world.chunkLattice.setBlock(blockPosition, this.UNMINABLE_GOLD_BLOCK_TYPE_ID);
-          } catch (error) {
-            // Silently fail - chunk might not be loaded yet
-          }
-        }
-
-        // Generate walls for all 3 Y coordinates of this level (normal walls)
-        for (const yCoord of levelYCoords) {
-          this.generateMineShaftWalls(yCoord, state.offset, worldId);
-        }
-
-        // Update deepest generated depth (bottom Y of this level)
-        const bottomY = levelYCoords[levelYCoords.length - 1];
-        if (bottomY < state.deepestGeneratedDepth) {
-          state.deepestGeneratedDepth = bottomY;
-        }
-
-        continue; // Skip normal generation for win level
-      }
-
-      // Check if a chest should spawn at this mine level (probabilistic, chance-based)
-      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
-
-      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
-        // Spawn a chest instead of an ore block
-        const chestType = chestSpawnResult.chestType;
-        const chestKey = `chest_level_${mineLevel}`;
-
-        // Create chest - HP will be initialized on first hit based on player's damage
-        const chest = new ChestBlock(chestType);
-        state.chestMap.set(chestKey, chest);
-
-        // Generate all blocks in the mining area at all 3 Y coordinates as chest blocks
-        const chestBlockTypeId = chestType === ChestType.BASIC
-          ? this.BASIC_CHEST_BLOCK_TYPE_ID
-          : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-
-        for (const yCoord of levelYCoords) {
-          for (const basePosition of miningPositions) {
-            const blockPosition = {
-              x: basePosition.x + state.offset.x,
-              y: yCoord,
-              z: basePosition.z + state.offset.z,
-            };
-
-            try {
-              this.world.chunkLattice.setBlock(blockPosition, chestBlockTypeId);
-            } catch (error) {
-              // Silently fail - chunk might not be loaded yet
-            }
-          }
-        }
-      } else {
-        // Generate ore type for this mine level (normal block) - uses CURRENT luck at generation time
-        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
-        const miningAreaKey = `mining_area_level_${mineLevel}`;
-
-        // Calculate HP based on ore type and depth
-        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
-        const block = new MineBlock(oreType, oreHP);
-        state.blockMap.set(miningAreaKey, block);
-
-        // Get the block ID for this ore type
-        const oreBlockId = this.getBlockIdForOreType(oreType, worldId);
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-
-        // Generate all blocks in the mining area at all 3 Y coordinates
-        for (const yCoord of levelYCoords) {
-          for (const basePosition of miningPositions) {
-            const blockPosition = {
-              x: basePosition.x + state.offset.x,
-              y: yCoord,
-              z: basePosition.z + state.offset.z,
-            };
-
-            try {
-              this.world.chunkLattice.setBlock(blockPosition, oreBlockId);
-            } catch (error) {
-              // Silently fail - chunk might not be loaded yet
-            }
-          }
+      } else if (levelContent) {
+        if (levelContent.type === 'chest') {
+          // Create chest for HP tracking - HP will be initialized on first hit
+          const chestType = levelContent.value as ChestType;
+          const chestKey = `chest_level_${mineLevel}`;
+          const chest = new ChestBlock(chestType);
+          state.chestMap.set(chestKey, chest);
+        } else {
+          // Create MineBlock for HP tracking
+          const oreType = levelContent.value;
+          const miningAreaKey = `mining_area_level_${mineLevel}`;
+          const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
+          const block = new MineBlock(oreType, oreHP);
+          state.blockMap.set(miningAreaKey, block);
         }
       }
 
@@ -1478,10 +1768,234 @@ export class MiningSystem {
       }
     }
 
+    // Set up current level state from level 0
+    const level0Content = state.levelSequence.get(0);
+    if (level0Content) {
+      if (level0Content.type === 'chest') {
+        state.currentLevelIsChest = true;
+        state.currentChestType = level0Content.value as ChestType;
+        state.currentOreType = undefined;
+      } else {
+        state.currentLevelIsChest = false;
+        state.currentChestType = undefined;
+        state.currentOreType = level0Content.value;
+      }
+    }
+
     // Generate bottom floor at the deepest level (10 blocks below deepest generated)
     const bottomDepth = state.deepestGeneratedDepth - 10;
     this.generateBottomFloor(bottomDepth, state.offset, worldId);
     state.bottomFloorDepth = bottomDepth;
+  }
+
+  /**
+   * Initializes the ore entity pool for a player
+   * Creates one entity per unique ore type that appears in the first 40 levels
+   * Each entity is positioned at its first occurrence
+   *
+   * @param player - Player who owns this mining state
+   * @param state - Player's mining state
+   * @param pickaxe - Player's pickaxe (for ore generation with current luck)
+   * @param worldId - World ID for ore generation
+   */
+  private initializeOreEntityPool(
+    player: Player,
+    state: MiningState,
+    pickaxe: PickaxeData,
+    worldId: string
+  ): void {
+    const bounds = this.getMiningAreaBounds(worldId);
+    const centerX = (bounds.minX + bounds.maxX) / 2 + state.offset.x;
+    const centerZ = (bounds.minZ + bounds.maxZ) / 2 + state.offset.z;
+
+    // Track first occurrence of each ore/chest type
+    const firstOccurrence: Map<string, number> = new Map();
+
+    // Generate level sequence for initial levels
+    const levelsToGenerate = this.INITIAL_MINE_LEVELS;
+    for (let mineLevel = 0; mineLevel < levelsToGenerate; mineLevel++) {
+      const absoluteDepth = mineLevel + 1;
+
+      // Check if this level should be a chest
+      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+
+      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
+        // Chest level
+        const chestTypeValue = chestSpawnResult.chestType;
+        state.levelSequence.set(mineLevel, { type: 'chest', value: chestTypeValue });
+
+        // Track first occurrence (use chest type prefixed to distinguish from ore types)
+        const chestKey = `chest_${chestTypeValue}`;
+        if (!firstOccurrence.has(chestKey)) {
+          firstOccurrence.set(chestKey, mineLevel);
+        }
+      } else {
+        // Normal ore level
+        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+        state.levelSequence.set(mineLevel, { type: 'ore', value: oreType });
+
+        // Track first occurrence
+        if (!firstOccurrence.has(oreType)) {
+          firstOccurrence.set(oreType, mineLevel);
+        }
+      }
+    }
+
+    // Calculate next occurrence for each ore/chest type
+    this.updateNextOccurrences(state, 0);
+
+    // Create entities for each unique ore type at their first occurrence
+    for (const [oreType, firstLevel] of firstOccurrence) {
+      if (oreType.startsWith('chest_')) {
+        // Chest entity
+        const chestTypeValue = oreType.replace('chest_', '') as ChestType;
+        if (!state.chestEntityPool.has(chestTypeValue)) {
+          const texture = this.getChestTextureUri(chestTypeValue);
+          const topY = this.mineLevelToTopY(firstLevel);
+          const centerY = topY - 1; // Adjusted for 3-block height
+
+          const entity = new Entity({
+            name: `Chest Floor ${chestTypeValue}`,
+            blockTextureUri: texture,
+            blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+            rigidBodyOptions: {
+              type: RigidBodyType.KINEMATIC_POSITION,
+              colliders: [{
+                shape: ColliderShape.BLOCK,
+                halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+              }],
+            },
+          });
+
+          entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
+          state.chestEntityPool.set(chestTypeValue, entity);
+          console.log('[MiningSystem] Created chest entity pool entry:', chestTypeValue, 'at level', firstLevel);
+        }
+      } else {
+        // Ore entity
+        if (!state.oreEntityPool.has(oreType)) {
+          const texture = this.getOreTextureUri(oreType);
+          const topY = this.mineLevelToTopY(firstLevel);
+          const centerY = topY - 1; // Adjusted for 3-block height
+
+          const entity = new Entity({
+            name: `Ore Floor ${oreType}`,
+            blockTextureUri: texture,
+            blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+            rigidBodyOptions: {
+              type: RigidBodyType.KINEMATIC_POSITION,
+              colliders: [{
+                shape: ColliderShape.BLOCK,
+                halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+              }],
+            },
+          });
+
+          entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
+          state.oreEntityPool.set(oreType, entity);
+          console.log('[MiningSystem] Created ore entity pool entry:', oreType, 'at level', firstLevel);
+        }
+      }
+    }
+
+    console.log('[MiningSystem] Entity pool initialized:',
+      'ore types:', state.oreEntityPool.size,
+      'chest types:', state.chestEntityPool.size);
+  }
+
+  /**
+   * Updates the nextOccurrence map for efficient repositioning
+   * Scans levelSequence from the given start level to find next occurrences
+   *
+   * @param state - Player's mining state
+   * @param afterLevel - Start scanning from this level + 1
+   */
+  private updateNextOccurrences(state: MiningState, afterLevel: number): void {
+    state.nextOccurrence.clear();
+
+    // Track which types we've found next occurrence for
+    const foundNext: Set<string> = new Set();
+
+    // Scan through level sequence starting from afterLevel + 1
+    for (let level = afterLevel; level < state.levelSequence.size + afterLevel + 100; level++) {
+      const content = state.levelSequence.get(level);
+      if (!content) continue;
+
+      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
+
+      // Only record first occurrence after afterLevel for each type
+      if (!foundNext.has(key) && level > afterLevel) {
+        // For items at level > afterLevel, store their next occurrence
+        // But we need to track from current position, so scan from 0
+      }
+    }
+
+    // Actually, we need a different approach:
+    // For each ore type that appears in the sequence, track where it appears
+    const occurrencesByType: Map<string, number[]> = new Map();
+
+    for (const [level, content] of state.levelSequence) {
+      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
+      if (!occurrencesByType.has(key)) {
+        occurrencesByType.set(key, []);
+      }
+      occurrencesByType.get(key)!.push(level);
+    }
+
+    // Store all occurrences sorted for each type (for efficient lookup later)
+    // We'll store a simple "next after current player level" approach
+    for (const [key, levels] of occurrencesByType) {
+      levels.sort((a, b) => a - b);
+      // Find first level after afterLevel
+      const nextLevel = levels.find(l => l > afterLevel);
+      if (nextLevel !== undefined) {
+        state.nextOccurrence.set(key, nextLevel);
+      }
+    }
+  }
+
+  /**
+   * Finds the next occurrence of an ore/chest type after a given level
+   *
+   * @param state - Player's mining state
+   * @param typeKey - Ore type or "chest_<chestType>" key
+   * @param afterLevel - Find occurrence after this level
+   * @returns Mine level number or -1 if not found
+   */
+  private findNextOccurrence(state: MiningState, typeKey: string, afterLevel: number): number {
+    // Scan through level sequence to find next occurrence
+    for (let level = afterLevel + 1; level < afterLevel + 1000; level++) {
+      const content = state.levelSequence.get(level);
+      if (!content) continue;
+
+      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
+      if (key === typeKey) {
+        return level;
+      }
+    }
+
+    // Not found in generated levels - return a very far level
+    // The entity will be positioned way down, out of view
+    return afterLevel + 2000;
+  }
+
+  /**
+   * Repositions an ore entity to a specific mine level
+   *
+   * @param state - Player's mining state
+   * @param entity - Entity to reposition
+   * @param toMineLevel - Target mine level
+   */
+  private repositionOreEntity(state: MiningState, entity: Entity, toMineLevel: number): void {
+    if (!entity.isSpawned) return;
+
+    const topY = this.mineLevelToTopY(toMineLevel);
+    const centerY = topY - 1; // Adjusted for 3-block height
+
+    // Get current position for X/Z (they don't change)
+    const currentPos = entity.position;
+
+    entity.setNextKinematicPosition({ x: currentPos.x, y: centerY, z: currentPos.z });
   }
 
   /**
@@ -1515,10 +2029,10 @@ export class MiningSystem {
     const currentDeepestMineLevel = this.yCoordinateToMineLevel(state.deepestGeneratedDepth);
     const startMineLevel = currentDeepestMineLevel + 1; // Next level to generate
 
-    for (let mineLevel = startMineLevel; mineLevel <= targetMineLevel; mineLevel++) {
-      const topY = this.mineLevelToTopY(mineLevel);
-      const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
-      const absoluteDepth = mineLevel + 1; // For ore generation (1-based)
+      for (let mineLevel = startMineLevel; mineLevel <= targetMineLevel; mineLevel++) {
+        const topY = this.mineLevelToTopY(mineLevel);
+        const levelYCoords = this.getYCoordinatesForMineLevel(mineLevel);
+        const absoluteDepth = mineLevel + 1; // For ore generation (1-based)
       
       // Check if this mine level was already generated (check if top Y is in generatedDepths)
       if (state.generatedDepths.has(topY)) {
@@ -1529,73 +2043,55 @@ export class MiningSystem {
       for (const yCoord of levelYCoords) {
         state.generatedDepths.add(yCoord);
       }
-      
-      // Check if a chest should spawn at this mine level
-      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
-      
-      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
-        // Spawn a chest instead of an ore block
-        const chestType = chestSpawnResult.chestType;
-        const chestKey = `chest_level_${mineLevel}`;
-        
-        // Create chest - HP will be initialized on first hit based on player's damage
-        const chest = new ChestBlock(chestType);
-        state.chestMap.set(chestKey, chest);
-        
-        // Generate all blocks in the mining area at all 3 Y coordinates as chest blocks
-        const chestBlockTypeId = chestType === ChestType.BASIC 
-          ? this.BASIC_CHEST_BLOCK_TYPE_ID 
-          : this.GOLDEN_CHEST_BLOCK_TYPE_ID;
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-        
-        for (const yCoord of levelYCoords) {
-          for (const basePosition of miningPositions) {
-            const blockPosition = {
-              x: basePosition.x + state.offset.x,
-              y: yCoord,
-              z: basePosition.z + state.offset.z,
-            };
-            
-            try {
-              this.world.chunkLattice.setBlock(blockPosition, chestBlockTypeId);
-            } catch (error) {
-              // Silently fail - chunk might not be loaded yet
-            }
-          }
+
+      // With single floor entity approach: only generate HP tracking objects and walls
+      // No floor blocks are generated - the floor entity handles visuals
+
+      // Win block at depth 1000
+      if (mineLevel === 999) {
+        const miningAreaKey = `unminable_gold_level_${mineLevel}`;
+        const goldOreType = worldId === 'island2' ? 'sunstonite' : OreType.GOLD;
+        const goldBlock = new MineBlock(goldOreType, Number.MAX_SAFE_INTEGER);
+        state.blockMap.set(miningAreaKey, goldBlock);
+        // Add to level sequence (gold ore for win block)
+        state.levelSequence.set(mineLevel, { type: 'ore', value: goldOreType });
+        // Create entity if this ore type doesn't have one yet
+        if (!state.oreEntityPool.has(goldOreType)) {
+          this.createPooledEntity(state, 'ore', goldOreType, mineLevel, worldId);
         }
       } else {
-        // Generate ore type for this mine level (normal block) - uses CURRENT luck at generation time
-        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
-        const miningAreaKey = `mining_area_level_${mineLevel}`;
-        
-        // Calculate HP based on ore type and depth
-        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
-        const block = new MineBlock(oreType, oreHP);
-        state.blockMap.set(miningAreaKey, block);
-        
-        // Get the block ID for this ore type
-        const oreBlockId = this.getBlockIdForOreType(oreType, worldId);
-        const miningPositions = this.getMiningAreaPositionsForPlayer(player);
-        
-        // Generate all blocks in the mining area at all 3 Y coordinates
-        for (const yCoord of levelYCoords) {
-          for (const basePosition of miningPositions) {
-            const blockPosition = {
-              x: basePosition.x + state.offset.x,
-              y: yCoord,
-              z: basePosition.z + state.offset.z,
-            };
-            
-            try {
-              this.world.chunkLattice.setBlock(blockPosition, oreBlockId);
-            } catch (error) {
-              // Silently fail - chunk might not be loaded yet
-            }
+        // Check if a chest should spawn at this mine level
+        const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+
+        if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
+          // Create chest for HP tracking
+          const chestType = chestSpawnResult.chestType;
+          const chestKey = `chest_level_${mineLevel}`;
+          const chest = new ChestBlock(chestType);
+          state.chestMap.set(chestKey, chest);
+          // Add to level sequence
+          state.levelSequence.set(mineLevel, { type: 'chest', value: chestType });
+          // Create entity if this chest type doesn't have one yet
+          if (!state.chestEntityPool.has(chestType)) {
+            this.createPooledEntity(state, 'chest', chestType, mineLevel, worldId);
+          }
+        } else {
+          // Create MineBlock for HP tracking
+          const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+          const miningAreaKey = `mining_area_level_${mineLevel}`;
+          const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
+          const block = new MineBlock(oreType, oreHP);
+          state.blockMap.set(miningAreaKey, block);
+          // Add to level sequence
+          state.levelSequence.set(mineLevel, { type: 'ore', value: oreType });
+          // Create entity if this ore type doesn't have one yet
+          if (!state.oreEntityPool.has(oreType)) {
+            this.createPooledEntity(state, 'ore', oreType, mineLevel, worldId);
           }
         }
       }
 
-      // Generate walls for all 3 Y coordinates of this level (so Island 2 uses sand, Island 1 uses dirt)
+      // Generate walls for all 3 Y coordinates of this level
       for (const yCoord of levelYCoords) {
         this.generateMineShaftWalls(yCoord, state.offset, worldId);
       }
@@ -1622,7 +2118,7 @@ export class MiningSystem {
    * 
    * @param depth - Y coordinate (depth) to generate walls at
    * @param offset - World-space offset for this mine instance
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private generateMineShaftWalls(depth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -1631,7 +2127,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     
     // Generate inner box (layer 1) - solid walls around the mining area
     const innerMinX = bounds.minX - 1 + offset.x;
@@ -1687,7 +2185,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     const ceilingLayers = 10;
     const startY = MINE_DEPTH_START + 1; // lowered by one to sit closer to the floor
     const floorY = MINE_DEPTH_START; // Floor level
@@ -1822,7 +2322,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -1831,7 +2331,9 @@ export class MiningSystem {
       ? 43
       : worldId === 'island3'
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
-        : this.DIRT_BLOCK_TYPE_ID;
+        : worldId === 'island4'
+          ? 100
+          : this.DIRT_BLOCK_TYPE_ID;
     
     // Mining area bounds (with offset) - this area should NOT be filled
     const miningMinX = bounds.minX + offset.x;
@@ -1873,7 +2375,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor to delete
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1' or 'island2')
+   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
    */
   private deleteBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -2055,4 +2557,223 @@ export class MiningSystem {
     // No chest spawns
     return { shouldSpawn: false, chestType: null };
   }
+
+  /**
+   * Spawns a burst particle effect when the player breaks through a floor
+   * Effect spreads ±4 blocks on X and Z axes from the mine center
+   */
+  private spawnFloorBreakEffect(player: Player, oreType: string, newFloorY: number): void {
+    const center = this.getMineCenter(player);
+
+    // Get ore color from appropriate database
+    const oreData = ORE_DATABASE[oreType as OreType] ||
+                    ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE] ||
+                    ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE] ||
+                    ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+    const hexColor = oreData?.color || '#808080';
+    const color = this.hexToRgb(hexColor);
+
+    if (DEBUG_MINING) console.log('[MiningSystem] Spawning floor break effect at', center.x, newFloorY + 1.5, center.z, 'color:', hexColor);
+
+    const emitter = new ParticleEmitter({
+      position: { x: center.x, y: newFloorY + 1.5, z: center.z },
+      textureUri: 'particles/smoke_04.png',
+      colorStart: color,
+      colorEnd: color,
+      colorIntensityStart: 1.5,
+      colorIntensityEnd: 0.8,
+      sizeStart: 1.2,
+      sizeEnd: 0.4,
+      opacityStart: 1.0,
+      opacityEnd: 0,
+      positionVariance: { x: 3, y: 0.5, z: 3 },
+      velocity: { x: 0, y: 2.0, z: 0 },
+      velocityVariance: { x: 1.5, y: 1.0, z: 1.5 },
+      lifetime: 0.6,
+      lifetimeVariance: 0.15,
+      rate: 40,
+      maxParticles: 80,
+    });
+
+    emitter.spawn(this.world);
+    setTimeout(() => emitter.despawn(), 800);
+  }
+
+  /**
+   * Converts a hex color string to RGB object
+   */
+  private hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 128, g: 128, b: 128 };
+  }
+
+  /**
+   * Transitions the floor entity to the next mine level
+   * NEW: Uses entity pooling - repositions the mined ore's entity to its next occurrence
+   * No texture changes needed - each entity keeps its texture forever
+   *
+   * @param player - Player whose floor entity to transition
+   * @param state - Player's mining state
+   * @param nextMineLevel - The next mine level to transition to (player is falling to this level)
+   * @param pickaxe - Player's pickaxe (for ore generation if needed)
+   */
+  private transitionFloorEntityToNextLevel(
+    player: Player,
+    state: MiningState,
+    nextMineLevel: number,
+    pickaxe: PickaxeData
+  ): void {
+    const worldId = this.getPlayerWorldId(player);
+    const currentMineLevel = nextMineLevel - 1; // The level that was just mined
+    const absoluteDepth = nextMineLevel + 1;
+
+    // Get what was at the just-mined level
+    const currentLevelContent = state.levelSequence.get(currentMineLevel);
+
+    if (currentLevelContent) {
+      // Reposition the entity for the just-mined ore/chest type to its next occurrence
+      const typeKey = currentLevelContent.type === 'chest'
+        ? `chest_${currentLevelContent.value}`
+        : currentLevelContent.value;
+
+      const nextOccurrence = this.findNextOccurrence(state, typeKey, currentMineLevel);
+
+      if (currentLevelContent.type === 'chest') {
+        const chestType = currentLevelContent.value as ChestType;
+        const entity = state.chestEntityPool.get(chestType);
+        if (entity) {
+          this.repositionOreEntity(state, entity, nextOccurrence);
+          console.log('[MiningSystem] Repositioned chest entity', chestType, 'from level', currentMineLevel, 'to level', nextOccurrence);
+        }
+      } else {
+        const oreType = currentLevelContent.value;
+        const entity = state.oreEntityPool.get(oreType);
+        if (entity) {
+          this.repositionOreEntity(state, entity, nextOccurrence);
+          console.log('[MiningSystem] Repositioned ore entity', oreType, 'from level', currentMineLevel, 'to level', nextOccurrence);
+        }
+      }
+    }
+
+    // Check what's at the next level and update state tracking
+    const chestKey = `chest_level_${nextMineLevel}`;
+    const miningAreaKey = `mining_area_level_${nextMineLevel}`;
+    const unminableGoldKey = `unminable_gold_level_${nextMineLevel}`;
+
+    const chest = state.chestMap.get(chestKey);
+    const unminableGoldBlock = state.blockMap.get(unminableGoldKey);
+    const oreBlock = state.blockMap.get(miningAreaKey);
+
+    if (unminableGoldBlock) {
+      // Win block
+      state.currentLevelIsChest = false;
+      state.currentChestType = undefined;
+      state.currentOreType = OreType.GOLD;
+    } else if (chest) {
+      // Chest level
+      state.currentLevelIsChest = true;
+      state.currentChestType = chest.chestType;
+      state.currentOreType = undefined;
+    } else if (oreBlock) {
+      // Normal ore level
+      state.currentLevelIsChest = false;
+      state.currentChestType = undefined;
+      state.currentOreType = oreBlock.oreType;
+    } else {
+      // Level not generated yet - generate it and add to sequence
+      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+
+      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
+        const newChest = new ChestBlock(chestSpawnResult.chestType);
+        state.chestMap.set(chestKey, newChest);
+        state.currentLevelIsChest = true;
+        state.currentChestType = chestSpawnResult.chestType;
+        state.currentOreType = undefined;
+
+        // Add to level sequence
+        state.levelSequence.set(nextMineLevel, { type: 'chest', value: chestSpawnResult.chestType });
+
+        // Create entity if this chest type doesn't have one yet
+        if (!state.chestEntityPool.has(chestSpawnResult.chestType)) {
+          this.createPooledEntity(state, 'chest', chestSpawnResult.chestType, nextMineLevel, worldId);
+        }
+      } else {
+        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
+        const newBlock = new MineBlock(oreType, oreHP);
+        state.blockMap.set(miningAreaKey, newBlock);
+        state.currentLevelIsChest = false;
+        state.currentChestType = undefined;
+        state.currentOreType = oreType;
+
+        // Add to level sequence
+        state.levelSequence.set(nextMineLevel, { type: 'ore', value: oreType });
+
+        // Create entity if this ore type doesn't have one yet
+        if (!state.oreEntityPool.has(oreType)) {
+          this.createPooledEntity(state, 'ore', oreType, nextMineLevel, worldId);
+        }
+      }
+    }
+
+    console.log('[MiningSystem] Player transitioned to level', nextMineLevel,
+      'ore:', state.currentOreType, 'chest:', state.currentChestType);
+  }
+
+  /**
+   * Creates a pooled entity for a new ore or chest type
+   * Called when an ore/chest type is encountered for the first time
+   *
+   * @param state - Player's mining state
+   * @param type - 'ore' or 'chest'
+   * @param value - Ore type name or ChestType value
+   * @param mineLevel - Mine level to position the entity at
+   * @param worldId - World ID for bounds calculation
+   */
+  private createPooledEntity(
+    state: MiningState,
+    type: 'ore' | 'chest',
+    value: string,
+    mineLevel: number,
+    worldId: string
+  ): void {
+    const bounds = this.getMiningAreaBounds(worldId);
+    const centerX = (bounds.minX + bounds.maxX) / 2 + state.offset.x;
+    const centerZ = (bounds.minZ + bounds.maxZ) / 2 + state.offset.z;
+    const topY = this.mineLevelToTopY(mineLevel);
+    const centerY = topY - 1;
+
+    const texture = type === 'chest'
+      ? this.getChestTextureUri(value as ChestType)
+      : this.getOreTextureUri(value);
+
+    const entity = new Entity({
+      name: type === 'chest' ? `Chest Floor ${value}` : `Ore Floor ${value}`,
+      blockTextureUri: texture,
+      blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+      rigidBodyOptions: {
+        type: RigidBodyType.KINEMATIC_POSITION,
+        colliders: [{
+          shape: ColliderShape.BLOCK,
+          halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+        }],
+      },
+    });
+
+    entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
+
+    if (type === 'chest') {
+      state.chestEntityPool.set(value as ChestType, entity);
+    } else {
+      state.oreEntityPool.set(value, entity);
+    }
+
+    console.log('[MiningSystem] Created new pooled entity:', type, value, 'at level', mineLevel);
+  }
 }
+
+

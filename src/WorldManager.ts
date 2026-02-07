@@ -124,6 +124,8 @@ export class WorldManager {
         return 750000000000; // 750B
       case 'island3':
         return 2000000000000000; // 2Q
+      case 'island4':
+        return 100000000000000000000000; // 100Sx
       default:
         return 2000000;
     }
@@ -192,9 +194,9 @@ export class WorldManager {
     const worldConfig = WorldRegistry.getWorldConfig(worldId);
     if (!worldConfig) return false;
 
-    // For now, only check wins requirement
-    if (worldConfig.unlockRequirement.type === 'wins') {
-      return player.wins >= worldConfig.unlockRequirement.amount;
+    // For now, only check trophies requirement
+    if (worldConfig.unlockRequirement.type === 'trophies') {
+      return player.trophies >= worldConfig.unlockRequirement.amount;
     }
 
     return false;

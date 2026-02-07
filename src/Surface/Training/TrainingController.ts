@@ -37,9 +37,19 @@ function formatNumber(value: number): string {
   };
   
   // Handle very large numbers
+  if (value >= 1e42) {
+    const num = value / 1e42;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+    return formatWithSuffix(num, 'TDe');
+  }
+  if (value >= 1e39) {
+    const num = value / 1e39;
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
+    return formatWithSuffix(num, 'DDe');
+  }
   if (value >= 1e36) {
     const num = value / 1e36;
-    if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'DDe');
     return formatWithSuffix(num, 'UDe');
   }
   if (value >= 1e33) {
@@ -75,11 +85,11 @@ function formatNumber(value: number): string {
   if (value >= 1e15) {
     const num = value / 1e15;
     if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
-    return formatWithSuffix(num, 'Q');
+    return formatWithSuffix(num, 'Qd');
   }
   if (value >= 1e12) {
     const num = value / 1e12;
-    if (num >= 1000) return formatWithSuffix(num / 1000, 'Q');
+    if (num >= 1000) return formatWithSuffix(num / 1000, 'Qd');
     return formatWithSuffix(num, 'T');
   }
   if (value >= 1e9) {
@@ -110,6 +120,7 @@ import { detectTrainingRockPlacements } from './TrainingRockLocator';
 import { GameManager } from '../../Core/GameManager';
 import type { PlayerData } from '../../Core/PlayerData';
 import { calculatePowerGainPerHit } from '../../Stats/StatCalculator';
+import { addPowerTrained, getBonuses } from '../../Achievements/Achievements';
 import { 
   ISLAND2_TRAINING_ROCK_DATABASE,
   ISLAND2_BLOCK_TYPE_TO_TIER,
@@ -121,6 +132,11 @@ import {
   getIsland3TrainingRockByTier,
   ISLAND3_TRAINING_ROCK_TIER,
   type Island3TrainingRockData,
+  ISLAND4_TRAINING_ROCK_DATABASE,
+  ISLAND4_BLOCK_TYPE_TO_TIER,
+  getIsland4TrainingRockByTier,
+  ISLAND4_TRAINING_ROCK_TIER,
+  type Island4TrainingRockData,
 } from '../../worldData/TrainingRocks';
 
 const FALLBACK_TRAINING_ROCKS: Array<{
@@ -242,11 +258,57 @@ const FALLBACK_ISLAND3_TRAINING_ROCKS: Array<{
   },
 ];
 
+/**
+ * Fallback positions for Island 4 training rocks
+ */
+const FALLBACK_ISLAND4_TRAINING_ROCKS: Array<{
+  position: { x: number; y: number; z: number };
+  bounds?: TrainingRockLocation['bounds'];
+  tier: ISLAND4_TRAINING_ROCK_TIER;
+}> = [
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK,
+    position: { x: -932.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -935, maxX: -931, minZ: -6, maxZ: 0 },
+  },
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.EVERGREEN_CRYSTAL,
+    position: { x: -928.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -931, maxX: -927, minZ: -6, maxZ: 0 },
+  },
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.STARFLARE,
+    position: { x: -924.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -927, maxX: -923, minZ: -6, maxZ: 0 },
+  },
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.COAL_OF_YULE,
+    position: { x: -917.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -920, maxX: -916, minZ: -6, maxZ: 0 },
+  },
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.MOLTEN_COCOA_STONE,
+    position: { x: -913.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -916, maxX: -912, minZ: -6, maxZ: 0 },
+  },
+  {
+    tier: ISLAND4_TRAINING_ROCK_TIER.SUGARPLUM_QUARTZ,
+    position: { x: -909.5, y: 2.5, z: -2.5 },
+    bounds: { minX: -912, maxX: -908, minZ: -6, maxZ: 0 },
+  },
+];
+
 const INTERACT_INPUTS: string[] = ['e', 'ml'];
+
+// Distance constants for two-mode display
+const CLOSE_RANGE = 5; // Distance in blocks for "close" mode (shows interaction key)
+const FAR_RANGE = 12;  // Maximum distance for "far" mode (shows rock info)
 
 interface PlayerTrainingState {
   intervalId: NodeJS.Timeout;
   nearbyRockId?: string;
+  // Full unique ID (includes world prefix) for reliable cleanup on teleports/world changes
+  nearbyRockUniqueId?: string;
   promptVisible: boolean;
   promptCanTrain?: boolean;
   interactHeld: boolean;
@@ -254,6 +316,7 @@ interface PlayerTrainingState {
   trainingRockLocation?: TrainingRockLocation;
   trainingStartPosition?: { x: number; y: number; z: number }; // Position after teleport (for movement detection baseline)
   originalPosition?: { x: number; y: number; z: number }; // Original position before teleport (for restoration)
+  isAutoTraining?: boolean;
 }
 
 /**
@@ -267,7 +330,7 @@ export class TrainingController {
   private gameManager: GameManager;
   private trainingRockSpawns: Array<{
     position: { x: number; y: number; z: number };
-    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER;
+    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER;
     bounds?: TrainingRockLocation['bounds'];
     worldId?: string;
   }>;
@@ -275,6 +338,12 @@ export class TrainingController {
   private rockSceneUIs: Map<string, SceneUI> = new Map(); // Map of rock ID -> SceneUI
   private rockSceneUIInterval?: NodeJS.Timeout;
   private readonly PROXIMITY_CHECK_INTERVAL = 200; // ms
+  // Track player visibility states per rock for player-specific Scene UI
+  // Includes mode (far/close) for two-mode display
+  private rockPlayerVisibility: Map<
+    string,
+    Map<string, { visible: boolean; canTrain: boolean; mode: 'far' | 'close' }>
+  > = new Map();
 
   /**
    * Creates a new TrainingController instance
@@ -289,9 +358,9 @@ export class TrainingController {
     this.trainingSystem.setWorld(world); // Pass world to training system for pickaxe access
     this.rockManager = new TrainingRockManager(world);
 
-    // Detect Island 1 training rocks from map.json
-    const island1Spawns = detectTrainingRockPlacements(undefined, 'island1');
-    const island1Placements = island1Spawns.length ? island1Spawns : FALLBACK_TRAINING_ROCKS.map(rock => ({
+    // Use exact positions for Island 1 training rocks
+    // Auto-detection from map.json was finding incorrect cobblestone blocks after map updates
+    const island1Placements = FALLBACK_TRAINING_ROCKS.map(rock => ({
       ...rock,
       worldId: 'island1' as const,
     }));
@@ -311,8 +380,15 @@ export class TrainingController {
       worldId: 'island3' as const,
     }));
 
+    // Detect Island 4 training rocks from map.json
+    const island4Spawns = detectTrainingRockPlacements(undefined, 'island4');
+    const island4Placements = island4Spawns.length ? island4Spawns : FALLBACK_ISLAND4_TRAINING_ROCKS.map(rock => ({
+      ...rock,
+      worldId: 'island4' as const,
+    }));
+
     // Combine all placements
-    this.trainingRockSpawns = [...island1Placements, ...island2Placements, ...island3Placements];
+    this.trainingRockSpawns = [...island1Placements, ...island2Placements, ...island3Placements, ...island4Placements];
 
     // Register all training rocks (both Island 1 and Island 2)
     this.rockManager.registerTrainingRocksFromMap(this.trainingRockSpawns);
@@ -326,37 +402,45 @@ export class TrainingController {
 
   /**
    * Initializes SceneUIs for all training rocks
-   * These are always visible, not dependent on player proximity
+   * SceneUIs start invisible and become visible per-player when they enter proximity
    */
   private initializeAllRockSceneUIs(): void {
     const allRocks = this.rockManager.getAllTrainingRocks();
+    console.log(`[TrainingController] Initializing ${allRocks.length} rock SceneUIs`);
     for (const rock of allRocks) {
       // Use unique ID that includes world ID to prevent conflicts between worlds
       const uniqueId = rock.worldId ? `${rock.worldId}:${rock.rockData.id}` : rock.rockData.id;
+      console.log(`[TrainingController] Rock ${uniqueId}: position=${JSON.stringify(rock.position)}, tier=${rock.rockData.tier}, worldId=${rock.worldId}`);
       const sceneUI = this.ensureRockSceneUI(uniqueId, rock);
-      
+
       // Format power requirement with proper letter abbreviations (K, M, B, T, etc.)
       // Handle both Island 1 and Island 2 rock data
       const requiredPower = 'requiredPower' in rock.rockData ? rock.rockData.requiredPower : 0;
       const powerReqText = formatNumber(requiredPower);
-      
+
       // Set initial state with base power gain (no player-specific calculation)
       // Handle both Island 1 (powerGainMultiplier) and Island 2 (uiPowerBonus) rocks
-      const powerBonus = 'uiPowerBonus' in rock.rockData 
-        ? rock.rockData.uiPowerBonus 
-        : ('powerGainMultiplier' in rock.rockData ? rock.rockData.powerGainMultiplier : 1);
+      const powerBonus =
+        'uiPowerBonus' in rock.rockData
+          ? rock.rockData.uiPowerBonus
+          : 'powerGainMultiplier' in rock.rockData
+            ? rock.rockData.powerGainMultiplier
+            : 1;
       const powerGainText = `+${formatNumber(powerBonus)} Power`;
       const requirementText = `${powerReqText} Required`;
       const requiredRebirths = 'requiredRebirths' in rock.rockData ? rock.rockData.requiredRebirths : 0;
       const rebirthText = `${formatNumber(requiredRebirths)} Rebirths`;
-      
+
+      // Initialize with empty playerStates - SceneUI is invisible until players enter proximity
       sceneUI.setState({
-        visible: true,
         requirementText,
         rebirthText,
         powerGainText,
-        canTrain: true, // Always show as trainable (access check happens on interaction)
+        playerStates: {}, // Empty - no players in proximity initially
       });
+
+      // Initialize empty player visibility map for this rock
+      this.rockPlayerVisibility.set(uniqueId, new Map());
     }
     
     // Set up periodic position updates to keep SceneUIs anchored to their rocks
@@ -381,6 +465,7 @@ export class TrainingController {
       }
     }
     this.rockSceneUIs.clear();
+    this.rockPlayerVisibility.clear();
     this.initializeAllRockSceneUIs();
   }
   
@@ -389,22 +474,26 @@ export class TrainingController {
     if (sceneUI) {
       // Update position to ensure it stays anchored to the rock
       const { x, y, z } = rockLocation.position;
+      const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
       const uiPos = {
         x,
-        y: y + 3.5, // float above rock (lowered from 4.5, matching updateRockSceneUIPosition)
-        z,
+        y: y + 1.8, // float above rock (lowered for better visibility)
+        z: z + zOffset,
       };
+      console.log(`[TrainingController] Updating SceneUI for ${rockId}: rockPos=${JSON.stringify(rockLocation.position)}, uiPos=${JSON.stringify(uiPos)}, worldId=${rockLocation.worldId}, tier=${rockLocation.rockData.tier}`);
       sceneUI.setPosition(uiPos);
       return sceneUI;
     }
-  
+
     // Use the rock's actual world position with offset above the rock
     const { x, y, z } = rockLocation.position;
+    const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
     const uiPos = {
       x,
-      y: y + 2.5, // float above rock
-      z,
+      y: y + 1.8, // float above rock (lowered for better visibility)
+      z: z + zOffset,
     };
+    console.log(`[TrainingController] Creating SceneUI for ${rockId}: rockPos=${JSON.stringify(rockLocation.position)}, uiPos=${JSON.stringify(uiPos)}, worldId=${rockLocation.worldId}, tier=${rockLocation.rockData.tier}`);
 
     sceneUI = new SceneUI({
       templateId: 'training:prompt',
@@ -437,10 +526,11 @@ export class TrainingController {
     if (!sceneUI) return;
 
     const { x, y, z } = rockLocation.position;
+    const zOffset = rockLocation.worldId === 'island2' ? -1 : 0;
     const uiPos = {
       x,
-      y: y + 3.5, // float above rock (lowered from 4.5)
-      z,
+      y: y + 1.8, // float above rock (lowered for better visibility)
+      z: z + zOffset,
     };
     sceneUI.setPosition(uiPos);
   }
@@ -466,7 +556,7 @@ export class TrainingController {
    * @param rockLocation - Training rock location to train on (optional, will find nearby if not provided)
    * @returns True if training started successfully
    */
-  startTraining(player: Player, rockLocation?: TrainingRockLocation): boolean {
+  startTraining(player: Player, rockLocation?: TrainingRockLocation, isAutoTraining: boolean = false): boolean {
     if (this.trainingSystem.isPlayerTraining(player)) {
       return true;
     }
@@ -542,18 +632,33 @@ export class TrainingController {
               z: targetRock.position.z + 0.1,
             };
           })()
+      : worldId === 'island4'
+        ? {
+            x: Math.round(targetRock.position.x * 10) / 10,
+            y: originalPosition.y,
+            z: Math.round((targetRock.position.z + 1.23) * 100) / 100,
+          }
       : {
           x: targetRock.position.x, // Same X as the ore block
           y: originalPosition.y,
           z: -9.27, // Fixed Z position (forward of the ore blocks, Island 1)
         };
     playerEntity.setPosition(standPosition);
+    // Keep pets snapped to the player after teleporting to a training rock
+    this.gameManager.syncEquippedPets(player);
+
+    // Face north (positive Z direction) when training
+    // Identity quaternion (0 degrees rotation)
+    const northFacingRotation = { x: 0, y: 0, z: 0, w: 1 };
+    if (typeof playerEntity.setRotation === 'function') {
+      playerEntity.setRotation(northFacingRotation);
+    }
 
     // Hide prompt while training (both regular and SceneUI)
     this.hideInteractPrompt(player);
-    // Use unique ID that includes world ID
+    // Use unique ID that includes world ID and hide for this specific player
     const uniqueId = targetRock.worldId ? `${targetRock.worldId}:${targetRock.rockData.id}` : targetRock.rockData.id;
-    this.hideRockSceneUI(uniqueId);
+    this.hideRockSceneUIForPlayer(player, uniqueId);
 
     // Store the training rock location and positions
     const state = this.playerStates.get(player);
@@ -564,6 +669,10 @@ export class TrainingController {
       state.trainingStartPosition = standPosition;
       // Store original position separately for restoration
       state.originalPosition = originalPosition;
+      // Keep the last nearby rock unique id in sync so teleport cleanup can always hide it.
+      state.nearbyRockId = targetRock.rockData.id;
+      state.nearbyRockUniqueId = uniqueId;
+      state.isAutoTraining = isAutoTraining;
     }
 
     // Start velocity monitoring to detect movement (including jumping)
@@ -590,18 +699,29 @@ export class TrainingController {
           hitRate = 3.0; // Rocks 1-5: 3 hits/second
         }
       }
-    } else if (worldId === 'island3') {
+    } else if (worldId === 'island3' || worldId === 'island4') {
       const rockData = targetRock.rockData as any;
       if (rockData.hitRate !== undefined) {
         hitRate = rockData.hitRate;
       }
+    } else if (worldId === 'island1') {
+      const rockData = targetRock.rockData as TrainingRockData;
+      if (rockData.tier === TrainingRockTier.EMERALD_DEEPSLATE) {
+        hitRate = 3.0; // Rock 6: 3 hits/second
+      }
+    }
+
+    // Achievements: faster training is applied as a multiplier to hit rate.
+    const trainingSpeedMult = getBonuses(playerData).trainingSpeedMultiplier ?? 1;
+    if (Number.isFinite(trainingSpeedMult) && trainingSpeedMult > 0) {
+      hitRate *= trainingSpeedMult;
     }
 
     // Create a unified rock data structure for TrainingSystem
     // TrainingSystem expects TrainingRockData, but we might have Island2/Island3 data
     let rockDataForSystem: TrainingRockData;
-    if ((worldId === 'island2' || worldId === 'island3') && 'uiPowerBonus' in targetRock.rockData) {
-      const rock = targetRock.rockData as Island2TrainingRockData | Island3TrainingRockData;
+    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4') && 'uiPowerBonus' in targetRock.rockData) {
+      const rock = targetRock.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData;
       rockDataForSystem = {
         id: rock.id,
         tier: rock.tier as any,
@@ -640,7 +760,10 @@ export class TrainingController {
           finalGain = MAX_SAFE_POWER_GAIN;
         }
         
+        // Achievements: track total power trained (persistent)
+        addPowerTrained(playerData, finalGain);
         const newTotal = this.gameManager.addPower(p, finalGain);
+        this.gameManager.getTutorialManager().onTrainingPowerGain(p);
         this.sendPowerGainEvent(p, finalGain, newTotal, targetRock.position);
         this.gameManager.getTutorialManager().handleTrainingHit(p);
       },
@@ -663,7 +786,11 @@ export class TrainingController {
    */
   stopTraining(player: Player): void {
     if (!this.trainingSystem.isPlayerTraining(player)) return;
-    
+
+    // Debug: Log where stopTraining was called from
+    const stack = new Error().stack;
+    console.log('[TrainingController] stopTraining called for player:', player.username, '\nStack:', stack);
+
     const rockName = this.trainingSystem.getPlayerTrainingRock(player)?.name || 'unknown rock';
     
     // Stop velocity monitoring
@@ -697,6 +824,16 @@ export class TrainingController {
       type: 'TRAINING_STATE',
       isTraining: false,
     });
+
+    // Always clear this player's SceneUI state for the training rock they were using.
+    // This prevents the "close" prompt from sticking after teleports (e.g., auto-mine).
+    if (state?.trainingRockLocation) {
+      const trainingRockId = state.trainingRockLocation.worldId
+        ? `${state.trainingRockLocation.worldId}:${state.trainingRockLocation.rockData.id}`
+        : state.trainingRockLocation.rockData.id;
+      this.hideRockSceneUIForPlayer(player, trainingRockId);
+    }
+
     // Show prompt again if still in area
     if (state?.trainingRockLocation) {
       const currentNearbyRock = this.getNearbyTrainingRock(player);
@@ -705,13 +842,15 @@ export class TrainingController {
         if (playerData) {
           const access = this.getAccessState(playerData, currentNearbyRock.rockData);
           this.showInteractPrompt(player, currentNearbyRock, access);
-          this.updateRockSceneUI(currentNearbyRock, access);
+          // Update SceneUI with player-specific visibility
+          this.updateRockSceneUIForPlayer(player, currentNearbyRock, access);
         }
       }
       // Clear training state
       state.trainingRockLocation = undefined;
       state.trainingStartPosition = undefined;
       state.originalPosition = undefined;
+      state.isAutoTraining = false;
     }
   }
 
@@ -840,6 +979,15 @@ export class TrainingController {
       [ISLAND3_TRAINING_ROCK_TIER.SULFURON]: 0,
     };
 
+    const tierOrderIsland4: Record<ISLAND4_TRAINING_ROCK_TIER, number> = {
+      [ISLAND4_TRAINING_ROCK_TIER.SUGARPLUM_QUARTZ]: 5,
+      [ISLAND4_TRAINING_ROCK_TIER.MOLTEN_COCOA_STONE]: 4,
+      [ISLAND4_TRAINING_ROCK_TIER.COAL_OF_YULE]: 3,
+      [ISLAND4_TRAINING_ROCK_TIER.STARFLARE]: 2,
+      [ISLAND4_TRAINING_ROCK_TIER.EVERGREEN_CRYSTAL]: 1,
+      [ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK]: 0,
+    };
+
     accessibleRocks.sort((a, b) => {
       // Use appropriate tier order based on world
       let tierA = -1;
@@ -854,6 +1002,9 @@ export class TrainingController {
       } else if (currentWorld === 'island3') {
         tierA = tierOrderIsland3[a.rockData.tier as ISLAND3_TRAINING_ROCK_TIER] ?? -1;
         tierB = tierOrderIsland3[b.rockData.tier as ISLAND3_TRAINING_ROCK_TIER] ?? -1;
+      } else if (currentWorld === 'island4') {
+        tierA = tierOrderIsland4[a.rockData.tier as ISLAND4_TRAINING_ROCK_TIER] ?? -1;
+        tierB = tierOrderIsland4[b.rockData.tier as ISLAND4_TRAINING_ROCK_TIER] ?? -1;
       }
       
       return tierB - tierA; // Descending order
@@ -878,7 +1029,22 @@ export class TrainingController {
     }
     this.trainingSystem.cleanupPlayer(player);
     this.playerStates.delete(player);
-    // SceneUIs are always visible, no need to update
+
+    // Remove player from all rock visibility states
+    for (const [rockId, playerVisibility] of this.rockPlayerVisibility.entries()) {
+      if (playerVisibility.has(player.id)) {
+        playerVisibility.delete(player.id);
+        // Update the SceneUI with the player removed
+        const sceneUI = this.rockSceneUIs.get(rockId);
+        if (sceneUI) {
+          const playerStates: Record<string, { visible: boolean; canTrain: boolean; mode?: string }> = {};
+          for (const [playerId, visState] of playerVisibility.entries()) {
+            playerStates[playerId] = visState;
+          }
+          sceneUI.setState({ playerStates });
+        }
+      }
+    }
   }
 
   /**
@@ -888,6 +1054,284 @@ export class TrainingController {
     for (const player of this.playerStates.keys()) {
       this.cleanupPlayer(player);
     }
+  }
+
+  /**
+   * Finds a training rock by hit position (from raycast)
+   * Used for tap-to-interact functionality
+   *
+   * @param hitPosition - Position where the raycast hit
+   * @param player - Player who initiated the interaction (to filter by world)
+   * @returns Training rock location or null if no rock found at position
+   */
+  findRockByPosition(hitPosition: { x: number; y: number; z: number }, player: Player): TrainingRockLocation | null {
+    const playerData = this.gameManager.getPlayerData(player);
+    const currentWorld = playerData?.currentWorld || 'island1';
+    const allRocks = this.rockManager.getAllTrainingRocks();
+
+    for (const rock of allRocks) {
+      // Only consider rocks from current world
+      if (rock.worldId !== currentWorld) continue;
+
+      // Check if hit position is within rock bounds (if bounds defined)
+      if (rock.bounds) {
+        const withinX = hitPosition.x >= rock.bounds.minX && hitPosition.x <= rock.bounds.maxX;
+        const withinZ = hitPosition.z >= rock.bounds.minZ && hitPosition.z <= rock.bounds.maxZ;
+        if (withinX && withinZ) {
+          return rock;
+        }
+      }
+
+      // Fallback: check distance from rock position (3 block radius)
+      const dx = hitPosition.x - rock.position.x;
+      const dz = hitPosition.z - rock.position.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+      if (distance <= 3) {
+        return rock;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Handles tap-to-interact (PlayerEvent.INTERACT)
+   * Allows players to tap on training rocks or SceneUI from any distance
+   * Will teleport player to rock and start training
+   *
+   * @param player - Player who initiated the interaction
+   * @param hitPosition - Optional hit position from raycast (works for tapping rock blocks or SceneUI)
+   * @returns True if interaction was handled
+   */
+  handleInteract(player: Player, hitPosition?: { x: number; y: number; z: number }): boolean {
+    // If already training, don't start another session
+    if (this.trainingSystem.isPlayerTraining(player)) {
+      return false;
+    }
+
+    let targetRock: TrainingRockLocation | null = null;
+
+    // Try to find rock by hit position first
+    if (hitPosition) {
+      targetRock = this.findRockByPosition(hitPosition, player);
+    }
+
+    // Fallback: if no hit position or rock not found, try nearby rock
+    if (!targetRock) {
+      targetRock = this.getNearbyTrainingRock(player);
+    }
+
+    if (!targetRock) {
+      return false;
+    }
+
+    // Check if player can access this rock
+    const playerData = this.gameManager.getPlayerData(player);
+    if (!playerData) {
+      return false;
+    }
+
+    const access = this.getAccessState(playerData, targetRock.rockData);
+    if (!access.canTrain) {
+      // Show locked state in SceneUI but don't start training
+      this.updateRockSceneUIForPlayer(player, targetRock, access);
+      return false;
+    }
+
+    // Start training (teleport + start)
+    return this.startTrainingFromInteract(player, targetRock);
+  }
+
+  /**
+   * Starts training from a tap/interact event
+   * Similar to startTraining but WITHOUT proximity validation
+   * This allows players to interact from any distance
+   *
+   * @param player - Player who wants to train
+   * @param rockLocation - Training rock location to train on
+   * @returns True if training started successfully
+   */
+  startTrainingFromInteract(player: Player, rockLocation: TrainingRockLocation, isAutoTraining: boolean = false): boolean {
+    if (this.trainingSystem.isPlayerTraining(player)) {
+      return true;
+    }
+
+    const playerData = this.gameManager.getPlayerData(player);
+    if (!playerData) {
+      return false;
+    }
+
+    // Check if player can access this rock
+    const access = this.getAccessState(playerData, rockLocation.rockData);
+    if (!access.canTrain) {
+      return false;
+    }
+
+    const playerEntity = this.getPlayerEntity(player);
+    if (!playerEntity) {
+      return false;
+    }
+
+    // Get player's pickaxe
+    const pickaxe = this.gameManager.getPlayerPickaxe(player);
+    if (!pickaxe) {
+      return false;
+    }
+
+    // Store original position before teleporting (for restoration on exit)
+    const originalPosition = { ...playerEntity.position };
+
+    // Get world ID to determine teleport position offset
+    const worldId = playerData.currentWorld || 'island1';
+
+    // Move player next to the rock so swings visibly hit it
+    // Use original Y to avoid ground/air collisions on teleport
+    const standPosition = worldId === 'island2'
+      ? {
+          x: Math.round((rockLocation.position.x + 0.02) * 10) / 10,
+          y: originalPosition.y,
+          z: rockLocation.position.z + 0.1,
+        }
+      : worldId === 'island3'
+        ? (() => {
+            if (rockLocation.bounds) {
+              const centerX = (rockLocation.bounds.minX + rockLocation.bounds.maxX) / 2;
+              const centerZ = (rockLocation.bounds.minZ + rockLocation.bounds.maxZ) / 2;
+              return {
+                x: Math.round(centerX * 10) / 10,
+                y: originalPosition.y,
+                z: Math.round(centerZ * 10) / 10,
+              };
+            }
+            return {
+              x: Math.round((rockLocation.position.x + 0.02) * 10) / 10,
+              y: originalPosition.y,
+              z: rockLocation.position.z + 0.1,
+            };
+          })()
+        : worldId === 'island4'
+          ? {
+              x: Math.round(rockLocation.position.x * 10) / 10,
+              y: originalPosition.y,
+              z: Math.round((rockLocation.position.z + 1.23) * 100) / 100,
+            }
+        : {
+            x: rockLocation.position.x,
+            y: originalPosition.y,
+            z: -9.27,
+          };
+    playerEntity.setPosition(standPosition);
+    // Keep pets snapped to the player after teleporting to a training rock
+    this.gameManager.syncEquippedPets(player);
+
+    // Face north (positive Z direction) when training
+    // Identity quaternion (0 degrees rotation)
+    const northFacingRotation = { x: 0, y: 0, z: 0, w: 1 };
+    if (typeof playerEntity.setRotation === 'function') {
+      playerEntity.setRotation(northFacingRotation);
+    }
+
+    // Hide prompt while training (both regular and SceneUI)
+    this.hideInteractPrompt(player);
+    const uniqueId = rockLocation.worldId ? `${rockLocation.worldId}:${rockLocation.rockData.id}` : rockLocation.rockData.id;
+    this.hideRockSceneUIForPlayer(player, uniqueId);
+
+    // Store the training rock location and positions
+    const state = this.playerStates.get(player);
+    if (state) {
+      state.trainingRockLocation = rockLocation;
+      state.trainingStartPosition = standPosition;
+      state.originalPosition = originalPosition;
+      state.isAutoTraining = isAutoTraining;
+    }
+
+    // Start velocity monitoring to detect movement (including jumping)
+    this.startVelocityMonitoring(player, rockLocation);
+
+    // Determine hit rate based on world ID
+    let hitRate = 2.0;
+    if (worldId === 'island2') {
+      const rockData = rockLocation.rockData as any;
+      if (rockData.hitRate !== undefined) {
+        hitRate = rockData.hitRate;
+      } else {
+        const rockId = rockLocation.rockData.id;
+        if (rockId === 'tradewindite-rock') {
+          hitRate = 4.0;
+        } else {
+          hitRate = 3.0;
+        }
+      }
+    } else if (worldId === 'island3' || worldId === 'island4') {
+      const rockData = rockLocation.rockData as any;
+      if (rockData.hitRate !== undefined) {
+        hitRate = rockData.hitRate;
+      }
+    } else if (worldId === 'island1') {
+      const rockData = rockLocation.rockData as TrainingRockData;
+      if (rockData.tier === TrainingRockTier.EMERALD_DEEPSLATE) {
+        hitRate = 3.0; // Rock 6: 3 hits/second
+      }
+    }
+
+    // Achievements: faster training is applied as a multiplier to hit rate.
+    const trainingSpeedMult = getBonuses(playerData).trainingSpeedMultiplier ?? 1;
+    if (Number.isFinite(trainingSpeedMult) && trainingSpeedMult > 0) {
+      hitRate *= trainingSpeedMult;
+    }
+
+    // Create a unified rock data structure for TrainingSystem
+    let rockDataForSystem: TrainingRockData;
+    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4') && 'uiPowerBonus' in rockLocation.rockData) {
+      const rock = rockLocation.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData;
+      rockDataForSystem = {
+        id: rock.id,
+        tier: rock.tier as any,
+        name: rock.name,
+        requiredRebirths: rock.requiredRebirths,
+        requiredPower: rock.requiredPower,
+        powerGainMultiplier: rock.uiPowerBonus,
+      };
+    } else {
+      rockDataForSystem = rockLocation.rockData as TrainingRockData;
+    }
+
+    // Start training loop
+    this.trainingSystem.startTraining(
+      player,
+      rockDataForSystem,
+      pickaxe,
+      playerData,
+      playerEntity,
+      (p, powerGain) => {
+        const multiplierSum = this.gameManager.getPetManager().getTrainingMultiplierSum(p);
+        let finalGain = powerGain * multiplierSum;
+
+        if (!Number.isFinite(finalGain) || finalGain < 0) {
+          finalGain = 0;
+        }
+
+        const MAX_SAFE_POWER_GAIN = Number.MAX_VALUE;
+        if (finalGain > MAX_SAFE_POWER_GAIN) {
+          finalGain = MAX_SAFE_POWER_GAIN;
+        }
+
+        // Achievements: track total power trained (persistent)
+        addPowerTrained(playerData, finalGain);
+        const newTotal = this.gameManager.addPower(p, finalGain);
+        this.gameManager.getTutorialManager().onTrainingPowerGain(p);
+        this.sendPowerGainEvent(p, finalGain, newTotal, rockLocation.position);
+      },
+      worldId,
+      hitRate
+    );
+
+    player.ui.sendData({
+      type: 'TRAINING_STATE',
+      isTraining: true,
+      rockName: rockLocation.rockData.name,
+    });
+    return true;
   }
 
   /**
@@ -901,7 +1345,12 @@ export class TrainingController {
     if (!playerEntity) {
       if (state.promptVisible) this.hideInteractPrompt(player);
       if (this.trainingSystem.isPlayerTraining(player)) this.stopTraining(player);
+      // If the player entity disappeared (teleport/world switch), force-hide any lingering SceneUI state.
+      if (state.nearbyRockUniqueId) {
+        this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
+      }
       state.nearbyRockId = undefined;
+      state.nearbyRockUniqueId = undefined;
       return;
     }
 
@@ -915,7 +1364,12 @@ export class TrainingController {
       if (state.promptVisible) {
         this.hideInteractPrompt(player);
       }
+      // Always hide the SceneUI when leaving proximity, even if promptVisible drifted.
+      if (state.nearbyRockUniqueId) {
+        this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
+      }
       state.nearbyRockId = undefined;
+      state.nearbyRockUniqueId = undefined;
       state.promptCanTrain = undefined;
       if (this.trainingSystem.isPlayerTraining(player)) {
         this.stopTraining(player);
@@ -934,11 +1388,22 @@ export class TrainingController {
       return;
     }
 
+    const nextRockUniqueId = rockLocation.worldId
+      ? `${rockLocation.worldId}:${rockLocation.rockData.id}`
+      : rockLocation.rockData.id;
+
+    // If we switched rocks, clear the previous rock's SceneUI state for this player.
+    if (state.nearbyRockUniqueId && state.nearbyRockUniqueId !== nextRockUniqueId) {
+      this.hideRockSceneUIForPlayer(player, state.nearbyRockUniqueId);
+    }
+
     this.showInteractPrompt(player, rockLocation, access);
 
-    this.updateRockSceneUI(rockLocation, access);
+    // Update SceneUI with player-specific visibility
+    this.updateRockSceneUIForPlayer(player, rockLocation, access);
     state.promptVisible = true;
     state.nearbyRockId = rockLocation.rockData.id;
+    state.nearbyRockUniqueId = nextRockUniqueId;
     state.promptCanTrain = access.canTrain;
   }
 
@@ -968,30 +1433,14 @@ export class TrainingController {
     rockLocation: TrainingRockLocation,
     access: { canTrain: boolean; meetsPower: boolean; meetsRebirth: boolean }
   ): void {
-    // Show the bottom UI prompt with "Hold E to interact"
-      // Handle both Island 1 and Island 2 rock data
-      const requiredPower = 'requiredPower' in rockLocation.rockData ? rockLocation.rockData.requiredPower : 0;
-      const requiredRebirths = 'requiredRebirths' in rockLocation.rockData ? rockLocation.rockData.requiredRebirths : 0;
-      
-      player.ui.sendData({
-        type: 'TRAINING_PROMPT',
-        visible: true,
-        rockName: rockLocation.rockData.name,
-        requirements: {
-          power: requiredPower,
-          rebirths: requiredRebirths,
-        },
-        canTrain: access.canTrain,
-        actionKey: 'E',
-      });
+    // No-op: Bottom overlay UI removed in favor of SceneUI
+    // The SceneUI now shows the interaction prompt in two-mode display
+    // This method is kept for compatibility but does nothing
   }
 
   private hideInteractPrompt(player: Player): void {
-    // Hide bottom UI prompt (we're not using it anymore)
-    player.ui.sendData({
-      type: 'TRAINING_PROMPT',
-      visible: false,
-    });
+    // No-op: Bottom overlay UI removed in favor of SceneUI
+    // Just update state tracking
     const state = this.playerStates.get(player);
     if (state) {
       state.promptVisible = false;
@@ -999,23 +1448,129 @@ export class TrainingController {
     }
   }
 
+  /**
+   * Updates the SceneUI for a rock with player-specific visibility
+   * Called when a player enters proximity to a training rock
+   * Now includes mode (far/close) based on distance
+   */
+  private updateRockSceneUIForPlayer(
+    player: Player,
+    rockLocation: TrainingRockLocation,
+    access: { canTrain: boolean; meetsPower: boolean; meetsRebirth: boolean }
+  ): void {
+    const uniqueId = rockLocation.worldId
+      ? `${rockLocation.worldId}:${rockLocation.rockData.id}`
+      : rockLocation.rockData.id;
+    const sceneUI = this.rockSceneUIs.get(uniqueId);
+    if (!sceneUI) {
+      console.log(`[TrainingController] No SceneUI found for rock ${uniqueId}`);
+      return;
+    }
+
+    // Calculate distance to determine mode (far or close)
+    const playerEntity = this.getPlayerEntity(player);
+    let mode: 'far' | 'close' = 'far';
+    let distance = -1;
+    if (playerEntity) {
+      const dx = playerEntity.position.x - rockLocation.position.x;
+      const dz = playerEntity.position.z - rockLocation.position.z;
+      distance = Math.sqrt(dx * dx + dz * dz);
+      mode = distance <= CLOSE_RANGE ? 'close' : 'far';
+      console.log(`[TrainingController] Player ${player.username} distance to ${rockLocation.rockData.name}: ${distance.toFixed(2)} blocks, mode: ${mode} (CLOSE_RANGE=${CLOSE_RANGE})`);
+    } else {
+      console.log(`[TrainingController] No player entity found for ${player.username}`);
+    }
+
+    // Get or create the player visibility map for this rock
+    if (!this.rockPlayerVisibility.has(uniqueId)) {
+      this.rockPlayerVisibility.set(uniqueId, new Map());
+    }
+    const playerVisibility = this.rockPlayerVisibility.get(uniqueId)!;
+
+    // Update this player's visibility state WITH mode (like Wumpus NPC pattern)
+    playerVisibility.set(player.id, {
+      visible: true,
+      canTrain: access.canTrain,
+      mode: mode, // Store the mode in visibility map so it persists for other players' updates
+    });
+
+    // Build playerStates object for the SceneUI
+    // Each player's mode is now stored in the visibility map, so all players keep their correct mode
+    const playerStates: Record<
+      string,
+      { visible: boolean; canTrain: boolean; mode: 'far' | 'close'; rockName?: string; powerGain?: string }
+    > = {};
+    for (const [playerId, state] of playerVisibility.entries()) {
+      playerStates[playerId] = {
+        ...state,
+        rockName: rockLocation.rockData.name,
+      };
+    }
+
+    // Get current rock data for display
+    const requiredPower = 'requiredPower' in rockLocation.rockData ? rockLocation.rockData.requiredPower : 0;
+    const requiredRebirths = 'requiredRebirths' in rockLocation.rockData ? rockLocation.rockData.requiredRebirths : 0;
+    const powerBonus =
+      'uiPowerBonus' in rockLocation.rockData
+        ? rockLocation.rockData.uiPowerBonus
+        : 'powerGainMultiplier' in rockLocation.rockData
+          ? rockLocation.rockData.powerGainMultiplier
+          : 1;
+
+    // Update SceneUI with playerStates (now includes mode)
+    console.log(`[TrainingController] Setting SceneUI state for ${rockLocation.rockData.name}, playerStates:`, JSON.stringify(playerStates, null, 2));
+    sceneUI.setState({
+      requirementText: `${formatNumber(requiredPower)} Required`,
+      rebirthText: `${formatNumber(requiredRebirths)} Rebirths`,
+      powerGainText: `+${formatNumber(powerBonus)} Power`,
+      rockName: rockLocation.rockData.name,
+      playerStates,
+    });
+  }
+
+  /**
+   * Hides the SceneUI for a specific player when they leave proximity
+   */
+  private hideRockSceneUIForPlayer(player: Player, rockId: string): void {
+    const sceneUI = this.rockSceneUIs.get(rockId);
+    if (!sceneUI) return;
+
+    // Get the player visibility map for this rock
+    const playerVisibility = this.rockPlayerVisibility.get(rockId);
+    if (!playerVisibility) return;
+
+    // Remove this player from visibility
+    playerVisibility.delete(player.id);
+
+    // Build playerStates object for the SceneUI
+    const playerStates: Record<string, { visible: boolean; canTrain: boolean; mode: 'far' | 'close' }> = {};
+    for (const [playerId, state] of playerVisibility.entries()) {
+      playerStates[playerId] = state;
+    }
+
+    // Update SceneUI with updated playerStates (this player now removed)
+    sceneUI.setState({
+      playerStates,
+    });
+  }
+
   private updateRockSceneUI(
     rockLocation: TrainingRockLocation,
     access: { canTrain: boolean; meetsPower: boolean; meetsRebirth: boolean }
   ): void {
-    // SceneUIs are always visible now, so we don't need to update them based on proximity
-    // The UI shows base requirements and power gain, which don't change
+    // Legacy method - no longer used for player-specific visibility
+    // Kept for backwards compatibility
     return;
   }
 
   private hideRockSceneUI(rockId: string): void {
-    // SceneUIs are always visible, so we don't hide them
+    // Legacy method - no longer used for player-specific visibility
+    // Kept for backwards compatibility
     return;
   }
-  
+
   private updateAllRockSceneUIs(): void {
-    // SceneUIs are always visible now, no need to update based on player proximity
-    // They show static information (requirements and base power gain)
+    // SceneUIs are now updated per-player via updateRockSceneUIForPlayer
     return;
   }
 
@@ -1034,8 +1589,8 @@ export class TrainingController {
     return entities[0];
   }
 
-  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData) {
-    // Handle Island 1 (TrainingRockData), Island 2 (Island2TrainingRockData), and Island 3 (Island3TrainingRockData) rocks
+  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData) {
+    // Handle Island 1 (TrainingRockData), Island 2 (Island2TrainingRockData), Island 3 (Island3TrainingRockData), and Island 4 (Island4TrainingRockData) rocks
     const requiredPower = 'requiredPower' in rock ? rock.requiredPower : 0;
     const requiredRebirths = 'requiredRebirths' in rock ? rock.requiredRebirths : 0;
     
@@ -1076,6 +1631,8 @@ export class TrainingController {
         return;
       }
 
+      const isAutoTraining = Boolean(state.isAutoTraining);
+
       // Get current position and compare to training start position
       const currentPos = playerEntity.position;
       const startPos = state.trainingStartPosition;
@@ -1094,8 +1651,9 @@ export class TrainingController {
           input?.['W'] || input?.['A'] || input?.['S'] || input?.['D'] ||
           input?.[' '] // Space bar for jumping
         );
-        
-        if (isMoving || horizontalDistance > 0.3) {
+
+        const maxHorizontalDrift = isAutoTraining ? 1.0 : 0.3;
+        if (isMoving || horizontalDistance > maxHorizontalDrift) {
           this.stopTraining(player);
         }
         return;
@@ -1116,32 +1674,32 @@ export class TrainingController {
         input?.[' '] // Space bar for jumping
       );
 
-      // Try to get velocity from entity if available
+      // Try to get velocity from entity if available (manual training only)
       let horizontalVelocity = 0;
       let verticalVelocity = 0;
-      try {
-        const velocity = (playerEntity as any).velocity;
-        if (velocity) {
-          const vx = velocity.x || 0;
-          const vy = velocity.y || 0;
-          const vz = velocity.z || 0;
-          horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
-          verticalVelocity = Math.abs(vy);
+      if (!isAutoTraining) {
+        try {
+          const velocity = (playerEntity as any).velocity;
+          if (velocity) {
+            const vx = velocity.x || 0;
+            const vy = velocity.y || 0;
+            const vz = velocity.z || 0;
+            horizontalVelocity = Math.sqrt(vx * vx + vz * vz);
+            verticalVelocity = Math.abs(vy);
+          }
+        } catch (e) {
+          // Velocity not available, use position-based check
         }
-      } catch (e) {
-        // Velocity not available, use position-based check
       }
 
-      // Stop training if ANY movement detected:
-      // - Horizontal movement input (WASD)
-      // - Jump input (space)
-      // - Horizontal velocity > 0.1
-      // - Vertical velocity > 0.1 (jumping)
-      // - Horizontal distance > 0.3 (walked)
-      // - Vertical distance > 0.3 (jumped)
+      // Stop training if movement detected.
+      // Auto training allows more drift to avoid false stops from tiny physics jitter.
+      const maxHorizontalDrift = isAutoTraining ? 1.0 : 0.3;
+      const maxVerticalDrift = isAutoTraining ? 1.0 : 0.3;
+
       const hasMovementInput = isMoving;
-      const hasHorizontalMovement = horizontalVelocity > 0.1 || horizontalDistance > 0.3;
-      const hasVerticalMovement = verticalVelocity > 0.1 || verticalDistance > 0.3;
+      const hasHorizontalMovement = horizontalVelocity > 0.1 || horizontalDistance > maxHorizontalDrift;
+      const hasVerticalMovement = verticalVelocity > 0.1 || verticalDistance > maxVerticalDrift;
       
       if (hasMovementInput || hasHorizontalMovement || hasVerticalMovement) {
         this.stopTraining(player);

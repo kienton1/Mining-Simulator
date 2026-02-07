@@ -1,0 +1,232 @@
+<!-- Leaderboards Modal -->
+<div
+  id="leaderboard-modal"
+  class="hud leaderboard-modal"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 11000;
+  "
+>
+  <div class="leaderboard-modal__container">
+    <div class="leaderboard-modal__header">
+      <div class="leaderboard-modal__title">LEADERBOARDS</div>
+      <button id="leaderboard-close-btn" class="modal__close" data-close="leaderboard-modal">X</button>
+    </div>
+
+    <div id="leaderboard-tabs" class="leaderboard-modal__tabs"></div>
+
+    <div class="leaderboard-modal__content">
+      <div class="leaderboard-modal__meta">
+        <div id="leaderboard-category-title" class="leaderboard-modal__category-title">Power</div>
+        <div id="leaderboard-updated" class="leaderboard-modal__updated"></div>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-modal__list"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #leaderboard-modal.visible {
+    display: flex !important;
+  }
+
+  .leaderboard-modal__container {
+    width: min(980px, 94vw);
+    height: min(680px, 86vh);
+    background:
+      radial-gradient(circle at top left, rgba(55, 214, 232, 0.15), transparent 55%),
+      radial-gradient(circle at bottom right, rgba(244, 196, 78, 0.15), transparent 60%),
+      linear-gradient(180deg, rgba(14, 20, 34, 0.98), rgba(9, 13, 24, 0.98));
+    border: 3px solid rgba(55, 214, 232, 0.35);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .leaderboard-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 2px solid rgba(55, 214, 232, 0.22);
+    background: linear-gradient(90deg, rgba(12, 18, 32, 0.9), rgba(20, 26, 42, 0.9));
+  }
+
+  .leaderboard-modal__title {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #f8fafc;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .leaderboard-modal__tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 2px solid rgba(244, 196, 78, 0.18);
+    background: rgba(5, 8, 18, 0.55);
+    overflow-x: auto;
+  }
+
+  .leaderboard-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(244, 196, 78, 0.25);
+    background: rgba(20, 26, 42, 0.85);
+    color: #f8fafc;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .leaderboard-tab img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+  }
+
+  .leaderboard-tab:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+    border-color: rgba(55, 214, 232, 0.6);
+  }
+
+  .leaderboard-tab.active {
+    background: linear-gradient(135deg, rgba(55, 214, 232, 0.25), rgba(244, 196, 78, 0.2));
+    border-color: rgba(55, 214, 232, 0.85);
+    color: #ffffff;
+  }
+
+  .leaderboard-modal__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .leaderboard-modal__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .leaderboard-modal__category-title {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #f7d35c;
+    text-transform: uppercase;
+  }
+
+  .leaderboard-modal__updated {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .leaderboard-modal__list {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .leaderboard-row {
+    display: grid;
+    grid-template-columns: 70px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    background: rgba(12, 18, 32, 0.75);
+    box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  .leaderboard-row--me {
+    border-color: rgba(244, 196, 78, 0.9);
+    box-shadow: 0 0 16px rgba(244, 196, 78, 0.3);
+  }
+
+  .leaderboard-rank {
+    font-size: 16px;
+    font-weight: 900;
+    color: #4be7f5;
+  }
+
+  .leaderboard-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #f8fafc;
+  }
+
+  .leaderboard-value {
+    font-size: 15px;
+    font-weight: 900;
+    color: #f7d35c;
+  }
+
+  .leaderboard-empty {
+    margin: auto;
+    text-align: center;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  body.mobile .leaderboard-modal__container {
+    width: 94vw;
+    height: 82vh;
+  }
+
+  body.mobile .leaderboard-modal__title {
+    font-size: 20px;
+  }
+
+  body.mobile .leaderboard-modal__meta {
+    display: none;
+  }
+
+  body.mobile .leaderboard-tab {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  body.mobile .leaderboard-modal__category-title {
+    font-size: 14px;
+  }
+
+  body.mobile .leaderboard-row {
+    grid-template-columns: 50px 1fr auto;
+    padding: 10px 12px;
+  }
+
+  body.mobile .leaderboard-rank,
+  body.mobile .leaderboard-name,
+  body.mobile .leaderboard-value {
+    font-size: 12px;
+  }
+</style>

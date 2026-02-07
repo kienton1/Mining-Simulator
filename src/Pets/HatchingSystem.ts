@@ -6,9 +6,10 @@
 
 import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
-import { EGG_DEFINITIONS, getEggLootTable, isPetId, rollPetId, PET_INVENTORY_CAPACITY } from './PetDatabase';
+import { EGG_DEFINITIONS, getEggLootTable, isPetId, rollPetId } from './PetDatabase';
 import { EggType, type PetId } from './PetData';
 import { PetManager } from './PetManager';
+import { getBonuses } from '../Achievements/Achievements';
 
 type GetPlayerData = (player: Player) => PlayerData | undefined;
 type UpdatePlayerData = (player: Player, data: PlayerData) => void;
@@ -64,17 +65,19 @@ export class HatchingSystem {
     const invCount = Array.isArray(data.petInventory) ? data.petInventory.length : 0;
     const eqCount = Array.isArray(data.equippedPets) ? data.equippedPets.length : 0;
     const ownedCount = invCount + eqCount;
+    const cap = getBonuses(data).petInventoryCap ?? invCount + eqCount;
     const autoDeleteSet = this.getAutoDeleteSet(data);
-    const table = getEggLootTable(eggType) || [];
-    const allAutoDeleted = table.length > 0 && table.every((entry) => autoDeleteSet.has(entry.petId));
-    if (!allAutoDeleted && ownedCount + count > PET_INVENTORY_CAPACITY) {
-      return { canHatch: false, message: `Pet capacity full (${ownedCount}/${PET_INVENTORY_CAPACITY})` };
+    const lootTable = getEggLootTable(eggType) || [];
+    const allAutoDelete = lootTable.length > 0 && lootTable.every((entry) => autoDeleteSet.has(entry.petId));
+    const requiredSlots = allAutoDelete ? 0 : count;
+    if (ownedCount + requiredSlots > cap) {
+      return { canHatch: false, message: `Pet capacity full (${ownedCount}/${cap})` };
     }
 
     return { canHatch: true };
   }
 
-  hatch(player: Player, eggType: EggType, count: number): { success: boolean; message?: string; results?: PetId[]; goldSpent?: number } {
+  hatch(player: Player, eggType: EggType, count: number): { success: boolean; message?: string; results?: PetId[] } {
     const data = this.getPlayerData(player);
     if (!data) return { success: false, message: 'Player data not found' };
 
@@ -116,7 +119,7 @@ export class HatchingSystem {
     // Update client gold display (optional, but consistent with other systems)
     player.ui.sendData({ type: 'GOLD_STATS', gold: data.gold });
 
-    return { success: true, results, goldSpent: totalCost };
+    return { success: true, results };
   }
 }
 

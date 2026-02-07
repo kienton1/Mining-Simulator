@@ -1,49 +1,36 @@
-export type TutorialPhase =
-  | 'enter_mine'
-  | 'mine_ores'
-  | 'sell_ores'
-  | 'training'
-  | 'pet_acquire'
-  | 'pet_hatch'
-  | 'pet_equip'
-  | 'complete';
+export enum TutorialPhase {
+  GET_TO_MINES = 'get_to_mines',
+  MINE_ORES = 'mine_ores',
+  SELL_ORES = 'sell_ores',
+  TRAINING = 'training',
+  BUY_PET = 'buy_pet',
+  EQUIP_PET = 'equip_pet',
+  BUY_PICKAXE = 'buy_pickaxe',
+  COMPLETE = 'complete',
+}
 
 export interface TutorialProgress {
   phase: TutorialPhase;
-  minedOres: number;
-  soldOres: number;
-  trainedOnce: boolean;
-  petPurchased: boolean;
-  petHatched: boolean;
-  petEquipped: boolean;
+  miningCount: number;
   completed: boolean;
+  skipped?: boolean;
   rewardGranted?: boolean;
+  rewardAmount?: number;
+  pickaxeRewardGranted?: boolean;
+  pickaxeRewardAmount?: number;
+  completionShown?: boolean;
 }
 
-export function createDefaultTutorialProgress(): TutorialProgress {
-  return {
-    phase: 'enter_mine',
-    minedOres: 0,
-    soldOres: 0,
-    trainedOnce: false,
-    petPurchased: false,
-    petHatched: false,
-    petEquipped: false,
-    completed: false,
-    rewardGranted: false,
-  };
-}
+export const DEFAULT_TUTORIAL_PROGRESS: TutorialProgress = {
+  phase: TutorialPhase.GET_TO_MINES,
+  miningCount: 0,
+  completed: false,
+  skipped: false,
+  rewardGranted: false,
+  rewardAmount: 0,
+  pickaxeRewardGranted: false,
+  pickaxeRewardAmount: 0,
+  completionShown: false,
+};
 
-export function createCompletedTutorialProgress(): TutorialProgress {
-  return {
-    phase: 'complete',
-    minedOres: 0,
-    soldOres: 0,
-    trainedOnce: true,
-    petPurchased: true,
-    petHatched: true,
-    petEquipped: true,
-    completed: true,
-    rewardGranted: true,
-  };
-}
+export const TUTORIAL_MINING_TARGET = 5;

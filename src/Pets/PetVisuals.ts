@@ -5,11 +5,32 @@
 
 import type { PetId } from './PetData';
 import { PET_IDS } from './PetDatabase';
+import { getBasePetIdFromAnyPetId, isGoldenPetId } from './PetUpgrades';
 
 export type PetModelInfo = {
   modelFolder: string;
   gltfFile: string;
   textureFile: string;
+  /** Optional direct model path under assets (bypasses models/Pets). */
+  modelPath?: string;
+  /** Optional direct texture path under assets (bypasses models/Pets/.../Textures). */
+  texturePath?: string;
+};
+
+export type PetTextureInfo = {
+  uri: string | null;
+  isGoldenTexture: boolean;
+};
+
+const PET_GOLDEN_TEXTURE_SUFFIX = '_GOLDEN';
+const PET_GOLDEN_IMAGE_SUFFIX = '_golden';
+
+const withGoldenSuffix = (value: string, suffix = PET_GOLDEN_TEXTURE_SUFFIX): string => {
+  const dot = value.lastIndexOf('.');
+  if (dot === -1) {
+    return `${value}${suffix}`;
+  }
+  return `${value.slice(0, dot)}${suffix}${value.slice(dot)}`;
 };
 
 const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
@@ -38,6 +59,31 @@ const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
   [PET_IDS.BABY_SANDDOG]: { modelFolder: 'Dog', gltfFile: 'Dog.gltf', textureFile: 'BABY_SANDDOG.png' },
   [PET_IDS.BABY_SANDRAY]: { modelFolder: 'Perch', gltfFile: 'perch.gltf', textureFile: 'BABY_SANDRAY.png' },
   [PET_IDS.BABY_SCORCHING_MAGMA]: { modelFolder: 'Wolf', gltfFile: 'wolf.gltf', textureFile: 'BABY_SCORCHING_MAGMA.png' },
+  [PET_IDS.BABY_GARLAND]: { modelFolder: 'Zombie', gltfFile: 'zombie-ice.gltf', textureFile: 'Baby_Garland.png' },
+  [PET_IDS.BABY_GLOWORB]: { modelFolder: 'Horse', gltfFile: 'horse.gltf', textureFile: 'Baby_Gloworb.png' },
+  [PET_IDS.BABY_BAUBLE]: { modelFolder: 'Wolf', gltfFile: 'wolf.gltf', textureFile: 'Baby_Bauble.png' },
+  [PET_IDS.BABY_TINSEL]: { modelFolder: 'Chicken', gltfFile: 'chicken.gltf', textureFile: 'Baby_Tinsel.png' },
+  [PET_IDS.BABY_SNOWGLOBE]: { modelFolder: 'Capybara', gltfFile: 'capybara.gltf', textureFile: 'Baby_Snowglobe.png' },
+  [PET_IDS.BABY_STARSHINE]: { modelFolder: 'Crab', gltfFile: 'crab.gltf', textureFile: 'Baby_Starshine.png' },
+  [PET_IDS.BABY_BELLRING]: { modelFolder: 'Pufferfish', gltfFile: 'pufferfish.gltf', textureFile: 'Baby_Bellring.png' },
+  [PET_IDS.BABY_NORTHSTAR]: { modelFolder: 'Fox', gltfFile: 'fox.gltf', textureFile: 'Baby_Northstar.png' },
+  [PET_IDS.BABY_JINGLE]: { modelFolder: 'Squid', gltfFile: 'squid.gltf', textureFile: 'Baby_Jingle.png' },
+  [PET_IDS.BABY_GINGERBREAD]: { modelFolder: 'Rabbit', gltfFile: 'rabbit.gltf', textureFile: 'Baby_Gingerbread.png' },
+  [PET_IDS.BABY_SUGARPLUM]: { modelFolder: 'Deer', gltfFile: 'deer.gltf', textureFile: 'Baby_Sugarplum.png' },
+  [PET_IDS.BABY_PEPPERMINT_SWIRL]: { modelFolder: 'Pig', gltfFile: 'pig.gltf', textureFile: 'Baby_Peppermint_Swirl.png' },
+  [PET_IDS.BABY_FROSTED_COOKIE]: { modelFolder: 'Cow', gltfFile: 'cow.gltf', textureFile: 'Baby_Frosted_Cookie.png' },
+  [PET_IDS.BABY_HOT_COCOA]: { modelFolder: 'Penguin', gltfFile: 'penguin.gltf', textureFile: 'Baby_Hot_Cocoa.png' },
+  [PET_IDS.BABY_CINNAMON_ROLL]: { modelFolder: 'Racoon', gltfFile: 'raccoon.gltf', textureFile: 'Baby_Cinnamon_Roll.png' },
+  [PET_IDS.BABY_CANDY_CANE]: { modelFolder: 'Spider', gltfFile: 'spider.gltf', textureFile: 'Baby_Candy_Cane.png' },
+  [PET_IDS.BABY_SNOWBALL]: { modelFolder: 'Lionfish', gltfFile: 'lionfish.gltf', textureFile: 'Baby_Snowball.png' },
+  [PET_IDS.BABY_FROSTPAW]: { modelFolder: 'Bear', gltfFile: 'bear.gltf', textureFile: 'Baby_Frostpaw.png' },
+  [PET_IDS.BABY_SNOWPUFF]: { modelFolder: 'Bee', gltfFile: 'bee-adult.gltf', textureFile: 'Baby_Snowpuff.png' },
+  [PET_IDS.BABY_ICEWHISKER]: { modelFolder: 'Racoon', gltfFile: 'raccoon.gltf', textureFile: 'Baby_Icewhisker.png' },
+  [PET_IDS.BABY_FLURRY]: { modelFolder: 'Dog', gltfFile: 'Dog.gltf', textureFile: 'Baby_Flurry.png' },
+  [PET_IDS.BABY_CHILLTAIL]: { modelFolder: 'Fox', gltfFile: 'fox.gltf', textureFile: 'Baby_Chilltail.png' },
+  [PET_IDS.BABY_POWDERFLAKE]: { modelFolder: 'FlyingFish', gltfFile: 'flying-fish.gltf', textureFile: 'Baby_Powderflake.png' },
+  [PET_IDS.BABY_SNOWBUN]: { modelFolder: 'Rabbit', gltfFile: 'rabbit.gltf', textureFile: 'Baby_Snowbun.png' },
+  [PET_IDS.BABY_FROSTBEAN]: { modelFolder: 'Pig', gltfFile: 'pig.gltf', textureFile: 'Baby_Frostbean.png' },
   [PET_IDS.BABY_SCORPIAN]: { modelFolder: 'Crab', gltfFile: 'crab.gltf', textureFile: 'BABY_SCORPIAN.png' },
   [PET_IDS.BABY_SKIFFLET]: { modelFolder: 'Swordfish', gltfFile: 'swordfish.gltf', textureFile: 'BABY_SKIFFLET.png' },
   [PET_IDS.BABY_SLICED_MAGMA]: { modelFolder: 'Capybara', gltfFile: 'capybara.gltf', textureFile: 'BABY_SLICED_MAGMA.png' },
@@ -63,10 +109,53 @@ const PET_MODEL_MAP: Record<PetId, PetModelInfo> = {
   [PET_IDS.SAPPHIRE_SPARK]: { modelFolder: 'Catfish', gltfFile: 'catfish.gltf', textureFile: 'SAPPHIRE_SPARK.png' },
   [PET_IDS.STONE_SPRITE]: { modelFolder: 'Dog', gltfFile: 'Dog.gltf', textureFile: 'STONE_SPRITE.png' },
   [PET_IDS.TOPAZ_TRACER]: { modelFolder: 'Cow', gltfFile: 'cow.gltf', textureFile: 'TOPAZ_TRACER.png' },
+  [PET_IDS.BLUE_BAT]: {
+    modelFolder: 'Bat',
+    gltfFile: 'bat.gltf',
+    textureFile: 'Blue Bat.png',
+    modelPath: 'models/15 Minute Reward Pets/Bat/bat.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Bat/Blue Bat.png',
+  },
+  [PET_IDS.GOLDEN_FLAMINGO]: {
+    modelFolder: 'Flamingo',
+    gltfFile: 'flamingo.gltf',
+    textureFile: 'Golden Flamingo.png',
+    modelPath: 'models/15 Minute Reward Pets/Flamingo/flamingo.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Flamingo/Golden Flamingo.png',
+  },
+  [PET_IDS.ANGRY_FROG]: {
+    modelFolder: 'Frog',
+    gltfFile: 'frog.gltf',
+    textureFile: 'Angry Frog.png',
+    modelPath: 'models/15 Minute Reward Pets/Frog/frog.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Frog/Angry Frog.png',
+  },
+  [PET_IDS.AQUATIC_LIZARD]: {
+    modelFolder: 'Lizard',
+    gltfFile: 'lizard.gltf',
+    textureFile: 'Aquatic Lizard.png',
+    modelPath: 'models/15 Minute Reward Pets/Lizard/lizard.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Lizard/Aquatic Lizard.png',
+  },
+  [PET_IDS.FROSTED_OCELOT]: {
+    modelFolder: 'Ocelot',
+    gltfFile: 'ocelot.gltf',
+    textureFile: 'Frosted Ocelot.png',
+    modelPath: 'models/15 Minute Reward Pets/Ocelot/ocelot.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Ocelot/Frosted Ocelot.png',
+  },
+  [PET_IDS.LARRY_THE_SKELETON]: {
+    modelFolder: 'Skeleton',
+    gltfFile: 'skeleton.gltf',
+    textureFile: 'Larry the Skeleton.png',
+    modelPath: 'models/15 Minute Reward Pets/Skeleton/skeleton.gltf',
+    texturePath: 'models/15 Minute Reward Pets/Skeleton/Larry the Skeleton.png',
+  },
 };
 
 export function getPetModelInfo(petId: PetId): PetModelInfo | null {
-  const info = PET_MODEL_MAP[petId];
+  const basePetId = getBasePetIdFromAnyPetId(petId);
+  const info = PET_MODEL_MAP[basePetId];
   if (!info) {
     return null;
   }
@@ -76,15 +165,40 @@ export function getPetModelInfo(petId: PetId): PetModelInfo | null {
 export function getPetModelUri(petId: PetId): string | null {
   const info = getPetModelInfo(petId);
   if (!info) return null;
+  if (info.modelPath) return info.modelPath;
   return `models/Pets/${info.modelFolder}/${info.gltfFile}`;
 }
 
-export function getPetTextureUri(petId: PetId): string | null {
+export function getPetTextureInfo(petId: PetId): PetTextureInfo {
   const info = getPetModelInfo(petId);
-  if (!info) return null;
-  return `models/Pets/${info.modelFolder}/Textures/${info.textureFile}`;
+  if (!info) return { uri: null, isGoldenTexture: false };
+
+  const isGolden = isGoldenPetId(petId);
+  if (info.texturePath) {
+    return { uri: info.texturePath, isGoldenTexture: false };
+  }
+
+  if (isGolden) {
+    return {
+      uri: `models/Pets/${info.modelFolder}/Textures/${withGoldenSuffix(info.textureFile)}`,
+      isGoldenTexture: true,
+    };
+  }
+
+  return {
+    uri: `models/Pets/${info.modelFolder}/Textures/${info.textureFile}`,
+    isGoldenTexture: false,
+  };
+}
+
+export function getPetTextureUri(petId: PetId): string | null {
+  return getPetTextureInfo(petId).uri;
 }
 
 export function getPetImageUri(petId: PetId): string | null {
-  return `ui/pets/${petId}.png`;
+  const basePetId = getBasePetIdFromAnyPetId(petId);
+  if (isGoldenPetId(petId)) {
+    return `ui/pets/${basePetId}${PET_GOLDEN_IMAGE_SUFFIX}.png`;
+  }
+  return `ui/pets/${basePetId}.png`;
 }

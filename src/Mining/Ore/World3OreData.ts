@@ -117,7 +117,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.CINDREL,
     rarity: 5, // 1 in 5
     value: 150_000_000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 200_000_000,
     lastDepth: 1000,
     lastHealth: 200_000_000_000,
@@ -129,7 +129,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.PYRESTONE,
     rarity: 10, // 1 in 10
     value: 200_000_000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 250_000_000,
     lastDepth: 1000,
     lastHealth: 250_000_000_000,
@@ -141,7 +141,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.SULFURON,
     rarity: 12, // 1 in 12
     value: 250_000_000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 300_000_000,
     lastDepth: 1000,
     lastHealth: 300_000_000_000,
@@ -155,7 +155,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.EMBERITE,
     rarity: 14, // 1 in 14
     value: 400_000_000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 750_000_000,
     lastDepth: 1000,
     lastHealth: 400_000_000_000,
@@ -167,7 +167,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.SCORIX,
     rarity: 14, // 1 in 14
     value: 600_000_000,
-    firstDepth: 10,
+    firstDepth: 5,
     firstHealth: 1_000_000_000,
     lastDepth: 1000,
     lastHealth: 500_000_000_000,
@@ -179,7 +179,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.HEATSTONE,
     rarity: 16, // 1 in 16
     value: 900_000_000,
-    firstDepth: 40,
+    firstDepth: 5,
     firstHealth: 3_000_000_000,
     lastDepth: 1000,
     lastHealth: 600_000_000_000,
@@ -191,7 +191,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.FUMARO,
     rarity: 22, // 1 in 22
     value: 2_000_000_000,
-    firstDepth: 40,
+    firstDepth: 5,
     firstHealth: 4_000_000_000,
     lastDepth: 1000,
     lastHealth: 750_000_000_000,
@@ -205,7 +205,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.CALDERA,
     rarity: 33, // 1 in 33
     value: 3_500_000_000,
-    firstDepth: 50,
+    firstDepth: 5,
     firstHealth: 10_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_000_000_000_000,
@@ -217,7 +217,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.VITRIN,
     rarity: 50, // 1 in 50
     value: 7_500_000_000,
-    firstDepth: 70,
+    firstDepth: 5,
     firstHealth: 20_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_250_000_000_000,
@@ -229,7 +229,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.BRIMMET,
     rarity: 100, // 1 in 100
     value: 30_000_000_000,
-    firstDepth: 100,
+    firstDepth: 25,
     firstHealth: 80_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_400_000_000_000,
@@ -241,7 +241,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.CHARBITE,
     rarity: 100, // 1 in 100
     value: 60_000_000_000,
-    firstDepth: 100,
+    firstDepth: 25,
     firstHealth: 100_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_400_000_000_000,
@@ -255,7 +255,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.NIGHTASH,
     rarity: 100, // 1 in 100
     value: 80_000_000_000,
-    firstDepth: 150,
+    firstDepth: 75,
     firstHealth: 100_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_500_000_000_000,
@@ -267,7 +267,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.SPIREC,
     rarity: 20, // 1 in 20
     value: 100_000_000_000,
-    firstDepth: 250,
+    firstDepth: 100,
     firstHealth: 100_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_750_000_000_000,
@@ -279,7 +279,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.VENTARA,
     rarity: 200, // 1 in 200
     value: 150_000_000_000,
-    firstDepth: 200,
+    firstDepth: 100,
     firstHealth: 200_000_000_000,
     lastDepth: 1000,
     lastHealth: 2_000_000_000_000,
@@ -291,7 +291,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.MINTASH,
     rarity: 222, // 1 in 222
     value: 250_000_000_000,
-    firstDepth: 200,
+    firstDepth: 100,
     firstHealth: 250_000_000_000,
     lastDepth: 1000,
     lastHealth: 2_000_000_000_000,
@@ -305,7 +305,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.LAPILLO,
     rarity: 40, // 1 in 40
     value: 350_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 150_000_000_000,
     lastDepth: 1000,
     lastHealth: 1_900_000_000_000,
@@ -317,7 +317,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.TUFFEN,
     rarity: 66, // 1 in 66
     value: 600_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 200_000_000_000,
     lastDepth: 1000,
     lastHealth: 2_000_000_000_000,
@@ -329,7 +329,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.SEARIN,
     rarity: 250, // 1 in 250
     value: 900_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 300_000_000_000,
     lastDepth: 1000,
     lastHealth: 2_400_000_000_000,
@@ -341,7 +341,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.MAGMAORB,
     rarity: 285, // 1 in 285
     value: 2_000_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 400_000_000_000,
     lastDepth: 1000,
     lastHealth: 2_700_000_000_000,
@@ -355,7 +355,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.CINDEROP,
     rarity: 33, // 1 in 33
     value: 7_500_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 450_000_000_000,
     lastDepth: 1000,
     lastHealth: 3_000_000_000_000,
@@ -367,7 +367,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.COREFLARE,
     rarity: 33, // 1 in 33
     value: 10_000_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 500_000_000_000,
     lastDepth: 1000,
     lastHealth: 3_500_000_000_000,
@@ -379,7 +379,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.DARKGLOW,
     rarity: 100, // 1 in 100
     value: 25_000_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 500_000_000_000,
     lastDepth: 1000,
     lastHealth: 4_000_000_000_000,
@@ -391,7 +391,7 @@ export const ISLAND3_ORE_DATABASE: Record<ISLAND3_ORE_TYPE, Island3OreData> = {
     type: ISLAND3_ORE_TYPE.INFERNON,
     rarity: 10000, // 1 in 10000
     value: 50_000_000_000_000,
-    firstDepth: 250,
+    firstDepth: 200,
     firstHealth: 1_000_000_000_000,
     lastDepth: 1000,
     lastHealth: 6_000_000_000_000,

@@ -1,0 +1,415 @@
+<!-- Golden Machine Modal -->
+<div
+  id="golden-machine-modal"
+  class="hud"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 12000;
+  "
+>
+  <div class="gm-wrapper">
+    <div class="gm-title-container">
+      <h2 class="gm-title">Golden Pets</h2>
+    </div>
+    <button id="gm-close-btn" class="gm-close-btn">X</button>
+
+    <div class="gm-container">
+      <div class="gm-left">
+        <div class="gm-instructions">
+          <div class="gm-instructions__headline">Select pets that<br />you want to craft!</div>
+          <div class="gm-instructions__warning">You will lose<br />selected pets.</div>
+        </div>
+
+        <div class="gm-chance">
+          <div id="gm-chance-value" class="gm-chance__value">0%</div>
+          <div class="gm-chance__label">Chance</div>
+        </div>
+
+        <div class="gm-actions">
+          <button id="gm-craft-btn" class="gm-btn gm-btn--green" disabled>Craft</button>
+          <button id="gm-craft-all-btn" class="gm-btn gm-btn--green">Craft All</button>
+          <button id="gm-back-btn" class="gm-btn gm-btn--blue" hidden>Back</button>
+          <div id="gm-status" class="gm-status"></div>
+        </div>
+      </div>
+
+      <div class="gm-right">
+        <div id="gm-grid" class="gm-grid">
+          <!-- Pet tiles populated dynamically -->
+        </div>
+
+        <div id="gm-wheel" class="gm-wheel" hidden>
+          <div class="gm-wheel__pointer"></div>
+          <div id="gm-wheel-disk" class="gm-wheel__disk"></div>
+          <div id="gm-wheel-text" class="gm-wheel__text">Rolling...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Ensure HTML [hidden] always wins (prevents wheel showing on open). */
+  #golden-machine-modal [hidden] {
+    display: none !important;
+  }
+
+  #golden-machine-modal.visible {
+    display: flex !important;
+  }
+
+  .gm-wrapper {
+    position: relative;
+    width: 860px;
+    max-width: 96vw;
+    font-family: "Fredoka", sans-serif;
+    margin-top: 30px;
+  }
+
+  .gm-container {
+    height: 72vh;
+    min-height: 68vh;
+    max-height: 78vh;
+    background: linear-gradient(180deg, rgba(20, 130, 175, 0.95), rgba(10, 95, 140, 0.95));
+    border: 4px solid rgba(0, 0, 0, 0.6);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
+    animation: gmSlideInUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes gmSlideInUp {
+    from { opacity: 0; transform: translateY(60px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .gm-title-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.35);
+    border: 4px solid rgba(0, 0, 0, 0.65);
+    border-radius: 12px;
+    padding: 6px 22px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  }
+
+  .gm-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.95), rgba(220, 50, 65, 0.95));
+    border: 4px solid rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.18s ease;
+    z-index: 110;
+  }
+
+  .gm-close-btn:hover {
+    transform: translate(50%, -50%) scale(1.08);
+  }
+
+  .gm-left {
+    width: 200px;
+    min-width: 200px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-right: 3px solid rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gm-instructions__headline {
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    line-height: 1.1;
+  }
+
+  .gm-instructions__warning {
+    margin-top: 8px;
+    font-size: 16px;
+    font-weight: 900;
+    color: #ff2e2e;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    line-height: 1.1;
+  }
+
+  .gm-chance {
+    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .gm-chance__value {
+    font-size: 44px;
+    font-weight: 900;
+    color: #ffd700;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+    line-height: 1;
+  }
+
+  .gm-chance__label {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+    line-height: 1;
+  }
+
+  .gm-actions {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gm-btn {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 3px solid rgba(0, 0, 0, 0.65);
+    font-size: 16px;
+    font-weight: 900;
+    font-family: "Fredoka", sans-serif;
+    cursor: pointer;
+    -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+    paint-order: stroke fill;
+    transition: transform 0.14s ease, filter 0.14s ease;
+  }
+
+  .gm-btn--green {
+    background: linear-gradient(180deg, #58ff2c, #20c41a);
+    color: #fff;
+  }
+
+  .gm-btn--blue {
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    color: #fff;
+  }
+
+  .gm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+  }
+
+  .gm-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  .gm-status {
+    min-height: 18px;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .gm-right {
+    flex: 1;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .gm-grid {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 12px;
+    padding: 4px;
+    padding-right: 8px;
+    min-height: 0;
+  }
+
+  .gm-pet-tile {
+    width: 92px;
+    height: 92px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    border: 4px solid rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.2);
+    transition: transform 0.15s ease;
+  }
+
+  .gm-pet-tile:hover {
+    transform: translateY(-2px);
+  }
+
+  .gm-pet-tile--common { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+  .gm-pet-tile--uncommon,
+  .gm-pet-tile--rare { background: linear-gradient(180deg, #22c55e, #15803d); }
+  .gm-pet-tile--epic { background: linear-gradient(180deg, #c084fc, #7c3aed); }
+  .gm-pet-tile--legendary { background: linear-gradient(180deg, #facc15, #b45309); }
+  .gm-pet-tile--mythic { background: linear-gradient(180deg, #7c3aed, #4c1d95); }
+  .gm-pet-tile--extreme { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+
+  .gm-pet-tile__img {
+    width: 72%;
+    height: 72%;
+    object-fit: contain;
+    image-rendering: auto;
+  }
+
+  .gm-pet-tile__mult {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-pet-tile__stars {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    font-size: 14px;
+    font-weight: 900;
+    color: #ffd700;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  .gm-pet-tile__check {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .gm-pet-tile__check-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #76ff66, #25cc23);
+    border: 4px solid rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    font-weight: 900;
+    color: #0a3b0a;
+  }
+
+  .gm-pet-tile--selected .gm-pet-tile__check {
+    display: flex;
+  }
+
+  /* Wheel view */
+  .gm-wheel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+  }
+
+  .gm-wheel__pointer {
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 24px solid rgba(0, 0, 0, 0.85);
+    transform: translateY(-12px);
+    z-index: 2;
+  }
+
+  .gm-wheel__disk {
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    border: 10px solid rgba(0, 0, 0, 0.75);
+    box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.15), 0 10px 25px rgba(0, 0, 0, 0.45);
+    background: conic-gradient(from -90deg, #22c55e 0deg, #ef4444 0deg);
+    transform: rotate(0deg);
+    transition: transform 3.2s cubic-bezier(0.12, 0.85, 0.15, 1);
+    will-change: transform;
+  }
+
+  .gm-wheel__text {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    paint-order: stroke fill;
+  }
+
+  /* Scrollbar */
+  .gm-grid::-webkit-scrollbar { width: 8px; }
+  .gm-grid::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+  .gm-grid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.35); border-radius: 4px; }
+
+  /* Mobile scrolling */
+  body.mobile .gm-right,
+  body.mobile .gm-right *,
+  body.mobile .gm-grid {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  body.mobile .gm-wrapper { width: 96vw; }
+  body.mobile .gm-pet-tile { width: 75px; height: 75px; }
+  body.mobile .gm-left { width: 200px; min-width: 200px; }
+  body.mobile .gm-chance__value { font-size: 44px; }
+  body.mobile .gm-btn { font-size: 18px; }
+  body.mobile .gm-wheel__disk { width: 250px; height: 250px; }
+</style>
+

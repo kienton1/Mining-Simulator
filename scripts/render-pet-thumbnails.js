@@ -10,11 +10,24 @@ const databasePath = path.join(rootDir, 'src', 'Pets', 'PetDatabase.ts');
 const visualsPath = path.join(rootDir, 'src', 'Pets', 'PetVisuals.ts');
 
 const THUMBNAIL_SIZE = 256;
+const GOLDEN_TEXTURE_SUFFIX = '_GOLDEN';
+const GOLDEN_THUMB_SUFFIX = '_golden';
+const ONLY_PET_IDS = (process.env.PET_THUMB_ONLY || '')
+  .split(',')
+  .map((id) => id.trim().toLowerCase())
+  .filter(Boolean);
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+};
+
+const withGoldenSuffix = (value, suffix = GOLDEN_TEXTURE_SUFFIX) => {
+  const ext = path.extname(value);
+  const base = ext ? value.slice(0, -ext.length) : value;
+  if (base.toUpperCase().endsWith(suffix)) return value;
+  return `${base}${suffix}${ext}`;
 };
 
 const parsePetIds = (filePath) => {
@@ -34,13 +47,23 @@ const parsePetIds = (filePath) => {
 const parsePetVisuals = (filePath) => {
   const content = fs.readFileSync(filePath, 'utf8');
   const map = new Map();
-  const regex = /\[PET_IDS\.([A-Z0-9_]+)\]:\s*\{\s*modelFolder:\s*'([^']+)',\s*gltfFile:\s*'([^']+)',\s*textureFile:\s*'([^']+)'\s*\}/g;
+  const entryRegex = /\[PET_IDS\.([A-Z0-9_]+)\]:\s*\{([\s\S]*?)\}\s*,?/g;
   let match;
-  while ((match = regex.exec(content)) !== null) {
+
+  const readProp = (block, prop) => {
+    const propRegex = new RegExp(`${prop}\\s*:\\s*['\"]([^'\"]+)['\"]`);
+    const propMatch = propRegex.exec(block);
+    return propMatch ? propMatch[1] : null;
+  };
+
+  while ((match = entryRegex.exec(content)) !== null) {
+    const block = match[2];
     map.set(match[1], {
-      modelFolder: match[2],
-      gltfFile: match[3],
-      textureFile: match[4],
+      modelFolder: readProp(block, 'modelFolder'),
+      gltfFile: readProp(block, 'gltfFile'),
+      textureFile: readProp(block, 'textureFile'),
+      modelPath: readProp(block, 'modelPath'),
+      texturePath: readProp(block, 'texturePath'),
     });
   }
   return map;
@@ -199,29 +222,29 @@ const main = async () => {
     }
 
     for (const [constName, petId] of petIds.entries()) {
+      if (ONLY_PET_IDS.length > 0 && !ONLY_PET_IDS.includes(String(petId).toLowerCase())) {
+        continue;
+      }
       const mapping = modelMap.get(constName);
       if (!mapping) {
         console.warn(`[pet-thumbnails] Missing model mapping for ${constName}.`);
         continue;
       }
 
-      const modelPath = path.join(
-        rootDir,
-        'assets',
-        'models',
-        'Pets',
-        mapping.modelFolder,
-        mapping.gltfFile
-      );
-      const texturePath = path.join(
-        rootDir,
-        'assets',
-        'models',
-        'Pets',
-        mapping.modelFolder,
-        'Textures',
-        mapping.textureFile
-      );
+      if (!mapping.modelPath && (!mapping.modelFolder || !mapping.gltfFile)) {
+        console.warn(`[pet-thumbnails] Missing model info for ${constName}.`);
+        continue;
+      }
+
+      const modelPath = mapping.modelPath
+        ? path.join(rootDir, 'assets', mapping.modelPath)
+        : path.join(rootDir, 'assets', 'models', 'Pets', mapping.modelFolder, mapping.gltfFile);
+
+      const texturePath = mapping.texturePath
+        ? path.join(rootDir, 'assets', mapping.texturePath)
+        : (mapping.modelFolder && mapping.textureFile
+          ? path.join(rootDir, 'assets', 'models', 'Pets', mapping.modelFolder, 'Textures', mapping.textureFile)
+          : null);
 
       if (!fs.existsSync(modelPath)) {
         console.warn(`[pet-thumbnails] Missing model file: ${modelPath}`);
@@ -229,13 +252,23 @@ const main = async () => {
       }
 
       const modelUrl = pathToFileURL(modelPath).href;
-      const textureUrl = fs.existsSync(texturePath) ? pathToFileURL(texturePath).href : null;
+      const textureUrl = texturePath && fs.existsSync(texturePath) ? pathToFileURL(texturePath).href : null;
 
       await page.evaluate((mUrl, tUrl) => window.renderPet(mUrl, tUrl), modelUrl, textureUrl);
 
       const outputPath = path.join(outputDir, `${petId}.png`);
       await canvas.screenshot({ path: outputPath, omitBackground: true });
       console.log(`[pet-thumbnails] Wrote ${outputPath}`);
+
+      const goldenTexturePath = texturePath ? withGoldenSuffix(texturePath) : null;
+      if (goldenTexturePath && goldenTexturePath !== texturePath && fs.existsSync(goldenTexturePath)) {
+        const goldenTextureUrl = pathToFileURL(goldenTexturePath).href;
+        await page.evaluate((mUrl, tUrl) => window.renderPet(mUrl, tUrl), modelUrl, goldenTextureUrl);
+
+        const goldenOutputPath = path.join(outputDir, `${petId}${GOLDEN_THUMB_SUFFIX}.png`);
+        await canvas.screenshot({ path: goldenOutputPath, omitBackground: true });
+        console.log(`[pet-thumbnails] Wrote ${goldenOutputPath}`);
+      }
     }
   } finally {
     await browser.close();

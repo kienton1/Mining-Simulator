@@ -1,0 +1,50 @@
+<!--
+  CDN URL injection and font loading
+  This must come first to ensure CDN_ASSETS_URL is available for other components
+-->
+
+<!-- CDN URL injection -->
+<div id="get-cdn" style="display: none">{{CDN_ASSETS_URL}}</div>
+
+<script>
+  // Extract CDN_ASSETS_URL from injected DOM (fallback to relative root)
+  try {
+    const cdnDiv = document.getElementById("get-cdn");
+    if (cdnDiv && typeof cdnDiv.textContent === "string") {
+      const val = cdnDiv.textContent.trim();
+      if (val) window.CDN_ASSETS_URL = val;
+    }
+    if (!window.CDN_ASSETS_URL) window.CDN_ASSETS_URL = "";
+  } catch {}
+
+  // Dynamically inject Fredoka font-face rules with CDN support
+  (function () {
+    const cdn = (window.CDN_ASSETS_URL || "").replace(/\/$/, "");
+    const basePath = cdn ? `${cdn}/fonts` : "../fonts";
+
+    const fontFaces = [
+      { weight: 300, file: "Fredoka-Light.ttf" },
+      { weight: 400, file: "Fredoka-Regular.ttf" },
+      { weight: 500, file: "Fredoka-Medium.ttf" },
+      { weight: 600, file: "Fredoka-SemiBold.ttf" },
+      { weight: 700, file: "Fredoka-Bold.ttf" },
+    ];
+
+    const style = document.createElement("style");
+    style.textContent = fontFaces
+      .map(
+        (ff) => `
+      @font-face {
+        font-family: "Fredoka";
+        src: url("${basePath}/${ff.file}") format("truetype");
+        font-weight: ${ff.weight};
+        font-style: normal;
+        font-display: swap;
+      }
+    `
+      )
+      .join("\n");
+
+    document.head.appendChild(style);
+  })();
+</script>

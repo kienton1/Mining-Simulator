@@ -9,6 +9,7 @@
 
 import { OreType } from '../Mining/Ore/World1OreData';
 import type { TutorialProgress } from '../Tutorial/TutorialTypes';
+import { DEFAULT_TUTORIAL_PROGRESS } from '../Tutorial/TutorialTypes';
 
 /**
  * Player's persistent statistics
@@ -29,8 +30,8 @@ export interface PlayerData {
   /** Current gems/currency amount (secondary currency) */
   gems: number;
   
-  /** Number of wins (reaching bottom of mines) */
-  wins: number;
+  /** Number of trophies (reaching bottom of mines) */
+  trophies: number;
   
   /** Current pickaxe tier (0 = Rusty, 1 = Stone, etc.) */
   currentPickaxeTier: number;
@@ -73,6 +74,17 @@ export interface PlayerData {
   tutorial?: TutorialProgress;
 
   /**
+   * Golden Machine (golden pets)
+   * When a player wins the wheel roll, the server stores a short-lived pending reward.
+   * The UI claims it after the wheel animation finishes.
+   */
+  pendingGoldenMachineCraft?: {
+    token: string;
+    outputPetId: string;
+    expiresAt: number;
+  };
+
+  /**
    * World System
    * 
    * Multi-world support for different maps/locations.
@@ -81,13 +93,60 @@ export interface PlayerData {
   currentWorld?: string;
   /** Array of unlocked world IDs (default: ['island1'] for original map) */
   unlockedWorlds?: string[];
+
+  /**
+   * Tutorial System
+   */
+  tutorial?: TutorialProgress;
+
+  /**
+   * Admin flag (optional, used for server-side commands)
+   */
+  isAdmin?: boolean;
+
+  /**
+   * Daily Reward System
+   */
+  /** Unix timestamp of last daily reward claim */
+  lastDailyRewardClaim?: number;
+  /** Maximum gold the player has ever held (for daily reward) */
+  maxGoldEverHeld?: number;
+  /** Maximum gems the player has ever held (for daily reward) */
+  maxGemsEverHeld?: number;
+
+  /**
+   * Achievements System (persistent)
+   * - Progress accumulates forever
+   * - Claims are rank counts per category (sequential claim enforced)
+   */
+  achievementProgress?: {
+    blocksMined?: number;
+    /** BigInt-string */
+    powerTrained?: string;
+    /** BigInt-string */
+    coinsEarned?: string;
+    eggsHatched?: number;
+    timePlayedMs?: number;
+  };
+  achievementClaims?: {
+    blocksMined?: number;
+    powerTrained?: number;
+    coinsEarned?: number;
+    eggsHatched?: number;
+    timePlayed?: number;
+  };
+
+  leaderboardHighScores?: {
+    bestPower?: string;  // BigInt string - highest power ever achieved
+    bestCoins?: string;  // BigInt string - highest coins ever held
+  };
 }
 
 /**
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 5;
+export const CURRENT_DATA_VERSION = 14;
 
 /**
  * Inventory data structure
@@ -111,7 +170,7 @@ export function createDefaultPlayerData(): PlayerData {
     rebirths: 0,
     gold: 0,
     gems: 0,
-    wins: 0,
+    trophies: 0,
     currentPickaxeTier: 0,
     ownedPickaxes: [0], // Start with tier 0 (Wooden) pickaxe
     currentMinerTier: -1, // Start with no miner equipped
@@ -128,6 +187,29 @@ export function createDefaultPlayerData(): PlayerData {
     autoDeletePets: [],
     currentWorld: 'island1', // Default to original map
     unlockedWorlds: ['island1'], // Original map is always unlocked
+    tutorial: { ...DEFAULT_TUTORIAL_PROGRESS },
+    isAdmin: false,
+    lastDailyRewardClaim: 0,
+    maxGoldEverHeld: 0,
+    maxGemsEverHeld: 0,
+    achievementProgress: {
+      blocksMined: 0,
+      powerTrained: '0',
+      coinsEarned: '0',
+      eggsHatched: 0,
+      timePlayedMs: 0,
+    },
+    achievementClaims: {
+      blocksMined: 0,
+      powerTrained: 0,
+      coinsEarned: 0,
+      eggsHatched: 0,
+      timePlayed: 0,
+    },
+    leaderboardHighScores: {
+      bestPower: '1',
+      bestCoins: '0',
+    },
   };
 }
 

@@ -1,1 +1,9 @@
 node_modules
+screenshots
+dev/persistence
+CLAUDE.md
+index.mjs
+package-lock.json
+.tmp-ore-dash-ui
+.tmp-sdk-examples
+index.mjs

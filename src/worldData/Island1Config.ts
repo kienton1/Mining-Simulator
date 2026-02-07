@@ -15,7 +15,7 @@ export const ISLAND1_CONFIG: WorldConfig = {
 
   // Unlock Requirements (always unlocked)
   unlockRequirement: {
-    type: 'wins',
+    type: 'trophies',
     amount: 0, // Always unlocked
   },
 

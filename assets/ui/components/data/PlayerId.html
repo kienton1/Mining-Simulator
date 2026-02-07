@@ -1,0 +1,33 @@
+<!--
+  PlayerId Component
+  Stores the current player's ID in the DOM for use by Scene UI templates.
+  This allows Scene UIs to filter visibility based on the current player.
+-->
+
+<script>
+  (function () {
+    let playerId = undefined;
+
+    hytopia.onData((data) => {
+      function setPlayerId(id) {
+        playerId = id;
+        // Create an invisible element and store the player ID in it
+        const playerIdElement = document.createElement("div");
+        playerIdElement.id = "playerId";
+        // Store player ID in data attribute
+        playerIdElement.dataset.playerId = playerId;
+        playerIdElement.style.display = "none";
+        document.body.appendChild(playerIdElement);
+      }
+
+      // Handle INIT event with playerId in payload
+      if (data.type === "INIT" && data.payload?.playerId && !playerId) {
+        setPlayerId(data.payload.playerId);
+      }
+      // Handle direct playerId for backwards compatibility
+      else if (data.playerId && !playerId) {
+        setPlayerId(data.playerId);
+      }
+    });
+  })();
+</script>

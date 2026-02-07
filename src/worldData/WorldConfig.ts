@@ -10,7 +10,7 @@ export interface WorldConfig {
 
   /** Unlock requirement */
   unlockRequirement: {
-    type: 'wins';
+    type: 'trophies';
     amount: number;
   };
 

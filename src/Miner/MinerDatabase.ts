@@ -4,7 +4,7 @@
  * Contains all miner definitions based on MinerSystemPlan.md
  */
 
-import { MinerData } from './MinerData';
+import type { MinerData } from './MinerData';
 
 /**
  * Helper to parse cost strings to numbers

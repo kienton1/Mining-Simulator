@@ -30,41 +30,73 @@ import {
   PlayerEvent,
   PlayerUIEvent,
   CollisionGroup,
+  PlayerManager,
+  World,
+  type WorldMap,
 } from 'hytopia';
 import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from './src/Mining/Ore/World3OreData';
+import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE, type Island4OreData } from './src/Mining/Ore/World4OreData';
 
 import * as worldMap from './assets/map.json';
+import { WorldLoadBalancer } from './src/Core/WorldLoadBalancer';
+import { WorldStateManager, type PerWorldManagers } from './src/Core/WorldStateManager';
+import { WORLD_INSTANCE_CONFIG } from './src/config/WorldInstanceConfig';
 import { GameManager } from './src/Core/GameManager';
 import { PickaxeManager } from './src/Pickaxe/PickaxeManager';
 import { MiningPlayerEntity } from './src/Core/MiningPlayerEntity';
 import { MerchantEntity } from './src/Shop/MerchantEntity';
 import { MineResetUpgradeNPC } from './src/Shop/MineResetUpgradeNPC';
 import { GemTraderEntity } from './src/Shop/GemTraderEntity';
+import { ShopLabelManager, type ShopLabelDefinition } from './src/Shop/ShopLabelManager';
 import { UpgradeType } from './src/Shop/GemTraderUpgradeSystem';
 import { ShopLabelManager, type ShopLabelDefinition } from './src/Shop/ShopLabelManager';
 import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS } from './src/Core/GameConstants';
 import { EggType } from './src/Pets/PetData';
-import { getPetDefinition, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { getPetDefinition, isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from './src/Pets/PetDatabase';
+import { getBasePetIdFromAnyPetId, getPetTierFromPetId, getStarsForTier, isGoldenPetId, PET_MAX_TIER } from './src/Pets/PetUpgrades';
+import { getPetImageUri } from './src/Pets/PetVisuals';
+import { addCoinsEarned, addEggsHatched, addTimePlayedMs, buildAchievementsUIState, claimAchievement, getBonuses } from './src/Achievements/Achievements';
 import { EggStationManager } from './src/Pets/EggStationManager';
 import { EggStationLabelManager } from './src/Pets/EggStationLabelManager';
+import { EGG_STATIONS } from './src/Pets/EggStationsConfig';
+import { GoldenMachineEntity } from './src/Pets/GoldenMachineEntity';
 import { WorldRegistry } from './src/WorldRegistry';
 import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
 import { ISLAND3_CONFIG } from './src/worldData/Island3Config';
+import { ISLAND4_CONFIG } from './src/worldData/Island4Config';
+import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS, CAMERA_DEFAULT_ZOOM, CAMERA_MODAL_ZOOM, CAMERA_ZOOM_TRANSITION_MS, CAMERA_ZOOM_STEP_INTERVAL } from './src/Core/GameConstants';
+import { DailyChestEntity } from './src/DailyReward/DailyChestEntity';
+import { DailyChestLabelManager } from './src/DailyReward/DailyChestLabelManager';
+import { DailyChestController } from './src/DailyReward/DailyChestController';
 
 /**
  * startServer is always the entry point for our game.
- * It accepts a single function where we should do any
- * setup necessary for our game. The init function is
- * passed a World instance which is the default
- * world created by the game server on startup.
- * 
+ *
+ * This game uses the WorldLoadBalancer pattern for multi-world support.
+ * Players are distributed across world instances using a least-populated-first
+ * algorithm. New worlds are created when existing ones reach capacity (10 players).
+ * Empty worlds are shut down after a 30-second grace period (keeping at least 1 active).
+ *
  * Documentation: https://github.com/hytopiagg/sdk/blob/main/docs/server.startserver.md
  */
 
-startServer(world => {
+const ADMIN_USERNAMES = new Set(
+  (process.env.ADMIN_USERNAMES ?? '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+/**
+ * Initialize a world instance with all game components.
+ * This function is called by the WorldLoadBalancer for each new world.
+ */
+function initializeWorld(world: World): void {
+  console.log(`[MINING_SIMULATOR] Initializing world ${world.id}: ${world.name}`);
+
   /**
    * Enable debug rendering of the physics simulation.
    * This will overlay lines in-game representing colliders,
@@ -75,11 +107,10 @@ startServer(world => {
    * It is intended for development environments only and
    * debugging physics.
    */
-  
-  world.simulation.enableDebugRendering(true);
-  if ((world.simulation as any).enableDebugRaycasting) {
 
-    (world.simulation as any).enableDebugRaycasting(true);
+  world.simulation.enableDebugRendering(false);
+  if ((world.simulation as any).enableDebugRaycasting) {
+    (world.simulation as any).enableDebugRaycasting(false);
   }
 
   /**
@@ -95,6 +126,7 @@ startServer(world => {
   WorldRegistry.registerWorld(ISLAND1_CONFIG);
   WorldRegistry.registerWorld(ISLAND2_CONFIG);
   WorldRegistry.registerWorld(ISLAND3_CONFIG);
+  WorldRegistry.registerWorld(ISLAND4_CONFIG);
 
   /**
    * Initialize Game Manager
@@ -102,208 +134,129 @@ startServer(world => {
    */
   const gameManager = new GameManager(world, pickaxeManager);
 
+  gameManager.initializeLeaderboard().catch(err => {
+    console.error('[Leaderboard] Failed to initialize:', err);
+  });
+
+  const isAdminPlayer = (player: { username: string; }): boolean => {
+    const data = gameManager.getPlayerData(player as any);
+    if (data?.isAdmin) return true;
+    if (ADMIN_USERNAMES.size === 0) return false;
+    return ADMIN_USERNAMES.has(player.username.toLowerCase());
+  };
+
   /**
-   * Load our map.
+   * Map loading is handled by WorldLoadBalancer.createWorld()
+   * The map is passed when creating the world to avoid Rapier physics race conditions.
    * Map structure:
    * - Cobbled-deepslate clusters = Training rocks (practice area)
    * - Gold block area = Mine entrance (mining area)
    * See Planning/mapStructure.md for details
    */
-  world.loadMap(worldMap);
+
+  // Start egg display animations (map is already loaded by WorldLoadBalancer)
+  gameManager.startEggDisplayAnimator();
+
   // Carve shared mine shaft (10-block drop) for all players - Island 1 (Original)
   gameManager.buildSharedMineShaft();
   // Carve shared mine shaft for Island 2 (Beach World) with beach ores
   gameManager.buildSharedMineShaftForIsland2();
   // Carve shared mine shaft for Island 3 (Volcanic World)
   gameManager.buildSharedMineShaftForIsland3();
+  // Carve shared mine shaft for Island 4 (Snow World)
+  gameManager.buildSharedMineShaftForIsland4();
 
   /**
-   * Spawn Shop NPCs (Ore Seller, Clock Upgrade, Gem Upgrades)
-   * Positions are placed relative to each world's mining area using Island 1 offsets.
+   * Spawn Shop Entities (Ore Seller, Timer Upgrade, Gem Upgrades)
+   * Copies are placed in each world at the same relative offset from the mine.
    */
-  const shopReferencePositions = {
-    merchant: { x: -8.56, y: 1.75, z: 14.15 },
-    mineResetUpgradeNpc: { x: 5.08, y: 2.45, z: 14.35 },
-    gemTrader: { x: 14.83, y: 2.25, z: 9.29 },
-  };
+  const getMineCenter = (bounds: { minX: number; maxX: number; minZ: number; maxZ: number }) => ({
+    x: (bounds.minX + bounds.maxX) / 2,
+    z: (bounds.minZ + bounds.maxZ) / 2,
+  });
+
+  const worldMineCenters = {
+    island1: getMineCenter(MINING_AREA_BOUNDS),
+    island2: getMineCenter(ISLAND2_MINING_AREA_BOUNDS),
+    island3: getMineCenter(ISLAND3_MINING_AREA_BOUNDS),
+    island4: getMineCenter(ISLAND4_MINING_AREA_BOUNDS),
+  } as const;
+
+  const baseShopPositions = {
+    ore: { x: -8.56, y: 1.75, z: 14.15 },
+    timer: { x: 5.08, y: 2.45, z: 14.35 },
+    upgrades: { x: 14.83, y: 2.25, z: 9.29 },
+  } as const;
 
   const shopOffsets = {
-    merchant: {
-      x: shopReferencePositions.merchant.x - MINING_AREA_BOUNDS.minX,
-      z: shopReferencePositions.merchant.z - MINING_AREA_BOUNDS.minZ,
-      y: shopReferencePositions.merchant.y,
+    ore: {
+      dx: baseShopPositions.ore.x - worldMineCenters.island1.x,
+      dz: baseShopPositions.ore.z - worldMineCenters.island1.z,
+      y: baseShopPositions.ore.y,
     },
-    mineResetUpgradeNpc: {
-      x: shopReferencePositions.mineResetUpgradeNpc.x - MINING_AREA_BOUNDS.minX,
-      z: shopReferencePositions.mineResetUpgradeNpc.z - MINING_AREA_BOUNDS.minZ,
-      y: shopReferencePositions.mineResetUpgradeNpc.y,
+    timer: {
+      dx: baseShopPositions.timer.x - worldMineCenters.island1.x,
+      dz: baseShopPositions.timer.z - worldMineCenters.island1.z,
+      y: baseShopPositions.timer.y,
     },
-    gemTrader: {
-      x: shopReferencePositions.gemTrader.x - MINING_AREA_BOUNDS.minX,
-      z: shopReferencePositions.gemTrader.z - MINING_AREA_BOUNDS.minZ,
-      y: shopReferencePositions.gemTrader.y,
+    upgrades: {
+      dx: baseShopPositions.upgrades.x - worldMineCenters.island1.x,
+      dz: baseShopPositions.upgrades.z - worldMineCenters.island1.z,
+      y: baseShopPositions.upgrades.y,
     },
-  };
+  } as const;
 
-  const shopWorldBounds = [MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS];
+  const getShopPosition = (
+    worldId: keyof typeof worldMineCenters,
+    kind: keyof typeof shopOffsets
+  ) => {
+    const center = worldMineCenters[worldId];
+    const offset = shopOffsets[kind];
+    return {
+      x: center.x + offset.dx,
+      y: offset.y,
+      z: center.z + offset.dz,
+    };
+  };
 
   const merchantEntities: MerchantEntity[] = [];
   const mineResetUpgradeNPCs: MineResetUpgradeNPC[] = [];
   const gemTraderEntities: GemTraderEntity[] = [];
-  const shopLabels: ShopLabelDefinition[] = [];
 
-  for (const [index, bounds] of shopWorldBounds.entries()) {
+  (['island1', 'island2', 'island3', 'island4'] as const).forEach(worldId => {
     const merchantEntity = new MerchantEntity(
       world,
-      {
-        x: bounds.minX + shopOffsets.merchant.x,
-        y: shopOffsets.merchant.y,
-        z: bounds.minZ + shopOffsets.merchant.z,
-      },
+      getShopPosition(worldId, 'ore'),
       'models/BuyStations/skeleton-miner.gltf'
     );
     merchantEntity.spawn();
     merchantEntities.push(merchantEntity);
-    shopLabels.push({
-      id: `shop-ore-${index + 1}`,
-      position: merchantEntity.getPosition(),
-      title: 'Ore Shop',
-      subtitle: 'Sell Ores',
-      kind: 'ore',
-    });
 
     const mineResetUpgradeNPC = new MineResetUpgradeNPC(
       world,
-      {
-        x: bounds.minX + shopOffsets.mineResetUpgradeNpc.x,
-        y: shopOffsets.mineResetUpgradeNpc.y,
-        z: bounds.minZ + shopOffsets.mineResetUpgradeNpc.z,
-      },
+      getShopPosition(worldId, 'timer'),
       'models/BuyStations/clock.gltf'
     );
     mineResetUpgradeNPC.spawn();
     mineResetUpgradeNPCs.push(mineResetUpgradeNPC);
-    shopLabels.push({
-      id: `shop-clock-${index + 1}`,
-      position: mineResetUpgradeNPC.getPosition(),
-      title: 'Clock Shop',
-      subtitle: 'Mine Timer',
-      kind: 'timer',
-    });
 
     const gemTraderEntity = new GemTraderEntity(
       world,
-      {
-        x: bounds.minX + shopOffsets.gemTrader.x,
-        y: shopOffsets.gemTrader.y,
-        z: bounds.minZ + shopOffsets.gemTrader.z,
-      },
+      getShopPosition(worldId, 'upgrades'),
       'models/BuyStations/mailbox.gltf'
     );
     gemTraderEntity.spawn();
     gemTraderEntities.push(gemTraderEntity);
-    shopLabels.push({
-      id: `shop-upgrades-${index + 1}`,
-      position: gemTraderEntity.getPosition(),
-      title: 'Upgrade Shop',
-      subtitle: 'Gem Upgrades',
-      kind: 'upgrades',
-    });
-  }
-
-  const shopLabelManager = new ShopLabelManager(world, shopLabels);
-  setTimeout(() => shopLabelManager.start(), 1000);
-  const sceneUiReadyPlayers = new Set<string>();
-  const getMineResetUpgradeCost = (worldId: string): number => {
-    if (worldId === 'island3') return 2_000_000_000_000_000;
-    if (worldId === 'island2') return 750_000_000_000;
-    return 2_000_000;
-  };
+  });
 
   /**
    * Egg Stations (barrels in `assets/map.json`)
-   * World 1 (Island 1) stations at positions -13, 2, Z
-   * World 2 (Island 2 / Beach World) stations at positions -300, 1.75, Z
+   * Shared config used across systems.
    */
-  const eggStations = [
-    // World 1 (Island 1) Egg Stations
-    {
-      id: 'egg-station-stone',
-      name: 'Stone Egg Station',
-      eggType: EggType.STONE,
-      defaultOpenCount: 1 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,9"
-      position: { x: -13, y: 2, z: 9 },
-    },
-    {
-      id: 'egg-station-gem',
-      name: 'Gem Egg Station',
-      eggType: EggType.GEM,
-      defaultOpenCount: 3 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,5"
-      position: { x: -13, y: 2, z: 5 },
-    },
-    {
-      id: 'egg-station-crystal',
-      name: 'Crystal Egg Station',
-      eggType: EggType.CRYSTAL,
-      defaultOpenCount: 1 as const,
-      // Exact barrel prop coordinate from `assets/map.json` entities: "-13,2,1"
-      position: { x: -13, y: 2, z: 1 },
-    },
-    
-    // World 2 (Island 2 / Beach World) Egg Stations
-    {
-      id: 'egg-station-abyssal',
-      name: 'Abyssal Egg Station',
-      eggType: EggType.ABYSSAL,
-      defaultOpenCount: 1 as const,
-      // User-provided position for World 2 Abyssal Egg
-      position: { x: -299.97, y: 1.75, z: 9.95 },
-    },
-    {
-      id: 'egg-station-boardwalk',
-      name: 'Boardwalk Egg Station',
-      eggType: EggType.BOARDWALK,
-      defaultOpenCount: 3 as const,
-      // User-provided position for World 2 Boardwalk Egg
-      position: { x: -300.03, y: 1.75, z: 6.12 },
-    },
-    {
-      id: 'egg-station-shipwreck',
-      name: 'Shipwreck Egg Station',
-      eggType: EggType.SHIPWRECK,
-      defaultOpenCount: 1 as const,
-      // User-provided position for World 2 Shipwreck Egg
-      position: { x: -299.97, y: 1.75, z: 1.95 },
-    },
+  const eggStations = EGG_STATIONS;
 
-    // World 3 (Island 3 / Volcanic World) Egg Stations
-    {
-      id: 'egg-station-sand',
-      name: 'Sand Egg Station',
-      eggType: EggType.SAND,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 12 },
-    },
-    {
-      id: 'egg-station-snow',
-      name: 'Snow Egg Station',
-      eggType: EggType.SNOW,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 8 },
-    },
-    {
-      id: 'egg-station-lava',
-      name: 'Lava Egg Station',
-      eggType: EggType.LAVA,
-      defaultOpenCount: 1 as const,
-      position: { x: -600, y: 2, z: 4 },
-    },
-  ];
-
-  // Egg UI should pop when you're close to the barrel.
-  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 2.5);
+  // Egg UI should pop when you're near the barrel (~3 blocks horizontal distance).
+  const eggStationManager = new EggStationManager(world, gameManager, eggStations, 3.0);
   eggStationManager.start();
 
   // Floating name + cost labels (SceneUI), anchored like training rocks.
@@ -311,35 +264,99 @@ startServer(world => {
   const eggStationLabelManager = new EggStationLabelManager(world, eggStations);
   setTimeout(() => eggStationLabelManager.start(), 1000);
 
-  const tutorialWorldIds = ['island1', 'island2', 'island3'] as const;
-  const tutorialMerchants: Record<string, { x: number; y: number; z: number }> = {};
-  for (const [index, merchantEntity] of merchantEntities.entries()) {
-    const worldId = tutorialWorldIds[index] ?? 'island1';
-    tutorialMerchants[worldId] = merchantEntity.getPosition();
-  }
+  /**
+   * Shop SceneUI labels (ore seller, timer upgrade, gem upgrades) for all worlds
+   */
+  const shopLabels: ShopLabelDefinition[] = [];
+  (['island1', 'island2', 'island3', 'island4'] as const).forEach(worldId => {
+    shopLabels.push(
+      {
+        id: `${worldId}-shop-ore`,
+        position: getShopPosition(worldId, 'ore'),
+        title: 'Ore Seller',
+        subtitle: 'Sell Your Ores',
+        kind: 'ore',
+      },
+      {
+        id: `${worldId}-shop-timer`,
+        position: getShopPosition(worldId, 'timer'),
+        title: 'Timer Upgrade',
+        subtitle: 'Increase Time',
+        kind: 'timer',
+      },
+      {
+        id: `${worldId}-shop-upgrades`,
+        position: getShopPosition(worldId, 'upgrades'),
+        title: 'Gem Upgrades',
+        subtitle: 'Spend Gems',
+        kind: 'upgrades',
+      }
+    );
+  });
+  const shopLabelManager = new ShopLabelManager(world, shopLabels);
+  setTimeout(() => shopLabelManager.start(), 1000);
 
-  const tutorialEggStations: Record<string, { x: number; y: number; z: number }> = {};
-  const tutorialStationByWorld = {
-    island1: eggStations.find((station) => station.eggType === EggType.STONE),
-    island2: eggStations.find((station) => station.eggType === EggType.ABYSSAL),
-    island3: eggStations.find((station) => station.eggType === EggType.SAND),
+  /**
+   * Golden Machine (pet merger -> golden variant)
+   * Placed in Island 1 at the requested coordinates.
+   */
+  const goldenMachine = new GoldenMachineEntity(
+    world,
+    { x: 0.07, y: 1.72, z: -18.57 },
+    'models/BuyStations/checkpoint-block.gltf',
+    // Decrease size by 2x vs previous tuning
+    { proximityRadius: 3.0, modelScale: 1.5 }
+  );
+  goldenMachine.spawn();
+  goldenMachine.onProximityChange = (player, inProximity, distance) => {
+    console.log(`[Golden Machine] Player ${player.username} proximity: ${inProximity}, distance: ${distance.toFixed(2)}`);
+    player.ui.sendData({ type: 'GOLDEN_MACHINE_PROXIMITY', inProximity });
   };
-  for (const [worldId, station] of Object.entries(tutorialStationByWorld)) {
-    if (station) {
-      tutorialEggStations[worldId] = station.position;
-    }
-  }
 
-  gameManager.getTutorialManager().setLocations({
-    merchants: tutorialMerchants,
-    eggStations: tutorialEggStations,
+  /**
+   * Daily Reward Chest System
+   * Spawn treasure chests near each gem upgrade store with sparkle particles
+   */
+  const dailyChestOffset = { x: 0, y: 0, z: -9 };
+  const dailyChestEntities: DailyChestEntity[] = [];
+  const dailyChestPositions: { id: string; position: { x: number; y: number; z: number } }[] = [];
+
+  (['island1', 'island2', 'island3', 'island4'] as const).forEach((worldId) => {
+    const upgradePos = getShopPosition(worldId, 'upgrades');
+    const chestPos = {
+      x: upgradePos.x + dailyChestOffset.x,
+      y: upgradePos.y + dailyChestOffset.y,
+      z: upgradePos.z + dailyChestOffset.z,
+    };
+
+    const chest = new DailyChestEntity(world, chestPos);
+    chest.spawn();
+    dailyChestEntities.push(chest);
+
+    dailyChestPositions.push({
+      id: `${worldId}-daily-chest`,
+      position: chestPos,
+    });
   });
 
-  eggStationManager.onProximityChange = (player, inProximity) => {
-    if (inProximity) {
-      gameManager.getTutorialManager().handleEggStationEntered(player);
-    }
-  };
+  // Daily chest label manager (SceneUI with countdown/Ready!)
+  const dailyChestLabelManager = new DailyChestLabelManager(
+    world,
+    dailyChestPositions,
+    gameManager.getDailyRewardSystem()
+  );
+  dailyChestLabelManager.setGetConnectedPlayersCallback(() =>
+    PlayerManager.instance.getConnectedPlayers()
+  );
+  setTimeout(() => dailyChestLabelManager.start(), 1000);
+
+  // Daily chest proximity controller (auto-opens modal when player is near and reward ready)
+  const dailyChestController = new DailyChestController(
+    world,
+    dailyChestEntities,
+    gameManager.getDailyRewardSystem()
+  );
+  dailyChestController.start();
 
   function sendPetState(player: any) {
     const playerData = gameManager.getPlayerData(player);
@@ -348,6 +365,7 @@ startServer(world => {
     const inv = Array.isArray(playerData.petInventory) ? playerData.petInventory : [];
     const eq = Array.isArray(playerData.equippedPets) ? playerData.equippedPets : [];
     const ownedCount = inv.length + eq.length;
+    const bonuses = getBonuses(playerData);
 
     // Expanded list: one entry per pet instance with a stable instanceId.
     // This is required to support duplicates reliably in the UI.
@@ -356,15 +374,24 @@ startServer(world => {
       ...inv.map((petId: string, idx: number) => ({ instanceId: `inv:${idx}`, petId, equipped: false, slotIndex: idx })),
     ].map((p) => {
       const def = getPetDefinition(p.petId);
+      const tier = getPetTierFromPetId(p.petId) ?? 0;
+      const basePetId = getBasePetIdFromAnyPetId(p.petId);
+      const isGolden = isGoldenPetId(p.petId);
       return {
         instanceId: p.instanceId,
         petId: p.petId,
+        basePetId,
+        tier,
+        stars: getStarsForTier(tier),
+        maxTier: PET_MAX_TIER,
+        imageUri: getPetImageUri(p.petId) ?? `ui/pets/${basePetId}.png`,
         equipped: p.equipped,
         slotIndex: p.slotIndex,
         name: def?.name ?? p.petId,
         rarity: def?.rarity ?? 'common',
         eggType: def?.eggType ?? 'stone',
         multiplier: def?.multiplier ?? 0,
+        isGolden,
       };
     });
 
@@ -375,20 +402,52 @@ startServer(world => {
       type: 'PET_STATE',
       pets,
       ownedCount,
-      ownedCap: PET_INVENTORY_CAPACITY,
+      ownedCap: bonuses.petInventoryCap,
       equippedCount: eq.length,
-      equippedCap: PET_EQUIP_CAPACITY,
+      equippedCap: bonuses.petEquipCap,
       multiplierSum,
       trainingMultiplier,
     });
   }
 
+  function sendAchievementsState(player: any) {
+    const playerData = gameManager.getPlayerData(player);
+    if (!playerData) return;
+    const payload = buildAchievementsUIState(playerData);
+    player.ui.sendData({
+      type: 'ACHIEVEMENTS_STATE',
+      bonuses: payload.bonuses,
+      categories: payload.categories,
+    });
+  }
+
+  function sendLeaderboardState(player: any) {
+    const snapshot = gameManager.getLeaderboardManager().getLeaderboardSnapshot();
+    const categories: Record<string, { entries: any[] }> = {};
+
+    for (const [catId, entries] of Object.entries(snapshot.categories)) {
+      categories[catId] = {
+        entries: (entries as any[]).map((entry: any, idx: number) => ({
+          rank: idx + 1,
+          playerId: entry.playerId,
+          name: entry.name,
+          value: entry.value,
+        })),
+      };
+    }
+
+    player.ui.sendData({
+      type: 'LEADERBOARD_STATE',
+      updatedAt: snapshot.lastPersistedAt || Date.now(),
+      categories,
+    });
+  }
 
   /**
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
-  const handleMerchantProximity = (player: Player, inProximity: boolean, distance: number) => {
+  const handleMerchantProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send inventory data to show UI
       const inventory = gameManager.getInventoryManager().getInventory(player);
@@ -405,7 +464,7 @@ startServer(world => {
       for (const [oreType, amount] of Object.entries(inventory)) {
         if (amount && amount > 0) {
           // Try Island 1 database first
-          let oreData: OreData | Island2OreData | Island3OreData | undefined = ORE_DATABASE[oreType as OreType];
+          let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
           // Try Island 2 database if not found
           if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
             oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -413,6 +472,9 @@ startServer(world => {
           // Try Island 3 database if not found
           if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
             oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+          }
+          if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+            oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
           }
           if (oreData) {
             // Calculate sell value per unit with multipliers
@@ -440,6 +502,9 @@ startServer(world => {
       });
     }
   };
+  merchantEntities.forEach(entity => {
+    entity.onProximityChange = handleMerchantProximity;
+  });
 
   for (const merchantEntity of merchantEntities) {
     merchantEntity.onProximityChange = handleMerchantProximity;
@@ -449,13 +514,20 @@ startServer(world => {
    * Handle mine reset upgrade NPC proximity events
    * When player enters/leaves NPC proximity, show/hide upgrade UI
    */
-  const handleMineResetUpgradeProximity = (player: Player, inProximity: boolean, distance: number) => {
+  const getMineResetUpgradeCost = (worldId: string): number => {
+    if (worldId === 'island2') return 750_000_000_000;
+    if (worldId === 'island3') return 2_000_000_000_000_000;
+    if (worldId === 'island4') return 100_000_000_000_000_000_000_000;
+    return 2_000_000;
+  };
+
+  const handleMineResetUpgradeProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
       const currentWorld = playerData?.currentWorld || 'island1';
       const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-      // Cost varies by world
+      // Cost varies by world: island1 = 2M, island2 = 750B, island3 = 2Q
       const cost = getMineResetUpgradeCost(currentWorld);
       const gold = playerData?.gold || 0;
       
@@ -474,6 +546,9 @@ startServer(world => {
       });
     }
   };
+  mineResetUpgradeNPCs.forEach(npc => {
+    npc.onProximityChange = handleMineResetUpgradeProximity;
+  });
 
   for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
     mineResetUpgradeNPC.onProximityChange = handleMineResetUpgradeProximity;
@@ -483,7 +558,7 @@ startServer(world => {
    * Handle gem trader proximity events
    * When player enters/leaves gem trader proximity, show/hide upgrades UI
    */
-  const handleGemTraderProximity = (player: Player, inProximity: boolean, distance: number) => {
+  const handleGemTraderProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
@@ -530,6 +605,9 @@ startServer(world => {
       });
     }
   };
+  gemTraderEntities.forEach(entity => {
+    entity.onProximityChange = handleGemTraderProximity;
+  });
 
   for (const gemTraderEntity of gemTraderEntities) {
     gemTraderEntity.onProximityChange = handleGemTraderProximity;
@@ -548,20 +626,49 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
+    // Wrap UI sendData to avoid errors when connections are closing (e.g., during world switches).
+    const uiAny = player.ui as any;
+    if (!uiAny.__safeSendWrapped) {
+      const unsafeSend = player.ui.sendData.bind(player.ui);
+      uiAny.__unsafeSendData = unsafeSend;
+      uiAny.__safeSendWrapped = true;
+      player.ui.sendData = ((data: any) => {
+        try {
+          unsafeSend(data);
+        } catch (err) {
+          console.warn(`[UI] sendData failed for ${player.username}:`, err);
+        }
+      }) as any;
+    }
+
     // Add player to merchant tracking
-    for (const merchantEntity of merchantEntities) {
-      merchantEntity.addPlayer(player);
-    }
+    merchantEntities.forEach(entity => entity.addPlayer(player));
     // Add player to mine reset upgrade NPC tracking
-    for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
-      mineResetUpgradeNPC.addPlayer(player);
-    }
+    mineResetUpgradeNPCs.forEach(npc => npc.addPlayer(player));
     // Add player to gem trader tracking
-    for (const gemTraderEntity of gemTraderEntities) {
-      gemTraderEntity.addPlayer(player);
-    }
+    gemTraderEntities.forEach(entity => entity.addPlayer(player));
     // Add player to egg station tracking
     eggStationManager.addPlayer(player);
+    // Add player to golden machine tracking
+    goldenMachine.addPlayer(player);
+    // Add player to daily chest tracking
+    dailyChestController.addPlayer(player);
+
+    // === Achievements: time played tracking ===
+    (player as any).__achLastTickMs = Date.now();
+    const achInterval = setInterval(() => {
+      const now = Date.now();
+      const last = Number((player as any).__achLastTickMs ?? now);
+      (player as any).__achLastTickMs = now;
+      const delta = Math.max(0, now - last);
+      const pd = gameManager.getPlayerData(player);
+      if (!pd || delta <= 0) return;
+      addTimePlayedMs(pd, delta);
+      gameManager.updatePlayerData(player, pd);
+      // Keep achievements UI + badge reasonably fresh (also drives time-played unlocks).
+      sendAchievementsState(player);
+    }, 30000);
+    (player as any).__achPlaytimeInterval = achInterval;
     
     // Initialize player data with defaults first (synchronous)
     // This ensures entity can spawn immediately for proper camera setup
@@ -604,26 +711,36 @@ startServer(world => {
     // Set and lock camera zoom (zoom out a bit and prevent player from changing it)
     // Wait a moment for camera to initialize
     setTimeout(() => {
-      const LOCKED_ZOOM = .6; // Zoom out a bit (1.0 = first person, higher = more zoomed out)
-      player.camera.setZoom(LOCKED_ZOOM);
-      
+      player.camera.setZoom(CAMERA_DEFAULT_ZOOM);
+
       // Store the locked zoom value on the player object
-      (player as any).__lockedZoom = LOCKED_ZOOM;
-      
+      (player as any).__lockedZoom = CAMERA_DEFAULT_ZOOM;
+
+      // Only set target zoom if not already set (prevents overwriting early modal opens)
+      if ((player as any).__targetZoom === undefined) {
+        (player as any).__targetZoom = CAMERA_DEFAULT_ZOOM;
+      }
+
+      // Only set transition flag if not already set
+      if ((player as any).__zoomTransitionActive === undefined) {
+        (player as any).__zoomTransitionActive = false;
+      }
+
       // Continuously enforce the zoom level (lock it) - check very frequently
+      // Skip enforcement during transitions to allow smooth animation
       const zoomLockInterval = setInterval(() => {
+        // Don't enforce zoom during transitions
+        if ((player as any).__zoomTransitionActive) return;
+
         const currentZoom = player.camera.zoom;
-        const lockedZoom = (player as any).__lockedZoom;
-        
-        // Always set it, even if it matches (ensures it stays locked)
-        if (Math.abs(currentZoom - lockedZoom) > 0.01) {
-          player.camera.setZoom(lockedZoom);
-        } else {
-          // Even if it matches, set it again to prevent any changes
-          player.camera.setZoom(lockedZoom);
+        const targetZoom = (player as any).__targetZoom ?? CAMERA_DEFAULT_ZOOM;
+
+        // Enforce zoom to target level
+        if (Math.abs(currentZoom - targetZoom) > 0.01) {
+          player.camera.setZoom(targetZoom);
         }
       }, 16); // Check every 16ms (~60fps) for maximum responsiveness
-      
+
       // Store interval ID for cleanup
       (player as any).__zoomLockInterval = zoomLockInterval;
 
@@ -658,6 +775,7 @@ startServer(world => {
         
         // Update with loaded data (this updates the in-memory playerDataMap)
         gameManager.updatePlayerData(player, loadedData);
+        gameManager.getTutorialManager().onPlayerDataLoaded(player);
         
         // Always restore pickaxe from saved data (ensures persistence works correctly)
         // Use a small delay to ensure entity is fully spawned before attaching pickaxe
@@ -689,13 +807,17 @@ startServer(world => {
         // This ensures the UI is fully loaded before we send the update
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
-
+          // Sync equipped pets to spawn pet entities that follow the player
+          gameManager.syncEquippedPets(player);
         }, 150);
       } else if (currentData) {
         // Even if no saved data, ensure UI is updated with current data
         setTimeout(() => {
           gameManager.sendPowerStatsToUI(player);
+          // Sync equipped pets to spawn pet entities that follow the player
+          gameManager.syncEquippedPets(player);
         }, 100);
+        gameManager.getTutorialManager().onPlayerDataLoaded(player);
       }
       gameManager.getTutorialManager().initializePlayer(player);
       if (loadingGate.uiLoaded) {
@@ -710,10 +832,7 @@ startServer(world => {
       setTimeout(() => {
         gameManager.sendPowerStatsToUI(player);
       }, 100);
-      gameManager.getTutorialManager().initializePlayer(player);
-      if (loadingGate.uiLoaded) {
-        gameManager.getTutorialManager().sendState(player);
-      }
+      gameManager.getTutorialManager().onPlayerDataLoaded(player);
       clearTimeout(dataLoadTimeout);
       loadingGate.dataLoaded = true;
       tryFinishLoading();
@@ -724,15 +843,85 @@ startServer(world => {
     
     // Set up UI loaded handler - this will send initial stats
     // Note: If saved data loads after UI loads, it will update the UI automatically
-    player.ui.on(PlayerUIEvent.LOAD, () => {
+    let uiLoadHandled = false;
+    const handleUiLoaded = () => {
+      if (uiLoadHandled) return;
+      uiLoadHandled = true;
       // Send initial stats (might be defaults if data hasn't loaded yet)
       gameManager.onPlayerUILoaded(player);
       gameManager.getTutorialManager().initializePlayer(player);
       gameManager.getTutorialManager().sendState(player);
       loadingGate.uiLoaded = true;
       tryFinishLoading();
-    });
+    };
+
+    player.ui.on(PlayerUIEvent.LOAD, handleUiLoaded);
+
+    // Fallback in case UI LOAD event fires before handler is registered
+    setTimeout(() => {
+      if (!uiLoadHandled) {
+        handleUiLoaded();
+      }
+    }, 2000);
     
+    /**
+     * Helper function to smoothly transition camera zoom with ease-out animation
+     */
+    const transitionCameraZoom = (targetZoom: number) => {
+      const startZoom = player.camera.zoom;
+      const zoomDirection = targetZoom > startZoom ? 'ZOOM OUT' : 'ZOOM IN';
+      console.log(`[ZOOM DEBUG] transitionCameraZoom called: ${zoomDirection} from ${startZoom.toFixed(2)} to ${targetZoom.toFixed(2)}`);
+
+      // Clear any existing transition
+      const existingTimeout = (player as any).__zoomTransitionTimeout;
+      if (existingTimeout) {
+        console.log(`[ZOOM DEBUG] Clearing existing zoom transition`);
+        clearTimeout(existingTimeout);
+      }
+
+      const startTime = Date.now();
+
+      (player as any).__zoomTransitionActive = true;
+      (player as any).__targetZoom = targetZoom;
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / CAMERA_ZOOM_TRANSITION_MS, 1);
+
+        // Ease-out function: 1 - (1 - t)^2
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const currentZoom = startZoom + (targetZoom - startZoom) * eased;
+
+        player.camera.setZoom(currentZoom);
+
+        if (progress < 1) {
+          (player as any).__zoomTransitionTimeout = setTimeout(animate, CAMERA_ZOOM_STEP_INTERVAL);
+        } else {
+          (player as any).__zoomTransitionActive = false;
+          player.camera.setZoom(targetZoom);
+          console.log(`[ZOOM DEBUG] Zoom transition COMPLETE: now at ${targetZoom.toFixed(2)}`);
+        }
+      };
+
+      animate();
+    };
+
+    /**
+     * Helper function to check if any modal is currently open for the player
+     */
+    const isAnyModalOpen = (): boolean => {
+      const modalTypes = ['miner', 'pickaxe', 'rebirth', 'pets', 'achievements', 'leaderboard', 'egg', 'reward', 'goldenMachine', 'maps', 'merchant', 'mineResetUpgrade', 'gemTrader', 'dailyReward'] as const;
+      const openModals: string[] = [];
+      for (const modalType of modalTypes) {
+        if (gameManager.getModalState(player, modalType)) {
+          openModals.push(modalType);
+        }
+      }
+      const anyOpen = openModals.length > 0;
+      console.log(`[ZOOM DEBUG] isAnyModalOpen check: ${anyOpen} | Open modals: [${openModals.join(', ')}]`);
+      return anyOpen;
+    };
+
     // Set up per-player UI event handler (as per Hytopia SDK guide)
     // This listens for data sent from this specific player's UI
     player.ui.on(PlayerUIEvent.DATA, ({ playerUI, data }) => {
@@ -744,13 +933,16 @@ startServer(world => {
 
       switch (data.type) {
         case 'SCENE_UI_READY':
-          if (!sceneUiReadyPlayers.has(player.id)) {
-            sceneUiReadyPlayers.add(player.id);
-            const trainingController = gameManager.getTrainingController();
-            trainingController?.reloadSceneUIs();
-            eggStationLabelManager.reload();
-            shopLabelManager.reload();
-          }
+          player.ui.sendData({
+            type: 'INIT',
+            payload: {
+              playerId: player.id,
+            },
+          });
+          // Send achievements state early so other UIs (egg hatch speed, pet caps) are correct immediately.
+          sendAchievementsState(player);
+          // Preload PET_STATE so proximity UIs (Golden Machine) can render pets immediately on first open.
+          sendPetState(player);
           break;
         case 'TOGGLE_AUTO_MINE':
 
@@ -764,11 +956,19 @@ startServer(world => {
 
           gameManager.teleportToSurface(player);
           break;
+        case 'TUTORIAL_SKIP':
+          gameManager.getTutorialManager().skipTutorial(player);
+          break;
         case 'SELL_ORE':
           const goldEarned = gameManager.getSellingSystem().sellOre(player, data.oreType, 1);
           // Send updated inventory and gold
           const inventoryAfterSell = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSell = gameManager.getPlayerData(player);
+          if (playerDataAfterSell && goldEarned > 0) {
+            addCoinsEarned(playerDataAfterSell, goldEarned);
+            gameManager.updatePlayerData(player, playerDataAfterSell);
+            sendAchievementsState(player);
+          }
           
           // Calculate totalValue with all multipliers using SellingSystem
           const totalValueAfterSell = gameManager.getSellingSystem().getSellValue(player);
@@ -781,10 +981,16 @@ startServer(world => {
           for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
             if (amount && amount > 0) {
               // Try Island 1 database first
-              let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
               // Try Island 2 database if not found
               if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
                 oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
+                oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+                oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
               }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSell;
@@ -803,13 +1009,20 @@ startServer(world => {
             gold: playerDataAfterSell?.gold || 0,
             goldEarned,
           });
-          gameManager.getTutorialManager().handleOreSold(player, goldEarned);
+          if (goldEarned && goldEarned > 0) {
+            gameManager.getTutorialManager().onOresSold(player, goldEarned);
+          }
           break;
         case 'SELL_ALL':
           const totalGoldEarned = gameManager.getSellingSystem().sellAll(player);
           // Send updated inventory and gold
           const inventoryAfterSellAll = gameManager.getInventoryManager().getInventory(player);
           const playerDataAfterSellAll = gameManager.getPlayerData(player);
+          if (playerDataAfterSellAll && totalGoldEarned > 0) {
+            addCoinsEarned(playerDataAfterSellAll, totalGoldEarned);
+            gameManager.updatePlayerData(player, playerDataAfterSellAll);
+            sendAchievementsState(player);
+          }
           
           // Calculate totalValue with all multipliers using SellingSystem
           const totalValueAfterSellAll = gameManager.getSellingSystem().getSellValue(player);
@@ -822,10 +1035,16 @@ startServer(world => {
           for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
             if (amount && amount > 0) {
               // Try Island 1 database first
-              let oreData: OreData | Island2OreData | undefined = ORE_DATABASE[oreType as OreType];
+              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
               // Try Island 2 database if not found
               if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
                 oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
+                oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+                oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
               }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSellAll;
@@ -844,12 +1063,30 @@ startServer(world => {
             gold: playerDataAfterSellAll?.gold || 0,
             goldEarned: totalGoldEarned,
           });
-          gameManager.getTutorialManager().handleOreSold(player, totalGoldEarned);
+          if (totalGoldEarned && totalGoldEarned > 0) {
+            gameManager.getTutorialManager().onOresSold(player, totalGoldEarned);
+          }
           break;
         case 'CLOSE_MERCHANT_UI':
 
           player.ui.sendData({
             type: 'MERCHANT_PROXIMITY',
+            inProximity: false,
+          });
+          break;
+        case 'CLOSE_EGG_STATION_UI':
+          // Mirror the Ore Seller close behavior: force-hide the egg station UI
+          // while the player remains in proximity. The EggStationManager will not
+          // immediately re-open it unless the player changes stations / leaves & re-enters.
+          player.ui.sendData({
+            type: 'EGG_STATION_PROXIMITY',
+            inProximity: false,
+          });
+          break;
+        case 'CLOSE_GOLDEN_MACHINE_UI':
+          // Hide golden machine UI until the player leaves and re-enters proximity.
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_PROXIMITY',
             inProximity: false,
           });
           break;
@@ -918,9 +1155,20 @@ startServer(world => {
           });
           break;
         case 'MODAL_OPENED':
-
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg' || data.modalType === 'maps') {
+          console.log(`[ZOOM DEBUG] MODAL_OPENED event received: modalType="${data.modalType}"`);
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'leaderboard' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
+            // Check if any modal was already open before setting new state
+            console.log(`[ZOOM DEBUG] Valid modalType, checking if any modal was already open...`);
+            const wasAnyModalOpen = isAnyModalOpen();
+            console.log(`[ZOOM DEBUG] wasAnyModalOpen=${wasAnyModalOpen}, setting "${data.modalType}" to OPEN`);
             gameManager.setModalState(player, data.modalType, true);
+            // Zoom out when first modal opens
+            if (!wasAnyModalOpen) {
+              console.log(`[ZOOM DEBUG] First modal opened - triggering ZOOM OUT to ${CAMERA_MODAL_ZOOM}`);
+              transitionCameraZoom(CAMERA_MODAL_ZOOM);
+            } else {
+              console.log(`[ZOOM DEBUG] Another modal already open - skipping zoom out`);
+            }
             // Stop any active manual mining when modal opens
             const miningController = gameManager.getMiningController();
             if (miningController && miningController.isPlayerMining(player)) {
@@ -931,24 +1179,105 @@ startServer(world => {
                 miningController.stopMiningLoop(player);
               }
             }
+          } else {
+            console.log(`[ZOOM DEBUG] MODAL_OPENED: Unknown modalType "${data.modalType}" - IGNORED`);
           }
           break;
         case 'MODAL_CLOSED':
-
-          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'egg') {
+          console.log(`[ZOOM DEBUG] MODAL_CLOSED event received: modalType="${data.modalType}"`);
+          if (data.modalType === 'miner' || data.modalType === 'pickaxe' || data.modalType === 'rebirth' || data.modalType === 'pets' || data.modalType === 'achievements' || data.modalType === 'leaderboard' || data.modalType === 'egg' || data.modalType === 'reward' || data.modalType === 'goldenMachine' || data.modalType === 'maps' || data.modalType === 'merchant' || data.modalType === 'mineResetUpgrade' || data.modalType === 'gemTrader' || data.modalType === 'dailyReward') {
+            console.log(`[ZOOM DEBUG] Valid modalType, setting "${data.modalType}" to CLOSED`);
             gameManager.setModalState(player, data.modalType, false);
+            // Zoom back to default when all modals are closed
+            console.log(`[ZOOM DEBUG] Checking if all modals are now closed...`);
+            if (!isAnyModalOpen()) {
+              console.log(`[ZOOM DEBUG] All modals closed - triggering ZOOM IN to ${CAMERA_DEFAULT_ZOOM}`);
+              transitionCameraZoom(CAMERA_DEFAULT_ZOOM);
+            } else {
+              console.log(`[ZOOM DEBUG] Other modals still open - skipping zoom in`);
+            }
           }
           break;
         case 'REQUEST_PET_STATE':
           sendPetState(player);
           break;
+        case 'REQUEST_ACHIEVEMENTS_STATE':
+          sendAchievementsState(player);
+          break;
+        case 'REQUEST_LEADERBOARD_STATE':
+          sendLeaderboardState(player);
+          break;
+        case 'ACHIEVEMENT_CLAIM': {
+          const categoryId = String((data as any).categoryId ?? '') as any;
+          const rankIndex = Number((data as any).rankIndex ?? -1);
+          const playerData = gameManager.getPlayerData(player);
+          if (!playerData) {
+            player.ui.sendData({ type: 'ACHIEVEMENT_CLAIM_RESULT', success: false, message: 'Player data not found' });
+            break;
+          }
+          const res = claimAchievement(playerData, categoryId, rankIndex);
+          if (res.success) {
+            gameManager.updatePlayerData(player, playerData);
+          }
+          player.ui.sendData({ type: 'ACHIEVEMENT_CLAIM_RESULT', success: res.success, message: res.message });
+          sendAchievementsState(player);
+          // Rewards can affect pet caps, etc.
+          sendPetState(player);
+          break;
+        }
+        case 'REQUEST_REWARD_STATE':
+          gameManager.sendRewardConfigUI(player);
+          gameManager.updateRewardTimerUI(player);
+          break;
+        case 'REQUEST_DAILY_REWARD_STATE': {
+          const dailyRewardSystem = gameManager.getDailyRewardSystem();
+          const canClaim = dailyRewardSystem.canClaim(player);
+          const remainingMs = dailyRewardSystem.getRemainingMs(player);
+          const possibleRewards = dailyRewardSystem.getPossibleRewards(player);
+          player.ui.sendData({
+            type: 'DAILY_REWARD_STATE',
+            canClaim,
+            remainingMs,
+            possibleRewards,
+          });
+          break;
+        }
+        case 'DAILY_REWARD_CLAIM': {
+          const dailyRewardSystem = gameManager.getDailyRewardSystem();
+          const claimResult = dailyRewardSystem.claimReward(player);
+          if (claimResult.success && claimResult.result) {
+            player.ui.sendData({
+              type: 'DAILY_REWARD_RESULT',
+              success: true,
+              result: claimResult.result,
+            });
+            // Update UI with new stats
+            gameManager.sendPowerStatsToUI(player);
+            sendPetState(player);
+          } else {
+            player.ui.sendData({
+              type: 'DAILY_REWARD_RESULT',
+              success: false,
+              message: claimResult.message,
+            });
+          }
+          // Reset the modal triggered state so player can re-open if they walk away and back
+          dailyChestController.resetModalTriggered(player);
+          break;
+        }
+        case 'DAILY_REWARD_MODAL_CLOSED': {
+          // Reset the modal triggered state when modal is closed
+          dailyChestController.resetModalTriggered(player);
+          break;
+        }
         case 'PET_EQUIP': {
           const petId = String(data.petId ?? '');
           const res = gameManager.getPetManager().equipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equip', success: res.success, message: res.message });
           sendPetState(player);
           if (res.success) {
-            gameManager.getTutorialManager().handlePetEquipped(player);
+            gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -957,6 +1286,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipPet(player, petId);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequip', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_EQUIP_INSTANCE': {
@@ -965,7 +1297,8 @@ startServer(world => {
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipInstance', success: res.success, message: res.message });
           sendPetState(player);
           if (res.success) {
-            gameManager.getTutorialManager().handlePetEquipped(player);
+            gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -974,6 +1307,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipFromEquippedIndex(player, idx);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipInstance', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_EQUIP_BEST': {
@@ -981,7 +1317,8 @@ startServer(world => {
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'equipBest', success: res.success, message: res.message });
           sendPetState(player);
           if (res.success) {
-            gameManager.getTutorialManager().handlePetEquipped(player);
+            gameManager.getTutorialManager().onPetEquipped(player);
+            gameManager.syncEquippedPets(player);
           }
           break;
         }
@@ -989,6 +1326,9 @@ startServer(world => {
           const res = gameManager.getPetManager().unequipAll(player);
           player.ui.sendData({ type: 'PET_ACTION_RESULT', action: 'unequipAll', success: res.success, message: res.message });
           sendPetState(player);
+          if (res.success) {
+            gameManager.syncEquippedPets(player);
+          }
           break;
         }
         case 'PET_DELETE_INV': {
@@ -1004,6 +1344,179 @@ startServer(world => {
           sendPetState(player);
           break;
         }
+        case 'PET_CRAFT_UPGRADE': {
+          const petId = String((data as any).petId ?? '');
+          const res = gameManager.getPetManager().craftUpgrade(player, petId);
+          player.ui.sendData({
+            type: 'PET_ACTION_RESULT',
+            action: 'craftUpgrade',
+            success: res.success,
+            message: res.message,
+            newPetId: res.newPetId,
+          });
+          sendPetState(player);
+          if (res.success) {
+            // Crafting can consume equipped pets, so always resync visuals on success.
+            gameManager.syncEquippedPets(player);
+          }
+          break;
+        }
+        case 'GOLDEN_MACHINE_CRAFT': {
+          const instanceIds = Array.isArray((data as any).instanceIds) ? (data as any).instanceIds : [];
+          const res = gameManager.getPetManager().craftGoldenVariant(player, instanceIds);
+          if (!res.success) {
+            player.ui.sendData({
+              type: 'GOLDEN_MACHINE_RESULT',
+              success: false,
+              message: res.message ?? 'Failed',
+            });
+            sendPetState(player);
+            break;
+          }
+
+          // Calculate target angle for wheel animation
+          // The gradient is: green from 0deg to greenDeg, red from greenDeg to 360deg
+          // The pointer is fixed at 0deg (top/12:00)
+          // When the wheel rotates clockwise by X degrees, the segment originally at (360 - X) mod 360 ends up at the pointer
+          // 
+          // For success (green at pointer): we need (360 - targetAngle) mod 360 in [0, greenDeg]
+          //   => targetAngle mod 360 in [360 - greenDeg, 360]
+          // For failure (red at pointer): we need (360 - targetAngle) mod 360 in [greenDeg, 360]
+          //   => targetAngle mod 360 in [0, 360 - greenDeg]
+          const chance = Number(res.chance ?? 0);
+          const greenDeg = chance * 3.6;
+          let targetAngle: number;
+          
+          // When wheel rotates clockwise by X degrees, segment at (360 - X) mod 360 ends up at pointer (0deg)
+          // For green at pointer: need (360 - X) mod 360 in [0, greenDeg] => X mod 360 in [360 - greenDeg, 360]
+          // For red at pointer: need (360 - X) mod 360 in [greenDeg, 360] => X mod 360 in [0, 360 - greenDeg]
+          if (res.didWin) {
+            // Green at pointer: targetAngle mod 360 should be in [360 - greenDeg, 360]
+            // Example: if greenDeg = 180, targetAngle mod 360 should be in [180, 360]
+            // So targetAngle could be 200, 250, 300, etc.
+            const minAngle = 360 - greenDeg;
+            const maxAngle = 360;
+            targetAngle = minAngle + Math.random() * (maxAngle - minAngle);
+            // Ensure we're in the right range (handle edge case where greenDeg = 0)
+            if (greenDeg > 0) {
+              targetAngle = Math.max(minAngle, Math.min(maxAngle, targetAngle));
+            } else {
+              // If greenDeg is 0, any angle in [0, 360) should be red, but we won't win anyway
+              targetAngle = Math.random() * 360;
+            }
+          } else {
+            // Red at pointer: targetAngle mod 360 should be in [0, 360 - greenDeg]
+            // Example: if greenDeg = 180, targetAngle mod 360 should be in [0, 180]
+            // So targetAngle could be 0, 50, 100, 150, etc.
+            const maxAngle = 360 - greenDeg;
+            targetAngle = Math.random() * maxAngle;
+          }
+          
+          console.log('[Golden Machine] Server calculated target angle:', {
+            didWin: res.didWin,
+            chance: chance,
+            greenDeg: greenDeg,
+            targetAngle: targetAngle,
+            targetAngleMod360: targetAngle % 360,
+            expectedSegmentAtPointer: (360 - (targetAngle % 360)) % 360
+          });
+
+          // Generate unique spin ID
+          const spinId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+          // Store result temporarily (will be sent after spin animation completes)
+          if (!(player as any).__goldenMachinePendingResults) {
+            (player as any).__goldenMachinePendingResults = new Map();
+          }
+          (player as any).__goldenMachinePendingResults.set(spinId, {
+            didWin: Boolean(res.didWin),
+            chance: chance,
+            inputPetId: res.inputPetId,
+            outputPetId: res.outputPetId ?? null,
+            token: res.token ?? null,
+          });
+
+          // Send spin start event to trigger wheel animation
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_SPIN_START',
+            success: true,
+            targetAngle: targetAngle,
+            chance: chance,
+            spinId: spinId,
+          });
+
+          sendPetState(player);
+          // This can consume equipped pets, so always resync visuals.
+          gameManager.syncEquippedPets(player);
+          break;
+        }
+        case 'GOLDEN_MACHINE_SPIN_RESULT': {
+          // Client finished wheel animation, now send the actual result
+          const spinId = String((data as any).spinId ?? '');
+          const pendingResults = (player as any).__goldenMachinePendingResults;
+          
+          if (!pendingResults || !pendingResults.has(spinId)) {
+            player.ui.sendData({
+              type: 'GOLDEN_MACHINE_RESULT',
+              success: false,
+              message: 'Invalid spin ID',
+            });
+            break;
+          }
+
+          const result = pendingResults.get(spinId);
+          pendingResults.delete(spinId);
+
+          // Send the stored result
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_RESULT',
+            success: true,
+            didWin: result.didWin,
+            chance: result.chance,
+            inputPetId: result.inputPetId,
+            outputPetId: result.outputPetId,
+            token: result.token,
+          });
+
+          break;
+        }
+        case 'GOLDEN_MACHINE_CLAIM': {
+          const token = String((data as any).token ?? '');
+          const res = gameManager.getPetManager().claimGoldenVariant(player, token);
+          player.ui.sendData({
+            type: 'GOLDEN_MACHINE_CLAIM_RESULT',
+            success: res.success,
+            message: res.message ?? (res.success ? 'OK' : 'Failed'),
+            petId: res.petId ?? null,
+          });
+          sendPetState(player);
+          // Claim adds a pet; resync visuals in case the player equips it immediately.
+          gameManager.syncEquippedPets(player);
+          break;
+        }
+        case 'EGG_AUTO_DELETE_TOGGLE': {
+          const petIdRaw = data.petId;
+          const enabled = Boolean(data.enabled);
+          const playerData = gameManager.getPlayerData(player);
+          if (!playerData || !isPetId(petIdRaw)) break;
+
+          const list = Array.isArray(playerData.autoDeletePets) ? [...playerData.autoDeletePets] : [];
+          const idx = list.indexOf(petIdRaw);
+          if (enabled) {
+            if (idx === -1) list.push(petIdRaw);
+          } else if (idx !== -1) {
+            list.splice(idx, 1);
+          }
+
+          playerData.autoDeletePets = list;
+          gameManager.updatePlayerData(player, playerData);
+
+          player.ui.sendData({
+            type: 'EGG_AUTO_DELETE_LIST',
+            autoDeletePets: list,
+          });
+          break;
+        }
         case 'EGG_HATCH': {
           const eggTypeStr = String(data.eggType ?? 'stone').toLowerCase();
           const eggType =
@@ -1015,6 +1528,9 @@ startServer(world => {
             eggTypeStr === 'sand' ? EggType.SAND :
             eggTypeStr === 'snow' ? EggType.SNOW :
             eggTypeStr === 'lava' ? EggType.LAVA :
+            eggTypeStr === 'sweets' ? EggType.SWEETS :
+            eggTypeStr === 'ornament' ? EggType.ORNAMENT :
+            eggTypeStr === 'winter' ? EggType.WINTER :
             EggType.STONE;
           const count = Math.max(1, Math.min(50, Number(data.count ?? 1) || 1));
 
@@ -1041,7 +1557,40 @@ startServer(world => {
             success: true,
             eggType,
             count,
-            goldSpent: hatchRes.goldSpent ?? 0,
+            results,
+          });
+          // Achievements: eggs hatched progress
+          const playerDataAfterHatch = gameManager.getPlayerData(player);
+          if (playerDataAfterHatch) {
+            addEggsHatched(playerDataAfterHatch, count);
+            gameManager.updatePlayerData(player, playerDataAfterHatch);
+            sendAchievementsState(player);
+          }
+          sendPetState(player);
+          gameManager.getTutorialManager().onEggHatched(player);
+          break;
+        }
+        case 'REWARD_CLAIM': {
+          const claimRes = gameManager.claimTimedReward(player);
+          if (!claimRes.success) {
+            player.ui.sendData({ type: 'REWARD_HATCH_RESULT', success: false, message: claimRes.message });
+            break;
+          }
+
+          const results = (claimRes.results ?? []).map((id) => {
+            const def = getPetDefinition(id);
+            return {
+              id,
+              name: def?.name ?? id,
+              rarity: def?.rarity ?? 'common',
+              eggType: def?.eggType ?? EggType.REWARD_15,
+              multiplier: def?.multiplier ?? 0,
+            };
+          });
+
+          player.ui.sendData({
+            type: 'REWARD_HATCH_RESULT',
+            success: true,
             results,
           });
           sendPetState(player);
@@ -1062,6 +1611,13 @@ startServer(world => {
             });
             // Also send updated power stats to update gold display
             gameManager.sendPowerStatsToUI(player);
+            gameManager.getTutorialManager().onPickaxePurchased(player);
+
+            // If the player is currently holding to mine, restart the loop so SPS reflects the new pickaxe speed.
+            const miningController = gameManager.getMiningController();
+            if (miningController?.isPlayerMining(player)) {
+              miningController.startMiningLoop(player);
+            }
           } else {
             player.ui.sendData({
               type: 'PICKAXE_PURCHASED',
@@ -1088,6 +1644,12 @@ startServer(world => {
               gold: updatedShopData.playerGold,
               pickaxes: updatedShopData.pickaxes,
             });
+
+            // If the player is currently holding to mine, restart the loop so SPS reflects the newly equipped pickaxe speed.
+            const miningController = gameManager.getMiningController();
+            if (miningController?.isPlayerMining(player)) {
+              miningController.startMiningLoop(player);
+            }
           } else {
             player.ui.sendData({
               type: 'PICKAXE_EQUIPPED',
@@ -1097,9 +1659,6 @@ startServer(world => {
           }
           break;
         case 'OPEN_REBIRTH_UI':
-
-          // Modal state should already be set by MODAL_OPENED event, but set it here too as backup
-          gameManager.setModalState(player, 'rebirth', true);
           const rebirthData = gameManager.getRebirthUIData(player);
           player.ui.sendData({
             type: 'REBIRTH_UI_DATA',
@@ -1259,12 +1818,13 @@ startServer(world => {
           });
           break;
         case 'UNLOCK_WORLD':
-          const unlockResult = gameManager.unlockWorld(player, data.worldId);
+          const unlockWorldId = data.worldId ?? data.payload?.worldId;
+          const unlockResult = gameManager.unlockWorld(player, unlockWorldId);
           player.ui.sendData({
             type: 'WORLD_UNLOCKED',
             success: unlockResult.success,
             message: unlockResult.message,
-            worldId: data.worldId,
+            worldId: unlockWorldId,
           });
           // Refresh worlds panel data after unlock attempt
           const worldSelectionDataAfterUnlock = gameManager.getWorldSelectionData(player);
@@ -1274,12 +1834,13 @@ startServer(world => {
           });
           break;
         case 'TELEPORT_TO_WORLD':
-          const teleportResult = gameManager.teleportToWorld(player, data.worldId);
+          const teleportWorldId = data.worldId ?? data.payload?.worldId;
+          const teleportResult = gameManager.teleportToWorld(player, teleportWorldId);
           player.ui.sendData({
             type: 'WORLD_TELEPORTED',
             success: teleportResult.success,
             message: teleportResult.message,
-            worldId: data.worldId,
+            worldId: teleportWorldId,
           });
           // Refresh worlds panel data after teleport attempt
           const worldSelectionDataAfterTeleport = gameManager.getWorldSelectionData(player);
@@ -1292,13 +1853,6 @@ startServer(world => {
 
       }
     });
-    
-    // Send initial UI stats after a brief delay to allow saved data to load first
-    // If saved data loads, it will update the UI with correct values
-    // If not, this will send the default values
-    setTimeout(() => {
-      gameManager.onPlayerUILoaded(player);
-    }, 150);
 
     // Set up mining input handling
     const miningController = gameManager.getMiningController();
@@ -1311,29 +1865,35 @@ startServer(world => {
     
     // Set up left click callbacks (like NewGame does with shoot)
     playerEntity.setOnLeftClickStart(() => {
+      console.log('[LeftClick] Click detected for player:', player.username);
+
       // Don't allow mining if player is not in the mine
       // This prevents mining animations and raycasting on the surface
       if (!gameManager.isPlayerInMine(player)) {
+        console.log('[LeftClick] Player not in mine');
         return;
       }
-      
+
       // Don't allow manual mining if:
       // 1. Auto-mine is enabled (it handles mining automatically)
       // 2. A blocking modal (pickaxe or rebirth) is open
       const autoState = gameManager.getPlayerAutoState(player);
       if (autoState?.autoMineEnabled) {
         // Auto-mine is on - don't allow manual clicks to mine
+        console.log('[LeftClick] Auto-mine enabled, ignoring manual click');
         return;
       }
-      
+
       // Check if any blocking modal is open
       if (gameManager.isBlockingModalOpen(player)) {
         // Modal is open - don't allow manual mining
         // Auto-mine can still work, but manual clicks are blocked
+        console.log('[LeftClick] Blocking modal open');
         return;
       }
-      
+
       // Player is in the mine, auto-mine is off, and no blocking modals - allow manual mining
+      console.log('[LeftClick] Starting mining loop');
       if (miningController && !miningController.isPlayerMining(player)) {
         miningController.startMiningLoop(player);
       }
@@ -1366,18 +1926,6 @@ startServer(world => {
 
     // Begin monitoring shared shaft so the player can be handed off to their personal mine
     gameManager.startMineEntranceWatch(player);
-
-    // Send welcome message with player stats
-    const pickaxe = gameManager.getPlayerPickaxe(player);
-    const pickaxeName = pickaxe ? pickaxe.name : 'None';
-    const playerData = gameManager.getPlayerData(player) || defaultPlayerData;
-    world.chatManager.sendPlayerMessage(player, 'Welcome to the Mining Game!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power} | Gold: ${playerData.gold} | Rebirths: ${playerData.rebirths}`, 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, `Pickaxe: ${pickaxeName} (Tier ${playerData.currentPickaxeTier})`, 'FFFF00');
-    world.chatManager.sendPlayerMessage(player, 'Cobbled-deepslate clusters = Training rocks | Stone blocks = Mining area', 'FFFF00');
-    world.chatManager.sendPlayerMessage(player, 'Use WASD to move around & space to jump.', 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, 'Hold shift to sprint.', 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, 'Left click to mine blocks!', 'FFFF00');
   });
 
   world.chatManager.registerCommand('/whereami', player => {
@@ -1551,6 +2099,39 @@ startServer(world => {
     }
   });
 
+  // Admin command: reset tutorial progress for a player (defaults to self)
+  world.chatManager.registerCommand('/tutorialreset', (player, args) => {
+    if (!isAdminPlayer(player)) {
+      world.chatManager.sendPlayerMessage(
+        player,
+        'You do not have permission to use /tutorialreset. Set ADMIN_USERNAMES env to enable.',
+        'FF5555'
+      );
+      return;
+    }
+
+    const identifier = (args[0] ?? '').trim();
+    let target = player;
+
+    if (identifier) {
+      const players = PlayerManager.instance.getConnectedPlayers();
+      const byId = players.find(p => String(p.id) === identifier);
+      const byName = PlayerManager.instance.getConnectedPlayerByUsername(identifier);
+      const found = byId ?? byName;
+      if (!found) {
+        world.chatManager.sendPlayerMessage(player, `Player not found: ${identifier}`, 'FF5555');
+        return;
+      }
+      target = found;
+    }
+
+    gameManager.getTutorialManager().resetTutorial(target);
+    world.chatManager.sendPlayerMessage(player, `Tutorial reset for ${target.username}.`, '00FF00');
+    if (target !== player) {
+      world.chatManager.sendPlayerMessage(target, 'Your tutorial has been reset by an admin.', 'FFFF00');
+    }
+  });
+
   // Persistence testing commands
   world.chatManager.registerCommand('/checkdata', player => {
     const playerData = gameManager.getPlayerData(player);
@@ -1564,7 +2145,7 @@ startServer(world => {
 
     world.chatManager.sendPlayerMessage(player, '=== Your Saved Data ===', '00FFFF');
     world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Gold: ${playerData.gold.toLocaleString()}`, 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, `Rebirths: ${playerData.rebirths} | Wins: ${playerData.wins}`, 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, `Rebirths: ${playerData.rebirths} | Trophies: ${playerData.trophies}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Pickaxe Tier: ${playerData.currentPickaxeTier}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Inventory: ${inventoryCount} ore types, ${totalOres} total ores`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Player ID: ${player.id} (check ./dev/persistence/player-${player.id}.json)`, 'FFFF00');
@@ -1621,20 +2202,33 @@ startServer(world => {
    * here: https://dev.hytopia.com/sdk-guides/events
    */
   world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => {
+    // Finalize achievements time played tracking on leave
+    const now = Date.now();
+    const last = Number((player as any).__achLastTickMs ?? now);
+    const delta = Math.max(0, now - last);
+    const pd = gameManager.getPlayerData(player);
+    if (pd && delta > 0) {
+      addTimePlayedMs(pd, delta);
+      gameManager.updatePlayerData(player, pd);
+    }
+    const achInterval = (player as any).__achPlaytimeInterval;
+    if (achInterval) {
+      clearInterval(achInterval);
+      (player as any).__achPlaytimeInterval = null;
+    }
+
     // Remove player from merchant tracking
-    for (const merchantEntity of merchantEntities) {
-      merchantEntity.removePlayer(player);
-    }
+    merchantEntities.forEach(entity => entity.removePlayer(player));
     // Remove player from mine reset upgrade NPC tracking
-    for (const mineResetUpgradeNPC of mineResetUpgradeNPCs) {
-      mineResetUpgradeNPC.removePlayer(player);
-    }
+    mineResetUpgradeNPCs.forEach(npc => npc.removePlayer(player));
     // Remove player from gem trader tracking
-    for (const gemTraderEntity of gemTraderEntities) {
-      gemTraderEntity.removePlayer(player);
-    }
+    gemTraderEntities.forEach(entity => entity.removePlayer(player));
     // Remove player from egg station tracking
     eggStationManager.removePlayer(player);
+    // Remove player from golden machine tracking
+    goldenMachine.removePlayer(player);
+    // Remove player from daily chest tracking
+    dailyChestController.removePlayer(player);
     
     // Clean up mining input interval
     const miningInputInterval = (player as any).__miningInputInterval;
@@ -1647,7 +2241,13 @@ startServer(world => {
     if (zoomLockInterval) {
       clearInterval(zoomLockInterval);
     }
-    
+
+    // Clean up zoom transition timeout
+    const zoomTransitionTimeout = (player as any).__zoomTransitionTimeout;
+    if (zoomTransitionTimeout) {
+      clearTimeout(zoomTransitionTimeout);
+    }
+
     // Clean up pickaxe entity
     pickaxeManager.cleanupPlayer(player);
     
@@ -1656,6 +2256,79 @@ startServer(world => {
     
     // Clean up player data (saves to persistence before cleanup)
     await gameManager.cleanupPlayer(player);
+  });
+
+  /**
+   * Handle player interact events (tap-to-interact for training rocks)
+   * This enables mobile players to tap on training rocks from any distance
+   * The player will be teleported to the rock and training will start
+   */
+  world.on(PlayerEvent.INTERACT, ({ player, raycastHit }) => {
+    const trainingController = gameManager.getTrainingController();
+    if (!trainingController) return;
+
+    // Get hit position from raycast (works for tapping rock blocks or SceneUI)
+    const hitPosition = raycastHit?.hitPoint;
+
+    // Try to find training rock at hit position OR nearby player
+    trainingController.handleInteract(player, hitPosition);
+  });
+
+  /**
+   * Handle player reconnecting to the game. The PlayerEvent.RECONNECTED_WORLD
+   * event is emitted when a player quickly disconnects and reconnects (within ~5 seconds).
+   * Without this handler, the UI would not reload for these players.
+   */
+  world.on(PlayerEvent.RECONNECTED_WORLD, ({ player }) => {
+    // Re-apply safe send wrapper (UI instance may have been recreated).
+    const uiAny = player.ui as any;
+    if (!uiAny.__safeSendWrapped) {
+      const unsafeSend = player.ui.sendData.bind(player.ui);
+      uiAny.__unsafeSendData = unsafeSend;
+      uiAny.__safeSendWrapped = true;
+      player.ui.sendData = ((data: any) => {
+        try {
+          unsafeSend(data);
+        } catch (err) {
+          console.warn(`[UI] sendData failed for ${player.username}:`, err);
+        }
+      }) as any;
+    }
+
+    // Reload the UI
+    player.ui.load('ui/index.html');
+
+    // Re-attach camera to player entity
+    const playerEntities = world.entityManager.getPlayerEntitiesByPlayer(player);
+    if (playerEntities.length > 0) {
+      player.camera.setAttachedToEntity(playerEntities[0]);
+    }
+
+    // Re-send initial UI data after UI loads
+    player.ui.on(PlayerUIEvent.LOAD, () => {
+      // Ensure loading screen is cleared after UI reload
+      gameManager.setPlayerLoading(player, false);
+      gameManager.onPlayerUILoaded(player);
+
+      // Re-add to proximity tracking systems
+      merchantEntities.forEach(entity => entity.addPlayer(player));
+      mineResetUpgradeNPCs.forEach(npc => npc.addPlayer(player));
+      gemTraderEntities.forEach(entity => entity.addPlayer(player));
+      eggStationManager.addPlayer(player);
+      dailyChestController.addPlayer(player);
+
+      // Re-send mining state if in mine
+      if (gameManager.isPlayerInMine(player)) {
+        player.ui.sendData({ type: 'MINING_STATE_UPDATE', isInMine: true });
+      }
+
+      // Re-send auto mode states
+      const autoState = gameManager.getPlayerAutoState(player);
+      if (autoState) {
+        player.ui.sendData({ type: 'AUTO_MINE_STATE', enabled: autoState.autoMineEnabled });
+        player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: autoState.autoTrainEnabled });
+      }
+    });
   });
 
   /**
@@ -1672,10 +2345,55 @@ startServer(world => {
    * Play some peaceful ambient music to
    * set the mood!
    */
-  
+
   new Audio({
-    uri: 'audio/music/hytopia-main-theme.mp3',
+    uri: 'audio/music/alt-music-3.mp3',
     loop: true,
     volume: 0.1,
   }).play(world);
+
+  // Register this world with the WorldStateManager for per-world lookups
+  const managers: PerWorldManagers = {
+    gameManager,
+    pickaxeManager,
+    merchantEntities,
+    mineResetUpgradeNPCs,
+    gemTraderEntities,
+    eggStationManager,
+    goldenMachine,
+    dailyChestController,
+    dailyChestLabelManager,
+    eggStationLabelManager,
+    shopLabelManager,
+  };
+  WorldStateManager.instance.registerWorld(world.id, managers);
+
+  console.log(`[MINING_SIMULATOR] World ${world.id} initialization complete`);
+}
+
+/**
+ * Server entry point - Uses WorldLoadBalancer for multi-world support.
+ *
+ * Key behaviors:
+ * - Players join the world with the fewest players (least-populated-first)
+ * - New worlds are created when all existing worlds are at capacity
+ * - Empty worlds are shut down after a 30-second grace period
+ * - At least 1 world is always kept active
+ */
+startServer(() => {
+  console.log('[MINING_SIMULATOR] Server starting...');
+  console.log(`[MINING_SIMULATOR] Max players per world: ${WORLD_INSTANCE_CONFIG.MAX_PLAYERS_PER_WORLD}`);
+  console.log(`[MINING_SIMULATOR] Min active worlds: ${WORLD_INSTANCE_CONFIG.MIN_ACTIVE_WORLDS}`);
+  console.log(`[MINING_SIMULATOR] Empty world grace period: ${WORLD_INSTANCE_CONFIG.EMPTY_WORLD_GRACE_PERIOD_MS}ms`);
+
+  // Create the WorldLoadBalancer with the world map
+  const worldLoadBalancer = new WorldLoadBalancer(worldMap as unknown as WorldMap);
+
+  // Initialize with our world setup function
+  worldLoadBalancer.initialize(initializeWorld);
+
+  // Start the cleanup loop for empty worlds
+  worldLoadBalancer.startCleanupLoop();
+
+  console.log('[MINING_SIMULATOR] WorldLoadBalancer initialized and running');
 });

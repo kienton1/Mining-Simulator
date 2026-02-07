@@ -12,8 +12,10 @@ import { Player, PersistenceManager } from 'hytopia';
 import type { PlayerData } from './PlayerData';
 import { createDefaultPlayerData, CURRENT_DATA_VERSION } from './PlayerData';
 import { isPetId, PET_EQUIP_CAPACITY, PET_INVENTORY_CAPACITY } from '../Pets/PetDatabase';
+import { getBonuses } from '../Achievements/Achievements';
 import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 import { stringToBigInt, bigIntToString } from './BigIntUtils';
+import { TutorialPhase } from '../Tutorial/TutorialTypes';
 
 /**
  * Validates player data structure
@@ -28,11 +30,16 @@ function validatePlayerData(data: any): data is PlayerData {
 
   // Check required fields (dataVersion is optional for backwards compatibility)
   // Note: gems is optional for backwards compatibility with old saves
-  const requiredFields = ['power', 'rebirths', 'gold', 'wins', 'currentPickaxeTier', 'inventory'];
+  const requiredFields = ['power', 'rebirths', 'gold', 'currentPickaxeTier', 'inventory'];
   for (const field of requiredFields) {
     if (!(field in data)) {
       return false;
     }
+  }
+  const hasTrophies = 'trophies' in data;
+  const hasWins = 'wins' in data;
+  if (!hasTrophies && !hasWins) {
+    return false;
   }
 
   // Validate types
@@ -41,7 +48,8 @@ function validatePlayerData(data: any): data is PlayerData {
   if (typeof data.rebirths !== 'number' || isNaN(data.rebirths) || data.rebirths < 0) return false;
   if (typeof data.gold !== 'number' || isNaN(data.gold) || data.gold < 0) return false;
   if (data.gems !== undefined && (typeof data.gems !== 'number' || isNaN(data.gems) || data.gems < 0)) return false;
-  if (typeof data.wins !== 'number' || isNaN(data.wins) || data.wins < 0) return false;
+  if (data.trophies !== undefined && (typeof data.trophies !== 'number' || isNaN(data.trophies) || data.trophies < 0)) return false;
+  if (data.wins !== undefined && (typeof data.wins !== 'number' || isNaN(data.wins) || data.wins < 0)) return false;
   if (typeof data.currentPickaxeTier !== 'number' || isNaN(data.currentPickaxeTier) || data.currentPickaxeTier < 0) return false;
   // Upgrade levels are optional for backward compatibility
   if (data.moreGemsLevel !== undefined && (typeof data.moreGemsLevel !== 'number' || isNaN(data.moreGemsLevel) || data.moreGemsLevel < 0)) return false;
@@ -59,6 +67,47 @@ function validatePlayerData(data: any): data is PlayerData {
   // World system fields are optional for backward compatibility
   if (data.currentWorld !== undefined && typeof data.currentWorld !== 'string') return false;
   if (data.unlockedWorlds !== undefined && !Array.isArray(data.unlockedWorlds)) return false;
+
+  // Tutorial system fields are optional for backward compatibility
+  if (data.tutorial !== undefined) {
+    if (!data.tutorial || typeof data.tutorial !== 'object') return false;
+    if (data.tutorial.phase !== undefined && typeof data.tutorial.phase !== 'string') return false;
+    if (data.tutorial.miningCount !== undefined && (typeof data.tutorial.miningCount !== 'number' || isNaN(data.tutorial.miningCount))) return false;
+    if (data.tutorial.completed !== undefined && typeof data.tutorial.completed !== 'boolean') return false;
+    if (data.tutorial.skipped !== undefined && typeof data.tutorial.skipped !== 'boolean') return false;
+    if (data.tutorial.rewardGranted !== undefined && typeof data.tutorial.rewardGranted !== 'boolean') return false;
+    if (data.tutorial.rewardAmount !== undefined && (typeof data.tutorial.rewardAmount !== 'number' || isNaN(data.tutorial.rewardAmount))) return false;
+    if (data.tutorial.pickaxeRewardGranted !== undefined && typeof data.tutorial.pickaxeRewardGranted !== 'boolean') return false;
+    if (data.tutorial.pickaxeRewardAmount !== undefined && (typeof data.tutorial.pickaxeRewardAmount !== 'number' || isNaN(data.tutorial.pickaxeRewardAmount))) return false;
+    if (data.tutorial.completionShown !== undefined && typeof data.tutorial.completionShown !== 'boolean') return false;
+  }
+
+  // Admin flag is optional
+  if (data.isAdmin !== undefined && typeof data.isAdmin !== 'boolean') return false;
+
+  // Daily reward fields are optional for backward compatibility
+  if (data.lastDailyRewardClaim !== undefined && (typeof data.lastDailyRewardClaim !== 'number' || isNaN(data.lastDailyRewardClaim) || data.lastDailyRewardClaim < 0)) return false;
+  if (data.maxGoldEverHeld !== undefined && (typeof data.maxGoldEverHeld !== 'number' || isNaN(data.maxGoldEverHeld) || data.maxGoldEverHeld < 0)) return false;
+  if (data.maxGemsEverHeld !== undefined && (typeof data.maxGemsEverHeld !== 'number' || isNaN(data.maxGemsEverHeld) || data.maxGemsEverHeld < 0)) return false;
+
+  // Achievements fields are optional for backward compatibility
+  if (data.achievementProgress !== undefined) {
+    if (!data.achievementProgress || typeof data.achievementProgress !== 'object') return false;
+    if (data.achievementProgress.blocksMined !== undefined && (typeof data.achievementProgress.blocksMined !== 'number' || isNaN(data.achievementProgress.blocksMined) || data.achievementProgress.blocksMined < 0)) return false;
+    if (data.achievementProgress.eggsHatched !== undefined && (typeof data.achievementProgress.eggsHatched !== 'number' || isNaN(data.achievementProgress.eggsHatched) || data.achievementProgress.eggsHatched < 0)) return false;
+    if (data.achievementProgress.timePlayedMs !== undefined && (typeof data.achievementProgress.timePlayedMs !== 'number' || isNaN(data.achievementProgress.timePlayedMs) || data.achievementProgress.timePlayedMs < 0)) return false;
+    if (data.achievementProgress.powerTrained !== undefined && (typeof data.achievementProgress.powerTrained !== 'string')) return false;
+    if (data.achievementProgress.coinsEarned !== undefined && (typeof data.achievementProgress.coinsEarned !== 'string')) return false;
+  }
+  if (data.achievementClaims !== undefined) {
+    if (!data.achievementClaims || typeof data.achievementClaims !== 'object') return false;
+    const c = data.achievementClaims;
+    if (c.blocksMined !== undefined && (typeof c.blocksMined !== 'number' || isNaN(c.blocksMined) || c.blocksMined < 0)) return false;
+    if (c.powerTrained !== undefined && (typeof c.powerTrained !== 'number' || isNaN(c.powerTrained) || c.powerTrained < 0)) return false;
+    if (c.coinsEarned !== undefined && (typeof c.coinsEarned !== 'number' || isNaN(c.coinsEarned) || c.coinsEarned < 0)) return false;
+    if (c.eggsHatched !== undefined && (typeof c.eggsHatched !== 'number' || isNaN(c.eggsHatched) || c.eggsHatched < 0)) return false;
+    if (c.timePlayed !== undefined && (typeof c.timePlayed !== 'number' || isNaN(c.timePlayed) || c.timePlayed < 0)) return false;
+  }
 
   return true;
 }
@@ -93,9 +142,15 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     gems: typeof savedData.gems === 'number' && !isNaN(savedData.gems) && savedData.gems >= 0 
       ? savedData.gems 
       : (defaults.gems || 0),
-    wins: typeof savedData.wins === 'number' && !isNaN(savedData.wins) && savedData.wins >= 0 
-      ? savedData.wins 
-      : defaults.wins,
+    trophies: (() => {
+      if (typeof savedData.trophies === 'number' && !isNaN(savedData.trophies) && savedData.trophies >= 0) {
+        return savedData.trophies;
+      }
+      if (typeof savedData.wins === 'number' && !isNaN(savedData.wins) && savedData.wins >= 0) {
+        return savedData.wins;
+      }
+      return defaults.trophies;
+    })(),
     currentPickaxeTier: (() => {
       const savedTier = typeof savedData.currentPickaxeTier === 'number' && !isNaN(savedData.currentPickaxeTier) && savedData.currentPickaxeTier >= 0
         ? savedData.currentPickaxeTier
@@ -168,12 +223,17 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     // Pet system (sanitize + cap)
     petInventory: (() => {
       const raw = Array.isArray(savedData.petInventory) ? savedData.petInventory : (defaults.petInventory ?? []);
-      const sanitized = raw.filter(isPetId).slice(0, PET_INVENTORY_CAPACITY);
+      // Compute dynamic cap based on achievement claims if present.
+      const tempData: PlayerData = { ...defaults, ...(savedData as any) } as any;
+      const cap = Math.max(PET_INVENTORY_CAPACITY, getBonuses(tempData).petInventoryCap);
+      const sanitized = raw.filter(isPetId).slice(0, cap);
       return sanitized;
     })(),
     equippedPets: (() => {
       const raw = Array.isArray(savedData.equippedPets) ? savedData.equippedPets : (defaults.equippedPets ?? []);
-      const sanitized = raw.filter(isPetId).slice(0, PET_EQUIP_CAPACITY);
+      const tempData: PlayerData = { ...defaults, ...(savedData as any) } as any;
+      const cap = Math.max(PET_EQUIP_CAPACITY, getBonuses(tempData).petEquipCap);
+      const sanitized = raw.filter(isPetId).slice(0, cap);
       return sanitized;
     })(),
     petDiscovered: (() => {
@@ -210,6 +270,139 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
         }
       }
       return unique;
+    })(),
+    tutorial: (() => {
+      const fallback = defaults.tutorial;
+      if (!savedData.tutorial || typeof savedData.tutorial !== 'object') {
+        return fallback;
+      }
+      const t = savedData.tutorial;
+      const phase =
+        typeof t.phase === 'string' && Object.values(TutorialPhase).includes(t.phase)
+          ? t.phase
+          : fallback?.phase;
+      const miningCount =
+        typeof t.miningCount === 'number' && !isNaN(t.miningCount)
+          ? Math.max(0, Math.floor(t.miningCount))
+          : (fallback?.miningCount ?? 0);
+      const completed = typeof t.completed === 'boolean' ? t.completed : Boolean(fallback?.completed);
+      const skipped = typeof t.skipped === 'boolean' ? t.skipped : Boolean(fallback?.skipped);
+      const rewardGranted = typeof t.rewardGranted === 'boolean' ? t.rewardGranted : Boolean(fallback?.rewardGranted);
+      const rewardAmount =
+        typeof t.rewardAmount === 'number' && !isNaN(t.rewardAmount)
+          ? t.rewardAmount
+          : (fallback?.rewardAmount ?? 0);
+      const pickaxeRewardGranted =
+        typeof t.pickaxeRewardGranted === 'boolean'
+          ? t.pickaxeRewardGranted
+          : (fallback?.pickaxeRewardGranted ?? false);
+      const pickaxeRewardAmount =
+        typeof t.pickaxeRewardAmount === 'number' && !isNaN(t.pickaxeRewardAmount)
+          ? t.pickaxeRewardAmount
+          : (fallback?.pickaxeRewardAmount ?? 0);
+      const completionShown =
+        typeof t.completionShown === 'boolean'
+          ? t.completionShown
+          : (typeof t.completed === 'boolean' && t.completed)
+            ? true
+            : (fallback?.completionShown ?? false);
+      return {
+        phase,
+        miningCount,
+        completed,
+        skipped,
+        rewardGranted,
+        rewardAmount,
+        pickaxeRewardGranted,
+        pickaxeRewardAmount,
+        completionShown,
+      };
+    })(),
+    isAdmin: typeof savedData.isAdmin === 'boolean' ? savedData.isAdmin : (defaults.isAdmin ?? false),
+    // Daily reward fields
+    lastDailyRewardClaim: typeof savedData.lastDailyRewardClaim === 'number' && !isNaN(savedData.lastDailyRewardClaim) && savedData.lastDailyRewardClaim >= 0
+      ? savedData.lastDailyRewardClaim
+      : (defaults.lastDailyRewardClaim ?? 0),
+    maxGoldEverHeld: typeof savedData.maxGoldEverHeld === 'number' && !isNaN(savedData.maxGoldEverHeld) && savedData.maxGoldEverHeld >= 0
+      ? savedData.maxGoldEverHeld
+      : (defaults.maxGoldEverHeld ?? 0),
+    maxGemsEverHeld: typeof savedData.maxGemsEverHeld === 'number' && !isNaN(savedData.maxGemsEverHeld) && savedData.maxGemsEverHeld >= 0
+      ? savedData.maxGemsEverHeld
+      : (defaults.maxGemsEverHeld ?? 0),
+
+    // Achievements (with defaults)
+    achievementProgress: (() => {
+      const ap = savedData.achievementProgress;
+      const base = defaults.achievementProgress ?? {
+        blocksMined: 0,
+        powerTrained: '0',
+        coinsEarned: '0',
+        eggsHatched: 0,
+        timePlayedMs: 0,
+      };
+      if (!ap || typeof ap !== 'object') return { ...base };
+      const blocksMined = typeof ap.blocksMined === 'number' && !isNaN(ap.blocksMined) && ap.blocksMined >= 0 ? ap.blocksMined : (base.blocksMined ?? 0);
+      const eggsHatched = typeof ap.eggsHatched === 'number' && !isNaN(ap.eggsHatched) && ap.eggsHatched >= 0 ? ap.eggsHatched : (base.eggsHatched ?? 0);
+      const timePlayedMs = typeof ap.timePlayedMs === 'number' && !isNaN(ap.timePlayedMs) && ap.timePlayedMs >= 0 ? ap.timePlayedMs : (base.timePlayedMs ?? 0);
+
+      const powerTrained = (() => {
+        const raw = typeof ap.powerTrained === 'string' ? ap.powerTrained : (base.powerTrained ?? '0');
+        try {
+          return bigIntToString(stringToBigInt(raw));
+        } catch {
+          return base.powerTrained ?? '0';
+        }
+      })();
+
+      const coinsEarned = (() => {
+        const raw = typeof ap.coinsEarned === 'string' ? ap.coinsEarned : (base.coinsEarned ?? '0');
+        try {
+          return bigIntToString(stringToBigInt(raw));
+        } catch {
+          return base.coinsEarned ?? '0';
+        }
+      })();
+
+      return { blocksMined, powerTrained, coinsEarned, eggsHatched, timePlayedMs };
+    })(),
+    leaderboardHighScores: (() => {
+      const lhs = savedData.leaderboardHighScores;
+      const defaultBestPower = defaults.leaderboardHighScores?.bestPower ?? '1';
+      const defaultBestCoins = defaults.leaderboardHighScores?.bestCoins ?? '0';
+      if (!lhs || typeof lhs !== 'object') return { bestPower: defaultBestPower, bestCoins: defaultBestCoins };
+
+      const bestPower = typeof lhs.bestPower === 'string' && /^\d+$/.test(lhs.bestPower)
+        ? lhs.bestPower
+        : defaultBestPower;
+
+      const bestCoinsFromLhs = typeof lhs.bestCoins === 'string' && /^\d+$/.test(lhs.bestCoins)
+        ? lhs.bestCoins
+        : undefined;
+      const bestCoinsFromMax = typeof savedData.maxGoldEverHeld === 'number' && !isNaN(savedData.maxGoldEverHeld) && savedData.maxGoldEverHeld >= 0
+        ? String(Math.floor(savedData.maxGoldEverHeld))
+        : undefined;
+      const bestCoins = bestCoinsFromLhs ?? bestCoinsFromMax ?? defaultBestCoins;
+
+      return { bestPower, bestCoins };
+    })(),
+    achievementClaims: (() => {
+      const ac = savedData.achievementClaims;
+      const base = defaults.achievementClaims ?? {
+        blocksMined: 0,
+        powerTrained: 0,
+        coinsEarned: 0,
+        eggsHatched: 0,
+        timePlayed: 0,
+      };
+      if (!ac || typeof ac !== 'object') return { ...base };
+      const numOr = (v: any, d: number) => (typeof v === 'number' && !isNaN(v) && v >= 0 ? Math.floor(v) : d);
+      return {
+        blocksMined: numOr(ac.blocksMined, base.blocksMined ?? 0),
+        powerTrained: numOr(ac.powerTrained, base.powerTrained ?? 0),
+        coinsEarned: numOr(ac.coinsEarned, base.coinsEarned ?? 0),
+        eggsHatched: numOr(ac.eggsHatched, base.eggsHatched ?? 0),
+        timePlayed: numOr(ac.timePlayed, base.timePlayed ?? 0),
+      };
     })(),
   };
 

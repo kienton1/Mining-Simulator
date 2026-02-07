@@ -47,6 +47,25 @@ export enum ISLAND3_TRAINING_ROCK_TIER {
 }
 
 /**
+ * Training rock tier enumeration for Island 4 (Snow World)
+ * 6 tiers based on snow ore block types:
+ * - FROSTBRICK: Rock 1 (+35M Power UI)
+ * - EVERGREEN_CRYSTAL: Rock 2 (+125M Power UI)
+ * - STARFLARE: Rock 3 (+400M Power UI)
+ * - COAL_OF_YULE: Rock 4 (+1.5B Power UI)
+ * - MOLTEN_COCOA_STONE: Rock 5 (+5B Power UI)
+ * - SUGARPLUM_QUARTZ: Rock 6 (+15B Power UI)
+ */
+export enum ISLAND4_TRAINING_ROCK_TIER {
+  FROSTBRICK = 'frostbrick',
+  EVERGREEN_CRYSTAL = 'evergreen_crystal',
+  STARFLARE = 'starflare',
+  COAL_OF_YULE = 'coal_of_yule',
+  MOLTEN_COCOA_STONE = 'molten_cocoa_stone',
+  SUGARPLUM_QUARTZ = 'sugarplum_quartz',
+}
+
+/**
  * Training rock data structure for Island 2
  */
 export interface Island2TrainingRockData {
@@ -89,6 +108,38 @@ export interface Island3TrainingRockData {
   tier: ISLAND3_TRAINING_ROCK_TIER;
 
   /** Display name (volcanic-themed) */
+  name: string;
+
+  /** Number of rebirths required to access this rock */
+  requiredRebirths: number;
+
+  /** Amount of power required to access this rock (alternative to rebirths) */
+  requiredPower: number;
+
+  /** UI power bonus display value */
+  uiPowerBonus: number;
+
+  /** Formula constant for power gain calculation */
+  formulaConstant: number;
+
+  /** Hit rate (hits per second) */
+  hitRate: number;
+
+  /** Block type used to identify this training rock */
+  blockType: string;
+}
+
+/**
+ * Training rock data structure for Island 4
+ */
+export interface Island4TrainingRockData {
+  /** Unique identifier for this training rock */
+  id: string;
+
+  /** Tier of training rock */
+  tier: ISLAND4_TRAINING_ROCK_TIER;
+
+  /** Display name (snow-themed) */
   name: string;
 
   /** Number of rebirths required to access this rock */
@@ -259,6 +310,80 @@ export const ISLAND3_TRAINING_ROCK_DATABASE: Record<ISLAND3_TRAINING_ROCK_TIER, 
 };
 
 /**
+ * Database of all Island 4 training rocks
+ * 6 tiers with exponential power gain functions based on rebirths
+ * Reference: Snow world training formulas (rocks 1-6)
+ */
+export const ISLAND4_TRAINING_ROCK_DATABASE: Record<ISLAND4_TRAINING_ROCK_TIER, Island4TrainingRockData> = {
+  [ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK]: {
+    id: 'frostbrick-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK,
+    name: 'Frostbrick Training Area',
+    requiredRebirths: 350_000_000_000, // 350B
+    requiredPower: 500_000_000_000_000_000_000_000, // 500 Sx
+    uiPowerBonus: 35_000_000,
+    formulaConstant: 912384.7793421043,
+    hitRate: 4,
+    blockType: 'Frostbrick',
+  },
+  [ISLAND4_TRAINING_ROCK_TIER.EVERGREEN_CRYSTAL]: {
+    id: 'evergreen-crystal-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.EVERGREEN_CRYSTAL,
+    name: 'Evergreen Crystal Training Area',
+    requiredRebirths: 1_000_000_000_000, // 1T
+    requiredPower: 2_500_000_000_000_000_000_000_000, // 2.5 Sp
+    uiPowerBonus: 125_000_000,
+    formulaConstant: 3258517.069078944,
+    hitRate: 4,
+    blockType: 'Evergreen_Crystal',
+  },
+  [ISLAND4_TRAINING_ROCK_TIER.STARFLARE]: {
+    id: 'starflare-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.STARFLARE,
+    name: 'Starflare Training Area',
+    requiredRebirths: 6_500_000_000_000, // 6.5T
+    requiredPower: 100_000_000_000_000_000_000_000_000, // 100 Sp
+    uiPowerBonus: 400_000_000,
+    formulaConstant: 10427254.621052621,
+    hitRate: 4,
+    blockType: 'Starflare',
+  },
+  [ISLAND4_TRAINING_ROCK_TIER.COAL_OF_YULE]: {
+    id: 'coal-of-yule-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.COAL_OF_YULE,
+    name: 'Coal of Yule Training Area',
+    requiredRebirths: 15_000_000_000_000, // 15T
+    requiredPower: 1_000_000_000_000_000_000_000_000_000, // 1 Oc
+    uiPowerBonus: 1_500_000_000,
+    formulaConstant: 39102204.82894733,
+    hitRate: 4,
+    blockType: 'Coal_of_Yule',
+  },
+  [ISLAND4_TRAINING_ROCK_TIER.MOLTEN_COCOA_STONE]: {
+    id: 'molten-cocoa-stone-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.MOLTEN_COCOA_STONE,
+    name: 'Molten Cocoa Stone Training Area',
+    requiredRebirths: 75_000_000_000_000, // 75T
+    requiredPower: 750_000_000_000_000_000_000_000_000_000, // 750 Oc
+    uiPowerBonus: 5_000_000_000,
+    formulaConstant: 130340682.76315776,
+    hitRate: 4,
+    blockType: 'Molten_Cocoa_Stone',
+  },
+  [ISLAND4_TRAINING_ROCK_TIER.SUGARPLUM_QUARTZ]: {
+    id: 'sugarplum-quartz-rock',
+    tier: ISLAND4_TRAINING_ROCK_TIER.SUGARPLUM_QUARTZ,
+    name: 'Sugarplum Quartz Training Area',
+    requiredRebirths: 250_000_000_000_000, // 250T
+    requiredPower: 1_000_000_000_000_000_000_000_000_000_000, // 1 No
+    uiPowerBonus: 15_000_000_000,
+    formulaConstant: 391022048.2894733,
+    hitRate: 4,
+    blockType: 'Sugarplum_Quartz',
+  },
+};
+
+/**
  * Calculate power gain per hit for Island 2 training rocks
  * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
  * Where x = player rebirth count, y = power gained per training hit
@@ -291,6 +416,22 @@ export function calculateIsland3TrainingPowerGain(rockTier: ISLAND3_TRAINING_ROC
 }
 
 /**
+ * Calculate power gain per hit for Island 4 training rocks
+ * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
+ * Where x = player rebirth count, y = power gained per training hit
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per hit
+ */
+export function calculateIsland4TrainingPowerGain(rockTier: ISLAND4_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const rockData = ISLAND4_TRAINING_ROCK_DATABASE[rockTier];
+  const exponent = 0.9993304728909983;
+
+  return Math.floor(rockData.formulaConstant * Math.pow(rebirthCount, exponent));
+}
+
+/**
  * Calculate power gain per second for Island 3 training rocks
  * Formula: Power/sec = (power per hit) * (hits per second)
  *
@@ -301,6 +442,21 @@ export function calculateIsland3TrainingPowerGain(rockTier: ISLAND3_TRAINING_ROC
 export function calculateIsland3TrainingPowerPerSecond(rockTier: ISLAND3_TRAINING_ROCK_TIER, rebirthCount: number): number {
   const powerPerHit = calculateIsland3TrainingPowerGain(rockTier, rebirthCount);
   const rockData = ISLAND3_TRAINING_ROCK_DATABASE[rockTier];
+
+  return powerPerHit * rockData.hitRate;
+}
+
+/**
+ * Calculate power gain per second for Island 4 training rocks
+ * Formula: Power/sec = (power per hit) * (hits per second)
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per second
+ */
+export function calculateIsland4TrainingPowerPerSecond(rockTier: ISLAND4_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const powerPerHit = calculateIsland4TrainingPowerGain(rockTier, rebirthCount);
+  const rockData = ISLAND4_TRAINING_ROCK_DATABASE[rockTier];
 
   return powerPerHit * rockData.hitRate;
 }
@@ -341,6 +497,16 @@ export function getIsland3TrainingRockByTier(tier: ISLAND3_TRAINING_ROCK_TIER): 
 }
 
 /**
+ * Gets Island 4 training rock data by tier
+ *
+ * @param tier - Training rock tier
+ * @returns Training rock data or undefined if tier doesn't exist
+ */
+export function getIsland4TrainingRockByTier(tier: ISLAND4_TRAINING_ROCK_TIER): Island4TrainingRockData | undefined {
+  return ISLAND4_TRAINING_ROCK_DATABASE[tier];
+}
+
+/**
  * Gets all Island 2 training rocks that a player can access based on their rebirth count OR power
  *
  * @param rebirths - Player's current rebirth count
@@ -362,6 +528,19 @@ export function getAccessibleIsland2TrainingRocks(rebirths: number, power: numbe
  */
 export function getAccessibleIsland3TrainingRocks(rebirths: number, power: number): Island3TrainingRockData[] {
   return Object.values(ISLAND3_TRAINING_ROCK_DATABASE).filter(
+    rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
+  );
+}
+
+/**
+ * Gets all Island 4 training rocks that a player can access based on their rebirth count OR power
+ *
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns Array of accessible training rock data
+ */
+export function getAccessibleIsland4TrainingRocks(rebirths: number, power: number): Island4TrainingRockData[] {
+  return Object.values(ISLAND4_TRAINING_ROCK_DATABASE).filter(
     rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
   );
 }
@@ -397,6 +576,21 @@ export function canAccessIsland3TrainingRock(tier: ISLAND3_TRAINING_ROCK_TIER, r
 }
 
 /**
+ * Checks if a player can access an Island 4 training rock
+ * Player can unlock via EITHER power requirement OR rebirth requirement
+ *
+ * @param tier - Training rock tier to check
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns True if player can access this rock
+ */
+export function canAccessIsland4TrainingRock(tier: ISLAND4_TRAINING_ROCK_TIER, rebirths: number, power: number): boolean {
+  const rock = getIsland4TrainingRockByTier(tier);
+  if (!rock) return false;
+  return rock.requiredRebirths <= rebirths || rock.requiredPower <= power;
+}
+
+/**
  * Get block type to tier mapping for Island 2 training rocks
  * Used for auto-detection of training rocks in the world
  */
@@ -423,6 +617,19 @@ export const ISLAND3_BLOCK_TYPE_TO_TIER: Record<string, ISLAND3_TRAINING_ROCK_TI
 };
 
 /**
+ * Get block type to tier mapping for Island 4 training rocks
+ * Used for auto-detection of training rocks in the world
+ */
+export const ISLAND4_BLOCK_TYPE_TO_TIER: Record<string, ISLAND4_TRAINING_ROCK_TIER> = {
+  'Frostbrick': ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK,
+  'Evergreen_Crystal': ISLAND4_TRAINING_ROCK_TIER.EVERGREEN_CRYSTAL,
+  'Starflare': ISLAND4_TRAINING_ROCK_TIER.STARFLARE,
+  'Coal_of_Yule': ISLAND4_TRAINING_ROCK_TIER.COAL_OF_YULE,
+  'Molten_Cocoa_Stone': ISLAND4_TRAINING_ROCK_TIER.MOLTEN_COCOA_STONE,
+  'Sugarplum_Quartz': ISLAND4_TRAINING_ROCK_TIER.SUGARPLUM_QUARTZ,
+};
+
+/**
  * Get training rock tier from block type
  *
  * @param blockType - Block type string
@@ -440,4 +647,14 @@ export function getIsland2TierFromBlockType(blockType: string): ISLAND2_TRAINING
  */
 export function getIsland3TierFromBlockType(blockType: string): ISLAND3_TRAINING_ROCK_TIER | undefined {
   return ISLAND3_BLOCK_TYPE_TO_TIER[blockType];
+}
+
+/**
+ * Get training rock tier from block type (Island 4)
+ *
+ * @param blockType - Block type string
+ * @returns Training rock tier or undefined if not found
+ */
+export function getIsland4TierFromBlockType(blockType: string): ISLAND4_TRAINING_ROCK_TIER | undefined {
+  return ISLAND4_BLOCK_TYPE_TO_TIER[blockType];
 }

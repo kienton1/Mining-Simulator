@@ -47,6 +47,13 @@ export const BLOCKS_PER_MINE_LEVEL = 3; // Each mine level is 3 blocks tall (7x3
 export const BASE_SWING_RATE = 1 / 0.5; // 2.0 swings per second (1 hit per 0.5 seconds)
 
 /**
+ * Maximum mining animation speed multiplier
+ * Caps how fast the mining animation can play regardless of pickaxe speed.
+ * At 20x, the animation is visibly fast but still somewhat readable.
+ */
+export const MAX_MINING_ANIMATION_SPEED = 20.0;
+
+/**
  * DEPRECATED: Old depth-based HP scaling constants
  * 
  * NEW SYSTEM (Linear Scaling): Ores now have firstHealth and lastHealth properties
@@ -230,6 +237,23 @@ export const ISLAND3_MINING_AREA_BOUNDS = {
 } as const;
 
 /**
+ * Island 4 (Snow World) Mining Area Coordinates
+ * Mining opening corners: (-919,0,30), (-919,0,24), (-925,0,24), (-925,0,30)
+ */
+export const ISLAND4_MINING_AREA_BOUNDS = {
+  /** Minimum X coordinate */
+  minX: -925,
+  /** Maximum X coordinate */
+  maxX: -919,
+  /** Y coordinate (surface level) */
+  y: 0,
+  /** Minimum Z coordinate */
+  minZ: 24,
+  /** Maximum Z coordinate */
+  maxZ: 30,
+} as const;
+
+/**
  * Island 2 (Beach World) Shared Mine Shaft (public drop-in hole)
  * Players jump down this 10-block-deep shaft; a trigger at the bottom
  * teleports them into their personal mine instance.
@@ -268,7 +292,33 @@ export const ISLAND3_SHARED_MINE_SHAFT = {
 } as const;
 
 /**
+ * Island 4 (Snow World) Shared Mine Shaft (public drop-in hole)
+ */
+export const ISLAND4_SHARED_MINE_SHAFT = {
+  bounds: {
+    minX: ISLAND4_MINING_AREA_BOUNDS.minX,
+    maxX: ISLAND4_MINING_AREA_BOUNDS.maxX,
+    minZ: ISLAND4_MINING_AREA_BOUNDS.minZ,
+    maxZ: ISLAND4_MINING_AREA_BOUNDS.maxZ,
+  },
+  topY: 0,
+  bottomY: -10,
+  /** Blocks of fall before teleporting to personal mine */
+  teleportAfterDropBlocks: 5,
+  /** Y threshold where we teleport (derived from topY - teleportAfterDropBlocks) */
+  teleportThresholdY: -5.5,
+} as const;
+
+/**
  * Spacing (in blocks) between per-player mine instances when using spatial offsets.
  * Keep large enough to avoid accidental overlap between players.
  */
 export const MINE_INSTANCE_SPACING = 256;
+
+/**
+ * Camera System Constants
+ */
+export const CAMERA_DEFAULT_ZOOM = 0.6;
+export const CAMERA_MODAL_ZOOM = 0.5;  // Lower value = more zoomed out (camera further away)
+export const CAMERA_ZOOM_TRANSITION_MS = 200;
+export const CAMERA_ZOOM_STEP_INTERVAL = 16;
