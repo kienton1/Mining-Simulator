@@ -1904,18 +1904,6 @@ function initializeWorld(world: World): void {
 
     // Begin monitoring shared shaft so the player can be handed off to their personal mine
     gameManager.startMineEntranceWatch(player);
-
-    // Send welcome message with player stats
-    const pickaxe = gameManager.getPlayerPickaxe(player);
-    const pickaxeName = pickaxe ? pickaxe.name : 'None';
-    const playerData = gameManager.getPlayerData(player) || defaultPlayerData;
-    world.chatManager.sendPlayerMessage(player, 'Welcome to the Mining Game!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power} | Gold: ${playerData.gold} | Rebirths: ${playerData.rebirths}`, 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, `Pickaxe: ${pickaxeName} (Tier ${playerData.currentPickaxeTier})`, 'FFFF00');
-    world.chatManager.sendPlayerMessage(player, 'Cobbled-deepslate clusters = Training rocks | Stone blocks = Mining area', 'FFFF00');
-    world.chatManager.sendPlayerMessage(player, 'Use WASD to move around & space to jump.', 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, 'Hold shift to sprint.', 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, 'Left click to mine blocks!', 'FFFF00');
   });
 
   world.chatManager.registerCommand('/whereami', player => {
