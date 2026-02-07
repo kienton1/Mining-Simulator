@@ -155,12 +155,19 @@ export class MiningPetEntity extends Entity {
       }
     }
 
+    // Create controller with animations
+    const simpleController = new SimpleEntityController({
+      idleLoopedAnimations: idleAnimations,
+      moveLoopedAnimations: walkAnimations.length > 0 ? walkAnimations : idleAnimations,
+    });
+
     // Build entity options
     const entityOptions: any = {
       name: `Pet_${options.petId}`,
       modelUri: modelUri || undefined,
       modelScale,
       tag: 'pet',
+      controller: simpleController,
     };
 
     if (textureUri) {
@@ -179,18 +186,14 @@ export class MiningPetEntity extends Entity {
     this.slotIndex = options.slotIndex;
     this.totalPets = options.totalPets;
 
-    // Create controller with animations
-    this.simpleController = new SimpleEntityController({
-      idleLoopedAnimations: idleAnimations,
-      moveLoopedAnimations: walkAnimations.length > 0 ? walkAnimations : idleAnimations,
-    });
+    // Store reference to controller
+    this.simpleController = simpleController;
   }
 
   /**
    * Spawn the pet into the world
    */
   public spawn(world: World, position: Vector3Like): void {
-    this.setController(this.simpleController);
     super.spawn(world, position);
     this._worldRef = world;
 

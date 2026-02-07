@@ -131,9 +131,9 @@
     {
       "id": 17,
       "name": "deepslate-ore",
-      "textureUri": "blocks/StoneOre",
+      "textureUri": "blocks/cobbled-deepslate.png",
       "isCustom": false,
-      "isMultiTexture": true,
+      "isMultiTexture": false,
       "isLiquid": false
     },
     {
