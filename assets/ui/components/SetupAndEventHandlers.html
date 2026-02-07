@@ -1144,7 +1144,7 @@
   /**
    * Update Merchant UI with inventory data
    */
-  function updateMerchantUI(inventory, totalValue, gold, oreSellValues) {
+  function updateMerchantUI(inventory, totalValue, gold, oreSellValues, oreMeta) {
     const merchantUIContent = document.getElementById('merchant-ui-content');
     if (!merchantUIContent) return;
 
@@ -1153,7 +1153,7 @@
 
     // Get ore data for values (matching ORE_DATABASE from OreData.ts and ISLAND2_ORE_DATABASE from Ores.ts)
     // Colors are hex values from the ore data files
-    const oreData = {
+    const fallbackOreData = {
       // Island 1 ores
       'stone': { name: 'Stone', value: 2, color: '#808080' },
       'deepslate': { name: 'Deepslate', value: 5, color: '#2F2F2F' },
@@ -1205,6 +1205,9 @@
       'palmitite': { name: 'Palmitite', value: 400000000, color: '#FFE4B5' },
       'tradewindite': { name: 'Tradewindite', value: 1750000000, color: '#87CEFA' },
     };
+
+    // Prefer server-provided ore metadata so worlds 3+ render correctly.
+    const oreData = Object.assign({}, fallbackOreData, oreMeta || {});
 
     // Create ore items
     const oreTypes = Object.keys(inventory).filter(oreType => inventory[oreType] > 0);
@@ -5889,7 +5892,7 @@
               merchantUI.classList.add('visible');
               hytopia.sendData({ type: 'MODAL_OPENED', modalType: 'merchant' });
               if (window.setModalOpen) window.setModalOpen(true);
-              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
+              updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {}, data.oreMeta || {});
             } else {
               console.log('[UI ZOOM] Merchant: Leaving proximity - hiding UI and sending MODAL_CLOSED');
               merchantUI.classList.remove('visible');
@@ -6338,7 +6341,7 @@
           if (moneyValueEl) moneyValueEl.textContent = formatNumber(state.gold);
           const merchantUIVisible = document.getElementById('merchant-ui')?.classList.contains('visible');
           if (merchantUIVisible) {
-            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {});
+            updateMerchantUI(data.inventory || {}, data.totalValue || 0, data.gold || 0, data.oreSellValues || {}, data.oreMeta || {});
             if (data.goldEarned && data.goldEarned > 0) {
               // Show gold earned notification
               console.log(`[UI] Gold earned: ${data.goldEarned}`);

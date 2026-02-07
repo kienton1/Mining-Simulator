@@ -444,6 +444,31 @@ function initializeWorld(world: World): void {
    * Handle merchant proximity events
    * When player enters/leaves merchant proximity, show/hide selling UI
    */
+  const getOreMeta = (oreType: string): { name: string; value: number; color: string } | null => {
+    let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+    if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
+      oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
+    }
+    if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
+      oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
+    }
+    if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
+      oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+    }
+    if (!oreData) return null;
+    return { name: oreData.name, value: oreData.value, color: oreData.color };
+  };
+
+  const buildOreMetaMap = (inventory: Record<string, number>): Record<string, { name: string; value: number; color: string }> => {
+    const map: Record<string, { name: string; value: number; color: string }> = {};
+    for (const [oreType, amount] of Object.entries(inventory)) {
+      if (!amount || amount <= 0) continue;
+      const meta = getOreMeta(oreType);
+      if (meta) map[oreType] = meta;
+    }
+    return map;
+  };
+
   const handleMerchantProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send inventory data to show UI
@@ -460,19 +485,7 @@ function initializeWorld(world: World): void {
       const oreSellValues: Record<string, number> = {};
       for (const [oreType, amount] of Object.entries(inventory)) {
         if (amount && amount > 0) {
-          // Try Island 1 database first
-          let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
-          // Try Island 2 database if not found
-          if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
-            oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
-          }
-          // Try Island 3 database if not found
-          if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
-            oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
-          }
-          if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
-            oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
-          }
+          const oreData = getOreMeta(oreType);
           if (oreData) {
             // Calculate sell value per unit with multipliers
             let sellValue = oreData.value * sellMultiplier;
@@ -489,6 +502,7 @@ function initializeWorld(world: World): void {
         inventory,
         totalValue,
         oreSellValues, // Send sell values per ore with multipliers
+        oreMeta: buildOreMetaMap(inventory),
         gold: playerData?.gold || 0,
       });
     } else {
@@ -959,18 +973,7 @@ function initializeWorld(world: World): void {
           const oreSellValuesAfterSell: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
             if (amount && amount > 0) {
-              // Try Island 1 database first
-              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
-              // Try Island 2 database if not found
-              if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
-                oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
-              }
-              if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
-                oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
-              }
-              if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
-                oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
-              }
+              const oreData = getOreMeta(oreType);
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSell;
                 // Round to nearest integer (no decimals)
@@ -985,6 +988,7 @@ function initializeWorld(world: World): void {
             inventory: inventoryAfterSell,
             totalValue: totalValueAfterSell,
             oreSellValues: oreSellValuesAfterSell,
+            oreMeta: buildOreMetaMap(inventoryAfterSell),
             gold: playerDataAfterSell?.gold || 0,
             goldEarned,
           });
@@ -1013,18 +1017,7 @@ function initializeWorld(world: World): void {
           const oreSellValuesAfterSellAll: Record<string, number> = {};
           for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
             if (amount && amount > 0) {
-              // Try Island 1 database first
-              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
-              // Try Island 2 database if not found
-              if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
-                oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
-              }
-              if (!oreData && oreType in ISLAND3_ORE_DATABASE) {
-                oreData = ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE];
-              }
-              if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
-                oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
-              }
+              const oreData = getOreMeta(oreType);
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSellAll;
                 // Round to nearest integer (no decimals)
@@ -1039,6 +1032,7 @@ function initializeWorld(world: World): void {
             inventory: inventoryAfterSellAll,
             totalValue: totalValueAfterSellAll,
             oreSellValues: oreSellValuesAfterSellAll,
+            oreMeta: buildOreMetaMap(inventoryAfterSellAll),
             gold: playerDataAfterSellAll?.gold || 0,
             goldEarned: totalGoldEarned,
           });
