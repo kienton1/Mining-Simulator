@@ -48,9 +48,10 @@ export class PetVisualManager {
         });
 
         // Spawn pet near the player
+        const petHalfHeight = Math.max(0.5, petEntity.height / 2);
         const spawnPosition = {
           x: playerEntity.position.x + 1 + idx * 0.5,
-          y: playerEntity.position.y + 0.5,
+          y: playerEntity.position.y + petHalfHeight,
           z: playerEntity.position.z + 2,
         };
 

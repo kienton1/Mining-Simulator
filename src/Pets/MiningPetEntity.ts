@@ -646,12 +646,13 @@ export class MiningPetEntity extends Entity {
 
     // Calculate position using owner's facing direction
     // Forward direction is (-sin(angle), -cos(angle)), so backward is (sin(angle), cos(angle))
+    const halfHeight = Math.max(0.5, this.height / 2);
     return {
       x:
         ownerPosition.x +
         Math.sin(facingAngle) * behindOffset +
         Math.cos(facingAngle) * sideOffset,
-      y: ownerPosition.y,
+      y: ownerPosition.y + halfHeight,
       z:
         ownerPosition.z +
         Math.cos(facingAngle) * behindOffset -

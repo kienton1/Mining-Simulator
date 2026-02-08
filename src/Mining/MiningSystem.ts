@@ -24,6 +24,8 @@ import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTA
 
 /** Set to true to enable verbose mining debug logging. */
 const DEBUG_MINING = false;
+const FLOOR_ENTITY_POOL_SIZE = 4;
+const FLOOR_ENTITY_HALF_EXTENTS = { x: 4.0, y: 0.5, z: 4.0 };
 
 /**
  * Mining block position key (x,y,z)
@@ -37,6 +39,12 @@ type BlockPositionKey = string;
 interface LevelContent {
   type: 'ore' | 'chest';
   value: string; // Ore type name or ChestType value
+}
+
+interface PooledFloorEntity {
+  entity: Entity;
+  mineLevel: number;
+  content: LevelContent;
 }
 
 interface MiningState {
@@ -88,17 +96,11 @@ interface MiningState {
   /** Current ore type for the floor entity (for texture tracking) */
   currentOreType?: string;
 
-  /** Pool of floor entities, one per ore type - for instant texture display */
-  oreEntityPool: Map<string, Entity>;
-
-  /** Pool of chest entities (basic and golden) - for instant chest display */
-  chestEntityPool: Map<ChestType, Entity>;
+  /** Pool of floor entities (leapfrog) for the mine column */
+  floorEntityPool: PooledFloorEntity[];
 
   /** Sequence of ore/chest types for generated levels: mineLevel -> content type */
   levelSequence: Map<number, LevelContent>;
-
-  /** Next occurrence index for each ore type (for efficient repositioning) */
-  nextOccurrence: Map<string, number>;
 }
 
 /**
@@ -950,6 +952,20 @@ export class MiningSystem {
     return this.getOffsetBounds(offset, worldId);
   }
 
+  private despawnFloorEntityPool(state: MiningState): void {
+    if (!state.floorEntityPool || state.floorEntityPool.length === 0) return;
+    for (const pooled of state.floorEntityPool) {
+      try {
+        if (pooled.entity?.isSpawned) {
+          pooled.entity.despawn();
+        }
+      } catch (error) {
+        // Entity might already be despawned
+      }
+    }
+    state.floorEntityPool = [];
+  }
+
   /**
    * Prepares the player's mine (all 1000 levels are pre-generated upfront) and returns entry position
    * All dirt walls are generated instantly when player spawns
@@ -987,10 +1003,8 @@ export class MiningSystem {
     const startTime = Date.now();
 
     // Initialize new fields for legacy states that may not have them
-    if (!state.oreEntityPool) state.oreEntityPool = new Map();
-    if (!state.chestEntityPool) state.chestEntityPool = new Map();
+    if (!state.floorEntityPool) state.floorEntityPool = [];
     if (!state.levelSequence) state.levelSequence = new Map();
-    if (!state.nextOccurrence) state.nextOccurrence = new Map();
 
     // Despawn the old floor entity if it exists (legacy single-entity approach)
     if (state.mineFloorEntity) {
@@ -1004,33 +1018,11 @@ export class MiningSystem {
       state.mineFloorEntity = undefined;
     }
 
-    // Despawn all ore entity pool entities
-    for (const entity of state.oreEntityPool.values()) {
-      try {
-        if (entity.isSpawned) {
-          entity.despawn();
-        }
-      } catch (error) {
-        // Entity might already be despawned
-      }
-    }
-    state.oreEntityPool.clear();
+    // Despawn all floor entity pool entities
+    this.despawnFloorEntityPool(state);
 
-    // Despawn all chest entity pool entities
-    for (const entity of state.chestEntityPool.values()) {
-      try {
-        if (entity.isSpawned) {
-          entity.despawn();
-        }
-      } catch (error) {
-        // Entity might already be despawned
-      }
-    }
-    state.chestEntityPool.clear();
-
-    // Clear level sequence and next occurrence tracking
+    // Clear level sequence
     state.levelSequence.clear();
-    state.nextOccurrence.clear();
 
     // Reset state (no floor blocks to clear - we use entity pool now)
     state.blockMap.clear();
@@ -1092,31 +1084,8 @@ export class MiningSystem {
         }
       }
 
-      // Despawn all ore entity pool entities (if pool exists)
-      if (state.oreEntityPool) {
-        for (const entity of state.oreEntityPool.values()) {
-          try {
-            if (entity.isSpawned) {
-              entity.despawn();
-            }
-          } catch (error) {
-            // Entity might already be despawned
-          }
-        }
-      }
-
-      // Despawn all chest entity pool entities (if pool exists)
-      if (state.chestEntityPool) {
-        for (const entity of state.chestEntityPool.values()) {
-          try {
-            if (entity.isSpawned) {
-              entity.despawn();
-            }
-          } catch (error) {
-            // Entity might already be despawned
-          }
-        }
-      }
+      // Despawn all floor entity pool entities (if pool exists)
+      this.despawnFloorEntityPool(state);
     }
 
     this.miningStates.delete(player);
@@ -1325,10 +1294,8 @@ export class MiningSystem {
       if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: Existing state found for player:', player.username);
 
       // Initialize new fields for legacy states that may not have them
-      if (!state.oreEntityPool) state.oreEntityPool = new Map();
-      if (!state.chestEntityPool) state.chestEntityPool = new Map();
+      if (!state.floorEntityPool) state.floorEntityPool = [];
       if (!state.levelSequence) state.levelSequence = new Map();
-      if (!state.nextOccurrence) state.nextOccurrence = new Map();
 
       // Check if the state's offset matches the current world's offset
       // If not, regenerate the state for the current world
@@ -1350,37 +1317,11 @@ export class MiningSystem {
           state.mineFloorEntity = undefined;
         }
 
-        // Despawn all ore entity pool entities (if pool exists)
-        if (state.oreEntityPool) {
-          for (const entity of state.oreEntityPool.values()) {
-            try {
-              if (entity.isSpawned) {
-                entity.despawn();
-              }
-            } catch (error) {
-              // Entity might already be despawned
-            }
-          }
-          state.oreEntityPool.clear();
-        }
+        // Despawn all floor entity pool entities (if pool exists)
+        this.despawnFloorEntityPool(state);
 
-        // Despawn all chest entity pool entities (if pool exists)
-        if (state.chestEntityPool) {
-          for (const entity of state.chestEntityPool.values()) {
-            try {
-              if (entity.isSpawned) {
-                entity.despawn();
-              }
-            } catch (error) {
-              // Entity might already be despawned
-            }
-          }
-          state.chestEntityPool.clear();
-        }
-
-        // Clear level sequence and next occurrence tracking (if they exist)
+        // Clear level sequence
         if (state.levelSequence) state.levelSequence.clear();
-        if (state.nextOccurrence) state.nextOccurrence.clear();
 
         // State is for a different world or legacy state, regenerate for current world
         state.blockMap.clear();
@@ -1417,10 +1358,8 @@ export class MiningSystem {
       ceilingBuilt: false,
       bottomFloorDepth: null,
       winTriggered: false,
-      oreEntityPool: new Map(),
-      chestEntityPool: new Map(),
+      floorEntityPool: [],
       levelSequence: new Map(),
-      nextOccurrence: new Map(),
     };
     this.miningStates.set(player, state);
     if (DEBUG_MINING) console.log('[MiningSystem] getOrCreateState: State created and stored');
@@ -1689,7 +1628,7 @@ export class MiningSystem {
    * Each mine level is 3 blocks tall (7x3x7)
    * Called when player first logs in or mine is reset
    *
-   * NEW: Uses entity pooling - one entity per ore type, repositioned as player mines
+   * NEW: Uses entity pooling - small leapfrog pool per column to avoid visible sliding
    *
    * @param player - Player who owns this mining state
    * @param state - Player's mining state
@@ -1710,13 +1649,13 @@ export class MiningSystem {
     }
 
     // Initialize entity pool if not already done
-    if (state.oreEntityPool.size === 0 && state.chestEntityPool.size === 0) {
-      this.initializeOreEntityPool(player, state, pickaxe, worldId);
+    if (!state.floorEntityPool || state.floorEntityPool.length === 0) {
+      this.initializeFloorEntityPool(player, state, pickaxe, worldId);
     }
 
     // Generate a limited number of levels upfront for performance
     // With entity pooling:
-    // - levelSequence already populated by initializeOreEntityPool
+    // - levelSequence already populated by initializeFloorEntityPool
     // - Generate MineBlock/ChestBlock objects for HP tracking
     // - Generate walls only
     const levelsToGenerate = this.INITIAL_MINE_LEVELS;
@@ -1789,213 +1728,49 @@ export class MiningSystem {
   }
 
   /**
-   * Initializes the ore entity pool for a player
-   * Creates one entity per unique ore type that appears in the first 40 levels
-   * Each entity is positioned at its first occurrence
+   * Initializes the floor entity pool for a player
+   * Creates a fixed pool of entities that leapfrog down the mine column.
    *
    * @param player - Player who owns this mining state
    * @param state - Player's mining state
    * @param pickaxe - Player's pickaxe (for ore generation with current luck)
    * @param worldId - World ID for ore generation
    */
-  private initializeOreEntityPool(
+  private initializeFloorEntityPool(
     player: Player,
     state: MiningState,
     pickaxe: PickaxeData,
     worldId: string
   ): void {
-    const bounds = this.getMiningAreaBounds(worldId);
-    const centerX = (bounds.minX + bounds.maxX) / 2 + state.offset.x;
-    const centerZ = (bounds.minZ + bounds.maxZ) / 2 + state.offset.z;
+    // Clear any existing pool before rebuilding
+    this.despawnFloorEntityPool(state);
+    state.floorEntityPool = [];
 
-    // Track first occurrence of each ore/chest type
-    const firstOccurrence: Map<string, number> = new Map();
-
-    // Generate level sequence for initial levels
+    // Generate level sequence for initial levels (if not already present)
     const levelsToGenerate = this.INITIAL_MINE_LEVELS;
     for (let mineLevel = 0; mineLevel < levelsToGenerate; mineLevel++) {
-      const absoluteDepth = mineLevel + 1;
+      if (state.levelSequence.has(mineLevel)) continue;
 
-      // Check if this level should be a chest
+      const absoluteDepth = mineLevel + 1;
       const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
 
       if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
-        // Chest level
-        const chestTypeValue = chestSpawnResult.chestType;
-        state.levelSequence.set(mineLevel, { type: 'chest', value: chestTypeValue });
-
-        // Track first occurrence (use chest type prefixed to distinguish from ore types)
-        const chestKey = `chest_${chestTypeValue}`;
-        if (!firstOccurrence.has(chestKey)) {
-          firstOccurrence.set(chestKey, mineLevel);
-        }
+        state.levelSequence.set(mineLevel, { type: 'chest', value: chestSpawnResult.chestType });
       } else {
-        // Normal ore level
         const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
         state.levelSequence.set(mineLevel, { type: 'ore', value: oreType });
-
-        // Track first occurrence
-        if (!firstOccurrence.has(oreType)) {
-          firstOccurrence.set(oreType, mineLevel);
-        }
       }
     }
 
-    // Calculate next occurrence for each ore/chest type
-    this.updateNextOccurrences(state, 0);
-
-    // Create entities for each unique ore type at their first occurrence
-    for (const [oreType, firstLevel] of firstOccurrence) {
-      if (oreType.startsWith('chest_')) {
-        // Chest entity
-        const chestTypeValue = oreType.replace('chest_', '') as ChestType;
-        if (!state.chestEntityPool.has(chestTypeValue)) {
-          const texture = this.getChestTextureUri(chestTypeValue);
-          const topY = this.mineLevelToTopY(firstLevel);
-          const centerY = topY - 1; // Adjusted for 3-block height
-
-          const entity = new Entity({
-            name: `Chest Floor ${chestTypeValue}`,
-            blockTextureUri: texture,
-            blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
-            rigidBodyOptions: {
-              type: RigidBodyType.KINEMATIC_POSITION,
-              colliders: [{
-                shape: ColliderShape.BLOCK,
-                halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
-              }],
-            },
-          });
-
-          entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
-          state.chestEntityPool.set(chestTypeValue, entity);
-          console.log('[MiningSystem] Created chest entity pool entry:', chestTypeValue, 'at level', firstLevel);
-        }
-      } else {
-        // Ore entity
-        if (!state.oreEntityPool.has(oreType)) {
-          const texture = this.getOreTextureUri(oreType);
-          const topY = this.mineLevelToTopY(firstLevel);
-          const centerY = topY - 1; // Adjusted for 3-block height
-
-          const entity = new Entity({
-            name: `Ore Floor ${oreType}`,
-            blockTextureUri: texture,
-            blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
-            rigidBodyOptions: {
-              type: RigidBodyType.KINEMATIC_POSITION,
-              colliders: [{
-                shape: ColliderShape.BLOCK,
-                halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
-              }],
-            },
-          });
-
-          entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
-          state.oreEntityPool.set(oreType, entity);
-          console.log('[MiningSystem] Created ore entity pool entry:', oreType, 'at level', firstLevel);
-        }
-      }
-    }
-
-    console.log('[MiningSystem] Entity pool initialized:',
-      'ore types:', state.oreEntityPool.size,
-      'chest types:', state.chestEntityPool.size);
-  }
-
-  /**
-   * Updates the nextOccurrence map for efficient repositioning
-   * Scans levelSequence from the given start level to find next occurrences
-   *
-   * @param state - Player's mining state
-   * @param afterLevel - Start scanning from this level + 1
-   */
-  private updateNextOccurrences(state: MiningState, afterLevel: number): void {
-    state.nextOccurrence.clear();
-
-    // Track which types we've found next occurrence for
-    const foundNext: Set<string> = new Set();
-
-    // Scan through level sequence starting from afterLevel + 1
-    for (let level = afterLevel; level < state.levelSequence.size + afterLevel + 100; level++) {
-      const content = state.levelSequence.get(level);
+    const poolDepth = Math.min(FLOOR_ENTITY_POOL_SIZE, levelsToGenerate);
+    for (let mineLevel = 0; mineLevel < poolDepth; mineLevel++) {
+      const content = state.levelSequence.get(mineLevel);
       if (!content) continue;
-
-      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
-
-      // Only record first occurrence after afterLevel for each type
-      if (!foundNext.has(key) && level > afterLevel) {
-        // For items at level > afterLevel, store their next occurrence
-        // But we need to track from current position, so scan from 0
-      }
+      const entity = this.createFloorEntity(state, content, mineLevel, worldId);
+      state.floorEntityPool.push({ entity, mineLevel, content });
     }
 
-    // Actually, we need a different approach:
-    // For each ore type that appears in the sequence, track where it appears
-    const occurrencesByType: Map<string, number[]> = new Map();
-
-    for (const [level, content] of state.levelSequence) {
-      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
-      if (!occurrencesByType.has(key)) {
-        occurrencesByType.set(key, []);
-      }
-      occurrencesByType.get(key)!.push(level);
-    }
-
-    // Store all occurrences sorted for each type (for efficient lookup later)
-    // We'll store a simple "next after current player level" approach
-    for (const [key, levels] of occurrencesByType) {
-      levels.sort((a, b) => a - b);
-      // Find first level after afterLevel
-      const nextLevel = levels.find(l => l > afterLevel);
-      if (nextLevel !== undefined) {
-        state.nextOccurrence.set(key, nextLevel);
-      }
-    }
-  }
-
-  /**
-   * Finds the next occurrence of an ore/chest type after a given level
-   *
-   * @param state - Player's mining state
-   * @param typeKey - Ore type or "chest_<chestType>" key
-   * @param afterLevel - Find occurrence after this level
-   * @returns Mine level number or -1 if not found
-   */
-  private findNextOccurrence(state: MiningState, typeKey: string, afterLevel: number): number {
-    // Scan through level sequence to find next occurrence
-    for (let level = afterLevel + 1; level < afterLevel + 1000; level++) {
-      const content = state.levelSequence.get(level);
-      if (!content) continue;
-
-      const key = content.type === 'chest' ? `chest_${content.value}` : content.value;
-      if (key === typeKey) {
-        return level;
-      }
-    }
-
-    // Not found in generated levels - return a very far level
-    // The entity will be positioned way down, out of view
-    return afterLevel + 2000;
-  }
-
-  /**
-   * Repositions an ore entity to a specific mine level
-   *
-   * @param state - Player's mining state
-   * @param entity - Entity to reposition
-   * @param toMineLevel - Target mine level
-   */
-  private repositionOreEntity(state: MiningState, entity: Entity, toMineLevel: number): void {
-    if (!entity.isSpawned) return;
-
-    const topY = this.mineLevelToTopY(toMineLevel);
-    const centerY = topY - 1; // Adjusted for 3-block height
-
-    // Get current position for X/Z (they don't change)
-    const currentPos = entity.position;
-
-    entity.setNextKinematicPosition({ x: currentPos.x, y: centerY, z: currentPos.z });
+    console.log('[MiningSystem] Floor entity pool initialized:', 'size:', state.floorEntityPool.length);
   }
 
   /**
@@ -2055,10 +1830,6 @@ export class MiningSystem {
         state.blockMap.set(miningAreaKey, goldBlock);
         // Add to level sequence (gold ore for win block)
         state.levelSequence.set(mineLevel, { type: 'ore', value: goldOreType });
-        // Create entity if this ore type doesn't have one yet
-        if (!state.oreEntityPool.has(goldOreType)) {
-          this.createPooledEntity(state, 'ore', goldOreType, mineLevel, worldId);
-        }
       } else {
         // Check if a chest should spawn at this mine level
         const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
@@ -2071,10 +1842,6 @@ export class MiningSystem {
           state.chestMap.set(chestKey, chest);
           // Add to level sequence
           state.levelSequence.set(mineLevel, { type: 'chest', value: chestType });
-          // Create entity if this chest type doesn't have one yet
-          if (!state.chestEntityPool.has(chestType)) {
-            this.createPooledEntity(state, 'chest', chestType, mineLevel, worldId);
-          }
         } else {
           // Create MineBlock for HP tracking
           const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
@@ -2084,10 +1851,6 @@ export class MiningSystem {
           state.blockMap.set(miningAreaKey, block);
           // Add to level sequence
           state.levelSequence.set(mineLevel, { type: 'ore', value: oreType });
-          // Create entity if this ore type doesn't have one yet
-          if (!state.oreEntityPool.has(oreType)) {
-            this.createPooledEntity(state, 'ore', oreType, mineLevel, worldId);
-          }
         }
       }
 
@@ -2613,8 +2376,7 @@ export class MiningSystem {
 
   /**
    * Transitions the floor entity to the next mine level
-   * NEW: Uses entity pooling - repositions the mined ore's entity to its next occurrence
-   * No texture changes needed - each entity keeps its texture forever
+   * Uses a small leapfrog pool so visible blocks never slide.
    *
    * @param player - Player whose floor entity to transition
    * @param state - Player's mining state
@@ -2631,33 +2393,11 @@ export class MiningSystem {
     const currentMineLevel = nextMineLevel - 1; // The level that was just mined
     const absoluteDepth = nextMineLevel + 1;
 
-    // Get what was at the just-mined level
-    const currentLevelContent = state.levelSequence.get(currentMineLevel);
+    // Ensure future levels exist for pool leapfrogging
+    this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
 
-    if (currentLevelContent) {
-      // Reposition the entity for the just-mined ore/chest type to its next occurrence
-      const typeKey = currentLevelContent.type === 'chest'
-        ? `chest_${currentLevelContent.value}`
-        : currentLevelContent.value;
-
-      const nextOccurrence = this.findNextOccurrence(state, typeKey, currentMineLevel);
-
-      if (currentLevelContent.type === 'chest') {
-        const chestType = currentLevelContent.value as ChestType;
-        const entity = state.chestEntityPool.get(chestType);
-        if (entity) {
-          this.repositionOreEntity(state, entity, nextOccurrence);
-          console.log('[MiningSystem] Repositioned chest entity', chestType, 'from level', currentMineLevel, 'to level', nextOccurrence);
-        }
-      } else {
-        const oreType = currentLevelContent.value;
-        const entity = state.oreEntityPool.get(oreType);
-        if (entity) {
-          this.repositionOreEntity(state, entity, nextOccurrence);
-          console.log('[MiningSystem] Repositioned ore entity', oreType, 'from level', currentMineLevel, 'to level', nextOccurrence);
-        }
-      }
-    }
+    // Recycle the consumed pooled entity to the next deepest level
+    this.advanceFloorEntityPool(player, state, currentMineLevel, pickaxe, worldId);
 
     // Check what's at the next level and update state tracking
     const chestKey = `chest_level_${nextMineLevel}`;
@@ -2696,11 +2436,6 @@ export class MiningSystem {
 
         // Add to level sequence
         state.levelSequence.set(nextMineLevel, { type: 'chest', value: chestSpawnResult.chestType });
-
-        // Create entity if this chest type doesn't have one yet
-        if (!state.chestEntityPool.has(chestSpawnResult.chestType)) {
-          this.createPooledEntity(state, 'chest', chestSpawnResult.chestType, nextMineLevel, worldId);
-        }
       } else {
         const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
         const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
@@ -2712,11 +2447,6 @@ export class MiningSystem {
 
         // Add to level sequence
         state.levelSequence.set(nextMineLevel, { type: 'ore', value: oreType });
-
-        // Create entity if this ore type doesn't have one yet
-        if (!state.oreEntityPool.has(oreType)) {
-          this.createPooledEntity(state, 'ore', oreType, nextMineLevel, worldId);
-        }
       }
     }
 
@@ -2724,55 +2454,90 @@ export class MiningSystem {
       'ore:', state.currentOreType, 'chest:', state.currentChestType);
   }
 
-  /**
-   * Creates a pooled entity for a new ore or chest type
-   * Called when an ore/chest type is encountered for the first time
-   *
-   * @param state - Player's mining state
-   * @param type - 'ore' or 'chest'
-   * @param value - Ore type name or ChestType value
-   * @param mineLevel - Mine level to position the entity at
-   * @param worldId - World ID for bounds calculation
-   */
-  private createPooledEntity(
+  private advanceFloorEntityPool(
+    player: Player,
     state: MiningState,
-    type: 'ore' | 'chest',
-    value: string,
-    mineLevel: number,
+    minedLevel: number,
+    pickaxe: PickaxeData,
     worldId: string
   ): void {
+    if (!state.floorEntityPool || state.floorEntityPool.length === 0) return;
+
+    const poolEntry = state.floorEntityPool.find(entry => entry.mineLevel === minedLevel);
+    if (!poolEntry) return;
+
+    const newMineLevel = minedLevel + FLOOR_ENTITY_POOL_SIZE;
+    let newContent = state.levelSequence.get(newMineLevel);
+
+    if (!newContent) {
+      const absoluteDepth = newMineLevel + 1;
+      const chestSpawnResult = this.shouldSpawnChest(absoluteDepth);
+
+      if (chestSpawnResult.shouldSpawn && chestSpawnResult.chestType !== null) {
+        newContent = { type: 'chest', value: chestSpawnResult.chestType };
+        state.levelSequence.set(newMineLevel, newContent);
+
+        const chestKey = `chest_level_${newMineLevel}`;
+        if (!state.chestMap.has(chestKey)) {
+          state.chestMap.set(chestKey, new ChestBlock(chestSpawnResult.chestType));
+        }
+      } else {
+        const oreType = this.generateOreType(pickaxe, absoluteDepth, player);
+        const oreHP = this.calculateOreHP(oreType, absoluteDepth, worldId);
+        newContent = { type: 'ore', value: oreType };
+        state.levelSequence.set(newMineLevel, newContent);
+
+        const miningAreaKey = `mining_area_level_${newMineLevel}`;
+        if (!state.blockMap.has(miningAreaKey)) {
+          state.blockMap.set(miningAreaKey, new MineBlock(oreType, oreHP));
+        }
+      }
+    }
+
+    try {
+      if (poolEntry.entity?.isSpawned) {
+        poolEntry.entity.despawn();
+      }
+    } catch (error) {
+      // Entity might already be despawned
+    }
+
+    poolEntry.entity = this.createFloorEntity(state, newContent, newMineLevel, worldId);
+    poolEntry.mineLevel = newMineLevel;
+    poolEntry.content = newContent;
+  }
+
+  private createFloorEntity(
+    state: MiningState,
+    content: LevelContent,
+    mineLevel: number,
+    worldId: string
+  ): Entity {
     const bounds = this.getMiningAreaBounds(worldId);
     const centerX = (bounds.minX + bounds.maxX) / 2 + state.offset.x;
     const centerZ = (bounds.minZ + bounds.maxZ) / 2 + state.offset.z;
     const topY = this.mineLevelToTopY(mineLevel);
-    const centerY = topY - 1;
+    const centerY = topY; // 1-block tall visual, spaced every 3 blocks
 
-    const texture = type === 'chest'
-      ? this.getChestTextureUri(value as ChestType)
-      : this.getOreTextureUri(value);
+    const texture = content.type === 'chest'
+      ? this.getChestTextureUri(content.value as ChestType)
+      : this.getOreTextureUri(content.value);
 
     const entity = new Entity({
-      name: type === 'chest' ? `Chest Floor ${value}` : `Ore Floor ${value}`,
+      name: content.type === 'chest' ? `Chest Floor ${content.value}` : `Ore Floor ${content.value}`,
       blockTextureUri: texture,
-      blockHalfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+      blockHalfExtents: FLOOR_ENTITY_HALF_EXTENTS,
       rigidBodyOptions: {
         type: RigidBodyType.KINEMATIC_POSITION,
         colliders: [{
           shape: ColliderShape.BLOCK,
-          halfExtents: { x: 4.0, y: 1.5, z: 4.0 },
+          halfExtents: FLOOR_ENTITY_HALF_EXTENTS,
         }],
       },
     });
 
     entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
-
-    if (type === 'chest') {
-      state.chestEntityPool.set(value as ChestType, entity);
-    } else {
-      state.oreEntityPool.set(value, entity);
-    }
-
-    console.log('[MiningSystem] Created new pooled entity:', type, value, 'at level', mineLevel);
+    return entity;
   }
 }
 
