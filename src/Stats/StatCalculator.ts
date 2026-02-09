@@ -379,7 +379,9 @@ export function damageFromPower(power: number): number {
     y += ks[i] * w * softplus(t);
   }
 
-  return Math.pow(10, y);
+  const raw = Math.pow(10, y);
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  return Math.max(1, raw);
 }
 
 /**
