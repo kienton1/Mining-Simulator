@@ -143,7 +143,7 @@ export interface PlayerData {
  * Current data version
  * Increment this when PlayerData structure changes to trigger migrations
  */
-export const CURRENT_DATA_VERSION = 14;
+export const CURRENT_DATA_VERSION = 15;
 
 /**
  * Inventory data structure

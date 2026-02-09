@@ -243,26 +243,26 @@ export class MiningSystem {
     [ISLAND4_ORE_TYPE.FIRESNOW_CORE, 122],      // Firesnow Core
     [ISLAND4_ORE_TYPE.SUGARPLUM_QUARTZ, 108],   // Sugarplum Quartz
     // Island 5 ores (Void Village) - Block IDs 127-146 from map.json
-    [ISLAND5_ORE_TYPE.SAND, 127],              // Eclipse_Sand
-    [ISLAND5_ORE_TYPE.SANDSTONE, 128],         // Abyssal_Basalt
-    [ISLAND5_ORE_TYPE.CACTUS, 129],            // Wraith_Ore
-    [ISLAND5_ORE_TYPE.CORAL, 130],             // Singularity_Fragment
-    [ISLAND5_ORE_TYPE.PYRAMID, 131],           // Antimatter_Nodule
-    [ISLAND5_ORE_TYPE.BEACH_BALL, 132],        // Oblivionite
-    [ISLAND5_ORE_TYPE.SANDCASTLE, 133],        // Blackstone_Shard
-    [ISLAND5_ORE_TYPE.SUNFLARE, 134],          // Eventide_Prism
-    [ISLAND5_ORE_TYPE.VIRIDIAN, 135],          // Gloom_Quartz
-    [ISLAND5_ORE_TYPE.MOLDAVITE, 136],         // Gravity_Core
-    [ISLAND5_ORE_TYPE.CYBERNETIUM, 137],       // Midnight_Obsidian
-    [ISLAND5_ORE_TYPE.ANCIENT_STONE, 138],     // Null_Pebble
-    [ISLAND5_ORE_TYPE.TOURMALINE, 139],        // Riftstone
-    [ISLAND5_ORE_TYPE.MATRIX, 140],            // Shadowglass
-    [ISLAND5_ORE_TYPE.STALAGMITE, 141],        // Umbral_Clay
-    [ISLAND5_ORE_TYPE.CRYOLITE, 142],          // Veil_Crystal
-    [ISLAND5_ORE_TYPE.PURPLURITE, 143],        // Void_Dust
-    [ISLAND5_ORE_TYPE.OSMIUM, 144],            // Darkstar_Alloy
-    [ISLAND5_ORE_TYPE.SPACE_RIFT, 145],        // Reality_Tear
-    [ISLAND5_ORE_TYPE.CRIMSON_FLARE, 146],     // Voidheart_Gem
+    [ISLAND5_ORE_TYPE.VOID_DUST, 143],              // Void_Dust
+    [ISLAND5_ORE_TYPE.BLACKSTONE_SHARD, 133],         // Blackstone_Shard
+    [ISLAND5_ORE_TYPE.NULL_PEBBLE, 138],            // Null_Pebble
+    [ISLAND5_ORE_TYPE.ECLIPSE_SAND, 127],             // Eclipse_Sand
+    [ISLAND5_ORE_TYPE.UMBRAL_CLAY, 141],           // Umbral_Clay
+    [ISLAND5_ORE_TYPE.GLOOM_QUARTZ, 135],        // Gloom_Quartz
+    [ISLAND5_ORE_TYPE.RIFTSTONE, 139],        // Riftstone
+    [ISLAND5_ORE_TYPE.ABYSSAL_BASALT, 128],          // Abyssal_Basalt
+    [ISLAND5_ORE_TYPE.SHADOWGLASS, 140],            // Shadowglass
+    [ISLAND5_ORE_TYPE.MIDNIGHT_OBSIDIAN, 137],          // Midnight_Obsidian
+    [ISLAND5_ORE_TYPE.VEIL_CRYSTAL, 142],          // Veil_Crystal
+    [ISLAND5_ORE_TYPE.WRAITH_ORE, 129],            // Wraith_Ore
+    [ISLAND5_ORE_TYPE.SINGULARITY_FRAGMENT, 130],        // Singularity_Fragment
+    [ISLAND5_ORE_TYPE.EVENTIDE_PRISM, 134],        // Eventide_Prism
+    [ISLAND5_ORE_TYPE.GRAVITY_CORE, 136],        // Gravity_Core
+    [ISLAND5_ORE_TYPE.ANTIMATTER_NODULE, 131],         // Antimatter_Nodule
+    [ISLAND5_ORE_TYPE.DARKSTAR_ALLOY, 144],       // Darkstar_Alloy
+    [ISLAND5_ORE_TYPE.VOIDHEART_GEM, 146],     // Voidheart_Gem
+    [ISLAND5_ORE_TYPE.REALITY_TEAR, 145],        // Reality_Tear
+    [ISLAND5_ORE_TYPE.OBLIVIONITE, 132],     // Oblivionite
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
@@ -2939,5 +2939,6 @@ export class MiningSystem {
     return entity;
   }
 }
+
 
 

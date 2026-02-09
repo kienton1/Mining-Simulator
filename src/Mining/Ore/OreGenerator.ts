@@ -233,7 +233,7 @@ export class OreGenerator {
     );
 
     if (availableOres.length === 0) {
-      return ISLAND5_ORE_TYPE.SAND;
+      return ISLAND5_ORE_TYPE.VOID_DUST;
     }
 
     const weights: Map<string, number> = new Map();
@@ -258,7 +258,7 @@ export class OreGenerator {
       }
     }
 
-    return ISLAND5_ORE_TYPE.SAND;
+    return ISLAND5_ORE_TYPE.VOID_DUST;
   }
 
   /**
@@ -301,7 +301,7 @@ export class OreGenerator {
         const oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
         return calculateOreHealth(oreData, currentDepth);
       }
-      const defaultOre = ISLAND5_ORE_DATABASE[ISLAND5_ORE_TYPE.SAND];
+      const defaultOre = ISLAND5_ORE_DATABASE[ISLAND5_ORE_TYPE.VOID_DUST];
       return calculateOreHealth(defaultOre, currentDepth);
     } else {
       // Check if it's an Island 1 ore type
@@ -388,4 +388,5 @@ export class OreGenerator {
     }
   }
 }
+
 

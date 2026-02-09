@@ -17,6 +17,42 @@ import { PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 import { stringToBigInt, bigIntToString } from './BigIntUtils';
 import { TutorialPhase } from '../Tutorial/TutorialTypes';
 
+const ISLAND5_ORE_ID_MIGRATION: Record<string, string> = {
+  sand: 'void_dust',
+  sandstone: 'blackstone_shard',
+  cactus: 'null_pebble',
+  coral: 'eclipse_sand',
+  pyramid: 'umbral_clay',
+  beach_ball: 'gloom_quartz',
+  sandcastle: 'riftstone',
+  sunflare: 'abyssal_basalt',
+  osmium: 'shadowglass',
+  viridian: 'midnight_obsidian',
+  cryolite: 'veil_crystal',
+  matrix: 'wraith_ore',
+  stalagmite: 'singularity_fragment',
+  purplurite: 'eventide_prism',
+  tourmaline: 'gravity_core',
+  moldavite: 'antimatter_nodule',
+  cybernetium: 'darkstar_alloy',
+  ancient_stone: 'voidheart_gem',
+  space_rift: 'reality_tear',
+  crimson_flare: 'oblivionite',
+};
+
+function migrateIsland5InventoryKeys(inventory: Record<string, number | undefined>): void {
+  for (const [oldKey, newKey] of Object.entries(ISLAND5_ORE_ID_MIGRATION)) {
+    const amount = inventory[oldKey];
+    if (amount === undefined) continue;
+    const numericAmount = typeof amount === 'number' ? amount : Number(amount);
+    if (!isNaN(numericAmount) && numericAmount > 0) {
+      const existing = inventory[newKey] ?? 0;
+      inventory[newKey] = (typeof existing === 'number' ? existing : Number(existing) || 0) + numericAmount;
+    }
+    delete inventory[oldKey];
+  }
+}
+
 /**
  * Validates player data structure
  * 
@@ -406,6 +442,11 @@ function mergeWithDefaults(savedData: any, defaults: PlayerData): PlayerData {
     })(),
   };
 
+  const savedVersion = typeof savedData.dataVersion === 'number' ? savedData.dataVersion : 0;
+  if (savedVersion < 15) {
+    migrateIsland5InventoryKeys(merged.inventory);
+  }
+
   // Sanitize inventory values (ensure they're numbers and non-negative)
   for (const key in merged.inventory) {
     const value = merged.inventory[key as keyof typeof merged.inventory];
@@ -463,7 +504,7 @@ export class PlayerDataPersistence {
       }
       
       // Ensure data version is set (for future migrations)
-      mergedData.dataVersion = mergedData.dataVersion || CURRENT_DATA_VERSION;
+      mergedData.dataVersion = Math.max(mergedData.dataVersion ?? 0, CURRENT_DATA_VERSION);
 
       return mergedData;
     } catch (error) {
