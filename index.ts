@@ -37,6 +37,7 @@ import { ORE_DATABASE, OreType, type OreData } from './src/Mining/Ore/World1OreD
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from './src/Mining/Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from './src/Mining/Ore/World3OreData';
 import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE, type Island4OreData } from './src/Mining/Ore/World4OreData';
+import { ISLAND5_ORE_DATABASE, ISLAND5_ORE_TYPE, type Island5OreData } from './src/Mining/Ore/World5OreData';
 
 import * as worldMap from './assets/map.json';
 import { WorldLoadBalancer } from './src/Core/WorldLoadBalancer';
@@ -64,7 +65,8 @@ import { ISLAND1_CONFIG } from './src/worldData/Island1Config';
 import { ISLAND2_CONFIG } from './src/worldData/Island2Config';
 import { ISLAND3_CONFIG } from './src/worldData/Island3Config';
 import { ISLAND4_CONFIG } from './src/worldData/Island4Config';
-import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS, CAMERA_DEFAULT_ZOOM, CAMERA_MODAL_ZOOM, CAMERA_ZOOM_TRANSITION_MS, CAMERA_ZOOM_STEP_INTERVAL } from './src/Core/GameConstants';
+import { ISLAND5_CONFIG } from './src/worldData/Island5Config';
+import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS, ISLAND5_MINING_AREA_BOUNDS, CAMERA_DEFAULT_ZOOM, CAMERA_MODAL_ZOOM, CAMERA_ZOOM_TRANSITION_MS, CAMERA_ZOOM_STEP_INTERVAL } from './src/Core/GameConstants';
 import { DailyChestEntity } from './src/DailyReward/DailyChestEntity';
 import { DailyChestLabelManager } from './src/DailyReward/DailyChestLabelManager';
 import { DailyChestController } from './src/DailyReward/DailyChestController';
@@ -124,6 +126,7 @@ function initializeWorld(world: World): void {
   WorldRegistry.registerWorld(ISLAND2_CONFIG);
   WorldRegistry.registerWorld(ISLAND3_CONFIG);
   WorldRegistry.registerWorld(ISLAND4_CONFIG);
+  WorldRegistry.registerWorld(ISLAND5_CONFIG);
 
   /**
    * Initialize Game Manager
@@ -162,6 +165,8 @@ function initializeWorld(world: World): void {
   gameManager.buildSharedMineShaftForIsland3();
   // Carve shared mine shaft for Island 4 (Snow World)
   gameManager.buildSharedMineShaftForIsland4();
+  // Carve shared mine shaft for Island 5 (Void Village)
+  gameManager.buildSharedMineShaftForIsland5();
 
   /**
    * Spawn Shop Entities (Ore Seller, Timer Upgrade, Gem Upgrades)
@@ -177,6 +182,7 @@ function initializeWorld(world: World): void {
     island2: getMineCenter(ISLAND2_MINING_AREA_BOUNDS),
     island3: getMineCenter(ISLAND3_MINING_AREA_BOUNDS),
     island4: getMineCenter(ISLAND4_MINING_AREA_BOUNDS),
+    island5: getMineCenter(ISLAND5_MINING_AREA_BOUNDS),
   } as const;
 
   const baseShopPositions = {
@@ -220,7 +226,7 @@ function initializeWorld(world: World): void {
   const mineResetUpgradeNPCs: MineResetUpgradeNPC[] = [];
   const gemTraderEntities: GemTraderEntity[] = [];
 
-  (['island1', 'island2', 'island3', 'island4'] as const).forEach(worldId => {
+  (['island1', 'island2', 'island3', 'island4', 'island5'] as const).forEach(worldId => {
     const merchantEntity = new MerchantEntity(
       world,
       getShopPosition(worldId, 'ore'),
@@ -265,7 +271,7 @@ function initializeWorld(world: World): void {
    * Shop SceneUI labels (ore seller, timer upgrade, gem upgrades) for all worlds
    */
   const shopLabels: ShopLabelDefinition[] = [];
-  (['island1', 'island2', 'island3', 'island4'] as const).forEach(worldId => {
+  (['island1', 'island2', 'island3', 'island4', 'island5'] as const).forEach(worldId => {
     shopLabels.push(
       {
         id: `${worldId}-shop-ore`,
@@ -318,7 +324,7 @@ function initializeWorld(world: World): void {
   const dailyChestEntities: DailyChestEntity[] = [];
   const dailyChestPositions: { id: string; position: { x: number; y: number; z: number } }[] = [];
 
-  (['island1', 'island2', 'island3', 'island4'] as const).forEach((worldId) => {
+  (['island1', 'island2', 'island3', 'island4', 'island5'] as const).forEach((worldId) => {
     const upgradePos = getShopPosition(worldId, 'upgrades');
     const chestPos = {
       x: upgradePos.x + dailyChestOffset.x,
@@ -461,7 +467,7 @@ function initializeWorld(world: World): void {
       for (const [oreType, amount] of Object.entries(inventory)) {
         if (amount && amount > 0) {
           // Try Island 1 database first
-          let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+          let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
           // Try Island 2 database if not found
           if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
             oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -472,6 +478,9 @@ function initializeWorld(world: World): void {
           }
           if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
             oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+          }
+          if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+            oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
           }
           if (oreData) {
             // Calculate sell value per unit with multipliers
@@ -511,6 +520,7 @@ function initializeWorld(world: World): void {
     if (worldId === 'island2') return 750_000_000_000;
     if (worldId === 'island3') return 2_000_000_000_000_000;
     if (worldId === 'island4') return 100_000_000_000_000_000_000_000;
+    if (worldId === 'island5') return 25_000_000_000_000_000_000_000_000_000;
     return 2_000_000;
   };
 
@@ -520,7 +530,7 @@ function initializeWorld(world: World): void {
       const playerData = gameManager.getPlayerData(player);
       const currentWorld = playerData?.currentWorld || 'island1';
       const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-      // Cost varies by world: island1 = 2M, island2 = 750B, island3 = 2Q
+      // Cost varies by world: island1 = 2M, island2 = 750B, island3 = 2Q, island4 = 100Sx, island5 = 25Oc
       const cost = getMineResetUpgradeCost(currentWorld);
       const gold = playerData?.gold || 0;
       
@@ -960,7 +970,7 @@ function initializeWorld(world: World): void {
           for (const [oreType, amount] of Object.entries(inventoryAfterSell)) {
             if (amount && amount > 0) {
               // Try Island 1 database first
-              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
               // Try Island 2 database if not found
               if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
                 oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -970,6 +980,9 @@ function initializeWorld(world: World): void {
               }
               if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
                 oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+                oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
               }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSell;
@@ -1014,7 +1027,7 @@ function initializeWorld(world: World): void {
           for (const [oreType, amount] of Object.entries(inventoryAfterSellAll)) {
             if (amount && amount > 0) {
               // Try Island 1 database first
-              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+              let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
               // Try Island 2 database if not found
               if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
                 oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -1024,6 +1037,9 @@ function initializeWorld(world: World): void {
               }
               if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
                 oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+              }
+              if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+                oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
               }
               if (oreData) {
                 let sellValue = oreData.value * sellMultiplierAfterSellAll;

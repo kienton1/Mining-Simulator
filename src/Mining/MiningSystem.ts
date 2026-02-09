@@ -7,7 +7,7 @@
  * Reference: Planning/gameOverview.txt section 6.1, 6.2
  */
 
-import { World, Player, Entity, RigidBodyType, ParticleEmitter, ColliderShape } from 'hytopia';
+import { World, Player, Entity, RigidBodyType, ParticleEmitter, ColliderShape, CollisionGroup } from 'hytopia';
 import { calculateMiningDamage, getSwingsPerSecond } from '../Stats/StatCalculator';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import type { PlayerData } from '../Core/PlayerData';
@@ -16,11 +16,12 @@ import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
 import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from './Ore/World4OreData';
+import { ISLAND5_ORE_DATABASE, ISLAND5_ORE_TYPE } from './Ore/World5OreData';
 import { OreGenerator } from './Ore/OreGenerator';
 import { MineBlock } from './MineBlock';
 import { ChestBlock, ChestType } from './ChestBlock';
 import { DebrisManager } from './DebrisManager';
-import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS } from '../Core/GameConstants';
+import { MINING_AREA_BOUNDS, MINING_AREA_POSITIONS, MINE_DEPTH_START, MINE_INSTANCE_SPACING, BLOCKS_PER_MINE_LEVEL, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOUNDS, ISLAND4_MINING_AREA_BOUNDS, ISLAND5_MINING_AREA_BOUNDS } from '../Core/GameConstants';
 
 /** Set to true to enable verbose mining debug logging. */
 const DEBUG_MINING = false;
@@ -130,6 +131,7 @@ export class MiningSystem {
    * Island 2 ores: Block IDs 45-68 from map.json
    * Island 3 ores: Block IDs 73-96 from map.json
    * Island 4 ores: Block IDs 103-122 from map.json
+   * Island 5 ores: Block IDs 127-146 from map.json
    */
   private readonly ORE_TO_BLOCK_ID: Map<string, number> = new Map([
     // Island 1 ores (OreType)
@@ -228,6 +230,27 @@ export class MiningSystem {
     [ISLAND4_ORE_TYPE.AURORALIGHT_ORE, 121],    // Auroralight Ore
     [ISLAND4_ORE_TYPE.FIRESNOW_CORE, 122],      // Firesnow Core
     [ISLAND4_ORE_TYPE.SUGARPLUM_QUARTZ, 108],   // Sugarplum Quartz
+    // Island 5 ores (Void Village) - Block IDs 127-146 from map.json
+    [ISLAND5_ORE_TYPE.SAND, 127],              // Eclipse_Sand
+    [ISLAND5_ORE_TYPE.SANDSTONE, 128],         // Abyssal_Basalt
+    [ISLAND5_ORE_TYPE.CACTUS, 129],            // Wraith_Ore
+    [ISLAND5_ORE_TYPE.CORAL, 130],             // Singularity_Fragment
+    [ISLAND5_ORE_TYPE.PYRAMID, 131],           // Antimatter_Nodule
+    [ISLAND5_ORE_TYPE.BEACH_BALL, 132],        // Oblivionite
+    [ISLAND5_ORE_TYPE.SANDCASTLE, 133],        // Blackstone_Shard
+    [ISLAND5_ORE_TYPE.SUNFLARE, 134],          // Eventide_Prism
+    [ISLAND5_ORE_TYPE.VIRIDIAN, 135],          // Gloom_Quartz
+    [ISLAND5_ORE_TYPE.MOLDAVITE, 136],         // Gravity_Core
+    [ISLAND5_ORE_TYPE.CYBERNETIUM, 137],       // Midnight_Obsidian
+    [ISLAND5_ORE_TYPE.ANCIENT_STONE, 138],     // Null_Pebble
+    [ISLAND5_ORE_TYPE.TOURMALINE, 139],        // Riftstone
+    [ISLAND5_ORE_TYPE.MATRIX, 140],            // Shadowglass
+    [ISLAND5_ORE_TYPE.STALAGMITE, 141],        // Umbral_Clay
+    [ISLAND5_ORE_TYPE.CRYOLITE, 142],          // Veil_Crystal
+    [ISLAND5_ORE_TYPE.PURPLURITE, 143],        // Void_Dust
+    [ISLAND5_ORE_TYPE.OSMIUM, 144],            // Darkstar_Alloy
+    [ISLAND5_ORE_TYPE.SPACE_RIFT, 145],        // Reality_Tear
+    [ISLAND5_ORE_TYPE.CRIMSON_FLARE, 146],     // Voidheart_Gem
   ]);
   
   /** Dirt block type ID for walls (dirt = 9) */
@@ -1221,7 +1244,7 @@ export class MiningSystem {
    * World-aware: Supports both Island 1 and Island 2 ores
    * 
    * @param oreType - Ore type as string (ore type name)
-   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
+   * @param worldId - World ID ('island1', 'island2', 'island3', 'island4', or 'island5'), defaults to 'island1'
    * @returns Block type ID for the ore
    */
   private getBlockIdForOreType(oreType: string, worldId: string = 'island1'): number {
@@ -1406,9 +1429,11 @@ export class MiningSystem {
         ? 10000
         : worldId === 'island3'
           ? 20000
-          : worldId === 'island4'
+        : worldId === 'island4'
             ? 30000
-            : 0;
+            : worldId === 'island5'
+              ? 40000
+              : 0;
     const index = instanceIndex;
     const spacing = MINE_INSTANCE_SPACING;
     const gridWidth = 16; // gives plenty of room before wrapping
@@ -1432,6 +1457,9 @@ export class MiningSystem {
     }
     if (worldId === 'island4') {
       return ISLAND4_MINING_AREA_BOUNDS;
+    }
+    if (worldId === 'island5') {
+      return ISLAND5_MINING_AREA_BOUNDS;
     }
     return MINING_AREA_BOUNDS;
   }
@@ -1612,7 +1640,7 @@ export class MiningSystem {
    * 
    * @param oreType - Type of ore as string
    * @param depth - Current mining depth (should be positive)
-   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
+   * @param worldId - World ID ('island1', 'island2', 'island3', 'island4', or 'island5')
    * @returns Calculated HP with linear depth scaling
    */
   private calculateOreHP(oreType: string, depth: number, worldId: string): number {
@@ -1881,7 +1909,7 @@ export class MiningSystem {
    * 
    * @param depth - Y coordinate (depth) to generate walls at
    * @param offset - World-space offset for this mine instance
-   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
+   * @param worldId - World ID ('island1', 'island2', 'island3', 'island4', or 'island5')
    */
   private generateMineShaftWalls(depth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -1892,7 +1920,9 @@ export class MiningSystem {
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
         : worldId === 'island4'
           ? 100
-          : this.DIRT_BLOCK_TYPE_ID;
+          : worldId === 'island5'
+            ? 123
+            : this.DIRT_BLOCK_TYPE_ID;
     
     // Generate inner box (layer 1) - solid walls around the mining area
     const innerMinX = bounds.minX - 1 + offset.x;
@@ -1950,7 +1980,9 @@ export class MiningSystem {
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
         : worldId === 'island4'
           ? 100
-          : this.DIRT_BLOCK_TYPE_ID;
+          : worldId === 'island5'
+            ? 123
+            : this.DIRT_BLOCK_TYPE_ID;
     const ceilingLayers = 10;
     const startY = MINE_DEPTH_START + 1; // lowered by one to sit closer to the floor
     const floorY = MINE_DEPTH_START; // Floor level
@@ -2085,7 +2117,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
+   * @param worldId - World ID ('island1', 'island2', 'island3', 'island4', or 'island5')
    */
   private generateBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -2096,7 +2128,9 @@ export class MiningSystem {
         ? this.DEEPSLATE_COBBLE_BLOCK_TYPE_ID
         : worldId === 'island4'
           ? 100
-          : this.DIRT_BLOCK_TYPE_ID;
+          : worldId === 'island5'
+            ? 123
+            : this.DIRT_BLOCK_TYPE_ID;
     
     // Mining area bounds (with offset) - this area should NOT be filled
     const miningMinX = bounds.minX + offset.x;
@@ -2138,7 +2172,7 @@ export class MiningSystem {
    * 
    * @param floorDepth - Y coordinate (depth) of the floor to delete
    * @param offset - Player's mine offset
-   * @param worldId - World ID ('island1', 'island2', 'island3', or 'island4')
+   * @param worldId - World ID ('island1', 'island2', 'island3', 'island4', or 'island5')
    */
   private deleteBottomFloor(floorDepth: number, offset: { x: number; z: number }, worldId: string): void {
     const wallThickness = 10;
@@ -2332,7 +2366,8 @@ export class MiningSystem {
     const oreData = ORE_DATABASE[oreType as OreType] ||
                     ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE] ||
                     ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE] ||
-                    ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+                    ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE] ||
+                    ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
     const hexColor = oreData?.color || '#808080';
     const color = this.hexToRgb(hexColor);
 
@@ -2532,6 +2567,10 @@ export class MiningSystem {
         colliders: [{
           shape: ColliderShape.BLOCK,
           halfExtents: FLOOR_ENTITY_HALF_EXTENTS,
+          collisionGroups: {
+            belongsTo: [CollisionGroup.BLOCK],
+            collidesWith: [CollisionGroup.ALL],
+          },
         }],
       },
     });

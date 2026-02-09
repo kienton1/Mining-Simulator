@@ -14,6 +14,7 @@ import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_TYPE, ISLAND2_ORE_DATABASE } from './Ore/World2OreData';
 import { ISLAND3_ORE_TYPE, ISLAND3_ORE_DATABASE } from './Ore/World3OreData';
 import { ISLAND4_ORE_TYPE, ISLAND4_ORE_DATABASE } from './Ore/World4OreData';
+import { ISLAND5_ORE_TYPE, ISLAND5_ORE_DATABASE } from './Ore/World5OreData';
 import type { PickaxeData } from '../Pickaxe/PickaxeData';
 import { MAX_MINING_ANIMATION_SPEED } from '../Core/GameConstants';
 import { getSwingsPerSecond } from '../Stats/StatCalculator';
@@ -55,6 +56,10 @@ export class MiningController {
     if (oreType in ISLAND4_ORE_DATABASE) {
       return ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
     }
+    // Try Island 5 database if not found
+    if (oreType in ISLAND5_ORE_DATABASE) {
+      return ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
+    }
     return null;
   }
 
@@ -74,6 +79,7 @@ export class MiningController {
       findIn(ISLAND2_ORE_DATABASE as Record<string, { name: string }>) ||
       findIn(ISLAND3_ORE_DATABASE as Record<string, { name: string }>) ||
       findIn(ISLAND4_ORE_DATABASE as Record<string, { name: string }>) ||
+      findIn(ISLAND5_ORE_DATABASE as Record<string, { name: string }>) ||
       null
     );
   }

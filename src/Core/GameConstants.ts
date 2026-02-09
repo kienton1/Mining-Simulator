@@ -254,6 +254,23 @@ export const ISLAND4_MINING_AREA_BOUNDS = {
 } as const;
 
 /**
+ * Island 5 (Void Village) Mining Area Coordinates
+ * Mining opening corners: (-1092,0,33), (-1086,0,33), (-1086,0,39), (-1092,0,39)
+ */
+export const ISLAND5_MINING_AREA_BOUNDS = {
+  /** Minimum X coordinate */
+  minX: -1092,
+  /** Maximum X coordinate */
+  maxX: -1086,
+  /** Y coordinate (surface level) */
+  y: 0,
+  /** Minimum Z coordinate */
+  minZ: 33,
+  /** Maximum Z coordinate */
+  maxZ: 39,
+} as const;
+
+/**
  * Island 2 (Beach World) Shared Mine Shaft (public drop-in hole)
  * Players jump down this 10-block-deep shaft; a trigger at the bottom
  * teleports them into their personal mine instance.
@@ -300,6 +317,24 @@ export const ISLAND4_SHARED_MINE_SHAFT = {
     maxX: ISLAND4_MINING_AREA_BOUNDS.maxX,
     minZ: ISLAND4_MINING_AREA_BOUNDS.minZ,
     maxZ: ISLAND4_MINING_AREA_BOUNDS.maxZ,
+  },
+  topY: 0,
+  bottomY: -10,
+  /** Blocks of fall before teleporting to personal mine */
+  teleportAfterDropBlocks: 5,
+  /** Y threshold where we teleport (derived from topY - teleportAfterDropBlocks) */
+  teleportThresholdY: -5.5,
+} as const;
+
+/**
+ * Island 5 (Void Village) Shared Mine Shaft (public drop-in hole)
+ */
+export const ISLAND5_SHARED_MINE_SHAFT = {
+  bounds: {
+    minX: ISLAND5_MINING_AREA_BOUNDS.minX,
+    maxX: ISLAND5_MINING_AREA_BOUNDS.maxX,
+    minZ: ISLAND5_MINING_AREA_BOUNDS.minZ,
+    maxZ: ISLAND5_MINING_AREA_BOUNDS.maxZ,
   },
   topY: 0,
   bottomY: -10,

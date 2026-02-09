@@ -10,6 +10,7 @@ import { OreType, ORE_DATABASE } from './Ore/World1OreData';
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE } from './Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE } from './Ore/World3OreData';
 import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from './Ore/World4OreData';
+import { ISLAND5_ORE_DATABASE, ISLAND5_ORE_TYPE } from './Ore/World5OreData';
 
 /**
  * Mapping from ore type to block type ID (matches MiningSystem)
@@ -17,6 +18,7 @@ import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE } from './Ore/World4OreData';
  * Block IDs 45-68: Island 2
  * Block IDs 73-96: Island 3
  * Block IDs 103-122: Island 4
+ * Block IDs 127-146: Island 5
  */
 const ORE_TO_BLOCK_ID: Map<string, number> = new Map([
   // Island 1 ores
@@ -115,6 +117,27 @@ const ORE_TO_BLOCK_ID: Map<string, number> = new Map([
   [ISLAND4_ORE_TYPE.AURORALIGHT_ORE, 121],
   [ISLAND4_ORE_TYPE.FIRESNOW_CORE, 122],
   [ISLAND4_ORE_TYPE.SUGARPLUM_QUARTZ, 108],
+  // Island 5 ores
+  [ISLAND5_ORE_TYPE.SAND, 127],
+  [ISLAND5_ORE_TYPE.SANDSTONE, 128],
+  [ISLAND5_ORE_TYPE.CACTUS, 129],
+  [ISLAND5_ORE_TYPE.CORAL, 130],
+  [ISLAND5_ORE_TYPE.PYRAMID, 131],
+  [ISLAND5_ORE_TYPE.BEACH_BALL, 132],
+  [ISLAND5_ORE_TYPE.SANDCASTLE, 133],
+  [ISLAND5_ORE_TYPE.SUNFLARE, 134],
+  [ISLAND5_ORE_TYPE.VIRIDIAN, 135],
+  [ISLAND5_ORE_TYPE.MOLDAVITE, 136],
+  [ISLAND5_ORE_TYPE.CYBERNETIUM, 137],
+  [ISLAND5_ORE_TYPE.ANCIENT_STONE, 138],
+  [ISLAND5_ORE_TYPE.TOURMALINE, 139],
+  [ISLAND5_ORE_TYPE.MATRIX, 140],
+  [ISLAND5_ORE_TYPE.STALAGMITE, 141],
+  [ISLAND5_ORE_TYPE.CRYOLITE, 142],
+  [ISLAND5_ORE_TYPE.PURPLURITE, 143],
+  [ISLAND5_ORE_TYPE.OSMIUM, 144],
+  [ISLAND5_ORE_TYPE.SPACE_RIFT, 145],
+  [ISLAND5_ORE_TYPE.CRIMSON_FLARE, 146],
 ]);
 
 /**
@@ -224,7 +247,8 @@ export class DebrisManager {
       (oreType in ORE_DATABASE && ORE_DATABASE[oreType as OreType]) ||
       (oreType in ISLAND2_ORE_DATABASE && ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE]) ||
       (oreType in ISLAND3_ORE_DATABASE && ISLAND3_ORE_DATABASE[oreType as ISLAND3_ORE_TYPE]) ||
-      (oreType in ISLAND4_ORE_DATABASE && ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE]);
+      (oreType in ISLAND4_ORE_DATABASE && ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE]) ||
+      (oreType in ISLAND5_ORE_DATABASE && ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE]);
     if (!oreData) {
       return; // Invalid ore type
     }

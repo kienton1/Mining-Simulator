@@ -20,6 +20,9 @@ import {
   ISLAND4_TRAINING_ROCK_TIER,
   getIsland4TrainingRockByTier,
   type Island4TrainingRockData,
+  ISLAND5_TRAINING_ROCK_TIER,
+  getIsland5TrainingRockByTier,
+  type Island5TrainingRockData,
 } from '../../worldData/TrainingRocks';
 
 /**
@@ -29,8 +32,8 @@ export interface TrainingRockLocation {
   /** Block position of the training rock */
   position: { x: number; y: number; z: number };
   
-  /** Training rock data (Island 1 or Island 2) */
-  rockData: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData;
+  /** Training rock data (Island 1-5) */
+  rockData: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | Island5TrainingRockData;
   
   /** Block entity (if applicable) */
   block?: Block;
@@ -43,7 +46,7 @@ export interface TrainingRockLocation {
     maxZ: number;
   };
   
-  /** World ID this rock belongs to ('island1', 'island2', 'island3', or 'island4') */
+  /** World ID this rock belongs to ('island1', 'island2', 'island3', 'island4', or 'island5') */
   worldId?: string;
 }
 
@@ -76,13 +79,13 @@ export class TrainingRockManager {
    */
   registerTrainingRock(
     position: { x: number; y: number; z: number },
-    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER,
+    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER | ISLAND5_TRAINING_ROCK_TIER,
     block?: Block,
     bounds?: TrainingRockLocation['bounds'],
     worldId: string = 'island1'
   ): void {
-    // Try Island 2/3 if world matches, otherwise fallback to Island 1
-    let rockData: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | undefined;
+    // Try Island 2/3/4/5 if world matches, otherwise fallback to Island 1
+    let rockData: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | Island5TrainingRockData | undefined;
     
     if (worldId === 'island2') {
       rockData = getIsland2TrainingRockByTier(tier as ISLAND2_TRAINING_ROCK_TIER);
@@ -90,6 +93,8 @@ export class TrainingRockManager {
       rockData = getIsland3TrainingRockByTier(tier as ISLAND3_TRAINING_ROCK_TIER);
     } else if (worldId === 'island4') {
       rockData = getIsland4TrainingRockByTier(tier as ISLAND4_TRAINING_ROCK_TIER);
+    } else if (worldId === 'island5') {
+      rockData = getIsland5TrainingRockByTier(tier as ISLAND5_TRAINING_ROCK_TIER);
     }
     
     // Fallback to Island 1 if Island 2 rock not found
@@ -204,7 +209,7 @@ export class TrainingRockManager {
   registerTrainingRocksFromMap(
     rockPositions: Array<{
       position: { x: number; y: number; z: number };
-      tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER;
+      tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER | ISLAND5_TRAINING_ROCK_TIER;
       bounds?: TrainingRockLocation['bounds'];
       worldId?: string;
     }>

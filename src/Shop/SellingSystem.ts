@@ -11,6 +11,7 @@ import { OreType, ORE_DATABASE, type OreData } from '../Mining/Ore/World1OreData
 import { ISLAND2_ORE_DATABASE, ISLAND2_ORE_TYPE, type Island2OreData } from '../Mining/Ore/World2OreData';
 import { ISLAND3_ORE_DATABASE, ISLAND3_ORE_TYPE, type Island3OreData } from '../Mining/Ore/World3OreData';
 import { ISLAND4_ORE_DATABASE, ISLAND4_ORE_TYPE, type Island4OreData } from '../Mining/Ore/World4OreData';
+import { ISLAND5_ORE_DATABASE, ISLAND5_ORE_TYPE, type Island5OreData } from '../Mining/Ore/World5OreData';
 import { InventoryManager } from '../Inventory/InventoryManager';
 import type { PlayerData } from '../Core/PlayerData';
 import { getPickaxeByTier } from '../Pickaxe/PickaxeDatabase';
@@ -141,7 +142,7 @@ export class SellingSystem {
       if (!amount) continue;
       
       // Try Island 1 database first
-      let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+      let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
       // Try Island 2 database if not found
       if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
         oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
@@ -152,6 +153,9 @@ export class SellingSystem {
       }
       if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
         oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+      }
+      if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+        oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
       }
       
       if (oreData && amount > 0) {
@@ -213,7 +217,7 @@ export class SellingSystem {
     for (const oreType of oreTypes) {
       const amount = this.inventoryManager.getOreCount(player, oreType);
       if (amount > 0) {
-        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
         if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
           oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
         }
@@ -222,6 +226,9 @@ export class SellingSystem {
         }
         if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
           oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+        }
+        if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+          oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
         }
         if (oreData) {
           const value = amount * oreData.value * sellMultiplier;
@@ -269,7 +276,7 @@ export class SellingSystem {
       return 0;
     }
 
-    let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+    let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
     if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
       oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
     }
@@ -278,6 +285,9 @@ export class SellingSystem {
     }
     if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
       oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+    }
+    if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+      oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
     }
     if (!oreData) {
       return 0;
@@ -459,7 +469,7 @@ export class SellingSystem {
     for (const oreType of oreTypes) {
       const amount = this.inventoryManager.getOreCount(player, oreType);
       if (amount > 0) {
-        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | undefined = ORE_DATABASE[oreType as OreType];
+        let oreData: OreData | Island2OreData | Island3OreData | Island4OreData | Island5OreData | undefined = ORE_DATABASE[oreType as OreType];
         if (!oreData && oreType in ISLAND2_ORE_DATABASE) {
           oreData = ISLAND2_ORE_DATABASE[oreType as ISLAND2_ORE_TYPE];
         }
@@ -468,6 +478,9 @@ export class SellingSystem {
         }
         if (!oreData && oreType in ISLAND4_ORE_DATABASE) {
           oreData = ISLAND4_ORE_DATABASE[oreType as ISLAND4_ORE_TYPE];
+        }
+        if (!oreData && oreType in ISLAND5_ORE_DATABASE) {
+          oreData = ISLAND5_ORE_DATABASE[oreType as ISLAND5_ORE_TYPE];
         }
         if (oreData) {
           total += amount * oreData.value * sellMultiplier;

@@ -10,6 +10,8 @@ import {
   ISLAND3_BLOCK_TYPE_TO_TIER,
   ISLAND4_TRAINING_ROCK_TIER,
   ISLAND4_BLOCK_TYPE_TO_TIER,
+  ISLAND5_TRAINING_ROCK_TIER,
+  ISLAND5_BLOCK_TYPE_TO_TIER,
 } from '../../worldData/TrainingRocks';
 
 interface MapBlockType {
@@ -23,7 +25,7 @@ interface MapFile {
 }
 
 export interface TrainingRockPlacement {
-  tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER;
+  tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER | ISLAND5_TRAINING_ROCK_TIER;
   position: { x: number; y: number; z: number };
   bounds: {
     minX: number;
@@ -31,7 +33,7 @@ export interface TrainingRockPlacement {
     minZ: number;
     maxZ: number;
   };
-  worldId?: string; // 'island1', 'island2', 'island3', or 'island4'
+  worldId?: string; // 'island1', 'island2', 'island3', 'island4', or 'island5'
 }
 
 const TRAINING_ORDER: TrainingRockTier[] = [
@@ -70,6 +72,15 @@ function parseCoord(key: string) {
   return { x, y, z };
 }
 
+function resolveBlockId(value: unknown): number | null {
+  if (typeof value === 'number') return value;
+  if (value && typeof value === 'object' && 'i' in value) {
+    const id = (value as { i?: unknown }).i;
+    return typeof id === 'number' ? id : null;
+  }
+  return null;
+}
+
 function resolveMapPath(customPath?: string) {
   if (customPath) return customPath;
   return path.resolve(process.cwd(), 'assets', 'map.json');
@@ -77,10 +88,10 @@ function resolveMapPath(customPath?: string) {
 
 /**
  * Detects training rock placements from a map file
- * Supports Island 1, Island 2, Island 3, and Island 4 training rocks
+ * Supports Island 1, Island 2, Island 3, Island 4, and Island 5 training rocks
  * 
  * @param mapPath - Optional path to map file (defaults to assets/map.json)
- * @param worldId - Optional world ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
+ * @param worldId - Optional world ID ('island1', 'island2', 'island3', 'island4', or 'island5'), defaults to 'island1'
  * @returns Array of training rock placements
  */
 export function detectTrainingRockPlacements(mapPath?: string, worldId: string = 'island1'): TrainingRockPlacement[] {
@@ -105,6 +116,11 @@ export function detectTrainingRockPlacements(mapPath?: string, worldId: string =
     if (worldId === 'island4') {
       return detectIsland4TrainingRockPlacements(data, blockTypeLookup);
     }
+
+    // Detect Island 5 training rocks if world is Island 5
+    if (worldId === 'island5') {
+      return detectIsland5TrainingRockPlacements(data, blockTypeLookup);
+    }
     
     // Island 1 training rocks (original logic)
     // Get block IDs for all training rock types
@@ -128,10 +144,12 @@ export function detectTrainingRockPlacements(mapPath?: string, worldId: string =
     }
 
     for (const [key, value] of Object.entries(data.blocks)) {
+      const resolvedId = resolveBlockId(value);
+      if (resolvedId === null) continue;
       // Find which tier this block belongs to
       let blockTier: TrainingRockTier | null = null;
       for (const [tier, blockId] of trainingBlockIds.entries()) {
-        if (value === blockId) {
+        if (resolvedId === blockId) {
           blockTier = tier;
           break;
         }
@@ -198,7 +216,8 @@ export function detectTrainingRockPlacements(mapPath?: string, worldId: string =
       
       if (dirtId !== undefined) {
         for (const [key, value] of Object.entries(data.blocks)) {
-          if (value === dirtId) {
+          const resolvedId = resolveBlockId(value);
+          if (resolvedId === dirtId) {
             const { x, y, z } = parseCoord(key);
             // Look for dirt at y=0 within 2 blocks X and 3 blocks Z of the training rock
             // This matches the actual dirt patch layout around each ore
@@ -279,10 +298,12 @@ function detectIsland2TrainingRockPlacements(
   }
 
   for (const [key, value] of Object.entries(data.blocks)) {
+    const resolvedId = resolveBlockId(value);
+    if (resolvedId === null) continue;
     // Find which tier this block belongs to
     let blockTier: ISLAND2_TRAINING_ROCK_TIER | null = null;
     for (const [tier, blockId] of trainingBlockIds.entries()) {
-      if (value === blockId) {
+      if (resolvedId === blockId) {
         blockTier = tier;
         break;
       }
@@ -347,7 +368,8 @@ function detectIsland2TrainingRockPlacements(
     
     if (dirtId !== undefined) {
       for (const [key, value] of Object.entries(data.blocks)) {
-        if (value === dirtId) {
+        const resolvedId = resolveBlockId(value);
+        if (resolvedId === dirtId) {
           const { x, y, z } = parseCoord(key);
           // Look for dirt at y=0 within 2 blocks X and 3 blocks Z of the training rock
           if (y === 0 && Math.abs(x - oreX) <= 2 && Math.abs(z - oreZ) <= 3) {
@@ -419,9 +441,11 @@ function detectIsland3TrainingRockPlacements(
   }
 
   for (const [key, value] of Object.entries(data.blocks)) {
+    const resolvedId = resolveBlockId(value);
+    if (resolvedId === null) continue;
     let blockTier: ISLAND3_TRAINING_ROCK_TIER | null = null;
     for (const [tier, blockId] of trainingBlockIds.entries()) {
-      if (value === blockId) {
+      if (resolvedId === blockId) {
         blockTier = tier;
         break;
       }
@@ -480,7 +504,8 @@ function detectIsland3TrainingRockPlacements(
 
     if (dirtId !== undefined) {
       for (const [key, value] of Object.entries(data.blocks)) {
-        if (value === dirtId) {
+        const resolvedId = resolveBlockId(value);
+        if (resolvedId === dirtId) {
           const { x, y, z } = parseCoord(key);
           if (y === 0 && Math.abs(x - oreX) <= 2 && Math.abs(z - oreZ) <= 3) {
             dirtBlocks.push({ x, z });
@@ -548,10 +573,11 @@ function detectIsland4TrainingRockPlacements(
   }
 
   for (const [key, value] of Object.entries(data.blocks)) {
-    if (typeof value !== 'number') continue;
+    const resolvedId = resolveBlockId(value);
+    if (resolvedId === null) continue;
     let blockTier: ISLAND4_TRAINING_ROCK_TIER | null = null;
     for (const [tier, blockId] of trainingBlockIds.entries()) {
-      if (value === blockId) {
+      if (resolvedId === blockId) {
         blockTier = tier;
         break;
       }
@@ -619,6 +645,108 @@ function detectIsland4TrainingRockPlacements(
       position,
       bounds,
       worldId: 'island4',
+    });
+  }
+
+  return allPlacements;
+}
+
+/**
+ * Detects Island 5 training rock placements from map data
+ * Island 5 uses void block types: Eclipse_Sand, Abyssal_Basalt, Wraith_Ore, Singularity_Fragment, Antimatter_Nodule, Oblivionite
+ */
+function detectIsland5TrainingRockPlacements(
+  data: MapFile,
+  blockTypeLookup: Map<string, number>
+): TrainingRockPlacement[] {
+  const trainingBlockIds = new Map<ISLAND5_TRAINING_ROCK_TIER, number>();
+  for (const [blockName, tier] of Object.entries(ISLAND5_BLOCK_TYPE_TO_TIER)) {
+    const blockId = blockTypeLookup.get(blockName);
+    if (blockId !== undefined) {
+      trainingBlockIds.set(tier, blockId);
+    }
+  }
+
+  if (trainingBlockIds.size === 0) {
+    return [];
+  }
+
+  const tierColumns = new Map<ISLAND5_TRAINING_ROCK_TIER, Map<string, { x: number; y: number; z: number }>>();
+  for (const [tier] of trainingBlockIds.entries()) {
+    tierColumns.set(tier, new Map());
+  }
+
+  for (const [key, value] of Object.entries(data.blocks)) {
+    const resolvedId = resolveBlockId(value);
+    if (resolvedId === null) continue;
+    let blockTier: ISLAND5_TRAINING_ROCK_TIER | null = null;
+    for (const [tier, blockId] of trainingBlockIds.entries()) {
+      if (resolvedId === blockId) {
+        blockTier = tier;
+        break;
+      }
+    }
+
+    if (!blockTier) continue;
+
+    const { x, y, z } = parseCoord(key);
+    if (y < SURFACE_Y_MIN || y > SURFACE_Y_MAX) continue;
+
+    const columnKey = `${x},${z}`;
+    const columns = tierColumns.get(blockTier)!;
+    const existing = columns.get(columnKey);
+    if (!existing || y > existing.y) {
+      columns.set(columnKey, { x, y, z });
+    }
+  }
+
+  const allPlacements: TrainingRockPlacement[] = [];
+  for (const [blockTier, columns] of tierColumns.entries()) {
+    if (!columns || columns.size === 0) continue;
+
+    const topBlocks: Array<{ x: number; y: number; z: number }> = [];
+    for (const column of columns.values()) {
+      topBlocks.push(column);
+    }
+
+    if (topBlocks.length === 0) continue;
+
+    const sum = topBlocks.reduce(
+      (acc, cur) => {
+        acc.x += cur.x;
+        acc.y += cur.y;
+        acc.z += cur.z;
+        return acc;
+      },
+      { x: 0, y: 0, z: 0 }
+    );
+
+    const center = {
+      x: sum.x / topBlocks.length,
+      y: sum.y / topBlocks.length,
+      z: sum.z / topBlocks.length,
+    };
+
+    const position = {
+      x: Math.round(center.x) + 0.5,
+      y: center.y + 0.5,
+      z: Math.round(center.z) + 0.5,
+    };
+
+    const oreX = Math.round(center.x);
+    const oreZ = Math.round(center.z);
+    const bounds = {
+      minX: oreX - 2,
+      maxX: oreX + 2,
+      minZ: oreZ - 3,
+      maxZ: oreZ + 3,
+    };
+
+    allPlacements.push({
+      tier: blockTier,
+      position,
+      bounds,
+      worldId: 'island5',
     });
   }
 

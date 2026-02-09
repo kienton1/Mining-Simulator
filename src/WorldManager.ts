@@ -126,6 +126,8 @@ export class WorldManager {
         return 2000000000000000; // 2Q
       case 'island4':
         return 100000000000000000000000; // 100Sx
+      case 'island5':
+        return 25000000000000000000000000000; // 25Oc
       default:
         return 2000000;
     }

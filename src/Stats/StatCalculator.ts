@@ -19,6 +19,8 @@ import {
   calculateIsland3TrainingPowerGain,
   ISLAND4_TRAINING_ROCK_TIER,
   calculateIsland4TrainingPowerGain,
+  ISLAND5_TRAINING_ROCK_TIER,
+  calculateIsland5TrainingPowerGain,
 } from '../worldData/TrainingRocks';
 // Note: POWER_SCALING_CONSTANT and REBIRTH_MULTIPLIER_PER_REBIRTH are deprecated
 // New system uses power-based damage formula and piecewise functions for power gain
@@ -265,13 +267,13 @@ function calculateRock6PowerGain(rebirths: number): number {
  * 
  * Reference: Planning/PowerSystemPlan.md section 4 - Training Rock Balance
  * 
- * @param rockTier - Training rock tier (Island 1, Island 2, Island 3, or Island 4)
+ * @param rockTier - Training rock tier (Island 1, Island 2, Island 3, Island 4, or Island 5)
  * @param rebirths - Number of rebirths the player has
- * @param worldId - Optional world ID ('island1', 'island2', 'island3', or 'island4'), defaults to 'island1'
+ * @param worldId - Optional world ID ('island1', 'island2', 'island3', 'island4', or 'island5'), defaults to 'island1'
  * @returns Power gained per hit
  */
 export function calculatePowerGainPerHit(
-  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER,
+  rockTier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER | ISLAND5_TRAINING_ROCK_TIER,
   rebirths: number,
   worldId: string = 'island1'
 ): number {
@@ -294,6 +296,13 @@ export function calculatePowerGainPerHit(
   if (worldId === 'island4') {
     if (Object.values(ISLAND4_TRAINING_ROCK_TIER).includes(rockTier as ISLAND4_TRAINING_ROCK_TIER)) {
       return calculateIsland4TrainingPowerGain(rockTier as ISLAND4_TRAINING_ROCK_TIER, rebirths);
+    }
+  }
+
+  // Island 5 uses different formulas
+  if (worldId === 'island5') {
+    if (Object.values(ISLAND5_TRAINING_ROCK_TIER).includes(rockTier as ISLAND5_TRAINING_ROCK_TIER)) {
+      return calculateIsland5TrainingPowerGain(rockTier as ISLAND5_TRAINING_ROCK_TIER, rebirths);
     }
   }
   
@@ -322,33 +331,62 @@ export function calculatePowerGainPerHit(
 }
 
 /**
- * Calculates total mining damage using power-based scaling formula
- * 
- * UPDATED: Uses new power-based damage formula with EarlyBoost multiplier
- * Formula: EarlyBoost = 1 + 2 / (1 + (Power / 398107.17)^0.3)
- *          Damage = 1 + 0.072 * Power^0.553 * EarlyBoost
- * 
- * Pickaxes no longer affect damage - damage comes from Power only
- * 
- * Reference: Planning/PowerSystemPlan.md section 3 - Power Impact on Mining
- * 
+ * Calculates mining damage from Power only.
+ *
+ * Formula:
+ * Damage(P) = (1 + A * P^p) * (1 + H * exp(-((log10(P + 1) - mu) / s)^2)) * (1 + (P / Pd)^q)^(-r)
+ *
+ * Pickaxes no longer affect damage - damage comes from Power only.
+ *
  * @param power - Player's current power level
  * @returns Total mining damage
  */
+export function damageFromPower(power: number): number {
+  if (power <= 0) return 1;
+
+  const x = Math.log10(power);
+  const w = 0.6;
+
+  // y = log10(Damage)
+  let y = -0.373147203 + 0.491433377 * x;
+
+  // softplus(t) = ln(1 + e^t) (stable)
+  const softplus = (t: number) => {
+    if (t > 50) return t;
+    if (t < -50) return Math.exp(t);
+    return Math.log1p(Math.exp(t));
+  };
+
+  const knots = [6, 9, 12, 14, 15.5, 18, 19, 21, 24, 27, 30, 33, 36];
+  const ks = [
+    -0.0132583083,
+    -0.00610516707,
+     2.59962243,
+    -8.76704186,
+     8.70732249,
+    -5.31137058,
+     4.10110004,
+    -1.87193888,
+     0.670420761,
+    -0.121298405,
+     0.0259032531,
+    -0.00618098107,
+     0.00332220795,
+  ];
+
+  for (let i = 0; i < knots.length; i++) {
+    const t = (x - knots[i]) / w;
+    y += ks[i] * w * softplus(t);
+  }
+
+  return Math.pow(10, y);
+}
+
+/**
+ * Backwards-compatible wrapper for mining damage.
+ */
 export function calculateMiningDamage(power: number): number {
-  const EARLY_BOOST_DIVISOR = 398107.17;
-  const EARLY_BOOST_EXPONENT = 0.3;
-  const DAMAGE_COEFFICIENT = 0.072;
-  const DAMAGE_POWER_EXPONENT = 0.553;
-  const BASE_DAMAGE = 1;
-  
-  // Calculate EarlyBoost
-  const earlyBoost = 1 + 2 / (1 + Math.pow(power / EARLY_BOOST_DIVISOR, EARLY_BOOST_EXPONENT));
-  
-  // Calculate damage
-  const damage = BASE_DAMAGE + DAMAGE_COEFFICIENT * Math.pow(power, DAMAGE_POWER_EXPONENT) * earlyBoost;
-  
-  return damage;
+  return damageFromPower(power);
 }
 
 /**

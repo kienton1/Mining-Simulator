@@ -66,6 +66,25 @@ export enum ISLAND4_TRAINING_ROCK_TIER {
 }
 
 /**
+ * Training rock tier enumeration for Island 5 (Void Village)
+ * 6 tiers based on void ore block types:
+ * - ECLIPSE_SAND: Rock 1 (+50B Power UI)
+ * - ABYSSAL_BASALT: Rock 2 (+150B Power UI)
+ * - WRAITH_ORE: Rock 3 (+325B Power UI)
+ * - SINGULARITY_FRAGMENT: Rock 4 (+1T Power UI)
+ * - ANTIMATTER_NODULE: Rock 5 (+4.5T Power UI)
+ * - OBLIVIONITE: Rock 6 (+15T Power UI)
+ */
+export enum ISLAND5_TRAINING_ROCK_TIER {
+  ECLIPSE_SAND = 'eclipse_sand',
+  ABYSSAL_BASALT = 'abyssal_basalt',
+  WRAITH_ORE = 'wraith_ore',
+  SINGULARITY_FRAGMENT = 'singularity_fragment',
+  ANTIMATTER_NODULE = 'antimatter_nodule',
+  OBLIVIONITE = 'oblivionite',
+}
+
+/**
  * Training rock data structure for Island 2
  */
 export interface Island2TrainingRockData {
@@ -140,6 +159,38 @@ export interface Island4TrainingRockData {
   tier: ISLAND4_TRAINING_ROCK_TIER;
 
   /** Display name (snow-themed) */
+  name: string;
+
+  /** Number of rebirths required to access this rock */
+  requiredRebirths: number;
+
+  /** Amount of power required to access this rock (alternative to rebirths) */
+  requiredPower: number;
+
+  /** UI power bonus display value */
+  uiPowerBonus: number;
+
+  /** Formula constant for power gain calculation */
+  formulaConstant: number;
+
+  /** Hit rate (hits per second) */
+  hitRate: number;
+
+  /** Block type used to identify this training rock */
+  blockType: string;
+}
+
+/**
+ * Training rock data structure for Island 5
+ */
+export interface Island5TrainingRockData {
+  /** Unique identifier for this training rock */
+  id: string;
+
+  /** Tier of training rock */
+  tier: ISLAND5_TRAINING_ROCK_TIER;
+
+  /** Display name (void-themed) */
   name: string;
 
   /** Number of rebirths required to access this rock */
@@ -384,6 +435,80 @@ export const ISLAND4_TRAINING_ROCK_DATABASE: Record<ISLAND4_TRAINING_ROCK_TIER, 
 };
 
 /**
+ * Database of all Island 5 training rocks
+ * 6 tiers with exponential power gain functions based on rebirths
+ * Reference: Void world training formulas (rocks 1-6)
+ */
+export const ISLAND5_TRAINING_ROCK_DATABASE: Record<ISLAND5_TRAINING_ROCK_TIER, Island5TrainingRockData> = {
+  [ISLAND5_TRAINING_ROCK_TIER.ECLIPSE_SAND]: {
+    id: 'eclipse-sand-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.ECLIPSE_SAND,
+    name: 'Eclipse Sand Training Area',
+    requiredRebirths: 1_000_000_000_000_000, // 1 Qd
+    requiredPower: 75_000_000_000_000_000_000_000_000_000_000, // 75 No
+    uiPowerBonus: 50_000_000_000, // 50B
+    formulaConstant: 1027642171.7746887,
+    hitRate: 4,
+    blockType: 'Eclipse_Sand',
+  },
+  [ISLAND5_TRAINING_ROCK_TIER.ABYSSAL_BASALT]: {
+    id: 'abyssal-basalt-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.ABYSSAL_BASALT,
+    name: 'Abyssal Basalt Training Area',
+    requiredRebirths: 2_500_000_000_000_000, // 2.5 Qd
+    requiredPower: 500_000_000_000_000_000_000_000_000_000_000, // 500 No
+    uiPowerBonus: 150_000_000_000, // 150B
+    formulaConstant: 3082926515.3240657,
+    hitRate: 4,
+    blockType: 'Abyssal_Basalt',
+  },
+  [ISLAND5_TRAINING_ROCK_TIER.WRAITH_ORE]: {
+    id: 'wraith-ore-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.WRAITH_ORE,
+    name: 'Wraith Ore Training Area',
+    requiredRebirths: 10_000_000_000_000_000, // 10 Qd
+    requiredPower: 2_500_000_000_000_000_000_000_000_000_000_000, // 2.5 De
+    uiPowerBonus: 325_000_000_000, // 325B
+    formulaConstant: 6679674116.535477,
+    hitRate: 4,
+    blockType: 'Wraith_Ore',
+  },
+  [ISLAND5_TRAINING_ROCK_TIER.SINGULARITY_FRAGMENT]: {
+    id: 'singularity-fragment-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.SINGULARITY_FRAGMENT,
+    name: 'Singularity Fragment Training Area',
+    requiredRebirths: 25_000_000_000_000_000, // 25 Qd
+    requiredPower: 50_000_000_000_000_000_000_000_000_000_000_000, // 50 De
+    uiPowerBonus: 1_000_000_000_000, // 1T
+    formulaConstant: 20552843435.493774,
+    hitRate: 4,
+    blockType: 'Singularity_Fragment',
+  },
+  [ISLAND5_TRAINING_ROCK_TIER.ANTIMATTER_NODULE]: {
+    id: 'antimatter-nodule-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.ANTIMATTER_NODULE,
+    name: 'Antimatter Nodule Training Area',
+    requiredRebirths: 125_000_000_000_000_000, // 125 Qd
+    requiredPower: 1_000_000_000_000_000_000_000_000_000_000_000_000, // 1 UDe
+    uiPowerBonus: 4_500_000_000_000, // 4.5T
+    formulaConstant: 92487795459.72198,
+    hitRate: 4,
+    blockType: 'Antimatter_Nodule',
+  },
+  [ISLAND5_TRAINING_ROCK_TIER.OBLIVIONITE]: {
+    id: 'oblivionite-rock',
+    tier: ISLAND5_TRAINING_ROCK_TIER.OBLIVIONITE,
+    name: 'Oblivionite Training Area',
+    requiredRebirths: 1_000_000_000_000_000_000, // 1 Qn
+    requiredPower: 50_000_000_000_000_000_000_000_000_000_000_000_000, // 50 UDe
+    uiPowerBonus: 15_000_000_000_000, // 15T
+    formulaConstant: 308292651532.40656,
+    hitRate: 4,
+    blockType: 'Oblivionite',
+  },
+};
+
+/**
  * Calculate power gain per hit for Island 2 training rocks
  * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
  * Where x = player rebirth count, y = power gained per training hit
@@ -432,6 +557,22 @@ export function calculateIsland4TrainingPowerGain(rockTier: ISLAND4_TRAINING_ROC
 }
 
 /**
+ * Calculate power gain per hit for Island 5 training rocks
+ * Formula: y(x) = floor(Constant * x^(0.9993304728909983))
+ * Where x = player rebirth count, y = power gained per training hit
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per hit
+ */
+export function calculateIsland5TrainingPowerGain(rockTier: ISLAND5_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const rockData = ISLAND5_TRAINING_ROCK_DATABASE[rockTier];
+  const exponent = 0.9993304728909983;
+
+  return Math.floor(rockData.formulaConstant * Math.pow(rebirthCount, exponent));
+}
+
+/**
  * Calculate power gain per second for Island 3 training rocks
  * Formula: Power/sec = (power per hit) * (hits per second)
  *
@@ -457,6 +598,21 @@ export function calculateIsland3TrainingPowerPerSecond(rockTier: ISLAND3_TRAININ
 export function calculateIsland4TrainingPowerPerSecond(rockTier: ISLAND4_TRAINING_ROCK_TIER, rebirthCount: number): number {
   const powerPerHit = calculateIsland4TrainingPowerGain(rockTier, rebirthCount);
   const rockData = ISLAND4_TRAINING_ROCK_DATABASE[rockTier];
+
+  return powerPerHit * rockData.hitRate;
+}
+
+/**
+ * Calculate power gain per second for Island 5 training rocks
+ * Formula: Power/sec = (power per hit) * (hits per second)
+ *
+ * @param rockTier - The training rock tier
+ * @param rebirthCount - Player's current rebirth count
+ * @returns Power gained per second
+ */
+export function calculateIsland5TrainingPowerPerSecond(rockTier: ISLAND5_TRAINING_ROCK_TIER, rebirthCount: number): number {
+  const powerPerHit = calculateIsland5TrainingPowerGain(rockTier, rebirthCount);
+  const rockData = ISLAND5_TRAINING_ROCK_DATABASE[rockTier];
 
   return powerPerHit * rockData.hitRate;
 }
@@ -507,6 +663,16 @@ export function getIsland4TrainingRockByTier(tier: ISLAND4_TRAINING_ROCK_TIER): 
 }
 
 /**
+ * Gets Island 5 training rock data by tier
+ *
+ * @param tier - Training rock tier
+ * @returns Training rock data or undefined if tier doesn't exist
+ */
+export function getIsland5TrainingRockByTier(tier: ISLAND5_TRAINING_ROCK_TIER): Island5TrainingRockData | undefined {
+  return ISLAND5_TRAINING_ROCK_DATABASE[tier];
+}
+
+/**
  * Gets all Island 2 training rocks that a player can access based on their rebirth count OR power
  *
  * @param rebirths - Player's current rebirth count
@@ -541,6 +707,19 @@ export function getAccessibleIsland3TrainingRocks(rebirths: number, power: numbe
  */
 export function getAccessibleIsland4TrainingRocks(rebirths: number, power: number): Island4TrainingRockData[] {
   return Object.values(ISLAND4_TRAINING_ROCK_DATABASE).filter(
+    rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
+  );
+}
+
+/**
+ * Gets all Island 5 training rocks that a player can access based on their rebirth count OR power
+ *
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns Array of accessible training rock data
+ */
+export function getAccessibleIsland5TrainingRocks(rebirths: number, power: number): Island5TrainingRockData[] {
+  return Object.values(ISLAND5_TRAINING_ROCK_DATABASE).filter(
     rock => rock.requiredRebirths <= rebirths || rock.requiredPower <= power
   );
 }
@@ -591,6 +770,21 @@ export function canAccessIsland4TrainingRock(tier: ISLAND4_TRAINING_ROCK_TIER, r
 }
 
 /**
+ * Checks if a player can access an Island 5 training rock
+ * Player can unlock via EITHER power requirement OR rebirth requirement
+ *
+ * @param tier - Training rock tier to check
+ * @param rebirths - Player's current rebirth count
+ * @param power - Player's current power
+ * @returns True if player can access this rock
+ */
+export function canAccessIsland5TrainingRock(tier: ISLAND5_TRAINING_ROCK_TIER, rebirths: number, power: number): boolean {
+  const rock = getIsland5TrainingRockByTier(tier);
+  if (!rock) return false;
+  return rock.requiredRebirths <= rebirths || rock.requiredPower <= power;
+}
+
+/**
  * Get block type to tier mapping for Island 2 training rocks
  * Used for auto-detection of training rocks in the world
  */
@@ -630,6 +824,19 @@ export const ISLAND4_BLOCK_TYPE_TO_TIER: Record<string, ISLAND4_TRAINING_ROCK_TI
 };
 
 /**
+ * Get block type to tier mapping for Island 5 training rocks
+ * Used for auto-detection of training rocks in the world
+ */
+export const ISLAND5_BLOCK_TYPE_TO_TIER: Record<string, ISLAND5_TRAINING_ROCK_TIER> = {
+  'Eclipse_Sand': ISLAND5_TRAINING_ROCK_TIER.ECLIPSE_SAND,
+  'Abyssal_Basalt': ISLAND5_TRAINING_ROCK_TIER.ABYSSAL_BASALT,
+  'Wraith_Ore': ISLAND5_TRAINING_ROCK_TIER.WRAITH_ORE,
+  'Singularity_Fragment': ISLAND5_TRAINING_ROCK_TIER.SINGULARITY_FRAGMENT,
+  'Antimatter_Nodule': ISLAND5_TRAINING_ROCK_TIER.ANTIMATTER_NODULE,
+  'Oblivionite': ISLAND5_TRAINING_ROCK_TIER.OBLIVIONITE,
+};
+
+/**
  * Get training rock tier from block type
  *
  * @param blockType - Block type string
@@ -657,4 +864,14 @@ export function getIsland3TierFromBlockType(blockType: string): ISLAND3_TRAINING
  */
 export function getIsland4TierFromBlockType(blockType: string): ISLAND4_TRAINING_ROCK_TIER | undefined {
   return ISLAND4_BLOCK_TYPE_TO_TIER[blockType];
+}
+
+/**
+ * Get training rock tier from block type (Island 5)
+ *
+ * @param blockType - Block type string
+ * @returns Training rock tier or undefined if not found
+ */
+export function getIsland5TierFromBlockType(blockType: string): ISLAND5_TRAINING_ROCK_TIER | undefined {
+  return ISLAND5_BLOCK_TYPE_TO_TIER[blockType];
 }

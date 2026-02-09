@@ -137,6 +137,11 @@ import {
   getIsland4TrainingRockByTier,
   ISLAND4_TRAINING_ROCK_TIER,
   type Island4TrainingRockData,
+  ISLAND5_TRAINING_ROCK_DATABASE,
+  ISLAND5_BLOCK_TYPE_TO_TIER,
+  getIsland5TrainingRockByTier,
+  ISLAND5_TRAINING_ROCK_TIER,
+  type Island5TrainingRockData,
 } from '../../worldData/TrainingRocks';
 
 const FALLBACK_TRAINING_ROCKS: Array<{
@@ -298,6 +303,46 @@ const FALLBACK_ISLAND4_TRAINING_ROCKS: Array<{
   },
 ];
 
+/**
+ * Fallback positions for Island 5 training rocks
+ */
+const FALLBACK_ISLAND5_TRAINING_ROCKS: Array<{
+  position: { x: number; y: number; z: number };
+  bounds?: TrainingRockLocation['bounds'];
+  tier: ISLAND5_TRAINING_ROCK_TIER;
+}> = [
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.ECLIPSE_SAND,
+    position: { x: -1099.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1102, maxX: -1098, minZ: 3, maxZ: 9 },
+  },
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.ABYSSAL_BASALT,
+    position: { x: -1095.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1098, maxX: -1094, minZ: 3, maxZ: 9 },
+  },
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.WRAITH_ORE,
+    position: { x: -1091.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1094, maxX: -1090, minZ: 3, maxZ: 9 },
+  },
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.SINGULARITY_FRAGMENT,
+    position: { x: -1084.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1087, maxX: -1083, minZ: 3, maxZ: 9 },
+  },
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.ANTIMATTER_NODULE,
+    position: { x: -1080.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1083, maxX: -1079, minZ: 3, maxZ: 9 },
+  },
+  {
+    tier: ISLAND5_TRAINING_ROCK_TIER.OBLIVIONITE,
+    position: { x: -1076.5, y: 2.5, z: 6.5 },
+    bounds: { minX: -1079, maxX: -1075, minZ: 3, maxZ: 9 },
+  },
+];
+
 const INTERACT_INPUTS: string[] = ['e', 'ml'];
 
 // Distance constants for two-mode display
@@ -330,7 +375,7 @@ export class TrainingController {
   private gameManager: GameManager;
   private trainingRockSpawns: Array<{
     position: { x: number; y: number; z: number };
-    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER;
+    tier: TrainingRockTier | ISLAND2_TRAINING_ROCK_TIER | ISLAND3_TRAINING_ROCK_TIER | ISLAND4_TRAINING_ROCK_TIER | ISLAND5_TRAINING_ROCK_TIER;
     bounds?: TrainingRockLocation['bounds'];
     worldId?: string;
   }>;
@@ -387,8 +432,15 @@ export class TrainingController {
       worldId: 'island4' as const,
     }));
 
+    // Detect Island 5 training rocks from map.json
+    const island5Spawns = detectTrainingRockPlacements(undefined, 'island5');
+    const island5Placements = island5Spawns.length ? island5Spawns : FALLBACK_ISLAND5_TRAINING_ROCKS.map(rock => ({
+      ...rock,
+      worldId: 'island5' as const,
+    }));
+
     // Combine all placements
-    this.trainingRockSpawns = [...island1Placements, ...island2Placements, ...island3Placements, ...island4Placements];
+    this.trainingRockSpawns = [...island1Placements, ...island2Placements, ...island3Placements, ...island4Placements, ...island5Placements];
 
     // Register all training rocks (both Island 1 and Island 2)
     this.rockManager.registerTrainingRocksFromMap(this.trainingRockSpawns);
@@ -638,6 +690,12 @@ export class TrainingController {
             y: originalPosition.y,
             z: Math.round((targetRock.position.z + 1.23) * 100) / 100,
           }
+      : worldId === 'island5'
+        ? {
+            x: Math.round(targetRock.position.x * 10) / 10,
+            y: originalPosition.y,
+            z: Math.round((targetRock.position.z + 1.23) * 100) / 100,
+          }
       : {
           x: targetRock.position.x, // Same X as the ore block
           y: originalPosition.y,
@@ -699,7 +757,7 @@ export class TrainingController {
           hitRate = 3.0; // Rocks 1-5: 3 hits/second
         }
       }
-    } else if (worldId === 'island3' || worldId === 'island4') {
+    } else if (worldId === 'island3' || worldId === 'island4' || worldId === 'island5') {
       const rockData = targetRock.rockData as any;
       if (rockData.hitRate !== undefined) {
         hitRate = rockData.hitRate;
@@ -720,8 +778,8 @@ export class TrainingController {
     // Create a unified rock data structure for TrainingSystem
     // TrainingSystem expects TrainingRockData, but we might have Island2/Island3 data
     let rockDataForSystem: TrainingRockData;
-    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4') && 'uiPowerBonus' in targetRock.rockData) {
-      const rock = targetRock.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData;
+    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4' || worldId === 'island5') && 'uiPowerBonus' in targetRock.rockData) {
+      const rock = targetRock.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | Island5TrainingRockData;
       rockDataForSystem = {
         id: rock.id,
         tier: rock.tier as any,
@@ -987,6 +1045,15 @@ export class TrainingController {
       [ISLAND4_TRAINING_ROCK_TIER.FROSTBRICK]: 0,
     };
 
+    const tierOrderIsland5: Record<ISLAND5_TRAINING_ROCK_TIER, number> = {
+      [ISLAND5_TRAINING_ROCK_TIER.OBLIVIONITE]: 5,
+      [ISLAND5_TRAINING_ROCK_TIER.ANTIMATTER_NODULE]: 4,
+      [ISLAND5_TRAINING_ROCK_TIER.SINGULARITY_FRAGMENT]: 3,
+      [ISLAND5_TRAINING_ROCK_TIER.WRAITH_ORE]: 2,
+      [ISLAND5_TRAINING_ROCK_TIER.ABYSSAL_BASALT]: 1,
+      [ISLAND5_TRAINING_ROCK_TIER.ECLIPSE_SAND]: 0,
+    };
+
     accessibleRocks.sort((a, b) => {
       // Use appropriate tier order based on world
       let tierA = -1;
@@ -1004,6 +1071,9 @@ export class TrainingController {
       } else if (currentWorld === 'island4') {
         tierA = tierOrderIsland4[a.rockData.tier as ISLAND4_TRAINING_ROCK_TIER] ?? -1;
         tierB = tierOrderIsland4[b.rockData.tier as ISLAND4_TRAINING_ROCK_TIER] ?? -1;
+      } else if (currentWorld === 'island5') {
+        tierA = tierOrderIsland5[a.rockData.tier as ISLAND5_TRAINING_ROCK_TIER] ?? -1;
+        tierB = tierOrderIsland5[b.rockData.tier as ISLAND5_TRAINING_ROCK_TIER] ?? -1;
       }
       
       return tierB - tierA; // Descending order
@@ -1214,6 +1284,12 @@ export class TrainingController {
               y: originalPosition.y,
               z: Math.round((rockLocation.position.z + 1.23) * 100) / 100,
             }
+        : worldId === 'island5'
+          ? {
+              x: Math.round(rockLocation.position.x * 10) / 10,
+              y: originalPosition.y,
+              z: Math.round((rockLocation.position.z + 1.23) * 100) / 100,
+            }
         : {
             x: rockLocation.position.x,
             y: originalPosition.y,
@@ -1261,7 +1337,7 @@ export class TrainingController {
           hitRate = 3.0;
         }
       }
-    } else if (worldId === 'island3' || worldId === 'island4') {
+    } else if (worldId === 'island3' || worldId === 'island4' || worldId === 'island5') {
       const rockData = rockLocation.rockData as any;
       if (rockData.hitRate !== undefined) {
         hitRate = rockData.hitRate;
@@ -1281,8 +1357,8 @@ export class TrainingController {
 
     // Create a unified rock data structure for TrainingSystem
     let rockDataForSystem: TrainingRockData;
-    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4') && 'uiPowerBonus' in rockLocation.rockData) {
-      const rock = rockLocation.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData;
+    if ((worldId === 'island2' || worldId === 'island3' || worldId === 'island4' || worldId === 'island5') && 'uiPowerBonus' in rockLocation.rockData) {
+      const rock = rockLocation.rockData as Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | Island5TrainingRockData;
       rockDataForSystem = {
         id: rock.id,
         tier: rock.tier as any,
@@ -1588,8 +1664,8 @@ export class TrainingController {
     return entities[0];
   }
 
-  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData) {
-    // Handle Island 1 (TrainingRockData), Island 2 (Island2TrainingRockData), Island 3 (Island3TrainingRockData), and Island 4 (Island4TrainingRockData) rocks
+  private getAccessState(playerData: PlayerData | undefined, rock: TrainingRockData | Island2TrainingRockData | Island3TrainingRockData | Island4TrainingRockData | Island5TrainingRockData) {
+    // Handle Island 1-5 training rocks
     const requiredPower = 'requiredPower' in rock ? rock.requiredPower : 0;
     const requiredRebirths = 'requiredRebirths' in rock ? rock.requiredRebirths : 0;
     
