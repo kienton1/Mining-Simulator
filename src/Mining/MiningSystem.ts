@@ -677,6 +677,9 @@ export class MiningSystem {
 
         // Transition floor entity to next level (2 operations instead of ~294 setBlock calls)
         this.transitionFloorEntityToNextLevel(player, state, nextMineLevel, pickaxe);
+        if (USE_ENTITY_POOLING && !isAutoMining) {
+          this.nudgePlayerDown(playerEntity);
+        }
 
         // Generate blocks ahead of player if needed (keep 20 levels ahead - walls only)
         this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
@@ -787,6 +790,9 @@ export class MiningSystem {
 
       // Transition floor entity to next level (2 operations instead of ~294 setBlock calls)
       this.transitionFloorEntityToNextLevel(player, state, nextMineLevel, pickaxe);
+      if (USE_ENTITY_POOLING && !isAutoMining) {
+        this.nudgePlayerDown(playerEntity);
+      }
 
       // Generate blocks ahead of player if needed (keep 20 levels ahead - walls only)
       this.ensureLevelsAheadOfPlayer(player, state, pickaxe);
@@ -2100,6 +2106,21 @@ export class MiningSystem {
     }, reenableDelayMs);
 
     this.pooledColliderReenableTimers.set(entity, timer);
+  }
+
+  private nudgePlayerDown(playerEntity: Entity): void {
+    const rigidBody = (playerEntity as any).rawRigidBody;
+    if (!rigidBody || typeof rigidBody.setLinearVelocity !== 'function') {
+      return;
+    }
+
+    const currentVelocity = rigidBody.linearVelocity ?? { x: 0, y: 0, z: 0 };
+    const downwardVelocity = Math.min(currentVelocity.y ?? 0, -6);
+    rigidBody.setLinearVelocity({
+      x: currentVelocity.x ?? 0,
+      y: downwardVelocity,
+      z: currentVelocity.z ?? 0,
+    });
   }
 
   /**
