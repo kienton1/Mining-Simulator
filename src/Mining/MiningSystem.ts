@@ -1999,6 +1999,7 @@ export class MiningSystem {
     const centerY = topY - 1; // Adjusted for 3-block height
     const currentPos = entity.position;
 
+    this.disablePositionInterpolation(entity);
     entity.setNextKinematicPosition({ x: currentPos.x, y: centerY, z: currentPos.z });
   }
 
@@ -2047,6 +2048,7 @@ export class MiningSystem {
     });
 
     entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
+    this.disablePositionInterpolation(entity);
 
     if (type === 'chest') {
       state.chestEntityPool.set(value as ChestType, entity);
@@ -2055,6 +2057,13 @@ export class MiningSystem {
     }
 
     console.log('[MiningSystem] Created new pooled entity:', type, value, 'at level', mineLevel);
+  }
+
+  private disablePositionInterpolation(entity: Entity): void {
+    const setInterpolationMs = (entity as any).setPositionInterpolationMs;
+    if (typeof setInterpolationMs === 'function') {
+      setInterpolationMs.call(entity, 0);
+    }
   }
 
   /**

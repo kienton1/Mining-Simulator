@@ -129,6 +129,17 @@ export class MiningPlayerEntity extends DefaultPlayerEntity {
     }
   }
 
+  private setModelAnimationsPlaybackRate(playbackRate: number): void {
+    const rate = Number.isFinite(playbackRate) ? playbackRate : 1.0;
+    const animationNames = ['mining-loop'];
+    for (const name of animationNames) {
+      const animation = this.getModelAnimation(name);
+      if (animation) {
+        animation.setPlaybackRate(rate);
+      }
+    }
+  }
+
   /**
    * Sets callback for left click start
    */
