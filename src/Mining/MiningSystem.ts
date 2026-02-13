@@ -29,7 +29,7 @@ const DEBUG_MINING = false;
 const USE_ENTITY_POOLING = true;
 const FLOOR_ENTITY_POOL_SIZE = 4;
 const FLOOR_ENTITY_HALF_EXTENTS = { x: 4.0, y: 0.5, z: 4.0 };
-const POOLED_ENTITY_HALF_EXTENTS = { x: 4.0, y: 1.5, z: 4.0 };
+const POOLED_ENTITY_HALF_EXTENTS = { x: 4.0, y: 0.5, z: 4.0 };
 
 /**
  * Mining block position key (x,y,z)
@@ -124,6 +124,7 @@ export class MiningSystem {
   private miningStates: Map<Player, MiningState> = new Map();
   private mineOffsets: Map<string, { x: number; z: number }> = new Map(); // Key: `${player.id}:${worldId}`
   private nextInstanceIndexPerWorld: Map<string, number> = new Map(); // Track instance indices per world
+  private pooledColliderReenableTimers: Map<Entity, NodeJS.Timeout> = new Map();
   private world: World;
   private getPlayerDataCallback?: (player: Player) => PlayerData | undefined;
   private firstBlockMined: Map<Player, boolean> = new Map();
@@ -1996,11 +1997,11 @@ export class MiningSystem {
     if (!entity.isSpawned) return;
 
     const topY = this.mineLevelToTopY(toMineLevel);
-    const centerY = topY - 1; // Adjusted for 3-block height
     const currentPos = entity.position;
 
     this.disablePositionInterpolation(entity);
-    entity.setNextKinematicPosition({ x: currentPos.x, y: centerY, z: currentPos.z });
+    this.temporarilyDisablePooledEntityColliders(entity);
+    entity.setNextKinematicPosition({ x: currentPos.x, y: topY, z: currentPos.z });
   }
 
   /**
@@ -2024,7 +2025,6 @@ export class MiningSystem {
     const centerX = (bounds.minX + bounds.maxX) / 2 + state.offset.x;
     const centerZ = (bounds.minZ + bounds.maxZ) / 2 + state.offset.z;
     const topY = this.mineLevelToTopY(mineLevel);
-    const centerY = topY - 1;
 
     const texture = type === 'chest'
       ? this.getChestTextureUri(value as ChestType)
@@ -2047,7 +2047,7 @@ export class MiningSystem {
       },
     });
 
-    entity.spawn(this.world, { x: centerX, y: centerY, z: centerZ });
+    entity.spawn(this.world, { x: centerX, y: topY, z: centerZ });
     this.disablePositionInterpolation(entity);
 
     if (type === 'chest') {
@@ -2064,6 +2064,40 @@ export class MiningSystem {
     if (typeof setInterpolationMs === 'function') {
       setInterpolationMs.call(entity, 0);
     }
+  }
+
+  private temporarilyDisablePooledEntityColliders(entity: Entity, reenableDelayMs: number = 0): void {
+    if (!entity.isSpawned) return;
+    const colliders = Array.from(entity.colliders ?? []);
+    if (colliders.length === 0) return;
+
+    const previousEnabled = colliders.map(collider => collider.isEnabled);
+    for (const collider of colliders) {
+      try {
+        collider.setEnabled(false);
+      } catch (error) {
+        // Ignore collider toggle failures
+      }
+    }
+
+    const existingTimer = this.pooledColliderReenableTimers.get(entity);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      for (let i = 0; i < colliders.length; i++) {
+        if (!previousEnabled[i]) continue;
+        try {
+          colliders[i].setEnabled(true);
+        } catch (error) {
+          // Ignore collider toggle failures
+        }
+      }
+      this.pooledColliderReenableTimers.delete(entity);
+    }, reenableDelayMs);
+
+    this.pooledColliderReenableTimers.set(entity, timer);
   }
 
   /**
