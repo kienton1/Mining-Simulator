@@ -689,13 +689,14 @@ export class MiningSystem {
           z: center.z,
         };
         
-        // Use setPosition on the rigid body to move the player
-        const rigidBody = (playerEntity as any).rawRigidBody;
-        if (rigidBody && rigidBody.setPosition) {
-          rigidBody.setPosition(newPosition);
-        } else {
-          // Fallback: try to set position directly on entity if rigidBody method doesn't work
-
+        // In pooling mode, allow gravity to pull the player down instead of snapping to the new floor.
+        if (!USE_ENTITY_POOLING || isAutoMining) {
+          const rigidBody = (playerEntity as any).rawRigidBody;
+          if (rigidBody && rigidBody.setPosition) {
+            rigidBody.setPosition(newPosition);
+          } else {
+            // Fallback: try to set position directly on entity if rigidBody method doesn't work
+          }
         }
 
         // Notify callback that block was destroyed (for animation reset)
@@ -801,14 +802,15 @@ export class MiningSystem {
       // Spawn floor break particle effect
       this.spawnFloorBreakEffect(player, minedOre, nextTopY);
 
-      // Use setPosition on the rigid body to move the player
-      const rigidBody = (playerEntity as any).rawRigidBody;
-      if (rigidBody && rigidBody.setPosition) {
-        rigidBody.setPosition(newPosition);
-      } else {
-        // Fallback: try to set position directly on entity if rigidBody method doesn't work
-        // The player will fall naturally due to physics, but we can at least set the position
-
+      // In pooling mode, allow gravity to pull the player down instead of snapping to the new floor.
+      if (!USE_ENTITY_POOLING || isAutoMining) {
+        const rigidBody = (playerEntity as any).rawRigidBody;
+        if (rigidBody && rigidBody.setPosition) {
+          rigidBody.setPosition(newPosition);
+        } else {
+          // Fallback: try to set position directly on entity if rigidBody method doesn't work
+          // The player will fall naturally due to physics, but we can at least set the position
+        }
       }
 
       // Notify callback that block was destroyed (for animation reset)
@@ -2066,7 +2068,7 @@ export class MiningSystem {
     }
   }
 
-  private temporarilyDisablePooledEntityColliders(entity: Entity, reenableDelayMs: number = 0): void {
+  private temporarilyDisablePooledEntityColliders(entity: Entity, reenableDelayMs: number = 50): void {
     if (!entity.isSpawned) return;
     const colliders = Array.from(entity.colliders ?? []);
     if (colliders.length === 0) return;
