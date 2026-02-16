@@ -342,10 +342,13 @@ export function calculatePowerGainPerHit(
  * @returns Total mining damage
  */
 export function damageFromPower(power: number): number {
-  if (power <= 0) return 1;
+  if (Number.isNaN(power)) return 1;
 
-  const x = Math.log10(power);
-  const w = 0.6;
+  const finitePower = Number.isFinite(power) ? power : Number.MAX_VALUE;
+  if (finitePower <= 0) return 1;
+
+  const x = Math.log10(Math.max(finitePower, Number.MIN_VALUE));
+  const w = 1.5;
 
   // y = log10(Damage)
   let y = -0.373147203 + 0.491433377 * x;
@@ -380,7 +383,10 @@ export function damageFromPower(power: number): number {
   }
 
   const raw = Math.pow(10, y);
-  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  if (!Number.isFinite(raw)) {
+    return y > 0 ? Number.MAX_VALUE : 1;
+  }
+  if (raw <= 0) return 1;
   return Math.max(1, raw);
 }
 

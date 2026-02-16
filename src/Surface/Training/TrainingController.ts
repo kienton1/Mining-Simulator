@@ -360,6 +360,7 @@ interface PlayerTrainingState {
   velocityCheckInterval?: NodeJS.Timeout;
   trainingRockLocation?: TrainingRockLocation;
   trainingStartPosition?: { x: number; y: number; z: number }; // Position after teleport (for movement detection baseline)
+  trainingStartTime?: number; // Timestamp when current training session started
   originalPosition?: { x: number; y: number; z: number }; // Original position before teleport (for restoration)
   isAutoTraining?: boolean;
 }
@@ -601,6 +602,68 @@ export class TrainingController {
     });
   }
 
+  private roundTo(value: number, decimals: number): number {
+    const scale = Math.pow(10, decimals);
+    return Math.round(value * scale) / scale;
+  }
+
+  private getTrainingStartPositionForRock(
+    rockLocation: TrainingRockLocation,
+    worldId: string,
+    y: number
+  ): { x: number; y: number; z: number } {
+    if (worldId === 'island2') {
+      // Island 2 is sensitive to slight offset errors; prefer exact pad center.
+      if (rockLocation.bounds) {
+        const centerX = (rockLocation.bounds.minX + rockLocation.bounds.maxX) / 2;
+        const centerZ = (rockLocation.bounds.minZ + rockLocation.bounds.maxZ) / 2;
+        return {
+          x: this.roundTo(centerX, 1),
+          y,
+          z: this.roundTo(centerZ, 1),
+        };
+      }
+
+      return {
+        x: this.roundTo(rockLocation.position.x, 1),
+        y,
+        z: this.roundTo(rockLocation.position.z + 0.1, 2),
+      };
+    }
+
+    if (worldId === 'island3') {
+      if (rockLocation.bounds) {
+        const centerX = (rockLocation.bounds.minX + rockLocation.bounds.maxX) / 2;
+        const centerZ = (rockLocation.bounds.minZ + rockLocation.bounds.maxZ) / 2;
+        return {
+          x: this.roundTo(centerX, 1),
+          y,
+          z: this.roundTo(centerZ, 1),
+        };
+      }
+
+      return {
+        x: this.roundTo(rockLocation.position.x + 0.02, 1),
+        y,
+        z: rockLocation.position.z + 0.1,
+      };
+    }
+
+    if (worldId === 'island4' || worldId === 'island5') {
+      return {
+        x: this.roundTo(rockLocation.position.x, 1),
+        y,
+        z: this.roundTo(rockLocation.position.z + 1.23, 2),
+      };
+    }
+
+    return {
+      x: rockLocation.position.x,
+      y,
+      z: -9.27,
+    };
+  }
+
   /**
    * Starts training for a player
    * 
@@ -659,48 +722,10 @@ export class TrainingController {
     // Get world ID to determine teleport position offset
     const worldId = playerData.currentWorld || 'island1';
     
-    // Move player next to the rock so swings visibly hit it
-    // Use original Y to avoid ground/air collisions on teleport
-    const standPosition = worldId === 'island2' 
-      ? {
-          x: Math.round((targetRock.position.x + 0.02) * 10) / 10, // Rock X + 0.02, rounded to 1 decimal
-          y: originalPosition.y,
-          z: targetRock.position.z + 0.1, // Rock Z + 0.1 (moved forward to prevent clipping)
-        }
-      : worldId === 'island3'
-        ? (() => {
-            if (targetRock.bounds) {
-              const centerX = (targetRock.bounds.minX + targetRock.bounds.maxX) / 2;
-              const centerZ = (targetRock.bounds.minZ + targetRock.bounds.maxZ) / 2;
-              return {
-                x: Math.round(centerX * 10) / 10,
-                y: originalPosition.y,
-                z: Math.round(centerZ * 10) / 10,
-              };
-            }
-            return {
-              x: Math.round((targetRock.position.x + 0.02) * 10) / 10,
-              y: originalPosition.y,
-              z: targetRock.position.z + 0.1,
-            };
-          })()
-      : worldId === 'island4'
-        ? {
-            x: Math.round(targetRock.position.x * 10) / 10,
-            y: originalPosition.y,
-            z: Math.round((targetRock.position.z + 1.23) * 100) / 100,
-          }
-      : worldId === 'island5'
-        ? {
-            x: Math.round(targetRock.position.x * 10) / 10,
-            y: originalPosition.y,
-            z: Math.round((targetRock.position.z + 1.23) * 100) / 100,
-          }
-      : {
-          x: targetRock.position.x, // Same X as the ore block
-          y: originalPosition.y,
-          z: -9.27, // Fixed Z position (forward of the ore blocks, Island 1)
-        };
+    // Move player next to the rock so swings visibly hit it.
+    // Use original Y to avoid ground/air collisions on teleport.
+    const standY = isAutoTraining ? 1.75 : originalPosition.y;
+    const standPosition = this.getTrainingStartPositionForRock(targetRock, worldId, standY);
     playerEntity.setPosition(standPosition);
     // Keep pets snapped to the player after teleporting to a training rock
     this.gameManager.syncEquippedPets(player);
@@ -725,8 +750,9 @@ export class TrainingController {
       // Store the teleported position as start position (so movement detection uses it as baseline)
       // This prevents the teleport from triggering movement detection
       state.trainingStartPosition = standPosition;
+      state.trainingStartTime = Date.now();
       // Store original position separately for restoration
-      state.originalPosition = originalPosition;
+      state.originalPosition = isAutoTraining ? undefined : originalPosition;
       // Keep the last nearby rock unique id in sync so teleport cleanup can always hide it.
       state.nearbyRockId = targetRock.rockData.id;
       state.nearbyRockUniqueId = uniqueId;
@@ -844,12 +870,6 @@ export class TrainingController {
   stopTraining(player: Player): void {
     if (!this.trainingSystem.isPlayerTraining(player)) return;
 
-    // Debug: Log where stopTraining was called from
-    const stack = new Error().stack;
-    console.log('[TrainingController] stopTraining called for player:', player.username, '\nStack:', stack);
-
-    const rockName = this.trainingSystem.getPlayerTrainingRock(player)?.name || 'unknown rock';
-    
     // Stop velocity monitoring
     this.stopVelocityMonitoring(player);
     
@@ -906,6 +926,7 @@ export class TrainingController {
       // Clear training state
       state.trainingRockLocation = undefined;
       state.trainingStartPosition = undefined;
+      state.trainingStartTime = undefined;
       state.originalPosition = undefined;
       state.isAutoTraining = false;
     }
@@ -930,6 +951,19 @@ export class TrainingController {
   getCurrentTrainingRock(player: Player): TrainingRockLocation | null {
     const state = this.playerStates.get(player);
     return state?.trainingRockLocation || null;
+  }
+
+  /**
+   * Gets the exact position where training teleports the player for a rock.
+   * Used by auto-train tracking so movement checks use the same baseline.
+   */
+  getTrainingStartPosition(player: Player, rockLocation: TrainingRockLocation): { x: number; y: number; z: number } | null {
+    const playerEntity = this.getPlayerEntity(player);
+    if (!playerEntity) return null;
+
+    const playerData = this.gameManager.getPlayerData(player);
+    const worldId = playerData?.currentWorld || rockLocation.worldId || 'island1';
+    return this.getTrainingStartPositionForRock(rockLocation, worldId, playerEntity.position.y);
   }
 
   /**
@@ -1253,48 +1287,10 @@ export class TrainingController {
     // Get world ID to determine teleport position offset
     const worldId = playerData.currentWorld || 'island1';
 
-    // Move player next to the rock so swings visibly hit it
-    // Use original Y to avoid ground/air collisions on teleport
-    const standPosition = worldId === 'island2'
-      ? {
-          x: Math.round((rockLocation.position.x + 0.02) * 10) / 10,
-          y: originalPosition.y,
-          z: rockLocation.position.z + 0.1,
-        }
-      : worldId === 'island3'
-        ? (() => {
-            if (rockLocation.bounds) {
-              const centerX = (rockLocation.bounds.minX + rockLocation.bounds.maxX) / 2;
-              const centerZ = (rockLocation.bounds.minZ + rockLocation.bounds.maxZ) / 2;
-              return {
-                x: Math.round(centerX * 10) / 10,
-                y: originalPosition.y,
-                z: Math.round(centerZ * 10) / 10,
-              };
-            }
-            return {
-              x: Math.round((rockLocation.position.x + 0.02) * 10) / 10,
-              y: originalPosition.y,
-              z: rockLocation.position.z + 0.1,
-            };
-          })()
-        : worldId === 'island4'
-          ? {
-              x: Math.round(rockLocation.position.x * 10) / 10,
-              y: originalPosition.y,
-              z: Math.round((rockLocation.position.z + 1.23) * 100) / 100,
-            }
-        : worldId === 'island5'
-          ? {
-              x: Math.round(rockLocation.position.x * 10) / 10,
-              y: originalPosition.y,
-              z: Math.round((rockLocation.position.z + 1.23) * 100) / 100,
-            }
-        : {
-            x: rockLocation.position.x,
-            y: originalPosition.y,
-            z: -9.27,
-          };
+    // Move player next to the rock so swings visibly hit it.
+    // Use original Y to avoid ground/air collisions on teleport.
+    const standY = isAutoTraining ? 1.75 : originalPosition.y;
+    const standPosition = this.getTrainingStartPositionForRock(rockLocation, worldId, standY);
     playerEntity.setPosition(standPosition);
     // Keep pets snapped to the player after teleporting to a training rock
     this.gameManager.syncEquippedPets(player);
@@ -1316,7 +1312,8 @@ export class TrainingController {
     if (state) {
       state.trainingRockLocation = rockLocation;
       state.trainingStartPosition = standPosition;
-      state.originalPosition = originalPosition;
+      state.trainingStartTime = Date.now();
+      state.originalPosition = isAutoTraining ? undefined : originalPosition;
       state.isAutoTraining = isAutoTraining;
     }
 
@@ -1707,6 +1704,14 @@ export class TrainingController {
       }
 
       const isAutoTraining = Boolean(state.isAutoTraining);
+
+      // Allow a short settle period after teleport to avoid false movement stops.
+      if (isAutoTraining && state.trainingStartTime) {
+        const elapsedMs = Date.now() - state.trainingStartTime;
+        if (elapsedMs < 1000) {
+          return;
+        }
+      }
 
       // Get current position and compare to training start position
       const currentPos = playerEntity.position;

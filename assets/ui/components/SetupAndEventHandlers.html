@@ -3935,7 +3935,14 @@
     const renderAchievements = () => {
       // Badge on left action button (claimable count)
       const categories = Array.isArray(state.achievements.categories) ? state.achievements.categories : [];
-      const claimableTotal = categories.reduce((sum, c) => sum + (Number(c.claimableCount ?? 0) || 0), 0);
+      const getCategoryClaimableCount = (category) => {
+        const items = Array.isArray(category?.items) ? category.items : [];
+        if (items.length > 0) {
+          return items.reduce((sum, item) => sum + ((item?.canClaim && !item?.claimed) ? 1 : 0), 0);
+        }
+        return Number(category?.claimableCount ?? 0) || 0;
+      };
+      const claimableTotal = categories.reduce((sum, c) => sum + getCategoryClaimableCount(c), 0);
       if (achievementsBadgeEl) {
         if (claimableTotal > 0) {
           achievementsBadgeEl.style.display = 'flex';
@@ -3992,7 +3999,7 @@
         // Notification badge (shows count of claimable achievements)
         const badge = document.createElement('div');
         badge.className = 'ach-cat-btn__badge';
-        const claimable = Number(cat.claimableCount ?? 0) || 0;
+        const claimable = getCategoryClaimableCount(cat);
         if (claimable > 0) {
           badge.style.display = 'flex';
           badge.textContent = String(Math.min(99, claimable));

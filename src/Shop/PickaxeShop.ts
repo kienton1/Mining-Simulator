@@ -6,10 +6,10 @@
  * Reference: Planning/inventoryAndSellingSystem.md section 3
  */
 
-import { Player } from 'hytopia';
+import type { Player } from 'hytopia';
 import { getPickaxeByTier, PICKAXE_DATABASE } from '../Pickaxe/PickaxeDatabase';
 import type { PlayerData } from '../Core/PlayerData';
-import { PickaxeManager } from '../Pickaxe/PickaxeManager';
+import type { PickaxeManager } from '../Pickaxe/PickaxeManager';
 
 /**
  * Result of a pickaxe purchase attempt
@@ -57,6 +57,55 @@ export class PickaxeShop {
     this.updatePlayerDataCallback = callback;
   }
 
+  private normalizeTier(tier: number): number | null {
+    const normalizedTier = Number(tier);
+    if (!Number.isFinite(normalizedTier) || !Number.isInteger(normalizedTier)) {
+      return null;
+    }
+    if (normalizedTier < 0 || normalizedTier >= PICKAXE_DATABASE.length) {
+      return null;
+    }
+    return normalizedTier;
+  }
+
+  private getNormalizedOwnedPickaxes(playerData: PlayerData): number[] {
+    const source = Array.isArray(playerData.ownedPickaxes) ? playerData.ownedPickaxes : [];
+    const normalized = Array.from(
+      new Set(
+        source
+          .map((tier) => Number(tier))
+          .filter((tier) => Number.isFinite(tier) && Number.isInteger(tier) && tier >= 0 && tier < PICKAXE_DATABASE.length)
+      )
+    ).sort((a, b) => a - b);
+
+    if (!normalized.includes(0)) {
+      normalized.unshift(0);
+    }
+
+    playerData.ownedPickaxes = normalized;
+    return normalized;
+  }
+
+  private getNormalizedEquippedTier(playerData: PlayerData): number {
+    const tier = Number(playerData.currentPickaxeTier ?? 0);
+    if (!Number.isFinite(tier) || !Number.isInteger(tier) || tier < 0 || tier >= PICKAXE_DATABASE.length) {
+      playerData.currentPickaxeTier = 0;
+      return 0;
+    }
+    return tier;
+  }
+
+  private getEffectiveTier(playerData: PlayerData, ownedPickaxes: number[]): number {
+    const currentEquippedTier = this.getNormalizedEquippedTier(playerData);
+    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
+    return Math.max(currentEquippedTier, highestOwnedTier);
+  }
+
+  private getNormalizedGold(playerData: PlayerData): number {
+    const gold = Number(playerData.gold ?? 0);
+    return Number.isFinite(gold) && gold > 0 ? gold : 0;
+  }
+
   /**
    * Attempts to purchase a pickaxe
    * Enforces tier progression: players can only buy the next tier (currentTier + 1)
@@ -74,44 +123,37 @@ export class PickaxeShop {
       };
     }
 
-    // Validate tier
-    if (tier < 0 || tier >= PICKAXE_DATABASE.length) {
+    const normalizedTier = this.normalizeTier(tier);
+    if (normalizedTier === null) {
       return {
         success: false,
-        message: `Invalid pickaxe tier: ${tier}`,
+        message: `Invalid pickaxe tier: ${tier as unknown as string}`,
       };
     }
 
     // Get pickaxe data
-    const pickaxe = getPickaxeByTier(tier);
+    const pickaxe = getPickaxeByTier(normalizedTier);
     if (!pickaxe) {
       return {
         success: false,
-        message: `Pickaxe tier ${tier} not found`,
+        message: `Pickaxe tier ${normalizedTier} not found`,
       };
     }
 
     // Check if player already has this tier or higher
-    if (playerData.currentPickaxeTier >= tier) {
+    const currentEquippedTier = this.getNormalizedEquippedTier(playerData);
+    if (currentEquippedTier >= normalizedTier) {
       return {
         success: false,
-        message: `You already have a pickaxe of tier ${playerData.currentPickaxeTier} or higher`,
+        message: `You already have a pickaxe of tier ${currentEquippedTier} or higher`,
       };
     }
 
     // ENFORCE TIER PROGRESSION: Can only buy the next tier based on OWNERSHIP (not what's equipped)
-    let ownedPickaxes = playerData.ownedPickaxes;
-    if (!ownedPickaxes || ownedPickaxes.length === 0) {
-      ownedPickaxes = [0];
-    } else if (!ownedPickaxes.includes(0)) {
-      ownedPickaxes = [0, ...ownedPickaxes];
-    }
-
-    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
-    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
-    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+    const ownedPickaxes = this.getNormalizedOwnedPickaxes(playerData);
+    const effectiveTier = this.getEffectiveTier(playerData, ownedPickaxes);
     const nextTier = effectiveTier + 1;
-    if (tier !== nextTier) {
+    if (normalizedTier !== nextTier) {
       return {
         success: false,
         message: `You can only purchase the next tier pickaxe (Tier ${nextTier}). You cannot skip tiers.`,
@@ -119,7 +161,7 @@ export class PickaxeShop {
     }
 
     // Check if player has enough gold
-    const currentGold = playerData.gold || 0;
+    const currentGold = this.getNormalizedGold(playerData);
     if (currentGold < pickaxe.cost) {
       return {
         success: false,
@@ -128,28 +170,25 @@ export class PickaxeShop {
     }
 
     // Purchase pickaxe
-    playerData.currentPickaxeTier = tier;
-    playerData.gold = currentGold - pickaxe.cost;
-    
-    // Add to owned pickaxes list
-    if (!playerData.ownedPickaxes) {
-      playerData.ownedPickaxes = [0]; // Initialize with tier 0 if not set
-    }
-    if (!playerData.ownedPickaxes.includes(tier)) {
-      playerData.ownedPickaxes.push(tier);
-      playerData.ownedPickaxes.sort((a, b) => a - b); // Keep sorted
+    playerData.currentPickaxeTier = normalizedTier;
+    playerData.gold = Math.max(0, currentGold - pickaxe.cost);
+
+    if (!ownedPickaxes.includes(normalizedTier)) {
+      ownedPickaxes.push(normalizedTier);
+      ownedPickaxes.sort((a, b) => a - b);
+      playerData.ownedPickaxes = ownedPickaxes;
     }
 
     // Update player data
     this.updatePlayerDataCallback?.(player, playerData);
 
     // Update pickaxe visual
-    this.pickaxeManager.attachPickaxeToPlayer(player, tier);
+    this.pickaxeManager.attachPickaxeToPlayer(player, normalizedTier);
 
     return {
       success: true,
       message: `Purchased ${pickaxe.name} pickaxe!`,
-      newTier: tier,
+      newTier: normalizedTier,
       goldSpent: pickaxe.cost,
     };
   }
@@ -188,19 +227,10 @@ export class PickaxeShop {
       };
     }
 
-    const equippedTier = playerData.currentPickaxeTier ?? 0;
-    const playerGold = playerData.gold || 0;
-
-    // Owned pickaxes drive progression (not what is currently equipped)
-    let ownedPickaxes = playerData.ownedPickaxes;
-    if (!ownedPickaxes || ownedPickaxes.length === 0) {
-      ownedPickaxes = [0]; // Default to tier 0 if not set
-    } else if (!ownedPickaxes.includes(0)) {
-      ownedPickaxes = [0, ...ownedPickaxes];
-    }
-
-    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
-    const effectiveTier = Math.max(equippedTier, highestOwnedTier);
+    const equippedTier = this.getNormalizedEquippedTier(playerData);
+    const playerGold = this.getNormalizedGold(playerData);
+    const ownedPickaxes = this.getNormalizedOwnedPickaxes(playerData);
+    const effectiveTier = this.getEffectiveTier(playerData, ownedPickaxes);
     const nextTier = effectiveTier + 1;
 
     const pickaxes = PICKAXE_DATABASE.map(pickaxe => {
@@ -257,17 +287,17 @@ export class PickaxeShop {
       };
     }
 
-    // Validate tier
-    if (tier < 0 || tier >= PICKAXE_DATABASE.length) {
+    const normalizedTier = this.normalizeTier(tier);
+    if (normalizedTier === null) {
       return {
         success: false,
-        message: `Invalid pickaxe tier: ${tier}`,
+        message: `Invalid pickaxe tier: ${tier as unknown as string}`,
       };
     }
 
     // Check if player owns this pickaxe
-    const ownedPickaxes = playerData.ownedPickaxes || [0];
-    if (!ownedPickaxes.includes(tier)) {
+    const ownedPickaxes = this.getNormalizedOwnedPickaxes(playerData);
+    if (!ownedPickaxes.includes(normalizedTier)) {
       return {
         success: false,
         message: `You do not own this pickaxe. Purchase it first.`,
@@ -275,7 +305,8 @@ export class PickaxeShop {
     }
 
     // Check if already equipped
-    if (playerData.currentPickaxeTier === tier) {
+    const equippedTier = this.getNormalizedEquippedTier(playerData);
+    if (equippedTier === normalizedTier) {
       return {
         success: false,
         message: `This pickaxe is already equipped.`,
@@ -283,15 +314,15 @@ export class PickaxeShop {
     }
 
     // Equip the pickaxe
-    playerData.currentPickaxeTier = tier;
+    playerData.currentPickaxeTier = normalizedTier;
 
     // Update player data
     this.updatePlayerDataCallback?.(player, playerData);
 
     // Update pickaxe visual
-    this.pickaxeManager.attachPickaxeToPlayer(player, tier);
+    this.pickaxeManager.attachPickaxeToPlayer(player, normalizedTier);
 
-    const pickaxe = getPickaxeByTier(tier);
+    const pickaxe = getPickaxeByTier(normalizedTier);
 
     return {
       success: true,
@@ -312,16 +343,8 @@ export class PickaxeShop {
     }
 
     // Next tier is based on highest owned tier (not what is equipped)
-    let ownedPickaxes = playerData.ownedPickaxes;
-    if (!ownedPickaxes || ownedPickaxes.length === 0) {
-      ownedPickaxes = [0];
-    } else if (!ownedPickaxes.includes(0)) {
-      ownedPickaxes = [0, ...ownedPickaxes];
-    }
-
-    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
-    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
-    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+    const ownedPickaxes = this.getNormalizedOwnedPickaxes(playerData);
+    const effectiveTier = this.getEffectiveTier(playerData, ownedPickaxes);
 
     const nextTier = effectiveTier + 1;
     if (nextTier >= PICKAXE_DATABASE.length) {
@@ -345,16 +368,8 @@ export class PickaxeShop {
 
     const available: number[] = [];
     // Available tiers are based on highest owned tier (not what is equipped)
-    let ownedPickaxes = playerData.ownedPickaxes;
-    if (!ownedPickaxes || ownedPickaxes.length === 0) {
-      ownedPickaxes = [0];
-    } else if (!ownedPickaxes.includes(0)) {
-      ownedPickaxes = [0, ...ownedPickaxes];
-    }
-
-    const currentEquippedTier = playerData.currentPickaxeTier ?? 0;
-    const highestOwnedTier = ownedPickaxes.length > 0 ? Math.max(...ownedPickaxes) : 0;
-    const effectiveTier = Math.max(currentEquippedTier, highestOwnedTier);
+    const ownedPickaxes = this.getNormalizedOwnedPickaxes(playerData);
+    const effectiveTier = this.getEffectiveTier(playerData, ownedPickaxes);
 
     for (let tier = effectiveTier + 1; tier < PICKAXE_DATABASE.length; tier++) {
       available.push(tier);
@@ -376,7 +391,7 @@ export class PickaxeShop {
     }
 
     const affordable: number[] = [];
-    const currentGold = playerData.gold || 0;
+    const currentGold = this.getNormalizedGold(playerData);
     const availableTiers = this.getAvailablePickaxes(player);
 
     for (const tier of availableTiers) {
@@ -402,12 +417,17 @@ export class PickaxeShop {
       return false;
     }
 
-    const pickaxe = getPickaxeByTier(tier);
+    const normalizedTier = this.normalizeTier(tier);
+    if (normalizedTier === null) {
+      return false;
+    }
+
+    const pickaxe = getPickaxeByTier(normalizedTier);
     if (!pickaxe) {
       return false;
     }
 
-    const currentGold = playerData.gold || 0;
+    const currentGold = this.getNormalizedGold(playerData);
     return currentGold >= pickaxe.cost;
   }
 }

@@ -219,8 +219,10 @@ function getPickaxeScale(pickaxeName: string): number {
  */
 export class PickaxeManager {
   private world: World;
-  private playerPickaxeEntities: Map<Player, Entity> = new Map();
-  private pickaxeAttachedCallbacks: Map<Player, (() => void)[]> = new Map();
+  private playerPickaxeEntities: Map<string, Entity> = new Map();
+  private pickaxeAttachedCallbacks: Map<string, (() => void)[]> = new Map();
+  private pendingAttachTimers: Map<string, NodeJS.Timeout> = new Map();
+  private attachNonceByPlayer: Map<string, number> = new Map();
 
   /**
    * Creates a new PickaxeManager instance
@@ -231,6 +233,64 @@ export class PickaxeManager {
     this.world = world;
   }
 
+  private getPlayerKey(player: Player): string {
+    return String(player.id);
+  }
+
+  private clearPendingAttachTimer(playerKey: string): void {
+    const timer = this.pendingAttachTimers.get(playerKey);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingAttachTimers.delete(playerKey);
+    }
+  }
+
+  private bumpAttachNonce(playerKey: string): number {
+    const nextNonce = (this.attachNonceByPlayer.get(playerKey) ?? 0) + 1;
+    this.attachNonceByPlayer.set(playerKey, nextNonce);
+    return nextNonce;
+  }
+
+  private getAllPickaxeEntities(): Entity[] {
+    const manager = this.world.entityManager as any;
+    if (typeof manager.getEntitiesByTag === 'function') {
+      return manager.getEntitiesByTag('pickaxe') as Entity[];
+    }
+    return this.world.entityManager.getAllEntities().filter((entity) => entity.tag === 'pickaxe');
+  }
+
+  private isEntityAttachedToPlayer(entity: Entity, playerEntities: Entity[]): boolean {
+    const entityAny = entity as any;
+    const parent = entityAny.parent ?? (typeof entityAny.getParent === 'function' ? entityAny.getParent() : undefined);
+    if (!parent) return false;
+    return playerEntities.includes(parent);
+  }
+
+  private getPickaxesOwnedByPlayer(player: Player): Entity[] {
+    const playerEntities = this.world.entityManager.getPlayerEntitiesByPlayer(player);
+    const playerId = String(player.id);
+    const pickaxes = this.getAllPickaxeEntities();
+
+    return pickaxes.filter((entity) => {
+      const entityAny = entity as any;
+      const ownerPlayerId = entityAny.__ownerPlayerId;
+      if (ownerPlayerId !== undefined && String(ownerPlayerId) === playerId) {
+        return true;
+      }
+      return this.isEntityAttachedToPlayer(entity, playerEntities);
+    });
+  }
+
+  private despawnEntitySafe(entity: Entity): void {
+    try {
+      if (entity.isSpawned) {
+        entity.despawn();
+      }
+    } catch {
+      // Ignore despawn errors for stale entities.
+    }
+  }
+
   /**
    * Register a callback to be called when pickaxe is attached to a player
    *
@@ -238,10 +298,11 @@ export class PickaxeManager {
    * @param callback - Function to call when pickaxe is attached
    */
   onPickaxeAttached(player: Player, callback: () => void): void {
-    if (!this.pickaxeAttachedCallbacks.has(player)) {
-      this.pickaxeAttachedCallbacks.set(player, []);
+    const playerKey = this.getPlayerKey(player);
+    if (!this.pickaxeAttachedCallbacks.has(playerKey)) {
+      this.pickaxeAttachedCallbacks.set(playerKey, []);
     }
-    this.pickaxeAttachedCallbacks.get(player)!.push(callback);
+    this.pickaxeAttachedCallbacks.get(playerKey)!.push(callback);
   }
 
   /**
@@ -250,7 +311,8 @@ export class PickaxeManager {
    * @param player - Player whose pickaxe was attached
    */
   private notifyPickaxeAttached(player: Player): void {
-    const callbacks = this.pickaxeAttachedCallbacks.get(player);
+    const playerKey = this.getPlayerKey(player);
+    const callbacks = this.pickaxeAttachedCallbacks.get(playerKey);
     if (callbacks) {
       callbacks.forEach(callback => callback());
     }
@@ -263,6 +325,8 @@ export class PickaxeManager {
    * @param pickaxeTier - Tier of pickaxe to spawn
    */
   attachPickaxeToPlayer(player: Player, pickaxeTier: number): void {
+    const playerKey = this.getPlayerKey(player);
+
     // Remove existing pickaxe if any
     this.removePickaxeFromPlayer(player);
 
@@ -318,7 +382,8 @@ export class PickaxeManager {
         y: playerPosition.y + 1,
         z: playerPosition.z + 1,
       });
-      this.playerPickaxeEntities.set(player, pickaxeEntity);
+      (pickaxeEntity as any).__ownerPlayerId = player.id;
+      this.playerPickaxeEntities.set(playerKey, pickaxeEntity);
       return;
     }
 
@@ -348,9 +413,32 @@ export class PickaxeManager {
       z: playerPosition.z + 1,
     };
     pickaxeEntity.spawn(this.world, testPosition);
-    
+
+    // Track ownership so stale entities can be cleaned up if a previous attach race occurs.
+    (pickaxeEntity as any).__ownerPlayerId = player.id;
+
+    // Store reference for cleanup immediately before async attach runs.
+    this.playerPickaxeEntities.set(playerKey, pickaxeEntity);
+
+    const attachNonce = this.bumpAttachNonce(playerKey);
+
     // Wait a moment to ensure entity is fully spawned, then attach
-    setTimeout(() => {
+    const attachTimer = setTimeout(() => {
+      this.pendingAttachTimers.delete(playerKey);
+
+      // Ignore stale attachment callbacks from older attach requests.
+      if (this.attachNonceByPlayer.get(playerKey) !== attachNonce) {
+        return;
+      }
+
+      if (this.playerPickaxeEntities.get(playerKey) !== pickaxeEntity) {
+        return;
+      }
+
+      if (!pickaxeEntity.isSpawned) {
+        return;
+      }
+
       // Now try to attach to hand - use setParent which won't crash if node doesn't exist
       // Based on console output, the actual anchor name is 'hand-right-anchor' (with dashes)
       const possibleAnchorNames = [
@@ -395,9 +483,7 @@ export class PickaxeManager {
       // Notify that pickaxe attachment is complete
       this.notifyPickaxeAttached(player);
     }, 100);
-
-    // Store reference for cleanup (do this immediately, attachment happens in setTimeout)
-    this.playerPickaxeEntities.set(player, pickaxeEntity);
+    this.pendingAttachTimers.set(playerKey, attachTimer);
   }
 
   /**
@@ -406,10 +492,20 @@ export class PickaxeManager {
    * @param player - Player to remove pickaxe from
    */
   removePickaxeFromPlayer(player: Player): void {
-    const pickaxeEntity = this.playerPickaxeEntities.get(player);
-    if (pickaxeEntity) {
-      pickaxeEntity.despawn();
-      this.playerPickaxeEntities.delete(player);
+    const playerKey = this.getPlayerKey(player);
+    this.clearPendingAttachTimer(playerKey);
+    this.bumpAttachNonce(playerKey);
+
+    const trackedPickaxe = this.playerPickaxeEntities.get(playerKey);
+    if (trackedPickaxe) {
+      this.despawnEntitySafe(trackedPickaxe);
+      this.playerPickaxeEntities.delete(playerKey);
+    }
+
+    // Safety scrub: remove any stale pickaxe entities owned by/attached to this player.
+    const attachedPickaxes = this.getPickaxesOwnedByPlayer(player);
+    for (const pickaxeEntity of attachedPickaxes) {
+      this.despawnEntitySafe(pickaxeEntity);
     }
   }
 
@@ -429,7 +525,11 @@ export class PickaxeManager {
    * @param player - Player who left
    */
   cleanupPlayer(player: Player): void {
+    const playerKey = this.getPlayerKey(player);
     this.removePickaxeFromPlayer(player);
+    this.pickaxeAttachedCallbacks.delete(playerKey);
+    this.pendingAttachTimers.delete(playerKey);
+    this.attachNonceByPlayer.delete(playerKey);
   }
 }
 

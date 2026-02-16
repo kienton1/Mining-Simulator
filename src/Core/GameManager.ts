@@ -1563,285 +1563,124 @@ export class GameManager {
   }
 
   /**
-   * Starts auto train mode - teleports to best training rock and starts training
-   * Uses the same teleport position and function as manually holding E
-   * 
-   * @param player - Player to start auto train for
+   * Disables auto train without toggling it back on.
+   */
+  private disableAutoTrain(player: Player, autoState?: PlayerAutoState): void {
+    const state = autoState || this.playerAutoStates.get(player);
+    if (!state?.autoTrainEnabled) {
+      return;
+    }
+
+    state.autoTrainEnabled = false;
+    this.stopAutoTrain(player);
+    player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
+  }
+
+  /**
+   * Starts auto train mode on the best currently accessible training rock.
    */
   private startAutoTrain(player: Player): void {
+    const autoState = this.playerAutoStates.get(player);
+    if (!autoState?.autoTrainEnabled) {
+      return;
+    }
 
     const playerData = this.getPlayerData(player);
     if (!playerData) {
-
+      this.disableAutoTrain(player, autoState);
       return;
     }
 
-    // Find the highest tier training rock the player can access
     const bestRockLocation = this.trainingController?.findBestAccessibleTrainingRock(player);
     if (!bestRockLocation) {
-
+      this.disableAutoTrain(player, autoState);
       return;
     }
 
-    // If player is already training on a lower-tier rock, stop it before auto-train takes over.
-    // This prevents velocity monitoring from disabling auto-train after the teleport.
     if (this.trainingController?.isPlayerTraining(player)) {
       this.trainingController.stopTraining(player);
     }
 
-    // First, teleport player to a position within the training rock bounds
-    // This is required because startTraining checks proximity before teleporting
-    // Calculate a position within the bounds (center of the bounds area)
-    const bounds = bestRockLocation.bounds;
-    let teleportX = bestRockLocation.position.x;
-    let teleportZ = -9.27; // Default Z (forward of the ore blocks)
-    
-    // If bounds exist, use a position within them
-    if (bounds) {
-      teleportX = (bounds.minX + bounds.maxX) / 2; // Center of bounds in X
-      teleportZ = (bounds.minZ + bounds.maxZ) / 2; // Center of bounds in Z
-    }
-    
-    const initialTeleportPosition = {
-      x: teleportX,
-      y: 1.75, // Ground level
-      z: teleportZ,
-    };
-    
-    // Teleport player to be within bounds first
-
-    this.teleportPlayer(player, initialTeleportPosition);
-
-    // Mark player as not in the mine (they're on the surface training)
+    // Auto-train always runs on surface.
     this.setPlayerInMine(player, false);
-
-    // Update UI to clear the mining display
     player.ui.sendData({
       type: 'MINING_STATE_UPDATE',
       isInMine: false,
     });
 
-    // Wait a moment for teleport to complete, then start training
-    setTimeout(() => {
-      const autoState = this.playerAutoStates.get(player);
-      if (!autoState?.autoTrainEnabled) {
+    const trainingStarted = this.trainingController?.startTrainingFromInteract(player, bestRockLocation, true) ?? false;
+    if (!trainingStarted) {
+      this.disableAutoTrain(player, autoState);
+      return;
+    }
 
+    autoState.lastAutoTrainPosition =
+      this.trainingController?.getTrainingStartPosition(player, bestRockLocation) ?? undefined;
+
+    if (autoState.autoTrainStopCheckInterval) {
+      clearInterval(autoState.autoTrainStopCheckInterval);
+      autoState.autoTrainStopCheckInterval = undefined;
+    }
+
+    autoState.autoTrainStopCheckInterval = setInterval(() => {
+      const stateNow = this.playerAutoStates.get(player);
+      if (!stateNow?.autoTrainEnabled) {
         return;
       }
 
-      // Now use the same function as holding E - this will teleport to exact position and start training
-      // startTraining will teleport to: x: rock.position.x, y: 1.75, z: -9.27
-      const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
-      
-      if (!trainingStarted) {
-
+      if (!this.trainingController?.isPlayerTraining(player)) {
+        this.disableAutoTrain(player, stateNow);
         return;
       }
 
-      // Store position to detect if player leaves training area
-      // Use the same teleport position that startTraining uses
-      const worldId = playerData.currentWorld || 'island1';
-      const standPosition = worldId === 'island2'
-        ? {
-            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-            y: 1.75,
-            z: bestRockLocation.position.z + 0.1,
-          }
-        : worldId === 'island3'
-          ? (() => {
-              if (bestRockLocation.bounds) {
-                const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
-                const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
-                return {
-                  x: Math.round(centerX * 10) / 10,
-                  y: 1.75,
-                  z: Math.round(centerZ * 10) / 10,
-                };
-              }
-              return {
-                x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-                y: 1.75,
-                z: bestRockLocation.position.z + 0.1,
-              };
-            })()
-        : worldId === 'island4'
-          ? {
-              x: Math.round(bestRockLocation.position.x * 10) / 10,
-              y: 1.75,
-              z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
-            }
-        : worldId === 'island5'
-          ? (() => {
-              if (bestRockLocation.bounds) {
-                const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
-                const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
-                return {
-                  x: Math.round(centerX * 10) / 10,
-                  y: 1.75,
-                  z: Math.round(centerZ * 10) / 10,
-                };
-              }
-              return {
-                x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-                y: 1.75,
-                z: bestRockLocation.position.z + 0.1,
-              };
-            })()
-        : {
-            x: bestRockLocation.position.x, // Same X as the ore block
-            y: 1.75, // Fixed Y position
-            z: -9.27, // Fixed Z position (forward of the ore blocks)
-          };
+      const playerEnt = this.getPlayerEntity(player);
+      const baseline = stateNow.lastAutoTrainPosition;
+      if (playerEnt && baseline) {
+        const input = player.input;
+        const hasMovementInput = Boolean(
+          input?.['w'] || input?.['a'] || input?.['s'] || input?.['d'] ||
+          input?.['W'] || input?.['A'] || input?.['S'] || input?.['D']
+        );
 
-      const playerEntity = this.getPlayerEntity(player);
-      if (playerEntity && autoState) {
-        autoState.lastAutoTrainPosition = standPosition;
+        const dx = playerEnt.position.x - baseline.x;
+        const dy = playerEnt.position.y - baseline.y;
+        const dz = playerEnt.position.z - baseline.z;
+        const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+        const verticalDistance = Math.abs(dy);
 
-        // Check periodically if player moved away from training rock
-        // Also check if player can access a higher-tier training rock
-        autoState.autoTrainStopCheckInterval = setInterval(() => {
-          if (!autoState.autoTrainEnabled) return;
-
-          // If training was stopped (e.g., by velocity monitoring detecting movement), turn off auto-train
-          if (!this.trainingController?.isPlayerTraining(player)) {
-            // Only turn off auto train if it's actually enabled (don't toggle - just disable)
-            // This prevents the interval from accidentally enabling auto train when it's disabled
-            autoState.autoTrainEnabled = false;
-            this.stopAutoTrain(player);
-            player.ui.sendData({ type: 'AUTO_TRAIN_STATE', enabled: false });
-            return;
-          }
-
-          const playerEnt = this.getPlayerEntity(player);
-          if (!playerEnt || !autoState.lastAutoTrainPosition) return;
-
-          // FIRST: Check for movement - if player moves, turn off auto-train immediately
-          // Check for movement input (WASD keys only - don't check space bar to avoid input conflicts)
-          const input = player.input;
-          const hasMovementInput = Boolean(
-            input?.['w'] || input?.['a'] || input?.['s'] || input?.['d'] ||
-            input?.['W'] || input?.['A'] || input?.['S'] || input?.['D']
-            // Removed space bar check to prevent input interference
-          );
-
-          // Check position distance
-          const currentPos = playerEnt.position;
-          const dx = currentPos.x - autoState.lastAutoTrainPosition.x;
-          const dy = currentPos.y - autoState.lastAutoTrainPosition.y;
-          const dz = currentPos.z - autoState.lastAutoTrainPosition.z;
-          const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-          const verticalDistance = Math.abs(dy);
-          const hasPositionMovement = horizontalDistance > 1.0 || verticalDistance > 1.0;
-
-          // If ANY movement detected (input or large position drift), turn off auto-train immediately
-          if (hasMovementInput || hasPositionMovement) {
-
-            this.toggleAutoTrain(player);
-            return; // Stop checking - auto-train is being turned off
-          }
-
-          // SECOND: Check if player can access a better training rock (higher tier)
-          const bestRockLocation = this.trainingController?.findBestAccessibleTrainingRock(player);
-          if (bestRockLocation) {
-            // Get the current training rock the player is on
-            const currentTrainingRock = this.trainingController?.getCurrentTrainingRock(player);
-            
-            // If we're not on the best rock (or not training), switch to it
-            // This allows players to automatically upgrade to higher-tier rocks as they gain power/rebirths
-            if (!currentTrainingRock || currentTrainingRock.rockData.id !== bestRockLocation.rockData.id) {
-
-              // Stop current training if any
-              if (this.trainingController?.isPlayerTraining(player)) {
-                this.trainingController.stopTraining(player);
-              }
-              
-              // Teleport to the new training rock and start training
-              const bounds = bestRockLocation.bounds;
-              let teleportX = bestRockLocation.position.x;
-              let teleportZ = -9.27;
-              
-              if (bounds) {
-                teleportX = (bounds.minX + bounds.maxX) / 2;
-                teleportZ = (bounds.minZ + bounds.maxZ) / 2;
-              }
-              
-              const initialTeleportPosition = {
-                x: teleportX,
-                y: 1.75,
-                z: teleportZ,
-              };
-              
-              this.teleportPlayer(player, initialTeleportPosition);
-              
-              // Wait a moment, then start training on the new rock
-              setTimeout(() => {
-                if (!autoState?.autoTrainEnabled) return;
-                
-                const trainingStarted = this.trainingController?.startTraining(player, bestRockLocation, true);
-                if (trainingStarted) {
-                  const worldId = playerData.currentWorld || 'island1';
-                  const newStandPosition = worldId === 'island2'
-                    ? {
-                        x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-                        y: 1.75,
-                        z: bestRockLocation.position.z + 0.1,
-                      }
-                    : worldId === 'island3'
-                      ? (() => {
-                          if (bestRockLocation.bounds) {
-                            const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
-                            const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
-                            return {
-                              x: Math.round(centerX * 10) / 10,
-                              y: 1.75,
-                              z: Math.round(centerZ * 10) / 10,
-                            };
-                          }
-                          return {
-                            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-                            y: 1.75,
-                            z: bestRockLocation.position.z + 0.1,
-                          };
-                        })()
-                    : worldId === 'island4'
-                      ? {
-                          x: Math.round(bestRockLocation.position.x * 10) / 10,
-                          y: 1.75,
-                          z: Math.round((bestRockLocation.position.z + 1.23) * 100) / 100,
-                        }
-                    : worldId === 'island5'
-                      ? (() => {
-                          if (bestRockLocation.bounds) {
-                            const centerX = (bestRockLocation.bounds.minX + bestRockLocation.bounds.maxX) / 2;
-                            const centerZ = (bestRockLocation.bounds.minZ + bestRockLocation.bounds.maxZ) / 2;
-                            return {
-                              x: Math.round(centerX * 10) / 10,
-                              y: 1.75,
-                              z: Math.round(centerZ * 10) / 10,
-                            };
-                          }
-                          return {
-                            x: Math.round((bestRockLocation.position.x + 0.02) * 10) / 10,
-                            y: 1.75,
-                            z: bestRockLocation.position.z + 0.1,
-                          };
-                        })()
-                    : {
-                        x: bestRockLocation.position.x,
-                        y: 1.75,
-                        z: -9.27,
-                      };
-                  autoState.lastAutoTrainPosition = newStandPosition;
-
-                }
-              }, 200);
-              
-              return; // Skip rest of checks this cycle since we're switching rocks
-            }
-          }
-        }, 2000); // Check every 2 seconds (less frequent since we're also checking for upgrades)
+        if (hasMovementInput || horizontalDistance > 1.0 || verticalDistance > 1.0) {
+          this.disableAutoTrain(player, stateNow);
+          return;
+        }
       }
-    }, 200); // Small delay to allow initial teleport to complete
+
+      const nextBestRock = this.trainingController?.findBestAccessibleTrainingRock(player);
+      if (!nextBestRock) {
+        return;
+      }
+
+      const currentTrainingRock = this.trainingController?.getCurrentTrainingRock(player);
+      const isSameRock = Boolean(
+        currentTrainingRock &&
+        currentTrainingRock.rockData.id === nextBestRock.rockData.id &&
+        (currentTrainingRock.worldId || 'island1') === (nextBestRock.worldId || 'island1')
+      );
+
+      if (isSameRock) {
+        return;
+      }
+
+      this.trainingController?.stopTraining(player);
+
+      const switched = this.trainingController?.startTrainingFromInteract(player, nextBestRock, true) ?? false;
+      if (!switched) {
+        this.disableAutoTrain(player, stateNow);
+        return;
+      }
+
+      stateNow.lastAutoTrainPosition =
+        this.trainingController?.getTrainingStartPosition(player, nextBestRock) ?? stateNow.lastAutoTrainPosition;
+    }, 1500);
   }
 
   /**
@@ -1856,6 +1695,9 @@ export class GameManager {
       clearInterval(autoState.autoTrainStopCheckInterval);
       autoState.autoTrainStopCheckInterval = undefined;
 
+    }
+    if (autoState) {
+      autoState.lastAutoTrainPosition = undefined;
     }
     
     // Stop training if active

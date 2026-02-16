@@ -1591,9 +1591,19 @@ function initializeWorld(world: World): void {
           sendPetState(player);
           break;
         }
-        case 'BUY_PICKAXE':
+        case 'BUY_PICKAXE': {
+          const requestedTierRaw = data?.tier ?? data?.payload?.pickaxeId;
+          const requestedTier = Number(requestedTierRaw);
+          if (!Number.isInteger(requestedTier)) {
+            player.ui.sendData({
+              type: 'PICKAXE_PURCHASED',
+              success: false,
+              message: 'Invalid pickaxe tier.',
+            });
+            break;
+          }
 
-          const result = gameManager.getPickaxeShop().buyPickaxe(player, data.tier);
+          const result = gameManager.getPickaxeShop().buyPickaxe(player, requestedTier);
           const playerDataAfterPurchase = gameManager.getPlayerData(player);
           if (result.success) {
             player.ui.sendData({
@@ -1620,14 +1630,25 @@ function initializeWorld(world: World): void {
             });
           }
           break;
-        case 'EQUIP_PICKAXE':
+        }
+        case 'EQUIP_PICKAXE': {
+          const requestedTierRaw = data?.tier ?? data?.payload?.pickaxeId;
+          const requestedTier = Number(requestedTierRaw);
+          if (!Number.isInteger(requestedTier)) {
+            player.ui.sendData({
+              type: 'PICKAXE_EQUIPPED',
+              success: false,
+              message: 'Invalid pickaxe tier.',
+            });
+            break;
+          }
 
-          const equipResult = gameManager.getPickaxeShop().equipPickaxe(player, data.tier);
+          const equipResult = gameManager.getPickaxeShop().equipPickaxe(player, requestedTier);
           if (equipResult.success) {
             player.ui.sendData({
               type: 'PICKAXE_EQUIPPED',
               success: true,
-              newTier: data.tier,
+              newTier: requestedTier,
               message: equipResult.message,
             });
             // Refresh shop data to show updated equipped status
@@ -1652,6 +1673,7 @@ function initializeWorld(world: World): void {
             });
           }
           break;
+        }
         case 'OPEN_REBIRTH_UI':
           const rebirthData = gameManager.getRebirthUIData(player);
           player.ui.sendData({
