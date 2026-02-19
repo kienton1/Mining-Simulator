@@ -576,21 +576,25 @@ function initializeWorld(world: World): void {
         upgrades: {
           moreGems: {
             level: moreGemsInfo.currentLevel,
+            maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_GEMS),
             cost: moreGemsInfo.nextLevelCost,
             canAfford: moreGemsInfo.canAfford,
           },
           moreRebirths: {
             level: moreRebirthsInfo.currentLevel,
+            maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS),
             cost: moreRebirthsInfo.nextLevelCost,
             canAfford: moreRebirthsInfo.canAfford,
           },
           moreCoins: {
             level: moreCoinsInfo.currentLevel,
+            maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_COINS),
             cost: moreCoinsInfo.nextLevelCost,
             canAfford: moreCoinsInfo.canAfford,
           },
           moreDamage: {
             level: moreDamageInfo.currentLevel,
+            maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_DAMAGE),
             cost: moreDamageInfo.nextLevelCost,
             canAfford: moreDamageInfo.canAfford,
           },
@@ -1760,21 +1764,25 @@ function initializeWorld(world: World): void {
               upgrades: {
                 moreGems: {
                   level: updatedMoreGemsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_GEMS),
                   cost: updatedMoreGemsInfo.nextLevelCost,
                   canAfford: updatedMoreGemsInfo.canAfford,
                 },
                 moreRebirths: {
                   level: updatedMoreRebirthsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS),
                   cost: updatedMoreRebirthsInfo.nextLevelCost,
                   canAfford: updatedMoreRebirthsInfo.canAfford,
                 },
                 moreCoins: {
                   level: updatedMoreCoinsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_COINS),
                   cost: updatedMoreCoinsInfo.nextLevelCost,
                   canAfford: updatedMoreCoinsInfo.canAfford,
                 },
                 moreDamage: {
                   level: updatedMoreDamageInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_DAMAGE),
                   cost: updatedMoreDamageInfo.nextLevelCost,
                   canAfford: updatedMoreDamageInfo.canAfford,
                 },
@@ -1940,9 +1948,42 @@ function initializeWorld(world: World): void {
       }
     });
 
-    // Begin monitoring shared shaft so the player can be handed off to their personal mine
-    gameManager.startMineEntranceWatch(player);
-  });
+  // Begin monitoring shared shaft so the player can be handed off to their personal mine
+  gameManager.startMineEntranceWatch(player);
+});
+
+  const resolveTargetPlayer = (identifier: string) => {
+    const normalizedIdentifier = identifier.trim();
+    if (!normalizedIdentifier) {
+      return undefined;
+    }
+
+    const players = PlayerManager.instance.getConnectedPlayers();
+    const byId = players.find(p => String(p.id) === normalizedIdentifier);
+    const byName = PlayerManager.instance.getConnectedPlayerByUsername(normalizedIdentifier);
+    return byId ?? byName;
+  };
+
+  const parsePositiveInteger = (value: string): number | null => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
+      return null;
+    }
+    return parsed;
+  };
+
+  const parsePositiveBigInt = (value: string): bigint | null => {
+    if (!/^\d+$/.test(value)) {
+      return null;
+    }
+
+    try {
+      const parsed = BigInt(value);
+      return parsed > 0n ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
 
   world.chatManager.registerCommand('/whereami', player => {
     const entities = world.entityManager.getPlayerEntitiesByPlayer(player);
@@ -2115,6 +2156,153 @@ function initializeWorld(world: World): void {
     }
   });
 
+  // Admin command: give resources to yourself (or another online player)
+  // Usage: /give <power|rebirth|coin|gem> <amount> [playerIdOrUsername]
+  world.chatManager.registerCommand('/give', (player, args) => {
+    if (!isAdminPlayer(player)) {
+      world.chatManager.sendPlayerMessage(
+        player,
+        'You do not have permission to use /give. Set ADMIN_USERNAMES env or isAdmin in save data.',
+        'FF5555'
+      );
+      return;
+    }
+
+    const resource = (args[0] ?? '').trim().toLowerCase();
+    const amountArg = (args[1] ?? '').trim();
+    const targetIdentifier = (args[2] ?? '').trim();
+
+    if (!resource || !amountArg) {
+      world.chatManager.sendPlayerMessage(
+        player,
+        'Usage: /give <power|rebirth|coin|gem> <amount> [playerIdOrUsername]',
+        'FFFF00'
+      );
+      return;
+    }
+
+    let target = player;
+    if (targetIdentifier) {
+      const found = resolveTargetPlayer(targetIdentifier);
+      if (!found) {
+        world.chatManager.sendPlayerMessage(player, `Player not found: ${targetIdentifier}`, 'FF5555');
+        return;
+      }
+      target = found;
+    }
+
+    switch (resource) {
+      case 'power': {
+        const amount = parsePositiveBigInt(amountArg);
+        if (amount === null) {
+          world.chatManager.sendPlayerMessage(player, 'Power amount must be a positive whole number.', 'FF5555');
+          return;
+        }
+
+        const newPower = gameManager.addPower(target, amount);
+        world.chatManager.sendPlayerMessage(
+          player,
+          `Gave ${amount.toString()} power to ${target.username}. New power: ${newPower}.`,
+          '00FF00'
+        );
+        if (target !== player) {
+          world.chatManager.sendPlayerMessage(
+            target,
+            `Admin ${player.username} gave you ${amount.toString()} power.`,
+            'FFFF00'
+          );
+        }
+        return;
+      }
+      case 'rebirth':
+      case 'rebirths': {
+        const amount = parsePositiveInteger(amountArg);
+        if (amount === null) {
+          world.chatManager.sendPlayerMessage(player, 'Rebirth amount must be a positive whole number.', 'FF5555');
+          return;
+        }
+
+        const targetData = gameManager.getPlayerData(target);
+        if (!targetData) {
+          world.chatManager.sendPlayerMessage(player, 'Target player data not found.', 'FF5555');
+          return;
+        }
+
+        targetData.rebirths += amount;
+        gameManager.updatePlayerData(target, targetData);
+        gameManager.sendPowerStatsToUI(target);
+
+        world.chatManager.sendPlayerMessage(
+          player,
+          `Gave ${amount.toLocaleString()} rebirths to ${target.username}.`,
+          '00FF00'
+        );
+        if (target !== player) {
+          world.chatManager.sendPlayerMessage(
+            target,
+            `Admin ${player.username} gave you ${amount.toLocaleString()} rebirths.`,
+            'FFFF00'
+          );
+        }
+        return;
+      }
+      case 'coin':
+      case 'coins':
+      case 'gold': {
+        const amount = parsePositiveInteger(amountArg);
+        if (amount === null) {
+          world.chatManager.sendPlayerMessage(player, 'Coin amount must be a positive whole number.', 'FF5555');
+          return;
+        }
+
+        gameManager.addGold(target, amount);
+        world.chatManager.sendPlayerMessage(
+          player,
+          `Gave ${amount.toLocaleString()} coins to ${target.username}.`,
+          '00FF00'
+        );
+        if (target !== player) {
+          world.chatManager.sendPlayerMessage(
+            target,
+            `Admin ${player.username} gave you ${amount.toLocaleString()} coins.`,
+            'FFFF00'
+          );
+        }
+        return;
+      }
+      case 'gem':
+      case 'gems': {
+        const amount = parsePositiveInteger(amountArg);
+        if (amount === null) {
+          world.chatManager.sendPlayerMessage(player, 'Gem amount must be a positive whole number.', 'FF5555');
+          return;
+        }
+
+        gameManager.addGems(target, amount);
+        world.chatManager.sendPlayerMessage(
+          player,
+          `Gave ${amount.toLocaleString()} gems to ${target.username}.`,
+          '00FF00'
+        );
+        if (target !== player) {
+          world.chatManager.sendPlayerMessage(
+            target,
+            `Admin ${player.username} gave you ${amount.toLocaleString()} gems.`,
+            'FFFF00'
+          );
+        }
+        return;
+      }
+      default:
+        world.chatManager.sendPlayerMessage(
+          player,
+          'Unknown resource. Use: power, rebirth, coin, or gem.',
+          'FF5555'
+        );
+        return;
+    }
+  });
+
   // Admin command: reset tutorial progress for a player (defaults to self)
   world.chatManager.registerCommand('/tutorialreset', (player, args) => {
     if (!isAdminPlayer(player)) {
@@ -2130,10 +2318,7 @@ function initializeWorld(world: World): void {
     let target = player;
 
     if (identifier) {
-      const players = PlayerManager.instance.getConnectedPlayers();
-      const byId = players.find(p => String(p.id) === identifier);
-      const byName = PlayerManager.instance.getConnectedPlayerByUsername(identifier);
-      const found = byId ?? byName;
+      const found = resolveTargetPlayer(identifier);
       if (!found) {
         world.chatManager.sendPlayerMessage(player, `Player not found: ${identifier}`, 'FF5555');
         return;

@@ -126,11 +126,6 @@
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
       return formatWithMax3Digits(num, 'Oc');
     }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
-      return formatWithMax3Digits(num, 'Oc');
-    }
     if (value >= 1e24) {
       const num = value / 1e24;
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
@@ -227,11 +222,6 @@
     if (value >= 1e27) {
       const num = value / 1e27;
       if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
-      return formatWithSuffix(num, 'Oc');
-    }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
       return formatWithSuffix(num, 'Oc');
     }
     if (value >= 1e24) {

@@ -216,11 +216,6 @@
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
       return formatWithMax3Digits(num, 'Oc');
     }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
-      return formatWithMax3Digits(num, 'Oc');
-    }
     if (value >= 1e24) {
       const num = value / 1e24;
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
@@ -317,11 +312,6 @@
     if (value >= 1e27) {
       const num = value / 1e27;
       if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
-      return formatWithSuffix(num, 'Oc');
-    }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
       return formatWithSuffix(num, 'Oc');
     }
     if (value >= 1e24) {
@@ -811,11 +801,6 @@
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'No');
       return formatWithMax3Digits(num, 'Oc');
     }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
-      return formatWithMax3Digits(num, 'Oc');
-    }
     if (value >= 1e24) {
       const num = value / 1e24;
       if (num >= 1000) return formatWithMax3Digits(num / 1000, 'Oc');
@@ -912,11 +897,6 @@
     if (value >= 1e27) {
       const num = value / 1e27;
       if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
-      return formatWithSuffix(num, 'Oc');
-    }
-    if (value >= 1e26) {
-      const num = value / 1e26;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
       return formatWithSuffix(num, 'Oc');
     }
     if (value >= 1e24) {
@@ -1706,21 +1686,27 @@
       return `<img class="gem-trader-ui__icon-img" src="${src}" alt="${altText}">`;
     };
 
+    const fallbackMaxLevelByKey = {
+      moreGems: 50,
+      moreRebirths: 12,
+      moreCoins: 160,
+      moreDamage: 50,
+    };
+
     // Upgrade definitions
     const upgradeDefs = [
       {
         key: 'moreGems',
         title: 'More Gems',
         iconHtml: hudIconHtml('GemIcon.png', 'gems'),
-        getEffect: (level) => {
+        getEffect: (level, maxLevel) => {
+          if (level >= maxLevel) return 'MAX';
           // UI shows level, backend is level + 1 (always 1 ahead)
           const displayLevel = level;
           const nextDisplayLevel = level + 1;
           return `${displayLevel}x -> ${nextDisplayLevel}x`;
         },
-        getLevelProgress: (level) => {
-          // TODO: Get max level from somewhere when defined
-          const maxLevel = 50;
+        getLevelProgress: (level, maxLevel) => {
           return `${level}/${maxLevel}`;
         },
       },
@@ -1728,11 +1714,11 @@
         key: 'moreRebirths',
         title: 'More Rebirths',
         iconHtml: hudIconHtml('RebirthIcon.png', 'rebirths'),
-        getEffect: (level) => {
+        getEffect: (level, maxLevel) => {
+          if (level >= maxLevel) return 'MAX';
           return `${level} -> ${level + 1}`;
         },
-        getLevelProgress: (level) => {
-          const maxLevel = 35;
+        getLevelProgress: (level, maxLevel) => {
           return `${level}/${maxLevel}`;
         },
       },
@@ -1740,15 +1726,15 @@
         key: 'moreCoins',
         title: 'More Coins',
         iconHtml: hudIconHtml('CoinIcon.png', 'coins'),
-        getEffect: (level) => {
+        getEffect: (level, maxLevel) => {
+          if (level >= maxLevel) return 'MAX';
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
           const currentPercent = level * 10;
           const nextPercent = (level + 1) * 10;
           return `${currentPercent}% -> ${nextPercent}%`;
         },
-        getLevelProgress: (level) => {
-          const maxLevel = 160; // 0-159 = 160 total levels
+        getLevelProgress: (level, maxLevel) => {
           return `${level}/${maxLevel}`;
         },
       },
@@ -1756,15 +1742,15 @@
         key: 'moreDamage',
         title: 'More Damage',
         iconHtml: hudIconHtml('PickaxeIcon.png', 'damage'),
-        getEffect: (level) => {
+        getEffect: (level, maxLevel) => {
+          if (level >= maxLevel) return 'MAX';
           // Display shows bonus percentage: level 0 = 0%, level 1 = 10%, etc.
           // Backend multiplier is 1.0 + (level * 0.1), so level 1 = 1.1x (110% total)
           const currentPercent = level * 10;
           const nextPercent = (level + 1) * 10;
           return `${currentPercent}% -> ${nextPercent}%`;
         },
-        getLevelProgress: (level) => {
-          const maxLevel = 50; // 0-49 = 50 total levels
+        getLevelProgress: (level, maxLevel) => {
           return `${level}/${maxLevel}`;
         },
       },
@@ -1775,8 +1761,12 @@
       if (!upgradeData) continue;
 
       const level = upgradeData.level || 0;
+      const maxLevel = Number.isFinite(Number(upgradeData.maxLevel))
+        ? Number(upgradeData.maxLevel)
+        : fallbackMaxLevelByKey[upgradeDef.key];
       const cost = upgradeData.cost || 0;
       const canAfford = upgradeData.canAfford || false;
+      const isMaxed = level >= maxLevel;
 
       // Create upgrade item container
       const item = document.createElement('div');
@@ -1812,7 +1802,7 @@
       // Effect (current -> next)
       const effect = document.createElement('div');
       effect.className = 'gem-trader-ui__effect';
-      effect.textContent = upgradeDef.getEffect(level);
+      effect.textContent = upgradeDef.getEffect(level, maxLevel);
       details.appendChild(effect);
 
       // Level progress and cost container
@@ -1827,7 +1817,7 @@
       levelArrow.textContent = '↑';
       levelProgress.appendChild(levelArrow);
       const levelText = document.createElement('span');
-      levelText.textContent = upgradeDef.getLevelProgress(level);
+      levelText.textContent = upgradeDef.getLevelProgress(level, maxLevel);
       levelProgress.appendChild(levelText);
       levelCostContainer.appendChild(levelProgress);
 
@@ -1839,7 +1829,7 @@
       gemIcon.textContent = '💎';
       costContainer.appendChild(gemIcon);
       const costText = document.createElement('span');
-      costText.textContent = formatNumber(cost);
+      costText.textContent = isMaxed ? 'MAX' : formatNumber(cost);
       costContainer.appendChild(costText);
       levelCostContainer.appendChild(costContainer);
 
@@ -5249,6 +5239,16 @@
         }
       }, 10);
     };
+
+    // Match miner modal behavior: explicit close button listener
+    const pickaxeCloseBtn = document.getElementById('pickaxe-close-btn');
+    if (pickaxeCloseBtn && pickaxeModal) {
+      pickaxeCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideModal(pickaxeModal);
+      });
+    }
 
     // Allow EggModal.html to close using the same modal logic.
     window.__closeEggStationModal = closeEggStationModal;

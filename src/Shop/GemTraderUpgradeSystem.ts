@@ -7,7 +7,7 @@
  * Reference: Planning/GemsSystemPlan.md section 2.1
  */
 
-import { Player } from 'hytopia';
+import type { Player } from 'hytopia';
 import type { PlayerData } from '../Core/PlayerData';
 
 /**
@@ -27,6 +27,26 @@ export enum UpgradeType {
 export class GemTraderUpgradeSystem {
   private getPlayerDataCallback?: (player: Player) => PlayerData | undefined;
   private updatePlayerDataCallback?: (player: Player, data: PlayerData) => void;
+  private readonly upgradeMaxLevels: Record<UpgradeType, number> = {
+    [UpgradeType.MORE_GEMS]: 50,
+    [UpgradeType.MORE_REBIRTHS]: 12,
+    [UpgradeType.MORE_COINS]: 160,
+    [UpgradeType.MORE_DAMAGE]: 50,
+  };
+  private readonly rebirthPackageUnlocks: Array<{ level: number; packages: number[] }> = [
+    { level: 1, packages: [50, 100] },
+    { level: 2, packages: [250, 500] },
+    { level: 3, packages: [1000] },
+    { level: 4, packages: [2500, 5000] },
+    { level: 5, packages: [10000, 25000] },
+    { level: 6, packages: [50000, 100000] },
+    { level: 7, packages: [250000, 500000] },
+    { level: 8, packages: [1000000] },
+    { level: 9, packages: [2500000, 10000000] },
+    { level: 10, packages: [25000000, 100000000] },
+    { level: 11, packages: [1000000000] },
+    { level: 12, packages: [50000000000] },
+  ];
 
   /**
    * Creates a new GemTraderUpgradeSystem instance
@@ -176,6 +196,19 @@ export class GemTraderUpgradeSystem {
   }
 
   /**
+   * Gets an upgrade's max level when it has a hard cap.
+   * Returns undefined for uncapped upgrades.
+   */
+  getUpgradeMaxLevel(upgradeType: UpgradeType): number {
+    const configuredMax = this.upgradeMaxLevels[upgradeType];
+    if (upgradeType === UpgradeType.MORE_REBIRTHS) {
+      const unlockMax = this.rebirthPackageUnlocks[this.rebirthPackageUnlocks.length - 1]?.level ?? 0;
+      return Math.min(configuredMax, unlockMax);
+    }
+    return configuredMax;
+  }
+
+  /**
    * Purchases an upgrade for a player
    * 
    * @param player - Player purchasing the upgrade
@@ -207,6 +240,16 @@ export class GemTraderUpgradeSystem {
 
     // Get current level
     const currentLevel = this.getUpgradeLevel(player, upgradeType);
+    const maxLevel = this.getUpgradeMaxLevel(upgradeType);
+    if (currentLevel >= maxLevel) {
+      return {
+        success: false,
+        error: 'Upgrade already at max level',
+        cost: 0,
+        remainingGems: data.gems,
+      };
+    }
+
     const cost = this.getUpgradeCost(upgradeType, currentLevel);
 
     // Check if player has enough gems
@@ -348,6 +391,15 @@ export class GemTraderUpgradeSystem {
     }
 
     const currentLevel = this.getUpgradeLevel(player, upgradeType);
+    const maxLevel = this.getUpgradeMaxLevel(upgradeType);
+    if (currentLevel >= maxLevel) {
+      return {
+        currentLevel,
+        nextLevelCost: 0,
+        canAfford: false,
+      };
+    }
+
     const nextLevelCost = this.getUpgradeCost(upgradeType, currentLevel);
     const canAfford = (data.gems || 0) >= nextLevelCost;
 
@@ -374,24 +426,8 @@ export class GemTraderUpgradeSystem {
     // Additional packages unlocked by upgrade level
     const additionalPackages: number[] = [];
     
-    // Level thresholds and their unlocked packages
-    const packageUnlocks: Array<{ level: number; packages: number[] }> = [
-      { level: 1, packages: [50, 100] },
-      { level: 2, packages: [250, 500] },
-      { level: 3, packages: [1000] },
-      { level: 4, packages: [2500, 5000] },
-      { level: 5, packages: [10000, 25000] },
-      { level: 6, packages: [50000, 100000] },
-      { level: 7, packages: [250000, 500000] },
-      { level: 8, packages: [1000000] },
-      { level: 9, packages: [2500000, 10000000] },
-      { level: 10, packages: [25000000, 100000000] },
-      { level: 11, packages: [1000000000] },
-      { level: 12, packages: [50000000000] },
-    ];
-    
     // Add packages based on upgrade level
-    for (const unlock of packageUnlocks) {
+    for (const unlock of this.rebirthPackageUnlocks) {
       if (moreRebirthsLevel >= unlock.level) {
         additionalPackages.push(...unlock.packages);
       } else {
