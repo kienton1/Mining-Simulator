@@ -50,7 +50,7 @@ test('more rebirths expands package options and caps explicitly at the final unl
 
   let successCount = 0;
   let maxLevelFailures = 0;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 60; i++) {
     const result = system.purchaseUpgrade(player, UpgradeType.MORE_REBIRTHS);
     if (result.success) {
       successCount++;
@@ -59,11 +59,13 @@ test('more rebirths expands package options and caps explicitly at the final unl
     }
   }
 
-  assert.equal(successCount, 12);
+  assert.equal(successCount, 48);
   assert.ok(maxLevelFailures > 0);
-  assert.equal(data.moreRebirthsLevel, 12);
+  assert.equal(data.moreRebirthsLevel, 48);
 
   const finalPackages = system.getAvailableRebirthPackages(player);
+  assert.ok(finalPackages.includes(2.5e46));
+  assert.ok(finalPackages.includes(2.5e47));
   assert.ok(finalPackages.includes(50_000_000_000));
 });
 
@@ -71,9 +73,19 @@ test('all gem upgrades expose expected max levels', () => {
   const { system } = createSystemWithData();
 
   assert.equal(system.getUpgradeMaxLevel(UpgradeType.MORE_GEMS), 50);
-  assert.equal(system.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS), 12);
+  assert.equal(system.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS), 48);
   assert.equal(system.getUpgradeMaxLevel(UpgradeType.MORE_COINS), 160);
   assert.equal(system.getUpgradeMaxLevel(UpgradeType.MORE_DAMAGE), 50);
+});
+
+test('more rebirths level 47 cost is tuned to 233.7k gems', () => {
+  const { system } = createSystemWithData();
+  assert.equal(system.calculateMoreRebirthsCost(47), 233700);
+});
+
+test('more gems level 49 cost is tuned to 25.2k gems', () => {
+  const { system } = createSystemWithData();
+  assert.equal(system.calculateMoreGemsCost(49), 25200);
 });
 
 test('non-rebirth upgrades stop at max level and return max-level error', () => {
@@ -97,4 +109,21 @@ test('non-rebirth upgrades stop at max level and return max-level error', () => 
   assert.equal(data.moreGemsLevel, 50);
   assert.equal(data.moreCoinsLevel, 160);
   assert.equal(data.moreDamageLevel, 50);
+});
+
+test('over-cap saved upgrade levels are clamped to configured max levels', () => {
+  const { system, player } = createSystemWithData({
+    moreGemsLevel: 109,
+    moreRebirthsLevel: 99,
+    moreCoinsLevel: 999,
+    moreDamageLevel: 500,
+  });
+
+  assert.equal(system.getUpgradeLevel(player, UpgradeType.MORE_GEMS), 50);
+  assert.equal(system.getUpgradeLevel(player, UpgradeType.MORE_REBIRTHS), 48);
+  assert.equal(system.getUpgradeLevel(player, UpgradeType.MORE_COINS), 160);
+  assert.equal(system.getUpgradeLevel(player, UpgradeType.MORE_DAMAGE), 50);
+  assert.equal(system.getMoreGemsMultiplier(player), 51);
+  assert.equal(system.getMoreCoinsMultiplier(player), 17);
+  assert.equal(system.getMoreDamageMultiplier(player), 6);
 });

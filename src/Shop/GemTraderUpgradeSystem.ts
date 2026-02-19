@@ -29,24 +29,42 @@ export class GemTraderUpgradeSystem {
   private updatePlayerDataCallback?: (player: Player, data: PlayerData) => void;
   private readonly upgradeMaxLevels: Record<UpgradeType, number> = {
     [UpgradeType.MORE_GEMS]: 50,
-    [UpgradeType.MORE_REBIRTHS]: 12,
+    [UpgradeType.MORE_REBIRTHS]: 48,
     [UpgradeType.MORE_COINS]: 160,
     [UpgradeType.MORE_DAMAGE]: 50,
   };
-  private readonly rebirthPackageUnlocks: Array<{ level: number; packages: number[] }> = [
-    { level: 1, packages: [50, 100] },
-    { level: 2, packages: [250, 500] },
-    { level: 3, packages: [1000] },
-    { level: 4, packages: [2500, 5000] },
-    { level: 5, packages: [10000, 25000] },
-    { level: 6, packages: [50000, 100000] },
-    { level: 7, packages: [250000, 500000] },
-    { level: 8, packages: [1000000] },
-    { level: 9, packages: [2500000, 10000000] },
-    { level: 10, packages: [25000000, 100000000] },
-    { level: 11, packages: [1000000000] },
-    { level: 12, packages: [50000000000] },
-  ];
+  private readonly rebirthPackageUnlocks: Array<{ level: number; packages: number[] }> =
+    GemTraderUpgradeSystem.buildRebirthPackageUnlocks();
+
+  private static buildRebirthPackageUnlocks(): Array<{ level: number; packages: number[] }> {
+    const unlocks: Array<{ level: number; packages: number[] }> = [
+      { level: 1, packages: [50, 100] },
+      { level: 2, packages: [250, 500] },
+      { level: 3, packages: [1000] },
+      { level: 4, packages: [2500, 5000] },
+      { level: 5, packages: [10000, 25000] },
+      { level: 6, packages: [50000, 100000] },
+      { level: 7, packages: [250000, 500000] },
+      { level: 8, packages: [1000000] },
+      { level: 9, packages: [2500000, 10000000] },
+      { level: 10, packages: [25000000, 100000000] },
+      { level: 11, packages: [1000000000] },
+      { level: 12, packages: [50000000000] },
+    ];
+
+    // Extend unlocks to level 48.
+    // Level 13 starts at x50, then x10 per level.
+    // This places level 47 at 2.5e46 (25QdDe) and level 48 at 2.5e47.
+    let previousMaxPackage = unlocks[unlocks.length - 1].packages.slice(-1)[0];
+    for (let level = 13; level <= 48; level++) {
+      const multiplier = level === 13 ? 50 : 10;
+      const nextPackage = previousMaxPackage * multiplier;
+      unlocks.push({ level, packages: [nextPackage] });
+      previousMaxPackage = nextPackage;
+    }
+
+    return unlocks;
+  }
 
   /**
    * Creates a new GemTraderUpgradeSystem instance
@@ -75,7 +93,8 @@ export class GemTraderUpgradeSystem {
 
   /**
    * Calculates the cost for "More Gems" upgrade
-   * Formula: y = 42.53732814 * e^(0.1985808056 * x) - 50.88152767
+   * Formula: y = 42.53732814 * e^(0.13033131319310182 * x) - 50.88152767
+   * Tuned so level 49 -> 50 costs 25,200 gems.
    * 
    * @param currentLevel - Current upgrade level
    * @returns Cost in gems (rounded to nearest integer, minimum 0)
@@ -83,13 +102,14 @@ export class GemTraderUpgradeSystem {
   calculateMoreGemsCost(currentLevel: number): number {
     const e = Math.E; // Euler's number
     const x = currentLevel;
-    const cost = 42.53732814 * Math.pow(e, 0.1985808056 * x) - 50.88152767;
+    const cost = 42.53732814 * Math.pow(e, 0.13033131319310182 * x) - 50.88152767;
     return Math.max(0, Math.round(cost));
   }
 
   /**
    * Calculates the cost for "More Rebirths" upgrade
-   * Formula: y = 177.8192150860 * e^(0.1936304553 * x) - 205.8098819448
+   * Formula: y = 177.8192150860 * e^(0.15280651920944222 * x) - 205.8098819448
+   * Tuned so level 47 -> 48 costs 233,700 gems.
    * 
    * @param currentLevel - Current upgrade level
    * @returns Cost in gems (rounded to nearest integer, minimum 0)
@@ -97,7 +117,7 @@ export class GemTraderUpgradeSystem {
   calculateMoreRebirthsCost(currentLevel: number): number {
     const e = Math.E; // Euler's number
     const x = currentLevel;
-    const cost = 177.8192150860 * Math.pow(e, 0.1936304553 * x) - 205.8098819448;
+    const cost = 177.8192150860 * Math.pow(e, 0.15280651920944222 * x) - 205.8098819448;
     return Math.max(0, Math.round(cost));
   }
 
@@ -181,18 +201,26 @@ export class GemTraderUpgradeSystem {
     const data = this.getPlayerDataCallback(player);
     if (!data) return 0;
 
+    let rawLevel = 0;
     switch (upgradeType) {
       case UpgradeType.MORE_GEMS:
-        return data.moreGemsLevel || 0;
+        rawLevel = data.moreGemsLevel || 0;
+        break;
       case UpgradeType.MORE_REBIRTHS:
-        return data.moreRebirthsLevel || 0;
+        rawLevel = data.moreRebirthsLevel || 0;
+        break;
       case UpgradeType.MORE_COINS:
-        return data.moreCoinsLevel || 0;
+        rawLevel = data.moreCoinsLevel || 0;
+        break;
       case UpgradeType.MORE_DAMAGE:
-        return data.moreDamageLevel || 0;
+        rawLevel = data.moreDamageLevel || 0;
+        break;
       default:
         return 0;
     }
+
+    const maxLevel = this.getUpgradeMaxLevel(upgradeType);
+    return Math.min(Math.max(0, Math.floor(rawLevel)), maxLevel);
   }
 
   /**
@@ -306,12 +334,11 @@ export class GemTraderUpgradeSystem {
       return 1.0; // Default multiplier
     }
 
-    const data = this.getPlayerDataCallback(player);
-    if (!data) {
+    if (!this.getPlayerDataCallback(player)) {
       return 1.0; // Default multiplier
     }
 
-    const moreCoinsLevel = data.moreCoinsLevel || 0;
+    const moreCoinsLevel = this.getUpgradeLevel(player, UpgradeType.MORE_COINS);
     return 1.0 + (moreCoinsLevel * 0.1);
   }
 
@@ -328,12 +355,11 @@ export class GemTraderUpgradeSystem {
       return 1.0; // Default multiplier
     }
 
-    const data = this.getPlayerDataCallback(player);
-    if (!data) {
+    if (!this.getPlayerDataCallback(player)) {
       return 1.0; // Default multiplier
     }
 
-    const moreDamageLevel = data.moreDamageLevel || 0;
+    const moreDamageLevel = this.getUpgradeLevel(player, UpgradeType.MORE_DAMAGE);
     return 1.0 + (moreDamageLevel * 0.1);
   }
 
@@ -351,12 +377,11 @@ export class GemTraderUpgradeSystem {
       return 1.0; // Default multiplier (level 0 = 1x)
     }
 
-    const data = this.getPlayerDataCallback(player);
-    if (!data) {
+    if (!this.getPlayerDataCallback(player)) {
       return 1.0; // Default multiplier (level 0 = 1x)
     }
 
-    const moreGemsLevel = data.moreGemsLevel || 0;
+    const moreGemsLevel = this.getUpgradeLevel(player, UpgradeType.MORE_GEMS);
     // Backend multiplier is always 1 ahead: level 0 = 1x, level 1 = 2x, etc.
     return moreGemsLevel + 1;
   }

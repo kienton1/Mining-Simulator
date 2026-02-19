@@ -105,7 +105,8 @@ export function bigIntToNumber(value: bigint): number {
 }
 
 /**
- * Formats a BigInt value as a string with K/M/B/T/Qd/Qn/Sx/Sp/Oc/No/De/UDe/DDe/TDe suffixes for display
+ * Formats a BigInt value as a compact string with suffixes for display.
+ * Keeps up to 3 significant digits and supports very large tiers.
  *
  * Handles negative values correctly and provides rounding for cleaner display.
  *
@@ -123,42 +124,22 @@ export function formatBigInt(value: bigint): string {
     return isNegative ? `-${str}` : str;
   }
 
-  const suffixes: { pow: number; suffix: string }[] = [
-    { pow: 42, suffix: 'TDe' },
-    { pow: 39, suffix: 'DDe' },
-    { pow: 36, suffix: 'UDe' },
-    { pow: 33, suffix: 'De' },
-    { pow: 30, suffix: 'No' },
-    { pow: 27, suffix: 'Oc' },
-    { pow: 24, suffix: 'Sp' },
-    { pow: 21, suffix: 'Sx' },
-    { pow: 18, suffix: 'Qn' },
-    { pow: 15, suffix: 'Qd' },
-    { pow: 12, suffix: 'T' },
-    { pow: 9, suffix: 'B' },
-    { pow: 6, suffix: 'M' },
-    { pow: 3, suffix: 'K' },
+  const compactSuffixes = [
+    '', 'K', 'M', 'B', 'T', 'Qd', 'Qn', 'Sx', 'Sp', 'Oc', 'No',
+    'De', 'UDe', 'DDe', 'TDe', 'QaDe', 'QiDe', 'SxDe', 'SpDe', 'OcDe', 'NoDe',
+    'Vg', 'UVg', 'DVg', 'TVg', 'QaVg', 'QiVg', 'SxVg', 'SpVg', 'OcVg', 'NoVg',
+    'Tg', 'UTg', 'DTg', 'TTg', 'QaTg', 'QiTg', 'SxTg', 'SpTg', 'OcTg', 'NoTg',
+    'Qag', 'UQag', 'DQag', 'TQag',
   ];
 
-  const formatWithSuffix = (pow: number, suffix: string): string => {
-    const wholeLen = len - pow;
-    const wholePart = str.slice(0, wholeLen);
-    const decimalDigit = str.slice(wholeLen, wholeLen + 1);
+  const tier = Math.floor((len - 1) / 3);
+  const pow = tier * 3;
+  const wholeLen = len - pow;
+  const wholePart = str.slice(0, wholeLen);
+  const decimalsAllowed = Math.max(0, 3 - wholeLen);
+  const decimalDigits = str.slice(wholeLen, wholeLen + decimalsAllowed).replace(/0+$/, '');
+  const suffix = compactSuffixes[tier] ?? `e${pow}`;
+  const formatted = decimalDigits ? `${wholePart}.${decimalDigits}` : wholePart;
 
-    let formatted = wholePart;
-    if (decimalDigit && decimalDigit !== '0') {
-      formatted += `.${decimalDigit}`;
-    }
-
-    const result = formatted + suffix;
-    return isNegative ? `-${result}` : result;
-  };
-
-  for (const { pow, suffix } of suffixes) {
-    if (len > pow) {
-      return formatWithSuffix(pow, suffix);
-    }
-  }
-
-  return isNegative ? `-${str}` : str;
+  return isNegative ? `-${formatted}${suffix}` : `${formatted}${suffix}`;
 }

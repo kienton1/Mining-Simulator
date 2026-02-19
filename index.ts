@@ -1736,7 +1736,45 @@ function initializeWorld(world: World): void {
           
           const upgradeSystem = gameManager.getGemTraderUpgradeSystem();
           const upgradePurchaseResult = upgradeSystem.purchaseUpgrade(player, upgradeType);
-          const upgradePlayerDataAfterPurchase = gameManager.getPlayerData(player);
+          const sendGemTraderUpgradeState = () => {
+            const latestPlayerData = gameManager.getPlayerData(player);
+            const latestMoreGemsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_GEMS);
+            const latestMoreRebirthsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_REBIRTHS);
+            const latestMoreCoinsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_COINS);
+            const latestMoreDamageInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_DAMAGE);
+
+            player.ui.sendData({
+              type: 'GEM_TRADER_PROXIMITY',
+              inProximity: true,
+              gems: latestPlayerData?.gems || 0,
+              upgrades: {
+                moreGems: {
+                  level: latestMoreGemsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_GEMS),
+                  cost: latestMoreGemsInfo.nextLevelCost,
+                  canAfford: latestMoreGemsInfo.canAfford,
+                },
+                moreRebirths: {
+                  level: latestMoreRebirthsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS),
+                  cost: latestMoreRebirthsInfo.nextLevelCost,
+                  canAfford: latestMoreRebirthsInfo.canAfford,
+                },
+                moreCoins: {
+                  level: latestMoreCoinsInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_COINS),
+                  cost: latestMoreCoinsInfo.nextLevelCost,
+                  canAfford: latestMoreCoinsInfo.canAfford,
+                },
+                moreDamage: {
+                  level: latestMoreDamageInfo.currentLevel,
+                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_DAMAGE),
+                  cost: latestMoreDamageInfo.nextLevelCost,
+                  canAfford: latestMoreDamageInfo.canAfford,
+                },
+              },
+            });
+          };
           
           if (upgradePurchaseResult.success) {
             // Send success response and update UI
@@ -1750,51 +1788,19 @@ function initializeWorld(world: World): void {
             });
             // Send updated stats
             gameManager.sendPowerStatsToUI(player);
-            // Re-send proximity data to refresh UI with updated upgrade info
-            const updatedPlayerData = gameManager.getPlayerData(player);
-            const updatedMoreGemsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_GEMS);
-            const updatedMoreRebirthsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_REBIRTHS);
-            const updatedMoreCoinsInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_COINS);
-            const updatedMoreDamageInfo = upgradeSystem.getUpgradeInfo(player, UpgradeType.MORE_DAMAGE);
-            
-            player.ui.sendData({
-              type: 'GEM_TRADER_PROXIMITY',
-              inProximity: true,
-              gems: updatedPlayerData?.gems || 0,
-              upgrades: {
-                moreGems: {
-                  level: updatedMoreGemsInfo.currentLevel,
-                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_GEMS),
-                  cost: updatedMoreGemsInfo.nextLevelCost,
-                  canAfford: updatedMoreGemsInfo.canAfford,
-                },
-                moreRebirths: {
-                  level: updatedMoreRebirthsInfo.currentLevel,
-                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_REBIRTHS),
-                  cost: updatedMoreRebirthsInfo.nextLevelCost,
-                  canAfford: updatedMoreRebirthsInfo.canAfford,
-                },
-                moreCoins: {
-                  level: updatedMoreCoinsInfo.currentLevel,
-                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_COINS),
-                  cost: updatedMoreCoinsInfo.nextLevelCost,
-                  canAfford: updatedMoreCoinsInfo.canAfford,
-                },
-                moreDamage: {
-                  level: updatedMoreDamageInfo.currentLevel,
-                  maxLevel: upgradeSystem.getUpgradeMaxLevel(UpgradeType.MORE_DAMAGE),
-                  cost: updatedMoreDamageInfo.nextLevelCost,
-                  canAfford: updatedMoreDamageInfo.canAfford,
-                },
-              },
-            });
+            // Re-send proximity data to refresh UI with updated upgrade info.
+            sendGemTraderUpgradeState();
           } else {
+            const latestPlayerData = gameManager.getPlayerData(player);
             player.ui.sendData({
               type: 'UPGRADE_PURCHASED',
               success: false,
               error: upgradePurchaseResult.error,
               upgradeType: data.upgradeType,
+              remainingGems: latestPlayerData?.gems || 0,
             });
+            // Always refresh to hard-disable maxed/blocked upgrades client-side.
+            sendGemTraderUpgradeState();
           }
           break;
         case 'PURCHASE_MINE_RESET_UPGRADE':
