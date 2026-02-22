@@ -3,6 +3,7 @@ import { WorldConfig } from './types/WorldConfig';
 import { WorldContext } from './types/WorldContext';
 import { WorldRegistry } from './WorldRegistry';
 import { MiningState } from '../Mining/MiningSystem';
+import { getMineResetUpgradeCost as getSharedMineResetUpgradeCost } from './Core/MineResetUpgradeCosts';
 
 export class WorldManager {
   private static instance: WorldManager;
@@ -117,20 +118,7 @@ export class WorldManager {
    * Get mine reset upgrade cost for a world
    */
   public getMineResetUpgradeCost(worldId: string): number {
-    switch (worldId) {
-      case 'island1':
-        return 2000000; // 2M
-      case 'island2':
-        return 750000000000; // 750B
-      case 'island3':
-        return 2000000000000000; // 2Q
-      case 'island4':
-        return 100000000000000000000000; // 100Sx
-      case 'island5':
-        return 25000000000000000000000000000; // 25Oc
-      default:
-        return 2000000;
-    }
+    return getSharedMineResetUpgradeCost(worldId);
   }
 
   /**

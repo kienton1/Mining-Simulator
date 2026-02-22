@@ -262,6 +262,9 @@ export class PickaxeShop {
         availability,
         purchasable,
       };
+    }).sort((a, b) => {
+      if (a.cost === b.cost) return a.tier - b.tier;
+      return a.cost - b.cost;
     });
 
     return {

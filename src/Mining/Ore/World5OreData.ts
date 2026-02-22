@@ -219,7 +219,7 @@ export const ISLAND5_ORE_DATABASE: Record<ISLAND5_ORE_TYPE, Island5OreData> = {
     firstDepth: 100,
     firstHealth: 30_000_000_000_000_000_000, // 30Qn
     lastDepth: 1000,
-    lastHealth: 500_000_000_000_000_000_000, // 500Qn
+    lastHealth: 750_000_000_000_000_000_000, // 750Qn
     name: 'Veil Crystal',
     block: 'Veil_Crystal',
     color: '#C4A7FF',
@@ -231,7 +231,7 @@ export const ISLAND5_ORE_DATABASE: Record<ISLAND5_ORE_TYPE, Island5OreData> = {
     firstDepth: 100,
     firstHealth: 35_000_000_000_000_000_000, // 35Qn
     lastDepth: 1000,
-    lastHealth: 600_000_000_000_000_000_000, // 600Qn
+    lastHealth: 900_000_000_000_000_000_000, // 900Qn
     name: 'Wraith Ore',
     block: 'Wraith_Ore',
     color: '#4B5563',

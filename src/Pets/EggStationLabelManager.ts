@@ -120,88 +120,34 @@ export class EggStationLabelManager {
   }
 
   private formatNumber(value: number): string {
-    if (value < 0) return '-' + this.formatNumber(-value);
+    if (!Number.isFinite(value)) return '0';
     if (value === 0) return '0';
 
-    const formatWithSuffix = (num: number, suffix: string): string => {
-      const with1Dec = num.toFixed(1);
-      if (with1Dec.endsWith('.0')) return Math.round(num).toString() + suffix;
-      const with2Dec = num.toFixed(2);
-      if (with2Dec.endsWith('.00')) return Math.round(num).toString() + suffix;
-      return with2Dec.replace(/\.?0+$/, '') + suffix;
-    };
+    const suffixes = [
+      '', 'K', 'M', 'B', 'T', 'Qd', 'Qn', 'Sx', 'Sp', 'Oc', 'No',
+      'De', 'UDe', 'DDe', 'TDe', 'QaDe', 'QiDe', 'SxDe', 'SpDe', 'OcDe', 'NoDe',
+    ];
 
-    if (value >= 1e42) {
-      const num = value / 1e42;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
-      return formatWithSuffix(num, 'TDe');
+    const negative = value < 0;
+    let abs = Math.abs(value);
+    let tier = 0;
+
+    while (abs >= 1000 && tier < suffixes.length - 1) {
+      abs /= 1000;
+      tier += 1;
     }
-    if (value >= 1e39) {
-      const num = value / 1e39;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'TDe');
-      return formatWithSuffix(num, 'DDe');
+
+    const integerDigits = abs >= 100 ? 3 : abs >= 10 ? 2 : 1;
+    const decimalsAllowed = Math.max(0, 3 - integerDigits);
+    let compact = abs.toFixed(decimalsAllowed).replace(/\.?0+$/, '');
+
+    // Handle rounding edge case (e.g. 999.9 -> 1000)
+    if (Number(compact) >= 1000 && tier < suffixes.length - 1) {
+      tier += 1;
+      compact = '1';
     }
-    if (value >= 1e36) {
-      const num = value / 1e36;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'DDe');
-      return formatWithSuffix(num, 'UDe');
-    }
-    if (value >= 1e33) {
-      const num = value / 1e33;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'UDe');
-      return formatWithSuffix(num, 'De');
-    }
-    if (value >= 1e30) {
-      const num = value / 1e30;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'De');
-      return formatWithSuffix(num, 'No');
-    }
-    if (value >= 1e27) {
-      const num = value / 1e27;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'No');
-      return formatWithSuffix(num, 'Oc');
-    }
-    if (value >= 1e24) {
-      const num = value / 1e24;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Oc');
-      return formatWithSuffix(num, 'Sp');
-    }
-    if (value >= 1e21) {
-      const num = value / 1e21;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sp');
-      return formatWithSuffix(num, 'Sx');
-    }
-    if (value >= 1e18) {
-      const num = value / 1e18;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Sx');
-      return formatWithSuffix(num, 'Qn');
-    }
-    if (value >= 1e15) {
-      const num = value / 1e15;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qn');
-      return formatWithSuffix(num, 'Qd');
-    }
-    if (value >= 1e12) {
-      const num = value / 1e12;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'Qd');
-      return formatWithSuffix(num, 'T');
-    }
-    if (value >= 1e9) {
-      const num = value / 1e9;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'T');
-      return formatWithSuffix(num, 'B');
-    }
-    if (value >= 1e6) {
-      const num = value / 1e6;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'B');
-      return formatWithSuffix(num, 'M');
-    }
-    if (value >= 1e3) {
-      const num = value / 1e3;
-      if (num >= 1000) return formatWithSuffix(num / 1000, 'M');
-      return formatWithSuffix(num, 'K');
-    }
-    return Math.round(value).toString();
+
+    return `${negative ? '-' : ''}${compact}${suffixes[tier]}`;
   }
 
   private updateLabelPosition(station: EggStationDefinition): void {

@@ -33,23 +33,23 @@ export class GemTraderUpgradeSystem {
     [UpgradeType.MORE_COINS]: 160,
     [UpgradeType.MORE_DAMAGE]: 50,
   };
-  private readonly rebirthPackageUnlocks: Array<{ level: number; packages: number[] }> =
+  private readonly rebirthPackageUnlocks: Array<{ level: number; packages: bigint[] }> =
     GemTraderUpgradeSystem.buildRebirthPackageUnlocks();
 
-  private static buildRebirthPackageUnlocks(): Array<{ level: number; packages: number[] }> {
-    const unlocks: Array<{ level: number; packages: number[] }> = [
-      { level: 1, packages: [50, 100] },
-      { level: 2, packages: [250, 500] },
-      { level: 3, packages: [1000] },
-      { level: 4, packages: [2500, 5000] },
-      { level: 5, packages: [10000, 25000] },
-      { level: 6, packages: [50000, 100000] },
-      { level: 7, packages: [250000, 500000] },
-      { level: 8, packages: [1000000] },
-      { level: 9, packages: [2500000, 10000000] },
-      { level: 10, packages: [25000000, 100000000] },
-      { level: 11, packages: [1000000000] },
-      { level: 12, packages: [50000000000] },
+  private static buildRebirthPackageUnlocks(): Array<{ level: number; packages: bigint[] }> {
+    const unlocks: Array<{ level: number; packages: bigint[] }> = [
+      { level: 1, packages: [50n, 100n] },
+      { level: 2, packages: [250n, 500n] },
+      { level: 3, packages: [1000n] },
+      { level: 4, packages: [2500n, 5000n] },
+      { level: 5, packages: [10000n, 25000n] },
+      { level: 6, packages: [50000n, 100000n] },
+      { level: 7, packages: [250000n, 500000n] },
+      { level: 8, packages: [1000000n] },
+      { level: 9, packages: [2500000n, 10000000n] },
+      { level: 10, packages: [25000000n, 100000000n] },
+      { level: 11, packages: [1000000000n] },
+      { level: 12, packages: [50000000000n] },
     ];
 
     // Extend unlocks to level 48.
@@ -57,7 +57,7 @@ export class GemTraderUpgradeSystem {
     // This places level 47 at 2.5e46 (25QdDe) and level 48 at 2.5e47.
     let previousMaxPackage = unlocks[unlocks.length - 1].packages.slice(-1)[0];
     for (let level = 13; level <= 48; level++) {
-      const multiplier = level === 13 ? 50 : 10;
+      const multiplier = level === 13 ? 50n : 10n;
       const nextPackage = previousMaxPackage * multiplier;
       unlocks.push({ level, packages: [nextPackage] });
       previousMaxPackage = nextPackage;
@@ -435,21 +435,14 @@ export class GemTraderUpgradeSystem {
     };
   }
 
-  /**
-   * Gets available rebirth package sizes based on More Rebirths upgrade level
-   * Each upgrade level unlocks additional package sizes
-   * 
-   * @param player - Player to get packages for
-   * @returns Array of available rebirth package sizes
-   */
-  getAvailableRebirthPackages(player: Player): number[] {
+  private getAvailableRebirthPackagesInternal(player: Player): bigint[] {
     const moreRebirthsLevel = this.getUpgradeLevel(player, UpgradeType.MORE_REBIRTHS);
     
     // Base packages (always available): 1, 5, 20
-    const basePackages = [1, 5, 20];
+    const basePackages = [1n, 5n, 20n];
     
     // Additional packages unlocked by upgrade level
-    const additionalPackages: number[] = [];
+    const additionalPackages: bigint[] = [];
     
     // Add packages based on upgrade level
     for (const unlock of this.rebirthPackageUnlocks) {
@@ -461,7 +454,25 @@ export class GemTraderUpgradeSystem {
     }
     
     // Combine and return sorted packages
-    return [...basePackages, ...additionalPackages].sort((a, b) => a - b);
+    return [...basePackages, ...additionalPackages].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  }
+
+  /**
+   * Gets available rebirth package sizes based on More Rebirths upgrade level
+   * (legacy numeric API kept for compatibility).
+   * 
+   * @param player - Player to get packages for
+   * @returns Array of available rebirth package sizes
+   */
+  getAvailableRebirthPackages(player: Player): number[] {
+    return this.getAvailableRebirthPackagesInternal(player).map((value) => Number(value));
+  }
+
+  /**
+   * Exact BigInt rebirth package API for late-game precision.
+   */
+  getAvailableRebirthPackagesBigInt(player: Player): bigint[] {
+    return this.getAvailableRebirthPackagesInternal(player);
   }
 }
 

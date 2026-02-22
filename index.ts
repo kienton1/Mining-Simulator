@@ -70,6 +70,7 @@ import { MINING_AREA_BOUNDS, ISLAND2_MINING_AREA_BOUNDS, ISLAND3_MINING_AREA_BOU
 import { DailyChestEntity } from './src/DailyReward/DailyChestEntity';
 import { DailyChestLabelManager } from './src/DailyReward/DailyChestLabelManager';
 import { DailyChestController } from './src/DailyReward/DailyChestController';
+import { getMineResetUpgradeCost } from './src/Core/MineResetUpgradeCosts';
 
 /**
  * startServer is always the entry point for our game.
@@ -516,21 +517,13 @@ function initializeWorld(world: World): void {
    * Handle mine reset upgrade NPC proximity events
    * When player enters/leaves NPC proximity, show/hide upgrade UI
    */
-  const getMineResetUpgradeCost = (worldId: string): number => {
-    if (worldId === 'island2') return 750_000_000_000;
-    if (worldId === 'island3') return 2_000_000_000_000_000;
-    if (worldId === 'island4') return 100_000_000_000_000_000_000_000;
-    if (worldId === 'island5') return 25_000_000_000_000_000_000_000_000_000;
-    return 2_000_000;
-  };
-
   const handleMineResetUpgradeProximity = (player: any, inProximity: boolean) => {
     if (inProximity) {
       // Player entered proximity - send upgrade data to show UI
       const playerData = gameManager.getPlayerData(player);
       const currentWorld = playerData?.currentWorld || 'island1';
       const hasUpgrade = playerData?.mineResetUpgradePurchased?.[currentWorld] ?? false;
-      // Cost varies by world: island1 = 2M, island2 = 750B, island3 = 2Q, island4 = 100Sx, island5 = 25Oc
+      // Cost varies by world via shared economy table.
       const cost = getMineResetUpgradeCost(currentWorld);
       const gold = playerData?.gold || 0;
       

@@ -267,7 +267,7 @@ export const ISLAND4_ORE_DATABASE: Record<ISLAND4_ORE_TYPE, Island4OreData> = {
     rarity: 250, // 1 in 250
     value: 25_000_000_000_000_000, // 25Qd
     firstDepth: 250,
-    firstHealth: 250_000_000_000_000_000, // 250Qd
+    firstHealth: 25_000_000_000_000_000, // 25Qd
     lastDepth: 1000,
     lastHealth: 400_000_000_000_000_000, // 400Qd
     name: 'Jinglevolt Ore',

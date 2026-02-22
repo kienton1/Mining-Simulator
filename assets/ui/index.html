@@ -5400,12 +5400,33 @@
       showModal(minerModal);
     };
 
+    const toBigIntSafe = (value) => {
+      if (typeof value === 'bigint') return value >= 0n ? value : 0n;
+      const raw = String(value ?? '').trim();
+      if (/^\d+$/.test(raw)) return BigInt(raw);
+      const asNum = Number(value);
+      if (!Number.isFinite(asNum) || asNum <= 0) return 0n;
+      return BigInt(Math.floor(asNum));
+    };
+
+    const compareBigIntLike = (left, right) => {
+      const a = toBigIntSafe(left);
+      const b = toBigIntSafe(right);
+      if (a < b) return -1;
+      if (a > b) return 1;
+      return 0;
+    };
+
+    const canAffordRebirthOption = (powerValue, costValue) => {
+      return toBigIntSafe(powerValue) >= toBigIntSafe(costValue);
+    };
+
     const renderRebirthOptions = () => {
       if (!rebirthOptionsEl) return;
       rebirthOptionsEl.innerHTML = '';
       
       // Sort options by count (1, 5, 20)
-      const sortedOptions = [...state.rebirth.options].sort((a, b) => a.count - b.count);
+      const sortedOptions = [...state.rebirth.options].sort((a, b) => compareBigIntLike(a.count, b.count));
 
       sortedOptions.forEach(opt => {
         const card = document.createElement('div');
@@ -5419,7 +5440,8 @@
         title.className = 'rebirth-option__title';
         // Format the count using formatNumber for readability (e.g., "1K Rebirths" instead of "1000 Rebirths")
         const formattedCount = formatNumber(opt.count);
-        title.textContent = `${formattedCount} Rebirth${opt.count > 1 ? 's' : ''}`;
+        const plural = toBigIntSafe(opt.count) > 1n;
+        title.textContent = `${formattedCount} Rebirth${plural ? 's' : ''}`;
         info.appendChild(title);
         
         const cost = document.createElement('div');
@@ -5435,7 +5457,7 @@
         const btn = document.createElement('button');
         btn.className = 'rebirth-button';
         btn.textContent = 'Rebirth';
-        const affordable = state.power >= opt.cost;
+        const affordable = canAffordRebirthOption(state.power, opt.cost);
         if (!affordable) {
           btn.classList.add('disabled');
           card.classList.add('unavailable');
@@ -5454,7 +5476,7 @@
 
     // Update rebirth badge visibility based on stored options and current power
     const updateRebirthBadge = () => {
-      const canRebirth = state.rebirth.options.some(opt => state.power >= opt.cost);
+      const canRebirth = state.rebirth.options.some(opt => canAffordRebirthOption(state.power, opt.cost));
       state.rebirth.canRebirth = canRebirth;
       const rebirthBadge = document.querySelector('.action-card__badge--rebirth');
       if (rebirthBadge) {

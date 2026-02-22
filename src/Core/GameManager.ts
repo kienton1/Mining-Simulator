@@ -33,6 +33,7 @@ import { WorldRegistry } from '../WorldRegistry';
 import { TutorialManager } from '../Tutorial/TutorialManager';
 import { DailyRewardSystem } from '../DailyReward/DailyRewardSystem';
 import { LeaderboardManager } from './LeaderboardManager';
+import { getMineResetUpgradeCost } from './MineResetUpgradeCosts';
 
 /**
  * Game Manager class
@@ -729,13 +730,98 @@ export class GameManager {
     await this.leaderboardManager.initialize();
   }
 
-  /**
-   * Calculates the cost for a single rebirth
-   * Formula: BASE_COST × (1.1 ^ currentRebirths)
-   * 
-   * @param currentRebirths - Current number of rebirths
-   * @returns Cost in power
-   */
+  private readonly REBIRTH_COST_STEP = 500n;
+  private readonly REBIRTH_COST_SEGMENTS: Array<{
+    start: bigint;
+    endExclusive: bigint | null;
+    base: bigint;
+  }> = [
+    { start: 1n, endExclusive: 6n, base: 1000n },
+    { start: 6n, endExclusive: 11n, base: 3500n },
+    { start: 11n, endExclusive: 16n, base: 6000n },
+    { start: 16n, endExclusive: 21n, base: 8500n },
+    { start: 21n, endExclusive: 26n, base: 11000n },
+    { start: 26n, endExclusive: 31n, base: 13500n },
+    { start: 31n, endExclusive: 36n, base: 16000n },
+    { start: 36n, endExclusive: 41n, base: 18500n },
+    { start: 41n, endExclusive: 47n, base: 21000n },
+    { start: 47n, endExclusive: 57n, base: 24000n },
+    { start: 57n, endExclusive: 77n, base: 29000n },
+    { start: 77n, endExclusive: 97n, base: 39000n },
+    { start: 97n, endExclusive: 117n, base: 49000n },
+    { start: 117n, endExclusive: 137n, base: 59000n },
+    { start: 137n, endExclusive: 157n, base: 69000n },
+    { start: 157n, endExclusive: 207n, base: 79000n },
+    { start: 207n, endExclusive: 257n, base: 104000n },
+    { start: 257n, endExclusive: 307n, base: 129000n },
+    { start: 307n, endExclusive: 357n, base: 154000n },
+    { start: 357n, endExclusive: 457n, base: 179000n },
+    { start: 457n, endExclusive: 2510n, base: 229000n },
+    { start: 2510n, endExclusive: 3760n, base: 1250000n },
+    { start: 3760n, endExclusive: null, base: 1880000n },
+  ];
+
+  private toNonNegativeBigInt(value: number | string | bigint): bigint {
+    if (typeof value === 'bigint') return value < 0n ? 0n : value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!/^\d+$/.test(trimmed)) return 0n;
+      return BigInt(trimmed);
+    }
+    if (!Number.isFinite(value)) return 0n;
+    const floored = Math.floor(Math.max(0, value));
+    return BigInt(floored);
+  }
+
+  private calculateRebirthCostBigInt(currentRebirths: bigint): bigint {
+    const x = currentRebirths < 0n ? 0n : currentRebirths;
+    if (x < 1n) return 1000n;
+
+    for (const segment of this.REBIRTH_COST_SEGMENTS) {
+      const inSegment = x >= segment.start && (segment.endExclusive === null || x < segment.endExclusive);
+      if (!inSegment) continue;
+      return segment.base + (x - segment.start) * this.REBIRTH_COST_STEP;
+    }
+
+    return 1000n;
+  }
+
+  private calculateRebirthCostMultipleBigInt(currentRebirths: bigint, count: bigint): bigint {
+    const safeCurrent = currentRebirths < 0n ? 0n : currentRebirths;
+    const safeCount = count < 0n ? 0n : count;
+    if (safeCount === 0n) return 0n;
+
+    const target = safeCurrent + safeCount;
+    let cursor = safeCurrent;
+    let total = 0n;
+
+    // x < 1 always costs 1000 (currently only x=0 is reachable).
+    if (cursor < 1n) {
+      const to = target < 1n ? target : 1n;
+      const n = to - cursor;
+      total += n * 1000n;
+      cursor = to;
+    }
+
+    for (const segment of this.REBIRTH_COST_SEGMENTS) {
+      if (cursor >= target) break;
+
+      const segStart = segment.start;
+      const segEnd = segment.endExclusive ?? target;
+      const from = cursor > segStart ? cursor : segStart;
+      const to = target < segEnd ? target : segEnd;
+      if (to <= from) continue;
+
+      const n = to - from;
+      const first = segment.base + (from - segStart) * this.REBIRTH_COST_STEP;
+      const last = segment.base + (to - 1n - segStart) * this.REBIRTH_COST_STEP;
+      total += (n * (first + last)) / 2n;
+      cursor = to;
+    }
+
+    return total;
+  }
+
   /**
    * Calculates rebirth cost using piecewise linear function
    * Reference: Planning/PowerSystemPlan.md section 6 - Rebirth Cost Formula
@@ -744,76 +830,27 @@ export class GameManager {
    * @returns Cost in power for next rebirth (y)
    */
   calculateRebirthCost(currentRebirths: number): number {
-    const x = currentRebirths;
-    
-    // Piecewise linear function with multiple segments
-    // Each segment increases cost by 500 power per rebirth, with different base costs
-    if (x >= 1 && x < 6) {
-      return 500 * (x - 1) + 1000; // Ensures continuity at x=6 (cost = 3500)
-    } else if (x >= 6 && x < 11) {
-      return 500 * (x - 6) + 3500;
-    } else if (x >= 11 && x < 16) {
-      return 500 * (x - 11) + 6000;
-    } else if (x >= 16 && x < 21) {
-      return 500 * (x - 16) + 8500;
-    } else if (x >= 21 && x < 26) {
-      return 500 * (x - 21) + 11000;
-    } else if (x >= 26 && x < 31) {
-      return 500 * (x - 26) + 13500;
-    } else if (x >= 31 && x < 36) {
-      return 500 * (x - 31) + 16000;
-    } else if (x >= 36 && x < 41) {
-      return 500 * (x - 36) + 18500;
-    } else if (x >= 41 && x < 47) {
-      return 500 * (x - 41) + 21000;
-    } else if (x >= 47 && x < 57) {
-      return 500 * (x - 47) + 24000;
-    } else if (x >= 57 && x < 77) {
-      return 500 * (x - 57) + 29000;
-    } else if (x >= 77 && x < 97) {
-      return 500 * (x - 77) + 39000;
-    } else if (x >= 97 && x < 117) {
-      return 500 * (x - 97) + 49000;
-    } else if (x >= 117 && x < 137) {
-      return 500 * (x - 117) + 59000;
-    } else if (x >= 137 && x < 157) {
-      return 500 * (x - 137) + 69000;
-    } else if (x >= 157 && x < 207) {
-      return 500 * (x - 157) + 79000;
-    } else if (x >= 207 && x < 257) {
-      return 500 * (x - 207) + 104000;
-    } else if (x >= 257 && x < 307) {
-      return 500 * (x - 257) + 129000;
-    } else if (x >= 307 && x < 357) {
-      return 500 * (x - 307) + 154000;
-    } else if (x >= 357 && x < 457) {
-      return 500 * (x - 357) + 179000;
-    } else if (x >= 457 && x < 2510) {
-      return 500 * (x - 457) + 229000;
-    } else if (x >= 2510 && x < 3760) {
-      return 500 * (x - 2510) + 1250000;
-    } else if (x >= 3760) {
-      return 500 * (x - 3760) + 1880000;
-    } else {
-      // x < 1 (first rebirth)
-      return 1000;
-    }
+    const cost = this.calculateRebirthCostBigInt(this.toNonNegativeBigInt(currentRebirths));
+    if (cost > BigInt(Number.MAX_SAFE_INTEGER)) return Number.MAX_SAFE_INTEGER;
+    return Number(cost);
   }
 
   /**
    * Calculates the total cost for multiple rebirths
-   * When buying multiple rebirths at once, the cost is the NEXT rebirth cost × quantity
-   * This keeps the bundle price constant even though individual rebirth costs increase
+   * Sum of each rebirth cost from currentRebirths to currentRebirths + count - 1
+   * (matches Planning/PowerSystemPlan.md).
    * 
    * @param currentRebirths - Current number of rebirths
    * @param count - Number of rebirths to perform
-   * @returns Total cost in power (NEXT rebirth cost × count)
+   * @returns Total cost in power
    */
   calculateRebirthCostMultiple(currentRebirths: number, count: number): number {
-    // Get the cost of the NEXT rebirth (currentRebirths + 0)
-    const nextRebirthCost = this.calculateRebirthCost(currentRebirths);
-    // Multiply by the quantity to get the total bundle cost
-    return nextRebirthCost * count;
+    const total = this.calculateRebirthCostMultipleBigInt(
+      this.toNonNegativeBigInt(currentRebirths),
+      this.toNonNegativeBigInt(count),
+    );
+    if (total > BigInt(Number.MAX_SAFE_INTEGER)) return Number.MAX_SAFE_INTEGER;
+    return Number(total);
   }
 
   /**
@@ -826,14 +863,13 @@ export class GameManager {
     const playerData = this.getPlayerData(player);
     if (!playerData) return 0;
 
-    let maxRebirths = 0;
-    let totalCost = 0;
-    const currentRebirths = playerData.rebirths;
-    // Convert power string (BigInt) to number for comparison
-    const currentPower = Number(playerData.power);
+    let maxRebirths = 0n;
+    let totalCost = 0n;
+    const currentRebirths = this.toNonNegativeBigInt(playerData.rebirths);
+    const currentPower = toBigInt(playerData.power);
 
     while (true) {
-      const nextCost = this.calculateRebirthCost(currentRebirths + maxRebirths);
+      const nextCost = this.calculateRebirthCostBigInt(currentRebirths + maxRebirths);
       if (totalCost + nextCost > currentPower) {
         break; // Can't afford more
       }
@@ -841,10 +877,10 @@ export class GameManager {
       maxRebirths++;
       
       // Safety limit
-      if (maxRebirths > 1000) break;
+      if (maxRebirths > 1000n) break;
     }
 
-    return maxRebirths;
+    return Number(maxRebirths);
   }
 
   /**
@@ -854,49 +890,48 @@ export class GameManager {
    * @returns Rebirth UI data
    */
   getRebirthUIData(player: Player): {
-    currentPower: number;
-    currentRebirths: number;
+    currentPower: string;
+    currentRebirths: string;
     options: Array<{
-      count: number;
-      cost: number;
+      count: string;
+      cost: string;
       available: boolean;
     }>;
     maxRebirths: number;
-    maxCost: number;
+    maxCost: string;
   } {
     const playerData = this.getPlayerData(player);
     if (!playerData) {
       return {
-        currentPower: 0,
-        currentRebirths: 0,
+        currentPower: '0',
+        currentRebirths: '0',
         options: [],
         maxRebirths: 0,
-        maxCost: 0,
+        maxCost: '0',
       };
     }
 
-    // Convert power string (BigInt) to number for comparison and UI display
-    const currentPower = Number(playerData.power);
-    const currentRebirths = playerData.rebirths;
+    const currentPower = toBigInt(playerData.power);
+    const currentRebirths = this.toNonNegativeBigInt(playerData.rebirths);
 
     // Get available rebirth packages based on More Rebirths upgrade level
-    const availablePackages = this.gemTraderUpgradeSystem.getAvailableRebirthPackages(player);
+    const availablePackages = this.gemTraderUpgradeSystem.getAvailableRebirthPackagesBigInt(player);
     
     const options = availablePackages.map(count => {
-      const cost = this.calculateRebirthCostMultiple(currentRebirths, count);
+      const cost = this.calculateRebirthCostMultipleBigInt(currentRebirths, count);
       return {
-        count,
-        cost,
+        count: count.toString(),
+        cost: cost.toString(),
         available: currentPower >= cost,
       };
     });
 
     return {
-      currentPower,
-      currentRebirths,
+      currentPower: currentPower.toString(),
+      currentRebirths: currentRebirths.toString(),
       options,
       maxRebirths: 0, // No longer used, kept for backwards compatibility
-      maxCost: 0, // No longer used, kept for backwards compatibility
+      maxCost: '0', // No longer used, kept for backwards compatibility
     };
   }
 
@@ -907,13 +942,13 @@ export class GameManager {
    * @param count - Number of rebirths to perform
    * @returns Result of rebirth attempt
    */
-  performRebirth(player: Player, count: number): {
+  performRebirth(player: Player, count: number | string): {
     success: boolean;
     message?: string;
-    rebirthsPerformed?: number;
-    newRebirths?: number;
-    powerSpent?: number;
-    newPower?: number;
+    rebirthsPerformed?: string;
+    newRebirths?: string;
+    powerSpent?: string;
+    newPower?: string;
   } {
     const playerData = this.getPlayerData(player);
     if (!playerData) {
@@ -923,38 +958,41 @@ export class GameManager {
       };
     }
 
-    const currentRebirths = playerData.rebirths;
-    const totalCost = this.calculateRebirthCostMultiple(currentRebirths, count);
-
-    // Convert power string (BigInt) to number for comparison
-    const playerPower = Number(playerData.power);
-    if (playerPower < totalCost) {
+    const requestedCount = this.toNonNegativeBigInt(count);
+    if (requestedCount <= 0n) {
       return {
         success: false,
-        message: `Insufficient power. Need ${totalCost.toLocaleString()}, have ${playerPower.toLocaleString()}`,
+        message: 'Invalid rebirth count.',
       };
     }
 
-    // Deduct cost using BigInt arithmetic
+    const currentRebirths = this.toNonNegativeBigInt(playerData.rebirths);
+    const totalCost = this.calculateRebirthCostMultipleBigInt(currentRebirths, requestedCount);
+
     const currentPowerBigInt = toBigInt(playerData.power);
-    const costBigInt = BigInt(totalCost);
-    const newPowerBigInt = currentPowerBigInt - costBigInt;
+    if (currentPowerBigInt < totalCost) {
+      return {
+        success: false,
+        message: `Insufficient power. Need ${totalCost.toString()}, have ${currentPowerBigInt.toString()}`,
+      };
+    }
     
     // Reset power to base (1) after rebirth (as string for BigInt)
     playerData.power = '1';
 
-    // Increase rebirths
-    playerData.rebirths += count;
+    // Keep legacy numeric field for compatibility with systems that still read number rebirths.
+    const newRebirthsBigInt = currentRebirths + requestedCount;
+    playerData.rebirths = Number(newRebirthsBigInt);
 
     // Update player data
     this.updatePlayerData(player, playerData);
 
     return {
       success: true,
-      rebirthsPerformed: count,
-      newRebirths: playerData.rebirths,
-      powerSpent: totalCost,
-      newPower: 1, // Return as number for UI compatibility
+      rebirthsPerformed: requestedCount.toString(),
+      newRebirths: newRebirthsBigInt.toString(),
+      powerSpent: totalCost.toString(),
+      newPower: '1',
     };
   }
 
@@ -2094,14 +2132,8 @@ export class GameManager {
       };
     }
 
-    // Get upgrade cost based on world (use WorldManager if available, otherwise default)
-    // Hardcoded values: island1: 2M, island2: 750B, island3: 2Q, island4: 100Sx, island5: 25Oc
-    const UPGRADE_COST =
-      currentWorld === 'island2' ? 750_000_000_000 :
-      currentWorld === 'island3' ? 2_000_000_000_000_000 :
-      currentWorld === 'island4' ? 100_000_000_000_000_000_000_000 :
-      currentWorld === 'island5' ? 25_000_000_000_000_000_000_000_000_000 :
-      2_000_000;
+    // World-specific pricing from shared economy table.
+    const UPGRADE_COST = getMineResetUpgradeCost(currentWorld);
     
     if (playerData.gold < UPGRADE_COST) {
       return {
@@ -2977,3 +3009,4 @@ export class GameManager {
     return { worlds };
   }
 }
+
